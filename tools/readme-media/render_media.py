@@ -15,7 +15,8 @@ Usage:
                          --out <docs/media dir> [scene ...]
 
 Scenes: hero, volume, browse, wake (the knob, knob_scenes.py), explorer, floating (the desktop,
-desktop_scene.py), stills (stills.py).
+desktop_scene.py), stills (stills.py), and the full-screen desktop clips explorer-16x9,
+explorer-32x9, upnext-16x9, picker-16x9, picker-32x9 (desktop_fullscreen.py).
 Build knob-anim first with build_lcd.py. Everything is headless and uses fictional data only
 (fixtures.py): no knob, no speakers, no Apple Music account, no screen capture.
 """
@@ -29,6 +30,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
+FULLSCREEN = ["explorer-16x9", "explorer-32x9", "upnext-16x9", "picker-16x9", "picker-32x9"]
 sys.path.insert(0, str(HERE))
 
 
@@ -45,7 +47,7 @@ def main():
     a.out.mkdir(parents=True, exist_ok=True)
     import knob_scenes as K
 
-    wanted = a.scenes or ["hero", "volume", "browse", "wake", "explorer", "floating", "stills"]
+    wanted = a.scenes or ["hero", "volume", "browse", "wake", "floating", "stills", *FULLSCREEN]
     for name in wanted:
         started = time.time()
         if name in K.SCENES:
@@ -64,6 +66,12 @@ def main():
         elif name in ("explorer", "floating"):
             import desktop_scene as D
             gif, webp = D.render(a.knob_anim, a.work, a.out, name)
+        elif name in FULLSCREEN:
+            import desktop_fullscreen as FS
+            for stem, n, webp, gif in FS.render(a.out, a.work, [name]):
+                print(f"{stem}: {n} frames, {webp.name} {webp.stat().st_size / 1e6:.2f} MB, {gif.name} "
+                      f"{gif.stat().st_size / 1e6:.2f} MB, {time.time() - started:.0f}s", flush=True)
+            continue
         elif name == "stills":
             import stills as S
             S.render(a.knob_anim, a.work, a.out)

@@ -41,15 +41,6 @@ between windows. Desk Dial is the Windows companion app and firmware that turn t
   <tr>
     <td width="50%" valign="top">
       <picture>
-        <source srcset="docs/media/desktop-explorer.webp" type="image/webp">
-        <img src="docs/media/desktop-explorer.gif" alt="The Music explorer overlay opening over a frosted desktop, the cover carousel moving with the knob, then closing" width="100%">
-      </picture>
-      <h3>Music explorer on your monitor</h3>
-      <b>Open</b> expands the list into a full-screen cover carousel with two tabs: <i>Recently added</i>
-      and <i>Favourite playlists</i>. It moves with the knob and closes on <b>Back</b>.
-    </td>
-    <td width="50%" valign="top">
-      <picture>
         <source srcset="docs/media/desktop-floating-knob.webp" type="image/webp">
         <img src="docs/media/desktop-floating-knob.gif" alt="A floating copy of the knob slides in at the left edge of the desktop when the knob is turned, and slides out a moment later" width="100%">
       </picture>
@@ -58,8 +49,6 @@ between windows. Desk Dial is the Windows companion app and firmware that turn t
       It is drawn at your display's refresh rate (240 Hz capable), never takes focus, and slides
       away 2.5 s after you stop.
     </td>
-  </tr>
-  <tr>
     <td width="50%" valign="top">
       <picture>
         <source srcset="docs/media/knob-wake.webp" type="image/webp">
@@ -69,20 +58,63 @@ between windows. Desk Dial is the Windows companion app and firmware that turn t
       At rest the ring glows a steady, dim warm white (#FF8424). Touch it and it brightens, draws what
       you are doing, and flashes an accent when something happens. Five seconds later it settles again.
     </td>
-    <td width="50%" valign="top">
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
       <h3>And the rest of the desk</h3>
       <ul>
         <li><b>Tracks and Seek</b>: skip, or scrub through the song in 5-second steps while the ring
             draws a lap of it.</li>
-        <li><b>Up next</b>: the Sonos queue on screen, with <b>Shuffle</b> and <b>Like</b>.</li>
-        <li><b>Windows picker</b>: a carousel of live window previews. Turn, then <b>Switch</b>,
-            or <b>Snap left</b> / <b>Snap right</b>.</li>
         <li><b>Haptics</b>: every mode has its own detents and end stops.</li>
         <li>Hold the first button for 600 ms to go home from anywhere.</li>
       </ul>
     </td>
   </tr>
 </table>
+
+## On your desktop
+
+The knob drives full-screen overlays on your monitor. They never take focus, keep pace with
+high-refresh displays, and lay out for 16:9 screens and 32:9 super-ultrawides.
+
+### Music explorer
+
+<picture>
+  <source srcset="docs/media/desktop-explorer-16x9.webp" type="image/webp">
+  <img src="docs/media/desktop-explorer-16x9.gif" alt="The Music explorer opens over a frosted desktop, the knob browses Recently Added covers, switches to the Favourite playlists tab, browses playlist mosaics, and Play grows the chosen card and closes the overlay" width="100%">
+</picture>
+
+Browse <i>Recently added</i> with the knob, switch to <i>Favourite playlists</i>, and press
+<b>Play</b>: the card grows, Sonos starts it, and the overlay steps aside.
+
+### Up next
+
+<picture>
+  <source srcset="docs/media/desktop-upnext-16x9.webp" type="image/webp">
+  <img src="docs/media/desktop-upnext-16x9.gif" alt="Up next opens on a playlist queue, the knob spins through the songs, Like fills a heart, Shuffle reorders what is left, and Play starts a song and closes the overlay" width="100%">
+</picture>
+
+The Sonos queue with covers: spin through it, <b>Like</b> a song, <b>Shuffle</b> what is left
+(songs you added with <i>Play next</i> stay right after the current one), and <b>Play</b> any row.
+
+### Windows picker
+
+<p>
+  <img src="docs/media/window-picker-16x9.png" alt="Windows picker: a carousel of live window previews over a frosted desktop" width="49%">
+  <img src="docs/media/window-picker-snap-16x9.png" alt="Windows picker after Snap left, with the tray showing the left half filled" width="49%">
+</p>
+
+Turn through live previews of your open windows, then <b>Switch</b>, or <b>Snap left</b> one window
+and <b>Snap right</b> another to put them side by side.
+
+### On a 32:9 ultrawide
+
+<picture>
+  <source srcset="docs/media/desktop-explorer-32x9.webp" type="image/webp">
+  <img src="docs/media/desktop-explorer-32x9.gif" alt="The Music explorer on a 32:9 super-ultrawide monitor, with more covers on each side" width="100%">
+</picture>
+
+The same explorer on a 32:9 super-ultrawide, with more of the carousel in view.
 
 The four buttons change meaning with the mode, and the screen always shows what they do:
 
@@ -91,14 +123,12 @@ The four buttons change meaning with the mode, and the screen always shows what 
 </p>
 
 <details>
-<summary><b>More screenshots</b>: Music explorer, Up next, Windows picker, LED states, app icons</summary>
+<summary><b>More screenshots</b>: Music explorer, Up next, LED states, app icons</summary>
 
 <p align="center">
   <img src="docs/media/music-explorer-16x9.png" alt="Music explorer, Recently added tab" width="49%">
   <img src="docs/media/music-explorer-playlists-16x9.png" alt="Music explorer, Favourite playlists tab" width="49%">
   <img src="docs/media/up-next-16x9.png" alt="Up next with a playlist queue, Shuffle and Like" width="49%">
-  <img src="docs/media/window-picker-16x9.png" alt="Windows picker carousel" width="49%">
-  <img src="docs/media/window-picker-snap-16x9.png" alt="Windows picker after Snap left, choosing the right half" width="49%">
 </p>
 <p align="center">
   <img src="docs/media/led-ring.png" alt="LED ring states: volume at 54, 86 and 95 percent, Browse in album colours, Seek lap, resting" width="820">
