@@ -145,6 +145,7 @@ typedef struct {
     uint8_t type;
     uint8_t keyNum;
     uint8_t keyState;
+    uint32_t control_id;
 } KeyEvt;
 
 

@@ -13,7 +13,7 @@ ui_bootMsg = lv_label_create(ui_bootimg);
 lv_obj_set_width( ui_bootMsg, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_bootMsg, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_bootMsg, LV_ALIGN_CENTER );
-lv_label_set_text(ui_bootMsg,"NANO_D++\nIS BOOTING...");
+lv_label_set_text(ui_bootMsg,"DESK DIAL\nIS BOOTING...");   /// Desk Dial (rename-desk-dial.md C2)
 lv_obj_set_style_text_color(ui_bootMsg, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_bootMsg, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_letter_space(ui_bootMsg, 2, LV_PART_MAIN| LV_STATE_DEFAULT);

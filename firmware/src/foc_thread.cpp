@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "HapticCommander.h"
 #include "./com_thread.h"
+#include "control_center.h"
 
 
 /*
@@ -70,14 +71,52 @@ void FocThread::run() {
     // float lastang = encoder.getAngle();
     // unsigned long ts = micros();
     uint16_t serial_last_pos = 0;
+    bool runtime_active = false;
+    HapticState previous;
+    uint32_t runtime_id = 0;
     while (true) {
-        haptic.haptic_loop();
+        CCControl control;
+        if (cc_take_request(control)) {
+            if (control.release) {
+                if (runtime_active) {
+                    haptic.rebase_runtime(previous.detent_profile, previous.current_pos);
+                    // Retain any runtime gains that existed before host ownership.
+                    haptic.haptic_state.detent_strength_unit = previous.detent_strength_unit;
+                    haptic.haptic_state.endstop_strength_unit = previous.endstop_strength_unit;
+                    haptic.haptic_state.attract_hysteresis = previous.attract_hysteresis;
+                }
+                runtime_active = false; runtime_id = 0;
+            } else {
+                if (!runtime_active) { previous = haptic.haptic_state; xQueueReset(_q_haptic_in); }
+                runtime_active = true; runtime_id = control.id;
+                haptic.rebase_runtime(control.profile, control.position);
+            }
+            serial_last_pos = haptic.haptic_state.current_pos;
+            xQueueReset(_q_angleevt_out);
+            cc_motor_applied(runtime_id, serial_last_pos);
+        }
+        if (runtime_active && cc_can_arm(runtime_id)) {
+            // Motion while labels/LEDs were being installed is not a new control gesture.
+            haptic.rebase_runtime(haptic.haptic_state.detent_profile,haptic.haptic_state.current_pos);
+            serial_last_pos = haptic.haptic_state.current_pos;
+            xQueueReset(_q_angleevt_out);
+            cc_motor_ready(runtime_id,serial_last_pos);
+        }
+        if (cc_claimed() && cc_input_id() != runtime_id) { motor.loopFOC(); motor.move(0); }
+        else haptic.haptic_loop();
         float ang = encoder.getAngle();
         unsigned long now = micros();
         // if (fabs(ang - lastang) >= angleEventMinAngle && now - ts >= angleEventMinMicroseconds) {
         if (haptic.haptic_state.current_pos != serial_last_pos){
-            AngleEvt ae = { haptic.haptic_state.current_pos };
-            xQueueSend(_q_angleevt_out, &ae, (TickType_t)0);
+            AngleEvt ae = { haptic.haptic_state.current_pos, runtime_id };
+            if (!cc_claimed() || cc_input_id() == runtime_id) {
+                if (xQueueSend(_q_angleevt_out, &ae, (TickType_t)0) != pdTRUE) {
+                    // Positions are absolute: retain newest state rather than lose it.
+                    AngleEvt discarded;
+                    xQueueReceive(_q_angleevt_out, &discarded, (TickType_t)0);
+                    xQueueSend(_q_angleevt_out, &ae, (TickType_t)0);
+                }
+            }
             serial_last_pos = haptic.haptic_state.current_pos;
         }
         
@@ -134,6 +173,12 @@ bool FocThread::pass_at_limit(){
     return haptic.haptic_state.atLimit;
 }
 
+// ALIVE.md 12.5 [Q1]: read-only (foc_thread.h).
+bool FocThread::pass_limit_push(){
+    const HapticState& state = haptic.haptic_state;
+    return state.atLimit && state.attract_angle != state.last_attract_angle;
+}
+
 
 
 
@@ -156,6 +201,7 @@ void FocThread::handleMessage() {
 
 
 void FocThread::handleHapticConfig() {
+    if (cc_claimed()) return;
     DetentProfile profile;
     if (xQueueReceive(_q_haptic_in, &profile, (TickType_t)0)) {
         // apply haptic config to motor

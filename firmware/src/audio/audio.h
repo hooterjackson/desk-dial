@@ -18,7 +18,7 @@ struct AudioCommand {
     AudioCommandType type;
     union {
         audioConfig config;
-        uint8_t* audio_file;
+        const uint8_t* audio_file;
     };
 };
 
@@ -29,14 +29,14 @@ public:
     BinarisAudioPlayer();
     ~BinarisAudioPlayer();
     void audio_init();
-    void play_audio(uint8_t* audio_file, uint16_t volume);
+    void play_audio(const uint8_t* audio_file, uint16_t volume);
     void put_audio_config(audioConfig& config);
     void play_haptic_audio();
     void audio_loop();
-    bool check_file(String fName, uint8_t* audio_file);
+    bool check_file(String fName, const uint8_t* audio_file);
 protected:
     void handle_audio_commands();
-    void start_play(uint8_t* audio_file);
+    void start_play(const uint8_t* audio_file);
 
     i2s_driver_config_t i2s_config;
     i2s_pin_config_t pin_config;
@@ -45,7 +45,7 @@ protected:
     audioConfig audio_config; // haptic audio config
 
     size_t num_bytes_remaining = 0;
-    uint8_t* data_ptr = nullptr;
+    const uint8_t* data_ptr = nullptr;
 };
 
 

@@ -18,6 +18,15 @@ typedef enum {
     POWER_9V_PD = 2
 } PowerType;
 
+// KeyEvt.type values the HMI queues for the COM task (1.0.0-cc5.4, PRESENTATION_V5 section 11;
+// hmi_api.h's KeyEvt layout is unchanged): AceButton's kEventPressed (0) and kEventReleased (1)
+// as before, and kKeyEvtHold (AceButton's kEventLongPressed, 4) for a hold (kh), queued only on the
+// claimed path for the raw at physical slot 0. A claimed key down that also sent F24 carries
+// kKeyEvtHid in bit 7 ("hid":1 on its kd, 11.4); the COM task masks the type with kKeyEvtTypeMask.
+constexpr uint8_t kKeyEvtHold = AceButton::kEventLongPressed;
+constexpr uint8_t kKeyEvtHid = 0x80;
+constexpr uint8_t kKeyEvtTypeMask = 0x7F;
+
 
 class HmiThreadButtonHandler : public IEventHandler  {
 public:
@@ -58,13 +67,25 @@ class HmiThread : public Thread<HmiThread> {
         void run();
         
         QueueHandle_t _q_config_in;
-        QueueHandle_t _q_hmi_config_in;
         QueueHandle_t _q_settings_in;
         QueueHandle_t _q_keyevt_out;
+
+        // hmiConfig handoff from COM. hmiConfig holds Strings (keyAction::profile), so
+        // it never goes through a queue: the queue's bitwise copy let the receiving
+        // local's destructor free the profile's heap buffers (names of 11+ chars).
+        // put_hmi_config() deep-copies into this slot and receiveHmiConfig() copies
+        // it out, both under _hmi_config_mutex. One slot: the newest config wins.
+        SemaphoreHandle_t _hmi_config_mutex;
+        hmiConfig _pending_hmi_config;
+        volatile bool _hmi_config_pending = false;
 
         // internal queue handler
         void handleConfig();
         void handleSettings();
+        // handleConfig()'s receivers, kept out of line so their locals and copy
+        // call chains exist only while a config is actually waiting.
+        __attribute__((noinline)) void receiveLedConfig();
+        __attribute__((noinline)) void receiveHmiConfig();
 
 
         // LEDs
@@ -75,8 +96,22 @@ class HmiThread : public Thread<HmiThread> {
         unsigned long lastCheck = 0;
         uint16_t last_pos = -1;
         bool isIdle = false;
-        void updateKeyLeds();
+        void updateKeyLeds();   // returns early while host-claimed (the alive engine renders)
+        void nativeKeyLeds();
+        // Every pass (ALIVE.md 8.1, 10.1): claim/release of the alive engine, the local input of
+        // the ready control ([Q1] push detector), and the native handover (until the next claim,
+        // [M29]); runs nativeLeds() while it is active.
         void updateLeds();
+        // The native (profile) LED path of 1.0.0-cc5.3, unchanged: halvesPointer or the
+        // global_sleep_flag idle animation, nativeKeyLeds() and the profile brightness.
+        void nativeLeds();
+        // Show time (the 16/17/17 ms deadline cadence, ALIVE.md 10.1) while the engine owns the
+        // LEDs: the latched fields, render, section 9 output, the write into leds/ledsp; returns
+        // the microseconds it took.
+        uint32_t renderAlive(uint32_t now);
+        bool cc_was_claimed = false;
+        uint32_t cc_f24_release_at = 0;
+        uint32_t cc_led_id = 0;
 
         // buttons
         hmiConfig hmi_config;

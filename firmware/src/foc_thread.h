@@ -31,6 +31,13 @@ class FocThread : public Thread<FocThread> {
         uint16_t pass_end_pos();
         uint16_t pass_last_pos();
         bool pass_at_limit();
+        // ALIVE.md 12.5 [Q1] (1.0.0-cc5.4), read-only: the knob is being pushed past a bound, i.e.
+        // the FOC is at the limit AND its attractor has moved past the bound detent
+        // (atLimit && attract_angle != last_attract_angle). The haptic code does not advance
+        // last_attract_angle during a push, so the two are equal again once the knob springs back
+        // to the bound detent. Both are floats the FOC task writes; a torn pair costs one HMI pass,
+        // which the re-arm hold-off (lim_rearm_ms) absorbs. Changes nothing in the haptic state.
+        bool pass_limit_push();
 
         void setCalibration(MotorCalibration& cal);
 

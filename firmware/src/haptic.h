@@ -31,6 +31,7 @@ public:
     uint16_t last_pos = 0; 
 
     float attract_angle = 0.0; 
+    float detent_origin = 0.0; // Runtime coordinate origin; force curve is unchanged.
     float last_attract_angle = 0.0;
     float attract_hysteresis = 0.25;
 
@@ -39,6 +40,7 @@ public:
 
     bool atLimit = false;
     bool wasAtLimit = false;
+    uint16_t last_limit_position = 0;
 
     //General parameters loaded from profile
     uint16_t num_detents;
@@ -61,6 +63,7 @@ public:
 
     void init(void);
     void haptic_loop(void);
+    void rebase_runtime(DetentProfile profile, uint16_t position);
     void HapticEventCallback(HapticEvt);
     void UserHapticEventCallback(HapticEvt, float, uint16_t);
 

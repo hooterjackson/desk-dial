@@ -1,5 +1,6 @@
 #include "haptic.h"
 #include "haptic_api.h"
+#include "haptic_bounds.h"
 #include "utils.h"
 
 /*
@@ -110,6 +111,16 @@ void HapticInterface::haptic_loop(void){
     haptic_target(); // PID Command
 }
 
+void HapticInterface::rebase_runtime(DetentProfile profile, uint16_t position) {
+    // Do not modify sensor calibration or force parameters. Translate the existing wells.
+    haptic_state = HapticState(profile, position);
+    haptic_state.detent_origin = motor->shaft_angle;
+    haptic_state.attract_angle = motor->shaft_angle;
+    haptic_state.last_attract_angle = motor->shaft_angle;
+    haptic_pid->reset();
+    motor->move(0);
+}
+
 /**
  * Handles scaling the P term error and clamping error to prevent overshoot.
  * The scaled P error helps to prevent steady state error due to lack of I term (for "rolling" reasons).
@@ -197,13 +208,15 @@ void HapticInterface::find_detent(void)
 
     if(motor->shaft_angle < minHysteresis){
         // Knob is turned less than detent (left half of texture graph)
-        haptic_state.attract_angle = round(motor->shaft_angle / haptic_state.detent_width); 
+        haptic_state.attract_angle = round((motor->shaft_angle - haptic_state.detent_origin) / haptic_state.detent_width);
         haptic_state.attract_angle *= haptic_state.detent_width;
+        haptic_state.attract_angle += haptic_state.detent_origin;
     }
     else if(motor->shaft_angle > maxHysteresis){
         // Knob is turned more than detent (right half of texture graph)
-        haptic_state.attract_angle = round(motor->shaft_angle / haptic_state.detent_width);
+        haptic_state.attract_angle = round((motor->shaft_angle - haptic_state.detent_origin) / haptic_state.detent_width);
         haptic_state.attract_angle *= haptic_state.detent_width;
+        haptic_state.attract_angle += haptic_state.detent_origin;
     }
 
     // If there has been a change in the haptic attractor
@@ -311,6 +324,7 @@ void HapticInterface::detent_handler(void){
         }
     }
 
+    if (haptic_state.atLimit) haptic_state.last_limit_position = haptic_state.current_pos;
     if (!haptic_state.atLimit){
         HapticEventCallback(HapticEvt::EITHER);
     }
@@ -361,8 +375,12 @@ void HapticInterface::haptic_target(void)
 void HapticInterface::bounds_handler(float detent_width)
 {
     float error = 0.0;
+    const unsigned long recoveryStarted = micros();
 
     while(fabsf(motor->shaft_velocity) > 1.0){
+        // Return to the main loop promptly so input/configuration and the lease
+        // cannot be starved by continuous movement at a boundary.
+        if ((unsigned long)(micros() - recoveryStarted) >= 2000) break;
         error = haptic_state.attract_angle - motor->shaft_angle;
         // If you are driving the motor by hand, skip out of here so that you don't feel dragging on the knob
         if(fabsf(error) > (detent_width * 2))
@@ -372,21 +390,11 @@ void HapticInterface::bounds_handler(float detent_width)
         motor->move(default_pid(error));
     }
 
-    // Determine current boundary
-    if(haptic_state.current_pos <= haptic_state.num_detents / 2)
-        haptic_state.current_pos = haptic_state.detent_profile.start_pos;
-    else
-        haptic_state.current_pos = haptic_state.detent_profile.end_pos;
-
-    // Correct position scaling if in vernier mode.
-    if(haptic_state.detent_profile.mode == HapticMode::VERNIER)
-        haptic_state.current_pos *= haptic_state.detent_profile.vernier;
-
-    // Fix physical drifting due to missing a detent when re-entering bounds.
-    if(haptic_state.current_pos <= haptic_state.num_detents / 2)
-        haptic_state.current_pos += 1;
-    else
-        haptic_state.current_pos -= 1;
+    const uint16_t scale = haptic_state.detent_profile.mode == HapticMode::VERNIER ? haptic_state.detent_profile.vernier : 1;
+    haptic_state.current_pos = inward_from_boundary(
+        haptic_state.detent_profile.start_pos * scale,
+        haptic_state.detent_profile.end_pos * scale,
+        haptic_state.last_limit_position);
 
     // Clear boundary exit flag
     haptic_state.wasAtLimit = false;

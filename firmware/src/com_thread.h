@@ -42,6 +42,7 @@ class ComThread : public Thread<ComThread> {
 
     protected:
         void run();
+        void handleLine(const char* line, size_t length); // one complete command line
         void handleProfileCommand(JsonVariant profile, JsonVariant updates);
         void handleSettingsCommand(JsonVariant s);
         void handleProfilesCommand(JsonVariant p);

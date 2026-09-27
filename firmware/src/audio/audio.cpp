@@ -20,7 +20,7 @@ XT_PlayListItem_Class* chime_wav_sample = nullptr;
 
 BinarisAudioPlayer audioPlayer; // global instance
 
-uint8_t* get_audio_file(String fName) {
+const uint8_t* get_audio_file(String fName) {
     if (fName=="loud")
         return loud_wav;
     else if (fName=="soft")
@@ -37,7 +37,7 @@ uint8_t* get_audio_file(String fName) {
 
 
 
-String get_audio_filename(uint8_t* audio_file){
+String get_audio_filename(const uint8_t* audio_file){
     if (audio_file==loud_wav)
         return "loud";
     else if (audio_file==soft_wav)
@@ -116,7 +116,7 @@ void BinarisAudioPlayer::audio_init(){
 
 
 // call from any thread
-void BinarisAudioPlayer::play_audio(uint8_t* audio_file, uint16_t volume){
+void BinarisAudioPlayer::play_audio(const uint8_t* audio_file, uint16_t volume){
     if (audio_file!=nullptr) {
         AudioCommand command{ .type = AudioCommandType::PLAY_WAV, .audio_file = audio_file };
         xQueueSend(_q_audio_in, &command, (TickType_t)0);
@@ -139,7 +139,7 @@ void BinarisAudioPlayer::play_haptic_audio(){
 
 
 
-void BinarisAudioPlayer::start_play(uint8_t* audio_file){
+void BinarisAudioPlayer::start_play(const uint8_t* audio_file){
     #ifdef USE_AUDIO_LIB
         XT_PlayListItem_Class* sample;
         if (audio_file==clack_wav)
@@ -169,7 +169,7 @@ void BinarisAudioPlayer::start_play(uint8_t* audio_file){
 };
 
 
-bool BinarisAudioPlayer::check_file(String fName, uint8_t* audio_file){
+bool BinarisAudioPlayer::check_file(String fName, const uint8_t* audio_file){
     if (!(audio_file[0] == 'R' && audio_file[1] == 'I' && audio_file[2] == 'F' && audio_file[3] == 'F' &&
         audio_file[8] == 'W' && audio_file[9] == 'A' && audio_file[10] == 'V' && audio_file[11] == 'E' &&
         audio_file[12] == 'f' && audio_file[13] == 'm' && audio_file[14] == 't' && audio_file[15] == ' ' &&

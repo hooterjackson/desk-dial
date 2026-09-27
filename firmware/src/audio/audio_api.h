@@ -28,18 +28,23 @@ typedef struct {
         buttons or knob state update that contains CC message, else midi_thread is disabled
 
     */
-   uint8_t* audio_file; // valid values are 'loud', 'soft', 'none', 'hard', 'clack'
+   const uint8_t* audio_file; // valid values are 'loud', 'soft', 'none', 'hard', 'clack'
 
-   uint8_t* key_audio_file; // valid values are 'loud', 'soft', 'none', 'hard', 'clack'
+   const uint8_t* key_audio_file; // valid values are 'loud', 'soft', 'none', 'hard', 'clack'
 
 } audioConfig;
 
 
-extern uint8_t soft_wav[];
-extern uint8_t hard_wav[];
-extern uint8_t loud_wav[];
-extern uint8_t clack_wav[];
-extern uint8_t chime_wav[];
+// 1.0.0-cc5.4 (PRESENTATION_V5 12.4 F1): the sample arrays are const, so they link into flash
+// .rodata instead of internal .data (53,964 B of internal RAM). They are read only in task
+// context: check_file() at init, start_play() and audio_loop()'s i2s_write(), which copies them
+// into the I2S driver's own DMA buffers (internal RAM); no DMA descriptor and no ISR ever points
+// at them. Profiles keep the sound by name (get_audio_file / get_audio_filename).
+extern const uint8_t soft_wav[];
+extern const uint8_t hard_wav[];
+extern const uint8_t loud_wav[];
+extern const uint8_t clack_wav[];
+extern const uint8_t chime_wav[];
 
-uint8_t* get_audio_file(String fName);
-String get_audio_filename(uint8_t* audio_file);
+const uint8_t* get_audio_file(String fName);
+String get_audio_filename(const uint8_t* audio_file);

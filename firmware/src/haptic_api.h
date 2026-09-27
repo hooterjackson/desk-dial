@@ -64,4 +64,5 @@ typedef struct {
 */
 typedef struct {
     uint16_t cur_pos;
+    uint32_t control_id;
 } AngleEvt;
