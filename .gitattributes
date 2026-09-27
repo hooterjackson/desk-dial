@@ -1,0 +1,4 @@
+# Store files byte-for-byte: the test suite compares fixtures, goldens and generated text exactly,
+# so no end-of-line conversion on checkout. The firmware keeps upstream's LF normalisation.
+* -text
+firmware/** text=auto

@@ -1,5 +1,6 @@
 # --- Secrets and personal data (never commit) ---
 credentials.bin
+credentials*.bin
 settings.json
 *.p8
 *.pem
@@ -8,9 +9,14 @@ settings.json
 .env.*
 local/
 backups/
-diagnostics/
 logs/
 *.log
+*.jsonl
+
+# Device evidence and run records: only the helper scripts in app/diagnostics are tracked
+app/diagnostics/*
+!app/diagnostics/*.ps1
+!app/diagnostics/*.py
 
 # --- Python ---
 __pycache__/
@@ -27,6 +33,24 @@ dist/
 .coverage
 htmlcov/
 
+# --- Desk Dial companion build outputs (published as GitHub Release assets instead) ---
+app/desktop-build*/
+app/desktop-dist*/
+app/previews/
+app/vendor/
+app/firmware/*.zip
+app/firmware/manifest*.json
+app/firmware/drafts/
+
+# --- Firmware tooling (virtualenvs, PlatformIO core, build logs and flash images) ---
+.pio-core/
+tools/nanod-flash-venv/
+tools/nanod-pio-venv/
+tools/platformio-core/
+*.bin
+*.elf
+*.map
+
 # --- PlatformIO / firmware builds ---
 .pio/
 .pioenvs/
@@ -35,9 +59,30 @@ htmlcov/
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-*.bin
-*.elf
-*.map
+compile_commands.json
+
+# --- LVGL host harness outputs (regenerate with harness/build.py and the *_tests.py scripts) ---
+harness/rendered/
+harness/cc3/
+harness/cc3-icons/
+harness/cc4-play-pause/
+harness/cc5-handoff/
+harness/cc5-stage1/
+harness/cc5-stage1-verify/
+harness/cc5-stage2/
+harness/quiet-listening/
+harness/cc54-handoff/*
+!harness/cc54-handoff/regression-checks-cc54.json
+!harness/cc54-handoff/lvgl-heap.json
+harness/alive_sequences.json
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.ppm
+
+# Large generated test fixture (regenerate with node app/tests/js/alive_oracle.cjs)
+app/tests/fixtures/alive_oracle.json
 
 # --- Editors and OS ---
 .idea/
