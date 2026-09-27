@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+  <script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+  <script src="knob-model.js"></script>
+  <style>body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent)}input[type=range]{accent-color:var(--color-accent)}</style>
+</helmet>
+<div style="max-width:1240px;margin:0 auto;padding:32px 24px 56px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:12px">
+    <h1 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Ring choreography v2</h1>
+    <span style="font-size:14px;color:var(--color-neutral-700);text-wrap:pretty">Cleaner light, one grammar, new uses. Drag or scroll the knob, ← → turn, 1–4 press. Click a moment to replay it.</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;font-size:14px;line-height:1.5">
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:2px solid var(--color-text);padding-top:10px"><strong>Four primitives</strong><span style="text-wrap:pretty">Spark (a point that flares), Wave (a front that travels), Wash (a field of colour), Breath (a slow swell). Every moment is built from these.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:2px solid var(--color-text);padding-top:10px"><strong>Three tempos</strong><span style="text-wrap:pretty">Quick 180 ms for touch, 450 ms for answers, 900 ms for state changes. Breath runs at 5.2 s. Nothing modulates brightness faster than 3 Hz.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:2px solid var(--color-text);padding-top:10px"><strong>One voice at a time</strong><span style="text-wrap:pretty">A new foreground moment fades the previous one out in 120 ms. The base ducks 35 % under it, so effects read without blowing out.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:2px solid var(--color-text);padding-top:10px"><strong>Light only</strong><span style="text-wrap:pretty">Only what 60 LEDs can do: no fake rotation or blur. Highlights are tone-mapped with a soft knee, so colours stay saturated and never clip to white.</span></div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+    <div style="flex:0 0 auto;background:#111;padding:20px;display:flex;flex-direction:column;gap:16px;width:420px;box-sizing:border-box">
+      <div ref="{{ devRef }}" style="position:relative;width:380px;height:480px;touch-action:none;user-select:none">
+        <canvas ref="{{ cvRef }}" style="position:absolute;left:0;top:0;width:380px;height:480px"></canvas>
+        <div style="position:absolute;left:70px;top:70px;width:240px;height:240px;border-radius:50%;overflow:hidden;background:#000">
+          <dc-import name="Knob Face" view="{{ v }}" part="lcd" art="{{ true }}" live="{{ true }}" hint-size="240px,240px"></dc-import>
+          <div ref="{{ maskRef }}" style="position:absolute;inset:0;background:#000;opacity:1;pointer-events:none"></div>
+        </div>
+        <div onPointerDown="{{ pd }}" onPointerMove="{{ pm }}" onPointerUp="{{ pu }}" onPointerCancel="{{ pu }}" style="position:absolute;left:10px;top:10px;width:360px;height:360px;border-radius:50%;cursor:grab"></div>
+        <button onClick="{{ b1 }}" aria-label="Button 1" style="position:absolute;left:61px;top:398px;width:48px;height:48px;background:transparent;border:0;padding:0;cursor:pointer"></button>
+        <button onClick="{{ b2 }}" aria-label="Button 2" style="position:absolute;left:131px;top:398px;width:48px;height:48px;background:transparent;border:0;padding:0;cursor:pointer"></button>
+        <button onClick="{{ b3 }}" aria-label="Button 3" style="position:absolute;left:201px;top:398px;width:48px;height:48px;background:transparent;border:0;padding:0;cursor:pointer"></button>
+        <button onClick="{{ b4 }}" aria-label="Button 4" style="position:absolute;left:271px;top:398px;width:48px;height:48px;background:transparent;border:0;padding:0;cursor:pointer"></button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #2d2b2b;padding-top:12px;min-height:96px">
+        <span style="font:600 11px Archivo,sans-serif;letter-spacing:0.12em;text-transform:uppercase;color:#9b9797">{{ lastKicker }}</span>
+        <strong style="font-size:16px;color:#f3f2f2">{{ lastName }}</strong>
+        <span style="font-size:13px;line-height:1.5;color:#bab6b6;text-wrap:pretty">{{ lastDesc }}</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Try it</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onClick="{{ ccw }}">‹ Turn</button>
+            <button class="btn btn-secondary" onClick="{{ cw }}">Turn ›</button>
+            <button class="btn btn-ghost" onClick="{{ rest }}">Rest now</button>
+            <button class="btn btn-ghost" onClick="{{ fail }}">{{ failLabel }}</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Speed</span>
+          <div style="display:flex;border:2px solid var(--color-text);width:max-content">
+            <sc-for list="{{ speeds }}" as="sp" hint-placeholder-count="3">
+              <button onClick="{{ sp.on }}" style="height:36px;padding:0 14px;border:0;font:600 14px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ sp.bg }};color:{{ sp.fg }}">{{ sp.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:220px;flex:1 1 220px">
+          <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Time of day · {{ hourLabel }}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:16px;height:16px;flex:none;background:{{ warmSwatch }}"></div>
+            <input type="range" min="0" max="23.5" step="0.5" value="{{ hour }}" onInput="{{ onHour }}" style="flex:1;min-width:0">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;padding-bottom:8px;border-bottom:2px solid var(--color-text)">{{ g.name }}</div>
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+              <button onClick="{{ it.on }}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;text-align:left;padding:12px;border:0;border-bottom:1px solid var(--color-divider);background:{{ it.bg }};color:var(--color-text);font:inherit;cursor:pointer" style-hover="background:var(--color-neutral-200)">
+                <span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><strong style="font-size:15px">{{ it.name }}</strong><span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">{{ it.prim }}</span></span>
+                <span style="font-size:13px;color:var(--color-neutral-700)">{{ it.dur }}</span>
+                <span style="grid-column:1 / -1;font-size:13px;line-height:1.5;color:var(--color-neutral-800);text-wrap:pretty">{{ it.desc }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;speed&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[1,0.5,0.25],&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;breathe&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;glow&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;}}">
+const TAU = Math.PI * 2, LV = [0, 0.12, 0.34, 0.68, 1];
+const GRN = [0, 1, 0.384], RED = [1, 0.094, 0], BLUE = [0.157, 0.549, 1];
+const cl = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const eo = u => 1 - Math.pow(1 - cl(u), 3);
+const eio = u => { u = cl(u); return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
+const gs = (x, w) => Math.exp(-x * x / (2 * w * w));
+const md = i => ((Math.round(i) % 60) + 60) % 60;
+const cd = (i, j) => ((((i - j) % 60) + 90) % 60) - 30;
+const bump = (ms, a, b) => ms < a || ms > b ? 0 : Math.sin(Math.PI * (ms - a) / (b - a));
+const rgbN = s => s.split(',').map(x => +x / 255);
+const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+const MODEL_WARM = '255,164,84';
+const TOD = [[0, [255, 118, 34], 0.55], [5, [255, 128, 44], 0.6], [8, [255, 192, 134], 0.95], [13, [255, 204, 156], 1], [17, [255, 180, 110], 1], [20, [255, 158, 76], 0.85], [22.5, [255, 132, 46], 0.65], [24, [255, 118, 34], 0.55]];
+function warmAt(h) { let i = 0; while (i < TOD.length - 2 && h > TOD[i + 1][0]) i++; const [h0, c0, b0] = TOD[i], [h1, c1, b1] = TOD[i + 1], k = cl((h - h0) / (h1 - h0)); return { c: mix(c0, c1, k).map(x => x / 255), b: b0 + (b1 - b0) * k }; }
+
+const DUR = { boot: 2800, down: 1800, wake: 520, tick: 180, bound: 460, bloom: 900, fail: 700, sweep: 640, fill: 760, drain: 860, shimmer: 1000, wash: 1100, reveal: 450, press: 220, pending: 2800 };
+const FG = ['boot', 'down', 'bloom', 'fail', 'sweep', 'fill', 'drain', 'shimmer', 'wash'];
+const MOMENTS = [
+  { g: 'Power', items: [
+    { id: 'boot', prim: 'Wave · Breath', name: 'Coming online', dur: '2.8 s', desc: 'One clean lap by a comet, a single warm breath, then the state draws itself along its own path: the volume arc from 7 o’clock, list landmarks from the top. Buttons, then the screen.' },
+    { id: 'down', prim: 'Wave · Spark', name: 'Going offline', dur: '1.8 s', desc: 'Unplugs for real. The light drains anticlockwise into the cursor, which holds as an ember and dies last. Amber marks then fade in from the top and breathe.' }
+  ] },
+  { g: 'Touch', items: [
+    { id: 'wake', prim: 'Wave', name: 'Wake', dur: '520 ms', desc: 'A soft warm front leaves the cursor both ways while the ring rises from resting to full warm.' },
+    { id: 'turn', prim: 'Spark', name: 'Spin trail', dur: '180 ms / detent', desc: 'Each detent sparks the cursor. Turn faster and a tail grows behind it, up to 7 segments, like motion blur made of light.' },
+    { id: 'bound', prim: 'Spark · Wave', name: 'End stop', dur: '460 ms', desc: 'The light compresses into the bound: four segments behind the cursor flare in sequence toward it, then relax.' },
+    { id: 'rest', prim: 'Breath', name: 'Resting', dur: '5.2 s cycle', desc: 'After 5 s untouched the ring settles to its resting level and breathes. Colour and level follow the time of day.' }
+  ] },
+  { g: 'Feedback', items: [
+    { id: 'pending', prim: 'Wave', name: 'Working', dur: '1.4 s / lap', desc: 'A dim comet laps the whole ring while Sonos or Windows hasn’t answered. Clearly busy, never alarming. Stops the instant the answer lands.' },
+    { id: 'bloom', prim: 'Wave · Spark', name: 'Confirmed', dur: '900 ms', desc: 'Two green fronts leave the cursor and meet on the far side with a small spark.' },
+    { id: 'fail', prim: 'Spark', name: 'Head shake', dur: '700 ms', desc: 'A red light at the cursor shakes side to side twice and settles, like a head saying no. Movement, not flashing.' }
+  ] },
+  { g: 'Playback', items: [
+    { id: 'fill', prim: 'Wave', name: 'Play', dur: '760 ms', desc: 'The arc refills from 7 o’clock to the level with a spark on its leading edge.' },
+    { id: 'drain', prim: 'Wave', name: 'Pause', dur: '860 ms', desc: 'A shadow slides down the arc. Play then breathes green while paused.' },
+    { id: 'sweep', prim: 'Wave', name: 'Skip', dur: '640 ms', desc: 'A streak laps the ring, clockwise for Next, anticlockwise for Previous.' },
+    { id: 'shimmer', prim: 'Wave · Spark', name: 'Changed elsewhere', dur: '1.0 s', desc: 'A blue light travels from the old level to the new one and settles.' },
+    { id: 'heat', prim: 'Breath', name: 'Near max', dur: 'while ≥ 90 %', desc: 'The red top of the arc glows unevenly, each segment swelling on its own slow cycle, like embers. Calm, but you notice.' },
+    { id: 'progress', prim: 'Spark', name: 'Song hand', dur: 'one lap per song', desc: 'At rest while playing, one faint mote moves round the ring like a clock hand: a full lap is the whole song.' }
+  ] },
+  { g: 'Context', items: [
+    { id: 'reveal', prim: 'Wave', name: 'Mode change', dur: '450 ms', desc: 'Landmarks unfold from 12 o’clock outwards as a new mode opens.' },
+    { id: 'tint', prim: 'Wash', name: 'Ambient tint', dur: 'continuous', desc: 'In Windows and Recently Added the dark segments carry a faint wash of the highlighted app or album colour, gliding as you turn.' },
+    { id: 'wash', prim: 'Wash', name: 'Switched · now playing', dur: '1.1 s', desc: 'The app’s or album’s colour floods the ring from the cursor, holds, then returns to warm.' },
+    { id: 'night', prim: 'Breath', name: 'Time of day', dur: 'continuous', desc: 'Warm white shifts from about 3000 K at midday to 1900 K late at night, and resting brightness drops 45 % overnight.' }
+  ] }
+];
+const INFO = {}; MOMENTS.forEach(g => g.items.forEach(it => { INFO[it.id] = it; }));
+
+class Component extends DCLogic {
+  state = { v: null, last: null, speed: null, fail: false, hour: null };
+  cvRef = React.createRef(); maskRef = React.createRef(); devRef = React.createRef();
+  fx = []; timers = []; vt = 0; vel = 0; lastRot = 0;
+  cur = Array.from({ length: 60 }, () => ({ r: 1, g: 0.64, b: 0.33, a: 0 }));
+  bcur = Array.from({ length: 4 }, () => ({ r: 1, g: 0.64, b: 0.33, a: 0 }));
+  tint = [0, 0, 0];
+
+  componentDidMount() {
+    const go = () => {
+      if (!window.NanoModel || !window.NanoModel.init) { this._w = setTimeout(go, 50); return; }
+      this.M = window.NanoModel; this.s = this.M.init(); this.v = this.view();
+      this.setState({ v: this.v });
+      this.M.loadColors && this.M.loadColors(() => { this.v = this.view(); this.setState({ v: this.v }); });
+      this.play('boot', {}, true);
+      this.timers.push(setTimeout(() => this.dispatch({ t: 'sleep' }), 6500));
+      this.raf = requestAnimationFrame(this.loop);
+    };
+    go();
+    this.iv = setInterval(() => { if (this.s && this.M.isPending(this.s)) { this.s = Object.assign({}, this.s, { tick: this.s.tick + 1 }); this.v = this.view(); this.setState({ v: this.v }); } }, 260);
+    this.kd = e => {
+      const tg = e.target && e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); this.dispatch({ t: 'rot', d: 1 }); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); this.dispatch({ t: 'rot', d: -1 }); }
+      else if (['1', '2', '3', '4'].includes(e.key)) this.dispatch({ t: 'btn', n: +e.key });
+    };
+    window.addEventListener('keydown', this.kd);
+    this.wh = e => { e.preventDefault(); this.wacc = (this.wacc || 0) + e.deltaY; while (Math.abs(this.wacc) >= 40) { const d = this.wacc > 0 ? 1 : -1; this.wacc -= d * 40; this.dispatch({ t: 'rot', d }); } };
+    this.devRef.current && this.devRef.current.addEventListener('wheel', this.wh, { passive: false });
+  }
+  componentWillUnmount() {
+    cancelAnimationFrame(this.raf); clearInterval(this.iv); clearTimeout(this._w); this.timers.forEach(clearTimeout);
+    window.removeEventListener('keydown', this.kd);
+    this.devRef.current && this.devRef.current.removeEventListener('wheel', this.wh);
+  }
+
+  view() { return this.M.view(this.s, { led: 'alive' }); }
+  speed() { return this.state.speed || this.props.speed || 1; }
+  hour() { if (this.state.hour != null) return this.state.hour; const d = new Date(); return d.getHours() + (d.getMinutes() >= 30 ? 0.5 : 0); }
+
+  dispatch(a) {
+    if (!this.s) return;
+    const ps = this.s, pv = this.v;
+    const r = this.M.step(this.s, a); this.s = r.s;
+    this.timers = this.timers.slice(-80);
+    r.fx.forEach(f => this.timers.push(setTimeout(() => this.dispatch(f.act), f.ms)));
+    const nv = this.view(); this.v = nv;
+    this.detect(a, ps, pv, r.s, nv);
+    this.setState({ v: nv });
+  }
+
+  detect(a, ps, pv, ns, nv) {
+    const colAt = (v, i) => (v.ring[i] && v.ring[i].c) || MODEL_WARM;
+    if (ps.conn === 'ok' && ns.conn !== 'ok') { this.play('down', { at: pv.cursor || 0 }); return; }
+    if (ps.conn !== 'ok' && ns.conn === 'ok') { this.play('boot'); return; }
+    if (ns.conn !== 'ok') return;
+    if (a.t === 'btn') this.play('press', { n: a.n - 1 }, true);
+    if (pv.ledSleep && !nv.ledSleep) this.play('wake', { at: nv.cursor }, a.t === 'rot' || a.t === 'btn');
+    if (a.t === 'rot' && a.d) {
+      const now = performance.now(), dtR = Math.max(16, now - this.lastRot); this.lastRot = now;
+      this.vel = dtR > 400 ? 0 : this.vel * 0.55 + (1000 / dtR) * 0.45;
+      if (nv.cursor === pv.cursor && nv.mode === pv.mode) this.play('bound', { at: nv.cursor, c: this.colOf(colAt(nv, nv.cursor)), dir: a.d });
+      else this.play('tick', { at: nv.cursor, dir: Math.sign(cd(nv.cursor, pv.cursor)) || a.d, len: Math.round(cl((this.vel - 4) / 14) * 7) }, true);
+    }
+    if (nv.mode !== pv.mode && pv.mode !== 'offline') this.play('reveal', {}, true);
+    if (ns.flash && (!ps.flash || ps.flash.id !== ns.flash.id)) {
+      if (ns.flash.kind === 'ok') {
+        const c = colAt(pv, pv.cursor);
+        if ((pv.mode === 'windows' || pv.mode === 'recent') && c !== MODEL_WARM) this.play('wash', { at: pv.cursor, c: rgbN(c) });
+        else this.play('bloom', { at: nv.cursor });
+      } else this.play('fail', { at: nv.cursor });
+    }
+    if (ns.qi !== ps.qi) this.play('sweep', { at: nv.cursor, dir: Math.sign(ns.qi - ps.qi) });
+    if (ns.playing !== ps.playing && ns.mode === 'home') this.play(ns.playing ? 'fill' : 'drain');
+    if (ns.ext && !ps.ext) this.play('shimmer', { from: pv.cursor, to: nv.cursor });
+  }
+
+  colOf(s) { return s === MODEL_WARM ? warmAt(this.hour()).c : rgbN(s); }
+
+  play(type, p, quiet) {
+    p = p || {};
+    const e = Object.assign({ type, t0: this.vt, dur: DUR[type] }, p);
+    if (e.at == null) e.at = (this.v && this.v.cursor) || 0;
+    if (type === 'fill' || type === 'drain') e.n = Math.round(((this.s && this.s.vol) || 54) / 2);
+    if (type === 'down') { e.snap = this.cur.map(c => [c.r * c.a, c.g * c.a, c.b * c.a]); e.bsnap = this.bcur.map(c => [c.r * c.a, c.g * c.a, c.b * c.a]); }
+    if (type === 'boot') e.home = !this.v || this.v.mode === 'home';
+    if (FG.includes(type)) this.fx.forEach(f => { if (FG.includes(f.type) && f.kill == null) f.kill = this.vt; });
+    else if (['wake', 'reveal', 'bound'].includes(type)) this.fx = this.fx.filter(f => f.type !== type);
+    this.fx.push(e);
+    if (!quiet && INFO[type]) this.setState({ last: type });
+  }
+
+  goHome() { if (this.s.mode !== 'home') { this.s = Object.assign({}, this.s, { mode: 'home' }); this.v = this.view(); this.setState({ v: this.v }); } }
+
+  demo(id) {
+    if (!this.v) return;
+    const cur = this.v.cursor || 0;
+    const claude = (this.M.COLORS && this.M.COLORS['app:Claude']) || '217,119,87';
+    this.setState({ last: id });
+    if (id === 'down') { this.dispatch({ t: 'unplug' }); return; }
+    if (id === 'rest' || id === 'progress' || id === 'night') {
+      if (id === 'progress') { this.goHome(); if (!this.s.playing) this.s = Object.assign({}, this.s, { playing: true, playReq: true, pIdle: false }); }
+      if (id === 'night') this.setState({ hour: 23 });
+      this.dispatch({ t: 'sleep' }); return;
+    }
+    if (id === 'wake') { if (this.v.ledSleep) this.dispatch({ t: 'rot', d: 0 }); this.play('wake', { at: cur }, true); return; }
+    if (id === 'turn') { for (let k = 0; k < 10; k++) this.timers.push(setTimeout(() => this.dispatch({ t: 'rot', d: 1 }), k * 45 / this.speed())); return; }
+    if (id === 'heat') { this.goHome(); const n = Math.max(0, 94 - this.s.vol); for (let k = 0; k < n; k++) this.timers.push(setTimeout(() => this.dispatch({ t: 'rot', d: 1 }), k * 22)); return; }
+    if (id === 'tint') { if (this.s.mode !== 'windows') { this.goHome(); this.dispatch({ t: 'btn', n: 3 }); } else this.dispatch({ t: 'rot', d: 1 }); return; }
+    const p = { bound: { at: cur, c: this.colOf((this.v.ring[cur] && this.v.ring[cur].c) || MODEL_WARM), dir: 1 }, sweep: { at: cur, dir: 1 }, shimmer: { from: md(cur - 9), to: cur }, wash: { at: cur, c: rgbN(claude) } }[id] || {};
+    this.play(id, p, true);
+  }
+
+  loop = T => {
+    const dt = Math.min(50, T - (this.lastT || T)); this.lastT = T;
+    const sdt = dt * this.speed(); this.vt += sdt;
+    try { this.draw(this.vt, sdt); } catch (err) { }
+    this.raf = requestAnimationFrame(this.loop);
+  };
+
+  draw(t, dt) {
+    const v = this.v, cv = this.cvRef.current; if (!v || !cv) return;
+    const asleep = !!v.ledSleep, off = v.mode === 'offline';
+    const tod = warmAt(this.hour()), WARM = tod.c, HOT = mix(WARM, [1, 1, 1], 0.5);
+    const restK = asleep ? tod.b : 1;
+    const br = asleep && (this.props.breathe ?? true) ? 1 + 0.4 * Math.sin(t / 5200 * TAU) : off ? 0.6 + 0.4 * Math.sin(t / 2600 * TAU) : 1;
+    const heat = v.mode === 'home' && !asleep && this.s.vol >= 90;
+    for (let i = 0; i < 60; i++) {
+      const r = v.ring[i], c = this.cur[i];
+      let ta = 0, tc = null;
+      if (r && r.l) {
+        tc = r.c === MODEL_WARM ? WARM : rgbN(r.c);
+        ta = (r.a != null ? r.a : LV[r.l]) * br * restK;
+        if (heat && r.c === '255,24,0') ta *= 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(t / (380 + (i * 97) % 260) + i * 1.9));
+      }
+      const up = ta > c.a;
+      const tau = asleep ? (up ? 400 : 700) : up ? (ta >= 0.9 ? 10 : 55) : 140;
+      c.a += (ta - c.a) * (1 - Math.exp(-dt / tau));
+      if (tc) { const k = 1 - Math.exp(-dt / (c.a < 0.02 ? 1 : 70)); c.r += (tc[0] - c.r) * k; c.g += (tc[1] - c.g) * k; c.b += (tc[2] - c.b) * k; }
+    }
+    const pausedPlay = v.mode === 'home' && !asleep && v.buttons[0] && v.buttons[0].c === '0,255,98';
+    for (let j = 0; j < 4; j++) {
+      const b = v.buttons[j] || {}, c = this.bcur[j];
+      let ta = b.l ? (b.a != null ? b.a : LV[b.l]) * restK : 0;
+      if (asleep) ta *= br;
+      if (j === 0 && pausedPlay) ta *= 0.55 + 0.45 * (0.5 + 0.5 * Math.cos(t / 2600 * TAU));
+      const up = ta > c.a, tau = asleep ? (up ? 400 : 700) : up ? 40 : 160;
+      c.a += (ta - c.a) * (1 - Math.exp(-dt / tau));
+      if (b.l && b.c) { const tc = b.c === MODEL_WARM ? WARM : rgbN(b.c), k = 1 - Math.exp(-dt / 70); c.r += (tc[0] - c.r) * k; c.g += (tc[1] - c.g) * k; c.b += (tc[2] - c.b) * k; }
+    }
+
+    const m = new Float32Array(60).fill(1), bm = new Float32Array(4).fill(1);
+    const O = Array.from({ length: 60 }, () => [0, 0, 0]), OB = Array.from({ length: 4 }, () => [0, 0, 0]);
+    let lcd = 0, duck = 0;
+    const add = (i, c, a) => { if (a <= 0.001) return; const o = O[md(i)]; o[0] += c[0] * a; o[1] += c[1] * a; o[2] += c[2] * a; };
+    const addG = (pos, w, c, a) => { for (let k = Math.floor(pos - 3 * w); k <= Math.ceil(pos + 3 * w); k++) add(k, c, a * gs(k - pos, w)); };
+    const addB = (j, c, a) => { const o = OB[j]; o[0] += c[0] * a; o[1] += c[1] * a; o[2] += c[2] * a; };
+    const comet = (head, dir, len, c0, c1, a) => { for (let k = 0; k <= len; k++) addG(head - dir * k, 0.7, k ? c1 : c0, a * Math.pow(1 - k / (len + 1), 1.7)); };
+
+    if (this.M.isPending(this.s)) comet(t / 1400 * 60, 1, 8, HOT, WARM, 0.5);
+
+    const tintOn = (v.mode === 'windows' || v.mode === 'recent') && !asleep && v.cursor != null && v.ring[v.cursor] && v.ring[v.cursor].c !== MODEL_WARM;
+    const tt = tintOn ? rgbN(v.ring[v.cursor].c) : [0, 0, 0], tk = 1 - Math.exp(-dt / 220);
+    for (let q = 0; q < 3; q++) this.tint[q] += (tt[q] - this.tint[q]) * tk;
+    for (let i = 0; i < 60; i++) if (!(v.ring[i] && v.ring[i].l)) add(i, this.tint, 0.06);
+
+    if (asleep && this.s.playing && v.mode === 'home' && this.s.conn === 'ok') {
+      const prog = ((t / 1000 + 50) % 214) / 214;
+      addG(prog * 60, 0.75, HOT, 0.26 * tod.b);
+    }
+
+    this.fx = this.fx.filter(e => {
+      const ms = t - e.t0, u = ms / e.dur; if (u > 1) return false;
+      let amp = 1;
+      if (e.kill != null) { amp = 1 - (t - e.kill) / 120; if (amp <= 0) return false; }
+      const A = (i, c, a) => add(i, c, a * amp), AG = (p, w, c, a) => addG(p, w, c, a * amp);
+      const at = e.at;
+      if (FG.includes(e.type) && e.type !== 'boot' && e.type !== 'down') duck = Math.max(duck, 0.35 * Math.sin(Math.PI * u) * amp);
+      switch (e.type) {
+        case 'boot': {
+          if (ms < 1000) comet(60 * eio(ms / 900), 1, 14, HOT, WARM, 0.95 * (ms < 900 ? 1 : 1 - (ms - 900) / 100) * amp);
+          const b = bump(ms, 850, 1450); if (b) for (let i = 0; i < 60; i++) A(i, WARM, 0.22 * b);
+          for (let i = 0; i < 60; i++) { const o = e.home ? md(i - 35) : Math.abs(cd(i, 0)) * 2; m[i] *= cl((ms - 1250 - o * 11) / 160); }
+          for (let j = 0; j < 4; j++) { const s0 = 1850 + j * 100; bm[j] *= cl((ms - s0) / 200); addB(j, HOT, 0.45 * bump(ms, s0, s0 + 240)); }
+          lcd = Math.max(lcd, ms < 1600 ? 1 : 1 - eo((ms - 1600) / 600));
+          break;
+        }
+        case 'down': {
+          for (let i = 0; i < 60; i++) {
+            const o = md(i - at), st = 80 + (60 - o) * 10, sn = e.snap[i];
+            m[i] *= i === at ? 0 : cl((ms - 1250 - Math.abs(cd(i, 0)) * 12) / 200);
+            if (o === 0) { A(i, sn, 1 - cl((ms - 700) / 500)); A(i, WARM, 0.35 * bump(ms, 500, 1250)); }
+            else A(i, sn, 1 - cl((ms - st) / 110));
+          }
+          for (let j = 0; j < 4; j++) { bm[j] = 0; addB(j, e.bsnap[j], 1 - cl((ms - 120 - (3 - j) * 80) / 160)); }
+          lcd = Math.max(lcd, ms < 1100 ? eo((ms - 150) / 500) : 1 - cl((ms - 1100) / 600));
+          break;
+        }
+        case 'wake': { const d = eo(u) * 30; for (let i = 0; i < 60; i++) A(i, HOT, 0.32 * (1 - u) * gs(Math.abs(cd(i, at)) - d, 3)); break; }
+        case 'tick': { A(at, HOT, 0.45 * Math.pow(1 - u, 2)); for (let k = 1; k <= e.len; k++) A(at - e.dir * k, WARM, 0.38 * Math.pow(1 - k / (e.len + 1), 1.5) * (1 - u)); break; }
+        case 'bound': { A(at, e.c, 0.8 * Math.pow(1 - u, 2)); for (let k = 1; k <= 4; k++) A(at - e.dir * k, e.c, 0.5 * (1 - k / 5) * bump(ms, (4 - k) * 30, (4 - k) * 30 + 260)); break; }
+        case 'pending': comet(ms / 1400 * 60 + at, 1, 8, HOT, WARM, 0.5 * Math.min(1, ms / 200, (e.dur - ms) / 200)); break;
+        case 'bloom': { const d = eo(u / 0.8) * 30; for (let i = 0; i < 60; i++) { const x = Math.abs(cd(i, at)); A(i, GRN, 0.9 * (1 - u * 0.5) * gs(x - d, 1.5)); if (x < d) A(i, GRN, 0.16 * Math.pow(1 - u, 1.5)); } AG(at + 30, 1, mix(GRN, [1, 1, 1], 0.3), 0.8 * bump(ms, 560, 900)); break; }
+        case 'fail': { const pos = at + 1.6 * Math.sin(ms / 1000 * TAU * 3.2) * (1 - eo(u)); AG(pos, 0.9, RED, 0.95 * (1 - Math.pow(u, 2))); for (let k = -3; k <= 3; k++) m[md(at + k)] *= 1 - 0.6 * Math.sin(Math.PI * u); break; }
+        case 'sweep': comet(at + e.dir * 60 * eo(u), e.dir, 10, HOT, WARM, 0.85 * (1 - Math.pow(u, 3)) * amp); break;
+        case 'fill': { const n = e.n, f = u * 1.15 * (n + 1); for (let k = 0; k <= n; k++) m[md(35 + k)] *= cl((f - k) / 2.5); AG(35 + Math.min(n, f), 0.9, HOT, 0.75 * (1 - cl((u - 0.85) / 0.15))); break; }
+        case 'drain': { const n = e.n, pos = n - eio(u) * (n + 6); for (let k = 0; k <= n; k++) m[md(35 + k)] *= 1 - 0.8 * gs(k - pos, 3.5) * amp; break; }
+        case 'shimmer': { const dl = cd(e.to, e.from), pos = e.from + dl * eio(u / 0.7); AG(pos, 1.2, BLUE, 0.9 * (u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3)); AG(e.to, 1.4, BLUE, 0.5 * bump(ms, 600, 1000)); break; }
+        case 'wash': { const d = eo(ms / 420) * 31, fade = ms < 520 ? 1 : 1 - eo((ms - 520) / 580); for (let i = 0; i < 60; i++) { const x = Math.abs(cd(i, at)); if (x <= d) A(i, e.c, 0.65 * fade); A(i, e.c, 0.45 * gs(x - d, 1.5) * (1 - cl(ms / 420))); m[i] *= 1 - 0.55 * fade * amp; } addB(3, e.c, 0.55 * fade * amp); break; }
+        case 'reveal': for (let i = 0; i < 60; i++) m[i] *= cl((ms - Math.abs(cd(i, 0)) * 8) / 130); break;
+        case 'press': addB(e.n, HOT, 0.6 * Math.pow(1 - u, 2)); break;
+      }
+      return true;
+    });
+
+    if (this.maskRef.current) this.maskRef.current.style.opacity = lcd.toFixed(3);
+
+    const dpr = window.devicePixelRatio || 1, W = 380, H = 480;
+    if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+    const x = cv.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    x.fillStyle = '#171717'; x.beginPath(); x.arc(190, 190, 178, 0, TAU); x.fill();
+    x.strokeStyle = '#232323'; x.lineWidth = 2; x.stroke();
+    const glow = this.props.glow ?? 1, R = 152, bk = 1 - duck;
+    const tone = e => { const mx = Math.max(e[0], e[1], e[2]); if (mx <= 0.78) return e; const k = (0.78 + 0.22 * (1 - Math.exp(-(mx - 0.78) / 0.22))) / mx; return [e[0] * k, e[1] * k, e[2] * k]; };
+    const rr = (ctx, px, py, w, h, r) => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(px, py, w, h, r); else ctx.rect(px, py, w, h); ctx.fill(); };
+    x.save(); x.translate(190, 190);
+    for (let i = 0; i < 60; i++) {
+      const c = this.cur[i], o = O[i], k = c.a * m[i] * bk;
+      const e = tone([c.r * k + o[0], c.g * k + o[1], c.b * k + o[2]]), mx = Math.max(e[0], e[1], e[2]);
+      x.save(); x.rotate(i * 6 * Math.PI / 180);
+      if (mx > 0.01) { const n = e.map(q => Math.round(q / mx * 255)).join(','); x.shadowColor = `rgba(${n},${Math.min(1, mx * 0.95).toFixed(3)})`; x.shadowBlur = (5 + 13 * mx) * glow; }
+      x.fillStyle = `rgb(${Math.round(36 + e[0] * 219)},${Math.round(36 + e[1] * 219)},${Math.round(36 + e[2] * 219)})`;
+      rr(x, -2.5, -R - 7, 5, 14, 2.5);
+      x.restore();
+    }
+    x.restore();
+    for (let j = 0; j < 4; j++) {
+      const c = this.bcur[j], o = OB[j], k = c.a * bm[j];
+      const e = tone([c.r * k + o[0], c.g * k + o[1], c.b * k + o[2]]), mx = Math.max(e[0], e[1], e[2]);
+      const bx = 61 + j * 70, by = 398;
+      x.fillStyle = '#1d1d1d'; x.fillRect(bx, by, 48, 48);
+      x.strokeStyle = '#2c2c2c'; x.lineWidth = 1; x.strokeRect(bx + 0.5, by + 0.5, 47, 47);
+      x.save();
+      if (mx > 0.01) { const n = e.map(q => Math.round(q / mx * 255)).join(','); x.shadowColor = `rgba(${n},${Math.min(1, mx).toFixed(3)})`; x.shadowBlur = (6 + 16 * mx) * glow; x.shadowOffsetY = 3; }
+      x.fillStyle = `rgb(${Math.round(38 + e[0] * 217)},${Math.round(38 + e[1] * 217)},${Math.round(38 + e[2] * 217)})`;
+      x.fillRect(bx, by + 45, 48, 3);
+      x.restore();
+    }
+  }
+
+  pd = e => { const r = e.currentTarget.getBoundingClientRect(); this.c0 = [r.left + r.width / 2, r.top + r.height / 2]; this.a0 = Math.atan2(e.clientY - this.c0[1], e.clientX - this.c0[0]); this.acc = 0; e.currentTarget.setPointerCapture(e.pointerId); };
+  pm = e => {
+    if (!this.c0) return;
+    const a = Math.atan2(e.clientY - this.c0[1], e.clientX - this.c0[0]);
+    let d = a - this.a0; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+    this.a0 = a; this.acc += d * 180 / Math.PI;
+    const det = (this.v && this.v.hap && this.v.hap.det) || 20, st = 360 / det;
+    while (Math.abs(this.acc) >= st) { const k = this.acc > 0 ? 1 : -1; this.acc -= k * st; this.dispatch({ t: 'rot', d: k }); }
+  };
+  pu = () => { this.c0 = null; };
+
+  renderVals() {
+    const sp = this.speed(), last = this.state.last && INFO[this.state.last], h = this.hour();
+    const w = warmAt(h).c.map(q => Math.round(q * 255)).join(',');
+    const hh = Math.floor(h), mm = h % 1 ? '30' : '00';
+    return {
+      cvRef: this.cvRef, maskRef: this.maskRef, devRef: this.devRef, v: this.state.v,
+      pd: this.pd, pm: this.pm, pu: this.pu,
+      b1: () => this.dispatch({ t: 'btn', n: 1 }), b2: () => this.dispatch({ t: 'btn', n: 2 }), b3: () => this.dispatch({ t: 'btn', n: 3 }), b4: () => this.dispatch({ t: 'btn', n: 4 }),
+      cw: () => this.dispatch({ t: 'rot', d: 1 }), ccw: () => this.dispatch({ t: 'rot', d: -1 }),
+      rest: () => this.demo('rest'),
+      fail: () => { this.dispatch({ t: 'opt', k: 'fail' }); this.setState({ fail: !this.state.fail }); },
+      failLabel: this.state.fail ? 'Actions succeed' : 'Next action fails',
+      hour: h, hourLabel: `${String(hh).padStart(2, '0')}:${mm}`, warmSwatch: `rgb(${w})`,
+      onHour: e => this.setState({ hour: +e.target.value }),
+      lastKicker: last ? `Last moment · ${last.prim}` : 'Last moment',
+      lastName: last ? last.name : 'Turn or press the knob',
+      lastDesc: last ? `${last.dur} · ${last.desc}` : 'Moments play as you use it. Click any moment on the right to replay it on the current state.',
+      speeds: [1, 0.5, 0.25].map(s => ({ label: s === 1 ? '1×' : s === 0.5 ? '½×' : '¼×', on: () => this.setState({ speed: s }), bg: sp === s ? 'var(--color-text)' : 'transparent', fg: sp === s ? 'var(--color-bg)' : 'var(--color-text)' })),
+      groups: MOMENTS.map(g => ({ name: g.g, items: g.items.map(it => ({ name: it.name, prim: it.prim, dur: it.dur, desc: it.desc, on: () => this.demo(it.id), bg: this.state.last === it.id ? 'var(--color-neutral-200)' : 'transparent' })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

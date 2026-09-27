@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+<script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&amp;family=Montserrat:wght@500&amp;display=swap">
+<script src="knob-model.js"></script>
+<style>body{margin:0;background:#f3f2f2;color:#201e1d;font-family:Archivo,system-ui,sans-serif}a{color:#201e1d}a:hover{color:#ec3013}</style>
+</helmet>
+<div style="max-width:1400px;margin:0 auto;padding:40px 32px 80px;display:flex;flex-direction:column">
+
+<header style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px;padding-bottom:28px;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Design proposal · v1 · 22 Sep 2026</div>
+    <h1 style="margin:0;font-size:52px;line-height:1;font-weight:800;letter-spacing:-0.02em">Nano_D++<br>Control Center</h1>
+    <p style="margin:0;font-size:17px;line-height:1.5;max-width:520px;text-wrap:pretty">One knob, four controls: Sonos volume, Recently Added, Tracks and Windows. The LCD says what you control and what the right-hand button will do. The ring shows position. Buttons light only when they do something.</p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.5">
+    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Direction</div>
+    <p style="margin:0;text-wrap:pretty">Text first on black. Montserrat at the firmware sizes, one ink colour and two greys. White LEDs at low level for position; green only on a lit confirm button, red only on a real Cancel. No sweeps, breathing or halos. Desktop surfaces use Archivo, square corners and 2px rules from Modernist, on a neutral dark ground with no accent red.</p>
+    <p style="margin:0;text-wrap:pretty;color:var(--color-neutral-700)">Footer slots are icons only, one per button on an even grid. Button 4 uses a verb icon (play, plus, skip, switch) rather than a bare ✓, and the detail line above spells out the consequence.</p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.5">
+    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Assumptions</div>
+    <div style="display:flex;flex-direction:column;gap:6px;text-wrap:pretty">
+      <div>Bezel may hide the outer 8 px of the LCD. Safe area is a 104 px radius circle.</div>
+      <div>Sonos reports volume and transport through events; “confirmed” means reported back.</div>
+      <div>Library items, titles and windows are sample data. Timings in the prototype are simulated.</div>
+      <div>Existing settings: launch at sign-in, Sonos target, manual IP, Apple Music sign-in. Anything else is tagged <span class="tag tag-outline">Proposed</span>.</div>
+    </div>
+  </div>
+</header>
+
+<section data-screen-label="00b LED colour" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">00b</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">White vs targeted colour</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">White stays primary. Colour appears only where it answers a question. Switch the prototype with “LEDs”.</span>
+  </div>
+  <div style="overflow-x:auto">
+  <div style="display:grid;grid-template-columns:150px 204px 204px minmax(180px,1fr);gap:12px 20px;align-items:start;min-width:760px">
+    <div></div>
+    <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--color-text)"><span class="tag tag-neutral">A</span><strong style="font-size:15px">White</strong></div>
+    <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--color-text)"><span class="tag tag-outline">B</span><strong style="font-size:15px">Targeted colour</strong></div>
+    <div style="padding-bottom:8px;border-bottom:2px solid var(--color-text);font-size:13px;font-weight:600">What changes</div>
+    <sc-for list="{{ ledRows }}" as="r" hint-placeholder-count="6">
+      <div style="font-size:14px;font-weight:600;padding-top:8px;border-top:1px solid var(--color-divider)">{{ r.name }}</div>
+      <div style="background:#141414;width:204px"><dc-import name="Knob Face" view="{{ r.w }}" zoom="0.6" hint-size="204px,240px"></dc-import></div>
+      <div style="background:#141414;width:204px"><dc-import name="Knob Face" view="{{ r.c }}" zoom="0.6" hint-size="204px,240px"></dc-import></div>
+      <div style="font-size:13px;line-height:1.5;padding-top:8px;border-top:1px solid var(--color-divider);text-wrap:pretty">{{ r.note }}</div>
+    </sc-for>
+  </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;font-size:14px;line-height:1.5">
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Rules for B</strong><span>Colour only on ring segments, never on the LCD text. Tracks, bounds, pending and More stay white. Buttons keep their meaning: green confirm, red cancel.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Where colours come from</strong><span>Extracted automatically: the most saturated dominant hue of each cover and app icon, normalised to full LED brightness. Grey or black icons fall back to white. The companion sends one RGB value per list entry.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Watch-outs</strong><span>Amber and red on the volume arc are a position cue, not a loudness measurement. Red appears only on the arc’s last 10 %, never on a button at home, so it can’t read as “cancel”. Some covers yield similar hues; the cursor’s brightness still marks the selection.</span></div>
+  </div>
+</section>
+
+<section data-screen-label="00 Options" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">00</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Clean vs album artwork</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Same layout and grid in both. Switch the live prototype with the “artwork” Tweak.</span>
+  </div>
+  <div style="overflow-x:auto">
+  <div style="display:grid;grid-template-columns:140px 240px 240px;gap:12px 24px;align-items:start;min-width:652px">
+    <div></div>
+    <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--color-text)"><span class="tag tag-neutral">A</span><strong style="font-size:16px">Clean</strong></div>
+    <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--color-text)"><span class="tag tag-outline">B</span><strong style="font-size:16px">Artwork</strong></div>
+    <div style="font-size:14px;font-weight:600;padding-top:8px">Volume · on knob</div>
+    <div style="background:#141414;width:240px;display:flex;justify-content:center"><dc-import name="Knob Face" view="{{ cmpHome }}" zoom="0.7" hint-size="238px,280px"></dc-import></div>
+    <div style="background:#141414;width:240px;display:flex;justify-content:center"><dc-import name="Knob Face" view="{{ cmpHome }}" zoom="0.7" art="{{ true }}" hint-size="238px,280px"></dc-import></div>
+    <sc-for list="{{ cmp }}" as="x" hint-placeholder-count="4">
+      <div style="font-size:14px;font-weight:600;padding-top:8px;border-top:1px solid var(--color-divider)">{{ x.name }}</div>
+      <dc-import name="Knob Face" view="{{ x.v }}" part="lcd" hint-size="240px,240px"></dc-import>
+      <dc-import name="Knob Face" view="{{ x.v }}" part="lcd" art="{{ true }}" hint-size="240px,240px"></dc-import>
+    </sc-for>
+    <div style="font-size:14px;font-weight:600;padding-top:8px;border-top:1px solid var(--color-divider)">Trade-offs</div>
+    <div style="font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:6px;text-wrap:pretty;padding-top:8px;border-top:1px solid var(--color-divider)">
+      <span>Highest contrast at every angle. Ships with current firmware; no image transfer.</span>
+      <span style="color:var(--color-neutral-700)">Less recognisable at a distance: you read the title rather than spot the cover.</span>
+    </div>
+    <div style="font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:6px;text-wrap:pretty;padding-top:8px;border-top:1px solid var(--color-divider)">
+      <span>Cover fills the upper half at 80 %, fading to black by y 168 so volume and icons sit on pure black. Changes per detent in Recently Added; unavailable items dim to 35 %. Windows and errors stay clean.</span>
+      <span style="color:var(--color-neutral-700)">Sample covers are stored in the project (from Wikipedia); items without one fall back to a flat placeholder. Needs artwork transfer over USB (240 × 240 RGB565 ≈ 113 KB, or 120 × 120 ≈ 28 KB upscaled), an LVGL image buffer, and fallback to A when art is missing. Check real busy or light covers at an angle.</span>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section data-screen-label="01 Prototype" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">01</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Interactive prototype</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Drag around the ring or scroll over it to turn. Click the four buttons. Keys: ← → turn, 1–4 buttons, Esc cancels the picker.</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+    <div tabindex="0" onKeyDown="{{ kd }}" style="position:relative;flex:none;outline-offset:4px;background:#141414;padding:0 0 16px">
+      <div style="position:absolute;left:12px;top:12px;z-index:2;font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:0.1em;color:#141414;background:repeating-linear-gradient(135deg,#e8c547 0 6px,#d9b53a 6px 12px);padding:5px 7px">SIMULATED · NOT HARDWARE</div>
+      <div style="position:relative;width:476px;height:560px">
+        <dc-import name="Knob Face" view="{{ v }}" zoom="1.4" overlay="{{ safe }}" art="{{ artOn }}" hint-size="476px,560px"></dc-import>
+        <div ref="{{ knobRef }}" onPointerDown="{{ pd }}" onPointerMove="{{ pm }}" onPointerUp="{{ pu }}" onPointerCancel="{{ pu }}" style="position:absolute;left:36px;top:36px;width:404px;height:404px;border-radius:50%;cursor:grab;touch-action:none"></div>
+        <div style="position:absolute;left:68px;top:470px;display:flex;gap:31px">
+          <button onClick="{{ b1 }}" aria-label="Button 1" style="width:62px;height:62px;background:transparent;border:0;cursor:pointer" style-hover="background:rgba(255,255,255,0.05)" style-active="background:rgba(255,255,255,0.1)"></button>
+          <button onClick="{{ b2 }}" aria-label="Button 2" style="width:62px;height:62px;background:transparent;border:0;cursor:pointer" style-hover="background:rgba(255,255,255,0.05)" style-active="background:rgba(255,255,255,0.1)"></button>
+          <button onClick="{{ b3 }}" aria-label="Button 3" style="width:62px;height:62px;background:transparent;border:0;cursor:pointer" style-hover="background:rgba(255,255,255,0.05)" style-active="background:rgba(255,255,255,0.1)"></button>
+          <button onClick="{{ b4 }}" aria-label="Button 4" style="width:62px;height:62px;background:transparent;border:0;cursor:pointer" style-hover="background:rgba(255,255,255,0.05)" style-active="background:rgba(255,255,255,0.1)"></button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:0 16px 10px">
+        <span style="font:500 12px Archivo,sans-serif;color:#9b9797;width:44px">Screen</span>
+        <div style="display:flex;border:1px solid #3a3838">
+          <button onClick="{{ artOff }}" style="height:30px;padding:0 12px;border:0;font:600 12px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ artOffBg }};color:{{ artOffFg }}">Clean</button>
+          <button onClick="{{ artOnB }}" style="height:30px;padding:0 12px;border:0;font:600 12px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ artOnBg }};color:{{ artOnFg }}">Album artwork</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:0 16px 10px">
+        <span style="font:500 12px Archivo,sans-serif;color:#9b9797;width:44px">LEDs</span>
+        <div style="display:flex;border:1px solid #3a3838">
+          <button onClick="{{ ledW }}" style="height:30px;padding:0 12px;border:0;font:600 12px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ ledWBg }};color:{{ ledWFg }}">White</button>
+          <button onClick="{{ ledC }}" style="height:30px;padding:0 12px;border:0;font:600 12px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ ledCBg }};color:{{ ledCFg }}">Targeted colour</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding:0 16px;flex-wrap:wrap">
+        <button onClick="{{ ccw5 }}" style="flex:1;height:36px;background:#232323;color:#e6e6e6;border:0;font:500 13px Archivo,sans-serif;cursor:pointer;text-align:left;padding:0 10px" style-hover="background:#2e2e2e">⟲ 5</button>
+        <button onClick="{{ ccw }}" style="flex:1;height:36px;background:#232323;color:#e6e6e6;border:0;font:500 13px Archivo,sans-serif;cursor:pointer;text-align:left;padding:0 10px" style-hover="background:#2e2e2e">⟲ 1 detent</button>
+        <button onClick="{{ cw }}" style="flex:1;height:36px;background:#232323;color:#e6e6e6;border:0;font:500 13px Archivo,sans-serif;cursor:pointer;text-align:left;padding:0 10px" style-hover="background:#2e2e2e">1 detent ⟳</button>
+        <button onClick="{{ cw5 }}" style="flex:1;height:36px;background:#232323;color:#e6e6e6;border:0;font:500 13px Archivo,sans-serif;cursor:pointer;text-align:left;padding:0 10px" style-hover="background:#2e2e2e">5 ⟳</button>
+      </div>
+    </div>
+
+    <div style="flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
+      <div style="background:#0f0f10;padding:14px 14px 10px;display:flex;flex-direction:column;gap:8px">
+        <div style="position:relative;aspect-ratio:16/9;background:#2a2d31;overflow:hidden">
+          <div style="position:absolute;left:6%;top:7%;right:6%;bottom:12%;background:#1c1b1b;box-shadow:0 12px 30px rgba(0,0,0,0.4);display:flex;flex-direction:column">
+            <div style="height:26px;display:flex;align-items:center;gap:8px;padding:0 10px;background:#262525;font:500 12px Archivo,sans-serif;color:#d7d3d3"><span style="width:14px;height:14px;background:#444141;display:grid;place-items:center;font-size:9px;color:#fff">{{ front.initial }}</span>{{ front.app }} — {{ front.title }}</div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;padding:18px">
+              <div style="height:8px;width:42%;background:#2d2b2b"></div><div style="height:8px;width:66%;background:#2d2b2b"></div><div style="height:8px;width:54%;background:#2d2b2b"></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:9%;background:#16171a;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;gap:8px">
+            <div style="display:flex;align-items:center;gap:6px;font:500 11px Archivo,sans-serif;color:#bab6b6"><span style="width:12px;height:12px;border-radius:50%;border:2px solid #d7d3d3;box-sizing:border-box;position:relative"></span><span style="width:6px;height:6px;border-radius:50%;background:{{ trayDot }}"></span>9:41</div>
+          </div>
+          <sc-if value="{{ winOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);width:min(92%,640px);background:rgba(22,21,21,0.97);box-shadow:0 20px 60px rgba(0,0,0,0.55);padding:14px;display:flex;flex-direction:column;gap:10px;font-family:Archivo,sans-serif">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:#f3f2f2;font-size:13px;font-weight:600"><span>Windows · {{ winPos }}</span><span style="font-weight:400;color:#9b9797;font-size:11px">Order frozen while browsing</span></div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">
+                <sc-for list="{{ winCards }}" as="c" hint-placeholder-count="9">
+                  <div style="display:flex;flex-direction:column;gap:4px;padding:5px;outline:2px solid {{ c.border }};background:{{ c.bg }};opacity:{{ c.op }}">
+                    <div style="height:54px;background:#2d2b2b;position:relative;display:flex;flex-direction:column;gap:4px;padding:8px 7px;box-sizing:border-box">
+                      <sc-if value="{{ c.thumb }}" hint-placeholder-val="{{ true }}"><div style="height:4px;width:70%;background:#4a4747"></div><div style="height:4px;width:48%;background:#4a4747"></div><div style="height:4px;width:60%;background:#4a4747"></div></sc-if>
+                      <sc-if value="{{ c.noThumb }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:grid;place-items:center"><sc-if value="{{ c.hasIc }}" hint-placeholder-val="{{ false }}"><div style="width:24px;height:24px;background:{{ c.icBg }}"></div></sc-if><sc-if value="{{ c.noIc }}" hint-placeholder-val="{{ true }}"><span style="width:22px;height:22px;background:#605d5d;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:600">{{ c.initial }}</span></sc-if></div></sc-if>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;font-size:10px;line-height:12px;color:#9b9797;white-space:nowrap;overflow:hidden"><sc-if value="{{ c.hasIc }}" hint-placeholder-val="{{ false }}"><div style="width:12px;height:12px;background:{{ c.icBg }};flex:none"></div></sc-if><span style="overflow:hidden;text-overflow:ellipsis">{{ c.app }}</span></div>
+                    <div style="font-size:11px;line-height:13px;color:#f3f2f2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:26px">{{ c.title }}</div>
+                    <div style="font-size:10px;line-height:12px;color:{{ c.hc }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.hint }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#9b9797"><span>Turn knob to highlight</span><span>Button 4 · Switch</span><span>Esc or button 1 · Cancel</span></div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;justify-content:space-between;font:400 11px Archivo,sans-serif;color:#7d7979"><span>Display 1 · picker opens on the display with the foreground window</span><span>Desktop simulation</span></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;border-top:2px solid var(--color-text)">
+        <div style="padding:14px 16px 14px 0;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--color-divider)">
+          <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Haptic profile · existing</div>
+          <div style="font-size:22px;font-weight:800">{{ hap.profile }}</div>
+          <div style="font-size:14px;line-height:1.5">{{ hap.detText }} · bounds {{ hap.bounds }}</div>
+          <div style="font-size:14px;line-height:1.5">Position <strong>{{ hap.pos }}</strong> · entry {{ hap.entry }}</div>
+          <div style="font-size:12px;line-height:1.4;color:var(--color-neutral-700)">Force, ramp, mode and spacing untouched. Only bounds and logical entry change per mode. Screen and LED updates never restart the profile.</div>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--color-divider)">
+          <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Available now</div>
+          <div style="font-size:15px;line-height:1.5;text-wrap:pretty">{{ v.actions }}</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:4px">
+            <sc-for list="{{ legend }}" as="b" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:3px;padding:6px;background:var(--color-surface)"><span style="font-size:10px;color:var(--color-neutral-700)">{{ b.n }}</span><span style="font-size:13px;font-weight:600">{{ b.w }}</span><span style="font-size:10px;color:var(--color-neutral-700)">{{ b.light }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="padding:14px 0 14px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--color-divider)">
+          <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Simulated commands</div>
+          <sc-for list="{{ log }}" as="c" hint-placeholder-count="3">
+            <div style="font:12px/1.45 ui-monospace,Menlo,monospace;color:var(--color-neutral-800)">{{ c }}</div>
+          </sc-for>
+          <sc-if value="{{ noLog }}" hint-placeholder-val="{{ true }}"><div style="font-size:13px;color:var(--color-neutral-600)">Nothing sent yet.</div></sc-if>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Inject conditions</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button class="btn btn-secondary" onClick="{{ tExt }}">Volume changed in Sonos app</button>
+          <button class="btn btn-secondary" onClick="{{ tSonos }}">{{ sonosLabel }}</button>
+          <button class="btn btn-secondary" onClick="{{ tClose }}">Close highlighted window</button>
+          <button class="btn btn-secondary" onClick="{{ tUnplug }}">Unplug USB</button>
+          <button class="btn btn-secondary" onClick="{{ tFail }}">{{ failLabel }}</button>
+          <button class="btn btn-secondary" onClick="{{ tAuth }}">{{ authLabel }}</button>
+          <button class="btn btn-secondary" onClick="{{ tEmpty }}">{{ emptyLabel }}</button>
+          <button class="btn btn-secondary" onClick="{{ tNoPrev }}">{{ prevLabel }}</button>
+          <button class="btn btn-secondary" onClick="{{ tNothing }}">{{ nothingLabel }}</button>
+          <button class="btn btn-ghost" onClick="{{ reset }}">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="02 LCD" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">02</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">LCD at 240 × 240</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Top row: 1 CSS px = 1 LCD px. Middle: 2× with mask, safe circle (dashed, r 104) and bezel band (red, r 112–120). Bottom: viewed from a 38° desk angle.</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:24px">
+    <sc-for list="{{ exports }}" as="x" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:12px;padding-top:10px;border-top:1px solid var(--color-divider)">
+        <div style="font-size:14px;font-weight:600">{{ x.name }}</div>
+        <dc-import name="Knob Face" view="{{ x.v }}" part="lcd" hint-size="240px,240px"></dc-import>
+        <dc-import name="Knob Face" view="{{ x.v }}" part="lcd" zoom="2" overlay="{{ true }}" hint-size="480px,480px" style="max-width:100%"></dc-import>
+        <div style="height:240px;display:flex;align-items:center;overflow:hidden;background:#2b2b2b;width:240px"><dc-import name="Knob Face" view="{{ x.v }}" part="lcd" tilt="{{ true }}" hint-size="240px,240px"></dc-import></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;font-size:14px;line-height:1.5">
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Layout grid</strong><span>Label 32 · title 50–104 · detail 106–141 · footer icons 154–174 (20 px). Every line is sized to the chord of the safe circle at its height, so text stays 16 px clear of the physical edge.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Footer</strong><span>Four icons centred at x 56, 99, 141, 184: equal spacing, same order as the buttons. No words, so differing label widths can’t make the row look uneven. The old 42/94/146/198 row pushed slots 1 and 4 into the bezel. Empty slots stay empty so the others never shift.</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><strong>Angle check</strong><span>At 38° the 12 px label and 20 px footer icons stay legible; the 48 px volume and 22 px titles carry at a glance. Nothing essential sits above y 32 or below y 176, where the bezel lip hides first.</span></div>
+  </div>
+</section>
+
+<section data-screen-label="03 Ring and light" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">03</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Ring, buttons and motion</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:32px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:10px"><span class="tag tag-neutral">Recommended</span><strong style="font-size:17px">White arc</strong></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;background:#141414;padding:8px">
+        <sc-for list="{{ volWhite }}" as="x" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:4px"><dc-import name="Knob Face" view="{{ x.v }}" zoom="0.5" hint-size="170px,200px"></dc-import><span style="font-size:11px;color:#9b9797;padding-left:4px">{{ x.n }}</span></div></sc-for>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.5;text-wrap:pretty">Arc runs clockwise from 7 to 5 o’clock, one segment per 2 %. Body L2, endpoint L3, the two bound marks L1. A pending request shows the confirmed arc at L2 and the requested span at L1, so the endpoint leads and the arc catches up when Sonos reports back.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:10px"><span class="tag tag-outline">Explored</span><strong style="font-size:17px">Green → red arc</strong></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;background:#141414;padding:8px">
+        <sc-for list="{{ volGrad }}" as="x" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:4px"><dc-import name="Knob Face" view="{{ x.v }}" zoom="0.5" hint-size="170px,200px"></dc-import><span style="font-size:11px;color:#9b9797;padding-left:4px">{{ x.n }}</span></div></sc-for>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.5;text-wrap:pretty">Adds no information: position already says how far up you are, and the colour repeats it. It also borrows green and red, which mean “confirm” and “cancel” on the buttons, and suggests a danger level that a Sonos percentage cannot measure. Kept as a Tweak for evaluation only.</p>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px;padding-top:12px;border-top:1px solid var(--color-divider)">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <strong style="font-size:15px">Ring per mode</strong>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.45">
+        <div><strong>Volume</strong> — proportional arc with a clear endpoint. 67 detents per turn, so the arc does not track knob angle.</div>
+        <div><strong>Recently Added, Windows</strong> — one L1 landmark per entry, 3 segments apart. 20 detents per turn is 18° per detent, so the cursor moves with the knob exactly. Unavailable and closed entries leave a gap. More is a double landmark.</div>
+        <div><strong>Tracks</strong> — Prev and Next as paired segments 45° either side of a single Neutral mark, matching 8 detents per turn.</div>
+        <div><strong>Screen change</strong> — LCD slides in 16 px and fades (240 ms), from the right when going deeper, from the left when going back. Ring and button lights switch instantly so the cursor never lags; no sweep.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <strong style="font-size:15px">Relative brightness</strong>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ levels }}" as="lv" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:40px 56px 1fr;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:13px">
+            <strong>{{ lv.k }}</strong>
+            <span style="height:14px;background:#141414;display:flex;align-items:center;padding:0 4px"><span style="height:6px;width:100%;background:{{ lv.sw }}"></span></span>
+            <span>{{ lv.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <span style="font-size:12px;color:var(--color-neutral-700)">Percentages are of maximum LED drive, a starting point for tuning on hardware. On-screen swatches are simulated; real LEDs will look brighter and more saturated.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <strong style="font-size:15px">Feedback</strong>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ motion }}" as="m" hint-placeholder-count="5">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:13px;line-height:1.4"><strong>{{ m.k }}</strong><span>{{ m.d }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="04 Desktop" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">04</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Windows companion</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Main window mirrors the prototype above. Closing hides to the tray; Quit stops the controller.</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:8px;flex:0 1 480px;min-width:300px">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Main window</div>
+      <div style="background:#1b1a1a;color:#f3f2f2;font-family:Archivo,sans-serif;box-shadow:0 18px 40px rgba(0,0,0,0.25)">
+        <div style="height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 0 0 14px;border-bottom:1px solid #2d2b2b;font-size:12px;color:#bab6b6"><span style="font-weight:600;color:#f3f2f2">Nano_D++</span><span style="display:flex"><span style="width:44px;text-align:center">–</span><span style="width:44px;text-align:center" title="Hides to tray">×</span></span></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:2px solid #444141">
+          <sc-for list="{{ svc }}" as="x" hint-placeholder-count="3">
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #2d2b2b">
+              <span style="font-size:11px;color:#9b9797;letter-spacing:0.08em;text-transform:uppercase">{{ x.k }}</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600"><span style="width:8px;height:8px;background:{{ x.c }};flex:none"></span>{{ x.v }}</span>
+              <span style="font-size:12px;color:#9b9797;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.d }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:16px;padding:18px 14px;align-items:center">
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <span style="font-size:11px;color:#9b9797;letter-spacing:0.08em;text-transform:uppercase">Knob is on</span>
+            <span style="font-size:26px;font-weight:800;line-height:1.1">{{ appMode }}</span>
+            <span style="font-size:14px;color:#d7d3d3;line-height:1.4">{{ appDetail }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <dc-import name="Knob Face" view="{{ v }}" zoom="0.42" hint-size="143px,168px"></dc-import>
+            <span style="font-size:10px;color:#9b9797">Live mirror</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;padding:0 14px 14px;flex-wrap:wrap">
+          <button style="height:34px;padding:0 14px;background:#f3f2f2;color:#1b1a1a;border:0;font:600 13px Archivo,sans-serif;text-align:left;cursor:pointer" style-hover="background:#d7d3d3">Settings</button>
+          <button style="height:34px;padding:0 14px;background:transparent;color:#f3f2f2;border:1px solid #444141;font:500 13px Archivo,sans-serif;text-align:left;cursor:pointer" style-hover="background:#2d2b2b">Disconnect knob</button>
+        </div>
+        <details style="border-top:1px solid #2d2b2b;padding:10px 14px;font-size:12px;color:#9b9797"><summary style="cursor:pointer">Troubleshooting</summary><div style="display:flex;flex-direction:column;gap:4px;padding-top:8px;line-height:1.5"><span>USB serial · COM5 · firmware 0.9.2</span><span>Sonos · Den at 192.168.1.42 · last event 2 s ago</span><span style="color:#d7d3d3;text-decoration:underline">Export diagnostics…</span></div></details>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;flex:0 1 460px;min-width:300px">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Settings</div>
+      <div style="background:#1b1a1a;color:#f3f2f2;font-family:Archivo,sans-serif;box-shadow:0 18px 40px rgba(0,0,0,0.25);display:flex;flex-direction:column">
+        <div style="height:34px;display:flex;align-items:center;padding:0 14px;border-bottom:2px solid #444141;font-size:12px;font-weight:600">Settings</div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #2d2b2b">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><strong style="font-size:14px">Knob</strong><span style="font-size:12px;color:#6ed996">Ready</span></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div style="padding:8px;background:#242323;display:flex;flex-direction:column;gap:2px"><span style="font-size:10px;color:#9b9797">1</span><span style="font-size:12px">Play/Pause · Back</span></div>
+            <div style="padding:8px;background:#242323;display:flex;flex-direction:column;gap:2px"><span style="font-size:10px;color:#9b9797">2</span><span style="font-size:12px">Browse · Home</span></div>
+            <div style="padding:8px;background:#242323;display:flex;flex-direction:column;gap:2px"><span style="font-size:10px;color:#9b9797">3</span><span style="font-size:12px">Windows</span></div>
+            <div style="padding:8px;background:#242323;display:flex;flex-direction:column;gap:2px"><span style="font-size:10px;color:#9b9797">4</span><span style="font-size:12px">Tracks · Action</span></div>
+          </div>
+          <span style="font-size:11px;color:#9b9797">Left to right, under the knob. Fixed mapping. <span style="border:1px solid #605d5d;padding:1px 4px">Proposed</span> press a button to see its cell light here.</span>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #2d2b2b">
+          <strong style="font-size:14px">Sonos target</strong>
+          <label style="display:flex;gap:10px;align-items:center;font-size:13px;padding:6px 0"><input type="radio" name="room" checked="checked" style="accent-color:#f3f2f2"><span>Den</span><span style="color:#9b9797">Stereo pair + Sub · Victoria</span></label>
+          <label style="display:flex;gap:10px;align-items:center;font-size:13px;padding:6px 0"><input type="radio" name="room" style="accent-color:#f3f2f2"><span>Kitchen</span><span style="color:#9b9797">One</span></label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#9b9797">Manual IP, if discovery fails<input value="" placeholder="192.168.1.42" style="height:32px;background:#242323;border:1px solid #444141;color:#f3f2f2;padding:0 8px;font:13px Archivo,sans-serif;border-radius:0"></label>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #2d2b2b">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><strong style="font-size:14px">Apple Music</strong><span style="font-size:12px;color:{{ amColor }}">{{ amText }}</span></div>
+          <span style="font-size:12px;color:#9b9797;line-height:1.5">Signing keys stay in Windows Credential Manager and are never shown here.</span>
+          <button style="align-self:flex-start;height:32px;padding:0 12px;background:transparent;color:#f3f2f2;border:1px solid #605d5d;font:500 13px Archivo,sans-serif;text-align:left;cursor:pointer" style-hover="background:#2d2b2b">Renew sign-in…</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #2d2b2b">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><strong style="font-size:14px">LED brightness</strong><span style="font-size:11px;border:1px solid #605d5d;padding:1px 4px;color:#bab6b6">Proposed</span></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #444141">
+            <span style="padding:7px 10px;font-size:13px">Dim</span><span style="padding:7px 10px;font-size:13px;background:#f3f2f2;color:#1b1a1a;font-weight:600">Standard</span><span style="padding:7px 10px;font-size:13px">Bright</span>
+          </div>
+          <span style="font-size:11px;color:#9b9797">Scales L1–L4 together; ratios stay fixed.</span>
+        </div>
+        <label style="padding:14px;display:flex;justify-content:space-between;align-items:center;font-size:14px"><span>Launch at Windows sign-in</span><input type="checkbox" checked="checked" style="accent-color:#f3f2f2;width:16px;height:16px"></label>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;flex:0 1 300px;min-width:260px">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Tray</div>
+      <sc-for list="{{ trays }}" as="t" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;color:var(--color-neutral-700)">{{ t.name }}</span>
+          <div style="width:240px;background:#242323;color:#f3f2f2;font:13px Archivo,sans-serif;box-shadow:0 10px 28px rgba(0,0,0,0.3);display:flex;flex-direction:column">
+            <div style="padding:10px 12px;border-bottom:1px solid #444141;display:flex;flex-direction:column;gap:2px"><span style="display:flex;align-items:center;gap:6px;font-weight:600"><span style="width:8px;height:8px;background:{{ t.c }}"></span>{{ t.head }}</span><span style="font-size:12px;color:#9b9797">{{ t.sub }}</span></div>
+            <div style="padding:8px 12px">Open Nano_D++</div>
+            <div style="padding:8px 12px">{{ t.conn }}</div>
+            <div style="padding:8px 12px;border-top:1px solid #444141;display:flex;justify-content:space-between"><span>Quit</span><span style="font-size:11px;color:#9b9797">Stops the knob</span></div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Overlay placement</span>
+        <div style="display:flex;gap:6px;align-items:flex-end">
+          <div style="width:150px;height:84px;background:#2a2d31;position:relative;display:grid;place-items:center"><div style="width:96px;height:36px;background:#161515;outline:2px solid #f3f2f2;outline-offset:-2px"></div><span style="position:absolute;left:4px;bottom:3px;font-size:9px;color:#bab6b6">1 · foreground</span></div>
+          <div style="width:110px;height:62px;background:#2a2d31;position:relative"><span style="position:absolute;left:4px;bottom:3px;font-size:9px;color:#bab6b6">2</span></div>
+        </div>
+        <span style="font-size:12px;line-height:1.5;color:var(--color-neutral-800);text-wrap:pretty">Centred on the display holding the foreground window, never spanning two. Topmost, no-activate: it never takes focus. If focus changes outside the knob, the overlay closes and the knob returns to its previous screen, so later turns go nowhere unexpected.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding-top:14px;border-top:1px solid var(--color-divider)">
+    <strong style="font-size:15px">Connection and recovery</strong>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+      <sc-for list="{{ recovery }}" as="r" hint-placeholder-count="4">
+        <div style="background:#1b1a1a;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:2px solid #444141">
+            <sc-for list="{{ r.svc }}" as="x" hint-placeholder-count="3"><div style="padding:8px 10px;display:flex;flex-direction:column;gap:2px;border-right:1px solid #2d2b2b"><span style="font-size:10px;color:#9b9797;text-transform:uppercase;letter-spacing:0.08em">{{ x.k }}</span><span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600"><span style="width:7px;height:7px;background:{{ x.c }}"></span>{{ x.v }}</span></div></sc-for>
+          </div>
+          <div style="display:flex;gap:12px;padding:12px;align-items:center">
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px"><strong style="font-size:15px">{{ r.title }}</strong><span style="font-size:12px;line-height:1.5;color:#d7d3d3;text-wrap:pretty">{{ r.body }}</span><span style="font-size:12px;color:#f3f2f2;text-decoration:underline">{{ r.cta }}</span></div>
+            <dc-import name="Knob Face" view="{{ r.v }}" part="lcd" zoom="0.5" hint-size="120px,120px"></dc-import>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="05 State table" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">05</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">State table</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Generated from the same model as the prototype.</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="table" style="width:100%;min-width:980px">
+      <thead><tr><th style="text-align:left">State</th><th style="text-align:left">Knob</th><th style="text-align:left">Ring</th><th style="text-align:left">1</th><th style="text-align:left">2</th><th style="text-align:left">3</th><th style="text-align:left">4</th><th style="text-align:left">Available</th></tr></thead>
+      <tbody>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <tr>
+            <td style="font-weight:600;font-size:14px;vertical-align:top;max-width:150px">{{ r.name }}</td>
+            <td style="vertical-align:top;background:#141414;width:120px"><dc-import name="Knob Face" view="{{ r.v }}" zoom="0.35" hint-size="119px,140px"></dc-import></td>
+            <td style="vertical-align:top;font-size:13px;max-width:180px">{{ r.ring }}</td>
+            <sc-for list="{{ r.b }}" as="b" hint-placeholder-count="4"><td style="vertical-align:top;font-size:13px;white-space:nowrap"><div style="display:flex;flex-direction:column;gap:3px"><strong>{{ b.w }}</strong><span style="display:flex;align-items:center;gap:5px;color:var(--color-neutral-700);font-size:12px"><span style="width:10px;height:4px;background:{{ b.sw }};outline:1px solid #bab6b6"></span>{{ b.light }}</span></div></td></sc-for>
+            <td style="vertical-align:top;font-size:13px;max-width:240px">{{ r.actions }}</td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section data-screen-label="06 Stress cases" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">06</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Stress cases</h2>
+    <span style="font-size:14px;color:var(--color-neutral-700)">Native 240 px LCD next to the ring and buttons it pairs with.</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px">
+    <sc-for list="{{ stress }}" as="x" hint-placeholder-count="6">
+      <div style="display:flex;gap:14px;align-items:flex-start;padding-top:10px;border-top:1px solid var(--color-divider)">
+        <dc-import name="Knob Face" view="{{ x.v }}" part="lcd" hint-size="240px,240px"></dc-import>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <strong style="font-size:15px">{{ x.name }}</strong>
+          <span style="font-size:13px;line-height:1.45;color:var(--color-neutral-800);text-wrap:pretty">{{ x.note }}</span>
+          <div style="background:#141414;align-self:flex-start"><dc-import name="Knob Face" view="{{ x.v }}" zoom="0.4" hint-size="136px,160px"></dc-import></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="07 Tokens" style="display:flex;flex-direction:column;gap:20px;padding:32px 0;border-bottom:2px solid var(--color-text)">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">07</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Tokens, icons, implementation</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong style="font-size:15px">LCD type · Montserrat</strong>
+      <sc-for list="{{ type }}" as="t" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:13px"><strong>{{ t.k }}</strong><span>{{ t.d }}</span></div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong style="font-size:15px">Colour</strong>
+      <sc-for list="{{ colors }}" as="c" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:22px 110px 1fr;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--color-divider);font-size:13px"><span style="width:22px;height:22px;background:{{ c.hex }};outline:1px solid #bab6b6"></span><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px">{{ c.k }} {{ c.hex }}</span><span>{{ c.d }}</span></div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong style="font-size:15px">Geometry and timing</strong>
+      <sc-for list="{{ geo }}" as="g" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--color-divider);font-size:13px"><strong>{{ g.k }}</strong><span>{{ g.d }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <strong style="font-size:15px">Icons · 24 px grid, 2.3 stroke at 20 px · click to download SVG</strong>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <sc-for list="{{ icons }}" as="i" hint-placeholder-count="12">
+        <a href="{{ i.url }}" download="{{ i.file }}" style="width:118px;display:flex;flex-direction:column;gap:6px;padding:10px;background:#141414;color:#e6e6e6;text-decoration:none" style-hover="background:#262626">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="{{ i.d }}"></path></svg>
+          <span style="font-size:12px;font-weight:600">{{ i.k }}</span>
+          <span style="font:10px/1.3 ui-monospace,Menlo,monospace;color:#9b9797">{{ i.lv }}</span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px;font-size:14px;line-height:1.5">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong>Supported today</strong>
+      <span>Four controls, their haptic profiles and detent counts; 60-segment ring; four RGB buttons; LVGL with Montserrat 12–32; tray app with auto-reconnect and launch at sign-in; Sonos volume, play and skip; Apple Music Recently Added.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong>Implementation changes this design needs</strong>
+      <span>Montserrat 48, digits and % only (~2 KB), for the volume. Fallback: 32 px, which still reads but loses dominance. Glyphs: LVGL built-ins cover all but Windows (uses LV_SYMBOL_COPY) and Switch (LV_SYMBOL_SHUFFLE or a 14 px custom glyph). Companion-owned overlay window, frozen list, focus-loss dismissal. Per-mode bounds and entry index sent to firmware without restarting the profile. Windows app icons: companion reads each window’s icon (WM_GETICON / exe or package icon), scales to 28 × 28 and sends it with the frozen list (≈ 2.3 KB each as RGB565 + alpha); letter tile when missing.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <strong>Proposed, not required</strong>
+      <span>LED brightness setting (Dim · Standard · Bright). Button test in Settings. Everything else in this document maps to existing behaviour.</span>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="08 Review" style="display:flex;flex-direction:column;gap:20px;padding:32px 0">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600">08</span>
+    <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Adversarial review</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 32px">
+    <sc-for list="{{ review }}" as="q" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:4px;padding:12px 0;border-bottom:1px solid var(--color-divider)"><strong style="font-size:15px">{{ q.q }}</strong><span style="font-size:14px;line-height:1.5;text-wrap:pretty">{{ q.a }}</span></div>
+    </sc-for>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;artwork&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;clean&quot;,&quot;artwork&quot;],&quot;default&quot;:&quot;clean&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;leds&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;white&quot;,&quot;color&quot;],&quot;default&quot;:&quot;white&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;ledVolume&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;white&quot;,&quot;gradient&quot;],&quot;default&quot;:&quot;white&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;safeArea&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = { s: null, log: [], art: true, led: 'color' };
+  componentDidMount() {
+    const go = () => {
+      if (window.NanoModel) { this.M = window.NanoModel; this.cur = this.M.init(); this.buildStatics(); this.setState({ s: this.cur }); this.M.loadColors(() => { this.buildStatics(); this.forceUpdate(); }); }
+      else this._t = setTimeout(go, 40);
+    };
+    go();
+    this._iv = setInterval(() => {
+      if (this.cur && this.M.isPending(this.cur)) { this.cur = Object.assign({}, this.cur, { tick: this.cur.tick + 1 }); this.setState({ s: this.cur }); }
+    }, 260);
+    this._esc = e => { if (e.key === 'Escape' && this.cur && this.cur.mode === 'windows') this.dispatch({ t: 'btn', n: 1 }); };
+    window.addEventListener('keydown', this._esc);
+  }
+  componentWillUnmount() {
+    clearTimeout(this._t); clearInterval(this._iv); window.removeEventListener('keydown', this._esc);
+    (this._timers || []).forEach(clearTimeout);
+    if (this._wel) this._wel.removeEventListener('wheel', this._wh);
+  }
+  dispatch(a) {
+    if (!this.cur) return;
+    const r = this.M.step(this.cur, a);
+    this.cur = r.s;
+    this._timers = (this._timers || []).slice(-40);
+    r.fx.forEach(f => this._timers.push(setTimeout(() => this.dispatch(f.act), f.ms)));
+    let log = this.state.log;
+    if (r.cmd) {
+      const vk = 'Sonos · Den group volume';
+      const co = r.cmd.startsWith(vk) && log[0] && log[0].startsWith(vk);
+      log = [r.cmd].concat(co ? log.slice(1) : log).slice(0, 7);
+    }
+    this.setState({ s: this.cur, log });
+  }
+  knobRef = el => {
+    if (this._wel === el) return;
+    if (this._wel) this._wel.removeEventListener('wheel', this._wh);
+    this._wel = el;
+    if (!el) return;
+    this._wh = e => {
+      e.preventDefault();
+      this._wacc = (this._wacc || 0) + e.deltaY;
+      while (Math.abs(this._wacc) >= 40) { const d = this._wacc > 0 ? 1 : -1; this._wacc -= d * 40; this.dispatch({ t: 'rot', d }); }
+    };
+    el.addEventListener('wheel', this._wh, { passive: false });
+  };
+  pd = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    this._c = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    this._a = Math.atan2(e.clientY - this._c.y, e.clientX - this._c.x); this._acc = 0;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  pm = e => {
+    if (!this._c || !this.cur) return;
+    const a = Math.atan2(e.clientY - this._c.y, e.clientX - this._c.x);
+    let d = a - this._a; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+    this._a = a; this._acc += d * 180 / Math.PI;
+    const det = (this.M.view(this.cur).hap || {}).det || 20, st = 360 / det;
+    while (Math.abs(this._acc) >= st) { const k = this._acc > 0 ? 1 : -1; this._acc -= k * st; this.dispatch({ t: 'rot', d: k }); }
+  };
+  pu = () => { this._c = null; };
+  kd = e => {
+    const k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowUp') { e.preventDefault(); this.dispatch({ t: 'rot', d: 1 }); }
+    else if (k === 'ArrowLeft' || k === 'ArrowDown') { e.preventDefault(); this.dispatch({ t: 'rot', d: -1 }); }
+    else if (['1', '2', '3', '4'].includes(k)) this.dispatch({ t: 'btn', n: +k });
+  };
+  buildStatics() {
+    const M = this.M;
+    const LN = { nav: 'White L2', go: 'Green L3', stop: 'Red L2', dim: 'Faint L1', none: 'Off' };
+    const SW = { nav: '#d8d8d8', go: '#46e178', stop: '#ff4834', dim: '#4a4a4a', none: '#141414' };
+    this.LN = LN; this.SW = SW;
+    const RING = {
+      home: 'Arc 7→5 o’clock. Body L2, endpoint L3, bound marks L1.',
+      'home-pidle': 'Volume arc as usual. Four buttons lit as on home.',
+      'home-none': 'Volume arc as usual; Play and Tracks buttons faint.',
+      'home-turn': 'Same arc; endpoint follows each detent.',
+      'home-pend': 'Confirmed arc L2, requested span L1, endpoint L3 at request.',
+      'home-paused': 'Unchanged from idle. Pause is shown on the LCD, not the ring.',
+      'home-ext': 'Arc redrawn at 38; endpoint L4 until next turn.',
+      'home-off': 'Last known endpoint L1 only.',
+      'ra-load': 'Top segment alternates L1/L2.',
+      'ra-item': 'Landmark per item L1, 3 segments apart; cursor L3.',
+      'ra-more': 'Double landmark; cursor on both at L3.',
+      'ra-na': 'Gap where item is; cursor L2.',
+      'ra-pend': 'Cursor alternates L3/L1 until Sonos reports.',
+      'ra-part': 'Red flash ×3 segments, 900 ms, then landmarks.',
+      'ra-auth': 'Off.', 'ra-empty': 'Off.',
+      'tr-neu': 'Neutral L2; Prev/Next pairs L1 at ±45°.',
+      'tr-next': 'Next pair L3.',
+      'tr-done': 'Green flash at Neutral, 650 ms, then quiet.',
+      'tr-noprev': 'Prev pair off; Neutral and Next L1.',
+      'wi-brw': 'Landmark per window L1; cursor L3.',
+      'wi-closed': 'Gap at closed slot; cursor L2.',
+      'wi-fail': 'Red flash at cursor, then landmarks.',
+      disc: 'Top segment L1; reconnecting alternates.'
+    };
+    const legend = v => v.foot.map((f, i) => ({ n: i + 1, w: f.tone === 'none' ? '—' : f.w, light: LN[f.tone], sw: SW[f.tone] }));
+    this.legendOf = legend;
+    this.rows = M.scenarios().map(x => { const v = M.view(x.st); return { name: x.name, v, ring: RING[x.id] || '', b: legend(v), actions: v.actions }; });
+    this.stress = M.stress().map(x => ({ name: x.name, note: x.note, v: M.view(x.st) }));
+    const vc = style => [0, 54, 100].map(n => ({ n: n + ' %', v: M.view(M.mk({ vol: n, volConf: n }), { volStyle: style }) }));
+    this.volWhite = vc('white'); this.volGrad = vc('gradient');
+    const sc = {}; M.scenarios().forEach(x => { sc[x.id] = M.view(x.st); });
+    const lr = (name, st, note) => ({ name, note, w: M.view(st), c: M.view(st, { led: 'color' }) });
+    this.ledRows = [
+      lr('Volume · 54 %', M.mk({ vol: 54, volConf: 54 }), 'No change: white below 80 %.'),
+      lr('Volume · 86 %', M.mk({ vol: 86, volConf: 86, volVis: true }), 'Segments past 80 % turn amber.'),
+      lr('Volume · 96 %', M.mk({ vol: 96, volConf: 96, volVis: true }), 'Last 10 % red; endpoint takes the colour.'),
+      lr('Recently Added', M.mk({ mode: 'recent', recent: { idx: 2 } }), 'Each landmark takes its cover’s dominant colour; cursor brightest.'),
+      lr('Windows · Claude', M.mk({ mode: 'windows', win: { idx: 1 } }), 'Each detent takes its app icon’s colour.'),
+      lr('Windows · Chrome', M.mk({ mode: 'windows', win: { idx: 2 } }), 'Monochrome icons (Terminal, ChatGPT) stay white.')
+    ];
+    this.cmpHome = sc.home;
+    this.cmp = [
+      { name: 'Recently Added', v: sc['ra-item'] }, { name: 'Tracks · Next', v: sc['tr-next'] },
+      { name: 'Long accented title', v: M.view(M.mk({ mode: 'recent', recent: { idx: 1 } })) }, { name: 'Volume · paused', v: sc['home-paused'] }
+    ];
+    this.exports = [
+      { name: 'Volume', v: sc.home }, { name: 'Recently Added', v: sc['ra-item'] },
+      { name: 'Tracks', v: sc['tr-next'] }, { name: 'Windows', v: sc['wi-brw'] }
+    ];
+    const OK = '#6ed996', BAD = '#ff7a66', WAIT = '#bab6b6';
+    this.recovery = [
+      { title: 'Knob not found', body: 'Plug in the USB cable. The app keeps looking and connects on its own; nothing else to do.', cta: 'Open Settings', v: sc.disc,
+        svc: [{ k: 'Knob', v: 'Not found', c: BAD }, { k: 'Sonos', v: 'Den', c: OK }, { k: 'Apple Music', v: 'Signed in', c: OK }] },
+      { title: 'Reconnecting…', body: 'Reads fresh volume and track from Sonos, then opens Volume. Turns and presses made while unplugged are discarded.', cta: '', v: M.view(M.mk({ conn: 'reconnecting' })),
+        svc: [{ k: 'Knob', v: 'Reconnecting', c: WAIT }, { k: 'Sonos', v: 'Den', c: OK }, { k: 'Apple Music', v: 'Signed in', c: OK }] },
+      { title: 'Den unavailable', body: 'Volume and Tracks wait for Sonos. Windows switching keeps working. Retrying every 5 s.', cta: 'Set manual IP…', v: sc['home-off'],
+        svc: [{ k: 'Knob', v: 'Connected', c: OK }, { k: 'Sonos', v: 'Unavailable', c: BAD }, { k: 'Apple Music', v: 'Signed in', c: OK }] },
+      { title: 'Apple Music sign-in expired', body: 'Recently Added can’t load. Volume, Tracks and Windows are unaffected.', cta: 'Renew sign-in…', v: sc['ra-auth'],
+        svc: [{ k: 'Knob', v: 'Connected', c: OK }, { k: 'Sonos', v: 'Den', c: OK }, { k: 'Apple Music', v: 'Sign-in needed', c: BAD }] }
+    ];
+    const names = { back: 'Back', cancel: 'Cancel', home: 'Home', list: 'Browse', win: 'Windows', tracks: 'Tracks', play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next', more: 'More', switch: 'Switch', ok: 'Confirm', dot: 'Neutral', warn: 'Warning', usb: 'USB' };
+    this.icons = Object.keys(names).map(k => {
+      const d = M.I[k];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+      return { k: names[k], d, lv: M.LV[k], file: `nano-${k}.svg`, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) };
+    });
+  }
+  renderVals() {
+    const M = this.M, s = this.state.s;
+    const D = d => () => this.dispatch(d);
+    const artOn = this.state.art != null ? this.state.art : this.props.artwork === 'artwork';
+    const base = {
+      kd: this.kd, knobRef: this.knobRef, pd: this.pd, pm: this.pm, pu: this.pu,
+      b1: D({ t: 'btn', n: 1 }), b2: D({ t: 'btn', n: 2 }), b3: D({ t: 'btn', n: 3 }), b4: D({ t: 'btn', n: 4 }),
+      cw: D({ t: 'rot', d: 1 }), ccw: D({ t: 'rot', d: -1 }),
+      cw5: () => { for (let i = 0; i < 5; i++) this.dispatch({ t: 'rot', d: 1 }); },
+      ccw5: () => { for (let i = 0; i < 5; i++) this.dispatch({ t: 'rot', d: -1 }); },
+      tExt: D({ t: 'external' }), tSonos: D({ t: 'sonos' }), tClose: D({ t: 'closeWin' }), tUnplug: D({ t: 'unplug' }),
+      tFail: D({ t: 'opt', k: 'fail' }), tAuth: D({ t: 'opt', k: 'auth' }), tEmpty: D({ t: 'opt', k: 'empty' }), tNoPrev: D({ t: 'opt', k: 'noPrev' }), tNothing: D({ t: 'nothing' }),
+      reset: () => { (this._timers || []).forEach(clearTimeout); this._timers = []; this.cur = M.init(); this.setState({ s: this.cur, log: [] }); },
+      safe: !!this.props.safeArea, artOn: artOn, artOff: () => this.setState({ art: false }), artOnB: () => this.setState({ art: true }),
+      ledW: () => this.setState({ led: 'white' }), ledC: () => this.setState({ led: 'color' }),
+      artOffBg: artOn ? 'transparent' : '#e6e6e6', artOffFg: artOn ? '#bab6b6' : '#141414', artOnBg: artOn ? '#e6e6e6' : 'transparent', artOnFg: artOn ? '#141414' : '#bab6b6', log: this.state.log,
+      cmp: this.cmp || [], cmpHome: this.cmpHome || null, noLog: !this.state.log.length,
+      levels: [
+        { k: 'L0', sw: '#1f1f1f', d: 'Off · 0 %. Unused segments, inactive buttons.' },
+        { k: 'L1', sw: '#3a3a3a', d: '~6 %. Landmarks, bounds, disabled buttons.' },
+        { k: 'L2', sw: '#6e6e6e', d: '~18 %. Volume body, nav buttons, red Cancel.' },
+        { k: 'L3', sw: '#b3b3b3', d: '~40 %. Cursor, endpoint, green confirm.' },
+        { k: 'L4', sw: '#ffffff', d: '~80 %. Transient only: success, external change.' }
+      ],
+      motion: [
+        { k: 'Curves', d: 'Enter: ease-out cubic-bezier(0.22,1,0.36,1). Exit: ease-in (0.4,0,1,1), shorter than enter. Emphasis: soft overshoot (0.34,1.45,0.64,1) on the volume number and centred icons only. LVGL: lv_anim custom path from the same bezier.' },
+        { k: 'Turn', d: 'Ring and LCD update on the next frame (≤16 ms). No easing on the cursor, so fast turns and reversals never lag.' },
+        { k: 'Volume reveal', d: 'Track lifts 8 px and fades (150 ms, ease-in); 50 ms later the value rises 6 px and settles from 93 % with a soft overshoot (340 ms). Return: value drops away in 170 ms, track eases back after 90 ms (420 ms).' },
+        { k: 'Paused → idle', d: '4 s after a confirmed pause: footer and title leave first (160 ms), artwork dissolves and drifts to 106 % (560 ms / 1.1 s), then the four centred icons rise in left to right, 45 ms apart (460 ms each).' },
+        { k: 'Pending', d: 'Cursor alternates L3/L1 every 260 ms. After 3 s it holds at L1 and the LCD keeps the “…” text.' },
+        { k: 'Success', d: 'Green L4 on cursor ±1 for 650 ms, then the destination screen’s normal pattern.' },
+        { k: 'Failure', d: 'Red L3 on cursor ±1 for 900 ms, once. The LCD message carries the rest. No strobing.' },
+        { k: 'Idle', d: 'Static. No breathing or chasing. After a volume turn the arc stays as is.' }
+      ],
+      type: [
+        { k: '12', d: 'Labels, meta lines. Caps + 0.08 em tracking for labels only.' },
+        { k: '14', d: 'Artist, app name, secondary detail.' },
+        { k: '16', d: 'Now-playing title on Volume, single line.' },
+        { k: '22', d: 'Primary item: library title, window title, track direction. Two lines max.' },
+        { k: '32', d: 'Fallback volume if 48 is not added.' },
+        { k: '48', d: 'Volume digits and %. New asset, digits-only subset.' }
+      ],
+      colors: [
+        { k: 'lcd.bg', hex: '#000000', d: 'Screen ground.' },
+        { k: 'lcd.ink', hex: '#F2F2F2', d: 'Primary text, volume.' },
+        { k: 'lcd.ink2', hex: '#A6A6A6', d: 'Labels, artist. 8.6:1.' },
+        { k: 'lcd.ink3', hex: '#7C7C7C', d: 'Meta lines. 4.9:1.' },
+        { k: 'lcd.off', hex: '#4A4A4A', d: 'Disabled footer slot.' },
+        { k: 'lcd.go', hex: '#6ED996', d: 'Slot 4 when it confirms.' },
+        { k: 'lcd.stop', hex: '#FF8474', d: 'Slot 1 when it cancels.' },
+        { k: 'led.white', hex: '#FFFFFF', d: 'Position, nav. Default.' },
+        { k: 'led.green', hex: '#46E178', d: 'Confirm available; success.' },
+        { k: 'led.red', hex: '#FF4834', d: 'Cancel available; failure.' }
+      ],
+      geo: [
+        { k: 'Safe circle', d: 'r 104 px (16 px inset). Bezel band r 112–120.' },
+        { k: 'Footer x', d: '56 · 99 · 141 · 184. Slot width 44.' },
+        { k: 'Footer y', d: 'Icons 20 px, 154–174. No text.' },
+        { k: 'Text lines', d: '32 · 50 · 71 · 88 · 106 · 127 · 134.' },
+        { k: 'Ring', d: 'Segment 0 at 12 o’clock, clockwise. Volume 35→25 (50 steps).' },
+        { k: 'List pitch', d: '3 segments = 18° = 1 detent at 20/rev.' },
+        { k: 'Tracks', d: 'Segments 52–53 · 0 · 7–8 (±45°).' },
+        { k: 'Volume ack', d: 'Pending after 380 ms idle until Sonos event.' },
+        { k: 'Screen change', d: 'LCD content settles from 20 px (380 ms ease-out, opacity 220 ms). Deeper from the right, back from the left.' },
+        { k: 'Ring damping', d: 'Segments light instantly and decay over 260 ms, so the cursor never lags but leaves a short tail on fast turns. Pending pulses soften for free.' }
+      ],
+      review: [
+        { q: 'Target and action in one glance?', a: 'The knob sits in the room it controls, so Volume carries no room label; other modes name themselves at the top. Slot 4 is the only green thing on screen and says its verb. At home nothing is green: Play/Pause on button 1 acts immediately like volume, so it lights white, and its glyph shows the action it will take.' },
+        { q: 'Does every footer map to a button?', a: 'Four fixed slots, equal spacing, in button order. Empty slots stay empty rather than collapsing, and each lit button has an icon directly above it.' },
+        { q: 'Readable at native size and at an angle?', a: 'Smallest text is 12 px, all inside the r 104 circle. The 38° views show footer words intact. Low-contrast greys are kept for meta only (≥4.9:1).' },
+        { q: 'Does colour carry information?', a: 'Green means confirm, red means cancel, both also shown by glyph, word and position. Volume stays white; the green-to-red arc was rejected because it repeats position and collides with those meanings.' },
+        { q: 'Is idle quiet?', a: 'Off segments are off. Idle Volume lights about 28 segments at L1–L3 and three buttons at L2. Nothing moves until you turn or press.' },
+        { q: 'Could Cancel imply undo?', a: 'Back is disabled while playback is pending, and the LCD says “Starting on Den…”. Volume has no confirm or undo at all. Partial failure says the queue was already replaced.' },
+        { q: 'Fast turns and reversals?', a: 'Cursor has no easing and in list modes sits at the physical detent angle, so it cannot trail the knob. Titles swap per detent.' },
+        { q: 'Haptics and navigation preserved?', a: 'Four profiles as installed; only bounds and entry positions change. No new layers: More is a list entry, Tracks returns to Neutral in place, Windows restores the interrupted screen on Cancel.' }
+      ]
+    };
+    if (!s || !M) return Object.assign(base, { ledRows: [], ledWBg: '#e6e6e6', ledWFg: '#141414', ledCBg: 'transparent', ledCFg: '#bab6b6', v: null, hap: {}, legend: [], winOpen: false, winCards: [], front: {}, rows: [], stress: [], exports: [], volWhite: [], volGrad: [], recovery: [], icons: [], svc: [], trays: [], sonosLabel: 'Sonos offline', failLabel: 'Fail next command', authLabel: 'Expire Apple Music sign-in', emptyLabel: 'Empty library', prevLabel: 'Previous unsupported', trayDot: '#6ed996', appMode: '', appDetail: '', amText: '', amColor: '#6ed996', winPos: '' });
+
+    const led = this.state.led || this.props.leds || 'white';
+    const v = M.view(s, { volStyle: this.props.ledVolume || 'white', led: led === 'color' ? 'color' : 'white' });
+    const h = v.hap || {};
+    const hap = Object.assign({}, h, { detText: h.det ? `${h.det} detents / rev` : 'No detents active', entry: h.entry || '—' });
+    const W = M.WINS, w = s.win;
+    const winOpen = s.mode === 'windows' && s.conn === 'ok';
+    const winCards = w.order.map((id, i) => {
+      const x = W[id], sel = i === w.idx, closed = w.closed.includes(i);
+      return { app: x.app, title: x.title, hint: closed ? 'Closed' : i === 0 ? 'Current window' : x.hint, hc: closed ? '#ff7a66' : '#9b9797',
+        thumb: !!x.th && !closed, noThumb: !x.th || closed, initial: x.app[0], icBg: M.APPIC[x.app] ? `url("assets/apps/${M.APPIC[x.app]}") center / contain no-repeat` : 'none', hasIc: !!M.APPIC[x.app], noIc: !M.APPIC[x.app], border: sel ? '#f3f2f2' : 'transparent', bg: sel ? '#2d2b2b' : 'transparent', op: closed ? 0.45 : 1 };
+    });
+    const fx = W[s.mru[0]];
+    const np = M.nowPlaying(s);
+    const OK = '#6ed996', BAD = '#ff7a66', WAIT = '#bab6b6';
+    const knobOk = s.conn === 'ok';
+    const svc = [
+      { k: 'Knob', v: knobOk ? 'Connected' : s.conn === 'missing' ? 'Not found' : 'Reconnecting', c: knobOk ? OK : s.conn === 'missing' ? BAD : WAIT, d: 'USB' },
+      { k: 'Sonos', v: s.sonos === 'ok' ? 'Den' : 'Unavailable', c: s.sonos === 'ok' ? OK : BAD, d: s.sonos === 'ok' ? 'Stereo pair + Sub' : 'Retrying' },
+      { k: 'Apple Music', v: s.opt.auth ? 'Sign-in needed' : 'Signed in', c: s.opt.auth ? BAD : OK, d: s.opt.auth ? 'Renew in Settings' : 'Recently Added' }
+    ];
+    const modeName = { home: 'Volume', recent: 'Recently Added', tracks: 'Tracks', windows: 'Windows', offline: 'Waiting' }[v.mode];
+    const appDetail = v.mode === 'home' ? (s.sonos === 'ok' ? `${s.playing ? '' : 'Paused · '}${s.vol} % · ${np ? np.t + ' — ' + np.a : 'Nothing playing'}` : 'Den unavailable; Windows still works')
+      : v.mode === 'recent' ? v.lcd.title : v.mode === 'tracks' ? v.lcd.title : v.mode === 'windows' ? `${W[w.order[w.idx]].app} · ${W[w.order[w.idx]].title}` : 'Knob not connected';
+    const trays = [
+      { name: 'Connected', c: OK, head: 'Knob connected', sub: `Den · ${s.volConf} %`, conn: 'Disconnect' },
+      { name: 'Device missing', c: BAD, head: 'Knob not found', sub: 'Looking for USB device…', conn: 'Connect' }
+    ];
+    const lc = (this.state.led || this.props.leds) === 'color';
+    return Object.assign(base, {
+      ledWBg: lc ? 'transparent' : '#e6e6e6', ledWFg: lc ? '#bab6b6' : '#141414', ledCBg: lc ? '#e6e6e6' : 'transparent', ledCFg: lc ? '#141414' : '#bab6b6',
+      ledRows: this.ledRows || [],
+      v, hap, legend: this.legendOf(v), winOpen, winCards, winPos: `${w.idx + 1} of ${w.order.length}`,
+      front: { app: fx.app, title: fx.title, initial: fx.app[0] },
+      trayDot: knobOk ? OK : BAD, svc, appMode: modeName, appDetail, trays,
+      amText: s.opt.auth ? 'Sign-in expired' : 'Signed in', amColor: s.opt.auth ? BAD : OK,
+      rows: this.rows, stress: this.stress, exports: this.exports, volWhite: this.volWhite, volGrad: this.volGrad, recovery: this.recovery, icons: this.icons,
+      sonosLabel: s.sonos === 'ok' ? 'Take Den offline' : 'Bring Den back',
+      failLabel: s.opt.fail ? 'Commands succeed ✓' : 'Make next command fail',
+      authLabel: s.opt.auth ? 'Restore Apple Music sign-in' : 'Expire Apple Music sign-in',
+      emptyLabel: s.opt.empty ? 'Library has items' : 'Empty Recently Added',
+      prevLabel: s.opt.noPrev ? 'Previous supported' : 'Previous unsupported',
+      nothingLabel: s.nothing ? 'Resume queue' : 'Stop: nothing playing'
+    });
+  }
+}
+</script>
+</body>
+</html>

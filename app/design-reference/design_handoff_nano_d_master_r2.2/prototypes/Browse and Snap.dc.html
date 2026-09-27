@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+  <script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+  <script src="knob-model.js"></script>
+  <script src="handoff-tables.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap">
+  <style>body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent)}</style>
+</helmet>
+<div style="max-width:1440px;margin:0 auto;padding:32px 24px 56px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:12px">
+    <h1 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-0.01em">Nano_D++ · revision 2</h1>
+    <span style="font-size:14px;color:var(--color-neutral-700);text-wrap:pretty">Designed around engineering’s hardware, service and 240 Hz findings. Turn with ← → or the scroll wheel; press 1–4 or the knob’s buttons; hold 1 for Home. Every state is reachable from the state picker below the stage.</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end">
+    <sc-for list="{{ viewCtl }}" as="g" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">{{ g.label }}</span>
+        <div style="display:flex;border:2px solid var(--color-text);width:max-content">
+          <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.on }}" style="height:32px;padding:0 12px;border:0;font:600 13px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <div ref="{{ wrapRef }}" style="flex:1 1 720px;min-width:0;height:{{ outerH }};position:relative;overflow:hidden;background:#111">
+      <div ref="{{ stageRef }}" style="position:absolute;left:0;top:0;width:{{ SW }};height:720px;transform-origin:0 0;transform:{{ stageTf }};overflow:hidden;font-family:Archivo,sans-serif;background:#0e1a2b">
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 20% 10%, #2a4a78 0%, #0e1a2b 60%, #080d16 100%)"></div>
+
+        <sc-for list="{{ deskWins }}" as="w" hint-placeholder-count="7">
+          <div style="position:absolute;left:{{ w.x }};top:{{ w.y }};width:{{ w.w }};height:{{ w.h }};opacity:{{ w.op }};z-index:{{ w.z }};overflow:hidden;background:#1b1b1d;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08)">
+            <div style="position:absolute;left:0;top:0;right:0;height:28px;background:#202022;display:flex;align-items:center;gap:8px;padding:0 10px;color:#d8d8d8;font-size:12px;white-space:nowrap;overflow:hidden">
+              <div style="width:14px;height:14px;flex:none;background:{{ w.icBg }};color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ w.letter }}</div>
+              <span style="overflow:hidden;text-overflow:ellipsis">{{ w.title }}</span>
+            </div>
+            <div style="position:absolute;left:0;top:28px;width:480px;height:300px;transform-origin:0 0;transform:{{ w.inner }};background:{{ w.thumb }}"></div>
+          </div>
+        </sc-for>
+
+        <div style="position:absolute;left:0;right:0;bottom:0;height:48px;background:rgba(32,32,32,0.96);display:flex;align-items:center;justify-content:center;gap:10px;z-index:5">
+          <sc-for list="{{ taskIcons }}" as="ti" hint-placeholder-count="6">
+            <div style="width:24px;height:24px;background:{{ ti.bg }};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;border-bottom:2px solid {{ ti.line }}">{{ ti.letter }}</div>
+          </sc-for>
+        </div>
+
+        <div style="position:absolute;inset:0;z-index:10;opacity:{{ wOp }};pointer-events:{{ wPe }};transition:opacity 280ms cubic-bezier(0.22,1,0.36,1)">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);background:rgba(10,10,12,0.5);opacity:{{ wFrostOp }}"></div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);opacity:{{ wFlatOp }}"></div>
+          <div style="position:absolute;left:{{ off }};top:0;width:1280px;height:720px;text-shadow:{{ wTextSh }}">
+
+          <div style="position:absolute;left:0;width:1280px;top:104px;display:flex;justify-content:center;gap:14px;opacity:{{ trayOp }};transform:{{ trayTf }};transition:opacity 260ms cubic-bezier(0.22,1,0.36,1), transform 460ms cubic-bezier(0.34,1.45,0.64,1);pointer-events:none">
+            <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                <div style="position:relative;width:176px;height:110px;overflow:hidden;border:{{ sl.border }};background:rgba(255,255,255,0.04);transition:border-color 260ms ease">
+                  <div style="position:absolute;left:0;top:0;width:480px;height:300px;transform:scale(0.3667);transform-origin:0 0;background:{{ sl.ghostThumb }};opacity:{{ sl.ghost }};transition:opacity 260ms cubic-bezier(0.22,1,0.36,1)"></div>
+                  <div style="position:absolute;left:0;top:0;width:480px;height:300px;transform:scale(0.3667);transform-origin:0 0;background:{{ sl.thumb }};opacity:{{ sl.fill }};transition:opacity 260ms cubic-bezier(0.22,1,0.36,1)"></div>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:{{ sl.empty }};transition:opacity 200ms ease;color:rgba(255,255,255,0.8)">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14"></rect><path d="{{ sl.half }}" fill="currentColor" stroke="none"></path></svg>
+                  </div>
+                  <div style="position:absolute;left:8px;bottom:8px;width:22px;height:22px;background:{{ sl.icBg }};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:{{ sl.fill }};transition:opacity 260ms ease">{{ sl.letter }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.86)">
+                  <span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ sl.key }}</span>
+                  <span style="color:{{ sl.labCol }}">{{ sl.label }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="position:absolute;inset:0;opacity:{{ wCardsOp }};transform:{{ wShift }};transition:opacity 220ms ease, transform 460ms cubic-bezier(0.22,1,0.36,1)">
+            <div style="position:absolute;inset:0;transform:{{ wBump }};transition:transform 160ms cubic-bezier(0.22,1,0.36,1)">
+              <sc-for list="{{ wCards }}" as="c" hint-placeholder-count="7">
+                <div onClick="{{ c.pick }}" style="position:absolute;left:640px;top:370px;width:400px;height:250px;transform:{{ c.tf }};opacity:{{ c.op }};z-index:{{ c.z }};transition:{{ c.tr }};cursor:pointer;pointer-events:{{ c.pe }}">
+                  <div style="position:absolute;inset:0;box-shadow:0 12px 30px rgba(0,0,0,0.3);opacity:{{ c.shS }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+                  <div style="position:absolute;inset:0;box-shadow:0 24px 60px rgba(0,0,0,0.45);opacity:{{ c.shB }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+                  <div style="position:absolute;left:-8px;top:-8px;right:-8px;bottom:-8px;border:2px solid rgba(255,255,255,0.9);opacity:{{ c.ringOp }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+                  <div style="position:absolute;inset:0;overflow:hidden;background:#1b1b1d">
+                    <div style="position:absolute;left:0;top:0;width:480px;height:300px;transform:scale(0.8333);transform-origin:0 0;background:{{ c.thumb }}"></div>
+                  </div>
+                  <div style="position:absolute;left:12px;bottom:12px;width:30px;height:30px;background:{{ c.icBg }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.45)">{{ c.letter }}</div>
+                  <sc-if value="{{ c.hasBadge }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(18,18,20,0.72);color:#fff;font-size:12px;font-weight:600">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14"></rect><path d="{{ c.badgeHalf }}" fill="currentColor" stroke="none"></path></svg>
+                      <span>{{ c.badge }}</span>
+                    </div>
+                  </sc-if>
+                  <div style="position:absolute;inset:0;background:#111;opacity:{{ c.shade }};transition:opacity 320ms ease"></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="position:absolute;left:190px;width:900px;top:512px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:#fff;opacity:{{ labOp }};transition:{{ labTr }}">
+              <div style="display:flex;align-items:center;gap:8px;font-size:15px;color:rgba(255,255,255,0.92)">
+                <div style="width:18px;height:18px;background:{{ wCur.icBg }};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ wCur.letter }}</div>
+                <span>{{ wCur.app }}</span>
+              </div>
+              <div style="font-size:26px;line-height:32px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:900px">{{ wCur.title }}</div>
+              <div style="font-size:15px;color:rgba(255,255,255,0.86)">{{ wCur.desc }}</div>
+            </div>
+            <div style="position:absolute;left:{{ wDotsL }};width:{{ wDotsW }};top:622px;height:6px">
+              <sc-for list="{{ wDots }}" as="d" hint-placeholder-count="7">
+                <div style="position:absolute;left:{{ d.l }};top:0;width:6px;height:6px;background:#fff;opacity:0.4"></div>
+              </sc-for>
+              <div style="position:absolute;left:0;top:0;width:6px;height:6px;background:#fff;transform:{{ wInd }};transition:{{ indTr }}"></div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div style="position:absolute;left:{{ fly.x }};top:{{ fly.y }};width:400px;height:250px;z-index:20;overflow:hidden;transform-origin:0 0;transform:{{ fly.tf }};opacity:{{ fly.op }};transition:{{ fly.tr }};pointer-events:none;box-shadow:0 30px 70px rgba(0,0,0,0.45)">
+          <div style="position:absolute;left:0;top:0;width:480px;height:300px;transform-origin:0 0;transform:scale(0.8333);background:{{ fly.thumb }}"></div>
+        </div>
+
+        <div style="position:absolute;inset:0;z-index:12;opacity:{{ xOp }};pointer-events:{{ xPe }};transition:opacity 340ms cubic-bezier(0.22,1,0.36,1);overflow:hidden">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(36px) saturate(1.3);-webkit-backdrop-filter:blur(36px) saturate(1.3);background:rgba(8,8,10,0.5)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ xAmbA }};filter:blur(90px) saturate(1.5);opacity:{{ xAmbAOp }};transition:opacity 600ms cubic-bezier(0.22,1,0.36,1)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ xAmbB }};filter:blur(90px) saturate(1.5);opacity:{{ xAmbBOp }};transition:opacity 600ms cubic-bezier(0.22,1,0.36,1)"></div>
+          <div style="position:absolute;left:{{ off }};top:0;width:1280px;height:720px">
+
+          <div style="position:absolute;left:0;width:1280px;top:44px;display:flex;justify-content:center;gap:36px">
+            <sc-for list="{{ xTabs }}" as="tb" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:#ffffff;opacity:{{ tb.op }};transition:opacity 240ms cubic-bezier(0.22,1,0.36,1)">
+                <div style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600">
+                  <span style="width:18px;height:18px;border:1px solid currentColor;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ tb.key }}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ tb.d }}"></path></svg>
+                  <span>{{ tb.label }}</span>
+                </div>
+                <div style="width:100%;height:2px;background:#fff;transform:scaleX({{ tb.sx }});transition:transform 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="position:absolute;inset:0;transform:{{ xBump }};transition:transform 160ms cubic-bezier(0.22,1,0.36,1)">
+            <sc-for list="{{ xCards }}" as="c" hint-placeholder-count="9">
+              <div onClick="{{ c.pick }}" style="position:absolute;left:640px;top:318px;width:340px;height:340px;transform:{{ c.tf }};opacity:{{ c.op }};z-index:{{ c.z }};transition:{{ c.tr }};cursor:pointer;pointer-events:{{ c.pe }}">
+                <div style="position:absolute;inset:0;box-shadow:0 16px 36px rgba(0,0,0,0.4);opacity:{{ c.shS }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+                <div style="position:absolute;inset:0;box-shadow:0 40px 80px rgba(0,0,0,0.55);opacity:{{ c.shB }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+                <div style="position:absolute;inset:0;overflow:hidden;background:{{ c.base }}">
+                  <div style="position:absolute;inset:0;background:{{ c.grad }};opacity:{{ c.gradOp }}"></div>
+                  <div style="position:absolute;left:{{ c.inset }};top:{{ c.inset }};right:{{ c.inset }};bottom:{{ c.inset }};display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;box-shadow:{{ c.innerRule }}">
+                    <sc-for list="{{ c.tiles }}" as="t" hint-placeholder-count="1">
+                      <div style="grid-column:{{ t.col }};grid-row:{{ t.row }};background:{{ t.bg }}"></div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ c.gen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:26px;top:24px;right:26px;display:flex;flex-direction:column;gap:8px;color:{{ c.ink }}">
+                      <div style="font:800 34px/37px Archivo,sans-serif;letter-spacing:-0.02em;text-wrap:balance;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">{{ c.gt }}</div>
+                      <div style="font:500 16px/20px Archivo,sans-serif;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.ga }}</div>
+                    </div>
+                    <div style="position:absolute;left:26px;right:26px;bottom:26px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;color:{{ c.ink }}">
+                      <div style="flex:1;height:2px;background:currentColor;opacity:0.5"></div>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path></svg>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.ld }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:22px;right:22px;bottom:20px;display:flex;flex-direction:column;gap:4px;color:{{ c.ink }}">
+                      <div style="font:600 17px/21px Archivo,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.gt }}</div>
+                      <div style="font:500 13px/17px Archivo,sans-serif;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.ga }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+                <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12)"></div>
+                <div style="position:absolute;inset:0;background:#0b0b0c;opacity:{{ c.shade }};transition:opacity 320ms ease"></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="position:absolute;left:190px;width:900px;top:514px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:#fff;opacity:{{ xLabelOp }};transition:{{ labTr }}">
+            <div style="font-size:30px;line-height:36px;font-weight:600;letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:900px">{{ xCur.title }}</div>
+            <div style="font-size:17px;line-height:22px;color:rgba(255,255,255,0.9)">{{ xCur.sub }}</div>
+            <div style="font-size:14px;line-height:18px;color:rgba(255,255,255,0.72)">{{ xCur.meta }}</div>
+          </div>
+          <sc-if value="{{ xEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:340px;width:600px;top:250px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;color:#fff">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 12H3M16 6H3M12 18H3"></path></svg>
+              <div style="font-size:28px;line-height:34px;font-weight:600">No favourite playlists yet</div>
+              <div style="font-size:16px;line-height:22px;color:rgba(255,255,255,0.8);text-wrap:pretty">Star a playlist in the Music app. It appears here within a few minutes.</div>
+            </div>
+          </sc-if>
+          <div style="position:absolute;left:{{ xDotsL }};width:{{ xDotsW }};top:622px;height:6px">
+            <sc-for list="{{ xDots }}" as="d" hint-placeholder-count="9">
+              <div style="position:absolute;left:{{ d.l }};top:0;width:6px;height:6px;background:#fff;opacity:0.4"></div>
+            </sc-for>
+            <div style="position:absolute;left:0;top:0;width:6px;height:6px;background:#fff;opacity:{{ xIndOp }};transform:{{ xInd }};transition:{{ indTr }}"></div>
+          </div>
+          <div style="position:absolute;left:0;width:1280px;top:664px;display:flex;justify-content:center;gap:28px;color:rgba(255,255,255,0.8);font-size:13px">
+            <sc-for list="{{ xHints }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ h.key }}</span>
+                <span>{{ h.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </div>
+        </div>
+
+        <div style="position:absolute;inset:0;z-index:13;opacity:{{ qOp }};pointer-events:{{ qPe }};transition:opacity 340ms cubic-bezier(0.22,1,0.36,1);overflow:hidden">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(36px) saturate(1.3);-webkit-backdrop-filter:blur(36px) saturate(1.3);background:rgba(8,8,10,0.55)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ qAmbA }};filter:blur(90px) saturate(1.5);opacity:{{ qAmbAOp }};transition:opacity 600ms cubic-bezier(0.22,1,0.36,1)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ qAmbB }};filter:blur(90px) saturate(1.5);opacity:{{ qAmbBOp }};transition:opacity 600ms cubic-bezier(0.22,1,0.36,1)"></div>
+          <div style="position:absolute;left:{{ off }};top:0;width:1280px;height:720px">
+          <div style="position:absolute;left:120px;top:120px;width:380px;display:flex;flex-direction:column;gap:18px;transform:{{ qArtTf }};opacity:{{ qArtOp }};transition:transform 460ms cubic-bezier(0.22,1,0.36,1), opacity 320ms ease">
+            <div style="position:relative;width:380px;height:380px;overflow:hidden;background:#1b1b1d;box-shadow:0 40px 80px rgba(0,0,0,0.55)">
+              <sc-for list="{{ qBigLayers }}" as="bl" hint-placeholder-count="2">
+                <div style="position:absolute;inset:0;overflow:hidden;opacity:{{ bl.op }};transition:opacity 420ms cubic-bezier(0.22,1,0.36,1)">
+                  <div style="position:absolute;inset:0;background:{{ bl.grad }}"></div>
+                  <div style="position:absolute;left:{{ bl.inset }};top:{{ bl.inset }};right:{{ bl.inset }};bottom:{{ bl.inset }};background:{{ bl.bg }};box-shadow:{{ bl.rule }}"></div>
+                  <sc-if value="{{ bl.gen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:28px;top:26px;right:28px;display:flex;flex-direction:column;gap:8px;color:{{ bl.ink }}">
+                      <div style="font:800 38px/41px Archivo,sans-serif;letter-spacing:-0.02em;text-wrap:balance">{{ bl.gt }}</div>
+                      <div style="font:500 17px/22px Archivo,sans-serif;opacity:0.8">{{ bl.ga }}</div>
+                    </div>
+                    <div style="position:absolute;left:28px;right:28px;bottom:28px;height:2px;background:{{ bl.ink }};opacity:0.5"></div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12)"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;color:#fff">
+              <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.72)">Up next</div>
+              <div style="font-size:24px;line-height:30px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ qCtx.title }}</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:15px;color:rgba(255,255,255,0.86)">
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ qCtx.sub }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:{{ qShuffleCol }};transition:color 240ms ease">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M2 6h1.9c1.5 0 2.9.9 3.6 2.2M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8M18 14l4 4-4 4"></path></svg>
+                <span>{{ qShuffle }}</span>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;left:600px;top:276px;width:560px;height:88px;background:rgba(255,255,255,0.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.28), 0 20px 50px rgba(0,0,0,0.35);opacity:{{ qPlateOp }};transition:opacity 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+          <div style="position:absolute;left:0;top:0;width:1280px;height:720px;transform:{{ qBump }};transition:transform 160ms cubic-bezier(0.22,1,0.36,1)">
+            <sc-for list="{{ qRows }}" as="r" hint-placeholder-count="9">
+              <div onClick="{{ r.pick }}" style="position:absolute;left:600px;top:320px;width:560px;height:88px;transform:{{ r.tf }};transform-origin:0 50%;opacity:{{ r.op }};transition:{{ r.tr }};cursor:pointer">
+                <div style="display:flex;align-items:center;gap:18px;height:88px;padding:0 20px;box-sizing:border-box">
+                  <sc-if value="{{ r.showArt }}" hint-placeholder-val="{{ false }}"><div style="width:56px;height:56px;flex:none;background:{{ r.art }};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12)"></div></sc-if>
+                  <sc-if value="{{ r.showNum }}" hint-placeholder-val="{{ true }}"><div style="width:40px;flex:none;font-size:20px;font-weight:500;color:rgba(255,255,255,0.72);font-variant-numeric:tabular-nums">{{ r.num }}</div></sc-if>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <sc-if value="{{ r.ph }}" hint-placeholder-val="{{ false }}"><div style="width:{{ r.phW }};height:16px;background:rgba(255,255,255,0.14)"></div><div style="width:34%;height:10px;margin-top:6px;background:rgba(255,255,255,0.1)"></div></sc-if>
+                    <div style="font-size:22px;line-height:26px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.t }}</div>
+                    <div style="font-size:14px;line-height:18px;color:rgba(255,255,255,0.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</div>
+                  </div>
+                  <div style="flex:none;display:flex;align-items:center;gap:12px">
+                    <span style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:{{ r.tagCol }}">{{ r.tag }}</span>
+                    <div style="position:relative;width:20px;height:20px;flex:none"><svg width="20" height="20" viewBox="0 0 24 24" style="position:absolute;left:0;top:0;opacity:{{ r.ghostOp }}"><path stroke-dasharray="{{ r.dash }}" d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 22l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" fill="none" stroke="#ffffff" stroke-width="1.8"></path></svg><svg width="20" height="20" viewBox="0 0 24 24" style="position:absolute;left:0;top:0;opacity:{{ r.heartOp }};transform:{{ r.heartTf }};transition:transform 380ms cubic-bezier(0.34,1.45,0.64,1), opacity 200ms cubic-bezier(0.22,1,0.36,1)"><path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 22l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" fill="#ff285a"></path></svg></div>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:0;width:1280px;top:664px;display:flex;justify-content:center;gap:28px;color:rgba(255,255,255,0.8);font-size:13px">
+            <sc-for list="{{ qHints }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ h.key }}</span>
+                <span>{{ h.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </div>
+        </div>
+
+        <div style="position:absolute;left:50%;top:588px;z-index:30;transform:{{ toastTf }};opacity:{{ toastOp }};transition:opacity 260ms cubic-bezier(0.22,1,0.36,1), transform 420ms cubic-bezier(0.34,1.45,0.64,1);padding:12px 18px;background:rgba(24,24,26,0.62);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:15px;white-space:nowrap;pointer-events:none">{{ toast }}</div>
+      </div>
+    </div>
+
+    <div style="flex:0 0 420px;background:#111;padding:20px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">
+      <div ref="{{ knobRef }}" style="position:relative;width:380px;height:480px;user-select:none;touch-action:none">
+        <canvas ref="{{ cvRef }}" style="position:absolute;left:0;top:0;width:380px;height:480px"></canvas>
+        <div onPointerDown="{{ pd }}" onPointerMove="{{ pm }}" onPointerUp="{{ pu }}" onPointerCancel="{{ pu }}" style="position:absolute;left:70px;top:70px;width:240px;height:240px;border-radius:50%;overflow:hidden;background:#000;cursor:grab;font-family:Montserrat,Archivo,sans-serif;font-weight:500;color:#F2F2F2">
+          <div style="position:absolute;inset:0;background:{{ lcdArt }};opacity:{{ lcdArtOp }};transition:{{ artTr }}"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.72) 45%, rgba(0,0,0,0.92) 62%, #000 70%);opacity:{{ lcdScrimOp }}"></div>
+          <div style="position:absolute;inset:0;transform:{{ lcdTf }};opacity:{{ lcdOp }};transition:{{ lcdTr }};text-shadow:0 1px 0 rgba(0,0,0,0.8)">
+            <sc-if value="{{ isHomeL }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:0;opacity:{{ trkOp }};transform:{{ trkTf }};transition:{{ trkTr }}">
+                <div style="position:absolute;left:35px;width:170px;top:60px;text-align:center;font-size:22px;line-height:26px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance">{{ hTitle }}</div>
+                <div style="position:absolute;left:35px;width:170px;top:114px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ hArtist }}</div>
+              </div>
+              <div style="position:absolute;inset:0;opacity:{{ volOp }};transform:{{ volTf }};transition:{{ volTr }}">
+                <div style="position:absolute;left:35px;width:170px;top:52px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ volCap }}</div>
+                <div style="position:absolute;left:0;width:240px;top:76px;display:flex;justify-content:center;align-items:baseline;gap:2px;font-size:48px;line-height:46px;letter-spacing:-0.02em;color:#F2F2F2">{{ big }}<span style="font-size:22px;letter-spacing:0;color:#A6A6A6">%</span></div>
+              </div>
+              <div style="position:absolute;left:40px;width:160px;top:134px;text-align:center;font-size:12px;line-height:14px;color:{{ hStCol }};opacity:{{ metaOp }};transition:{{ metaTr }}">{{ hSt }}</div>
+            </sc-if>
+            <sc-if value="{{ isListL }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:51px;width:138px;top:32px;text-align:center;font-size:12px;line-height:14px;letter-spacing:0.04em;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.label }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:52px;text-align:center;font-size:22px;line-height:26px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance">{{ lcd.title }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:106px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.sub }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:127px;text-align:center;font-size:12px;line-height:14px;color:{{ lcd.metaCol }};opacity:{{ metaOp }};transition:{{ metaTr }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.meta }}</div>
+            </sc-if>
+            <sc-if value="{{ isTracksL }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:51px;width:138px;top:32px;text-align:center;font-size:12px;line-height:14px;letter-spacing:0.04em;color:#A6A6A6">TRACKS</div>
+              <div style="position:absolute;left:35px;width:170px;top:54px;text-align:center;font-size:22px;line-height:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.title }}</div>
+              <div style="position:absolute;left:72px;width:96px;top:88px;display:flex;justify-content:space-between;align-items:center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ tpc }}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5v14l-9-7zM6 5v14"></path></svg>
+                <div style="width:6px;height:6px;border-radius:50%;background:{{ tdc }}"></div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ tnc }}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14l9-7zM18 5v14"></path></svg>
+              </div>
+              <div style="position:absolute;left:35px;width:170px;top:110px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.sub }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:130px;text-align:center;font-size:12px;line-height:14px;color:{{ lcd.metaCol }};opacity:{{ metaOp }};transition:{{ metaTr }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.meta }}</div>
+            </sc-if>
+            <sc-if value="{{ isSeekL }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:51px;width:138px;top:32px;text-align:center;font-size:12px;line-height:14px;letter-spacing:0.04em;color:#A6A6A6">SEEK</div>
+              <div style="position:absolute;left:35px;width:170px;top:52px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ seekCap }}</div>
+              <div style="position:absolute;left:0;width:240px;top:76px;text-align:center;font-size:48px;line-height:46px;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;color:#F2F2F2">{{ seekTime }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:128px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;font-variant-numeric:tabular-nums;color:{{ seekCol }}">{{ seekDur }}</div>
+            </sc-if>
+            <sc-if value="{{ isOffL }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:35px;width:170px;top:70px;text-align:center;font-size:22px;line-height:26px">Waiting for PC</div>
+              <div style="position:absolute;left:35px;width:170px;top:104px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6">{{ offSub }}</div>
+            </sc-if>
+            <sc-if value="{{ isWinL }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:104px;top:42px;width:32px;height:32px;background:{{ lcd.icBg }};color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ lcd.letter }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:80px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.sub }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:98px;text-align:center;font-size:16px;line-height:20px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance">{{ lcd.title }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:140px;text-align:center;font-size:12px;line-height:14px;color:{{ lcd.metaCol }};opacity:{{ metaOp }};transition:{{ metaTr }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lcd.meta }}</div>
+            </sc-if>
+          </div>
+          <div style="position:absolute;inset:0;opacity:{{ footOp }};transition:{{ footTr }}">
+            <sc-for list="{{ foot }}" as="f" hint-placeholder-count="4">
+              <div style="position:absolute;left:{{ f.x }};top:154px;width:20px;height:20px;color:{{ f.col }};transition:color 160ms ease">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="{{ f.d }}"></path><path d="{{ f.fill }}" fill="currentColor" stroke="none"></path></svg>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <sc-for list="{{ keys }}" as="k" hint-placeholder-count="4">
+          <button onPointerDown="{{ k.down }}" onPointerUp="{{ k.up }}" onPointerLeave="{{ k.up }}" aria-label="{{ k.aria }}" style="position:absolute;left:{{ k.x }};top:398px;width:48px;height:48px;padding:0;border:0;cursor:pointer;background:transparent;transform:{{ k.tf }};transition:transform 120ms ease"></button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;border-top:1px solid #2d2b2b;padding-top:10px">
+        <span style="font:600 11px Archivo,sans-serif;letter-spacing:0.12em;text-transform:uppercase;color:#9b9797;padding:0 4px 6px">{{ modeName }}</span>
+        <sc-for list="{{ legend }}" as="lg" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:10px;padding:5px 4px;color:#e6e6e6;font:500 13px Archivo,sans-serif">
+            <span style="width:18px;height:18px;flex:none;border:1px solid #5a5757;color:#bab6b6;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ lg.key }}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ lg.d }}"></path><path d="{{ lg.fill }}" fill="currentColor" stroke="none"></path></svg>
+            <span>{{ lg.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <button class="btn btn-ghost" onClick="{{ reset }}" style="color:#bab6b6;align-self:flex-start">Reset</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px">
+      <span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">State picker</span>
+      <span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">Each row sets how a service behaves; outcomes apply to the next press. Then use the knob.</span>
+      <button class="btn btn-ghost" onClick="{{ lockNow }}">Lock screen now</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px 24px">
+      <sc-for list="{{ simGroups }}" as="g" hint-placeholder-count="12">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:13px;font-weight:600">{{ g.label }}</span>
+          <div style="display:flex;flex-wrap:wrap;border:2px solid var(--color-text);width:max-content;max-width:100%">
+            <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.on }}" style="height:30px;padding:0 10px;border:0;font:600 12px Archivo,sans-serif;cursor:pointer;text-align:left;background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+          <span style="font-size:12px;line-height:1.45;color:var(--color-neutral-700);text-wrap:pretty">{{ g.hint }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Button map</div>
+    <div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:170px repeat(4,minmax(150px,1fr));min-width:780px;border-top:2px solid var(--color-text)">
+        <div style="padding:10px 8px;font-size:13px;font-weight:600;border-bottom:2px solid var(--color-text)">Mode</div>
+        <div style="padding:10px 8px;font-size:13px;font-weight:600;border-bottom:2px solid var(--color-text)">1</div>
+        <div style="padding:10px 8px;font-size:13px;font-weight:600;border-bottom:2px solid var(--color-text)">2</div>
+        <div style="padding:10px 8px;font-size:13px;font-weight:600;border-bottom:2px solid var(--color-text)">3</div>
+        <div style="padding:10px 8px;font-size:13px;font-weight:600;border-bottom:2px solid var(--color-text)">4 (action)</div>
+        <sc-for list="{{ mapRows }}" as="r" hint-placeholder-count="4">
+          <div style="padding:10px 8px;font-size:14px;font-weight:600;border-bottom:1px solid var(--color-divider)">{{ r.name }}</div>
+          <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="4">
+            <div style="padding:10px 8px;display:flex;align-items:center;gap:8px;font-size:14px;border-bottom:1px solid var(--color-divider);color:{{ c.col }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ c.d }}"></path><path d="{{ c.fill }}" fill="currentColor" stroke="none"></path></svg>
+              <span>{{ c.label }}</span>
+            </div>
+          </sc-for>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px"><span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Motion table</span><span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">Element · property · from · to · duration · delay · curve · trigger. Desktop overlays: translate, scale, opacity, clip and crossfades of pre-drawn states only. Knob LCD: translate and opacity at 60 fps.</span></div>
+    <div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:90px 190px 160px 130px 140px 70px 110px 200px minmax(240px,1fr);min-width:1300px;font-size:12px;line-height:1.4">
+        <div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Surface</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Element</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Property</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">From</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">To</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">ms</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Delay</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Curve</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Trigger</div>
+        <sc-for list="{{ mRows }}" as="m" hint-placeholder-count="12">
+          <div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-weight:600">{{ m.surf }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.el }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.prop }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.from }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.to }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-variant-numeric:tabular-nums">{{ m.ms }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.delay }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-family:ui-monospace,Menlo,monospace;font-size:11px">{{ m.curve }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ m.when }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px"><span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Blur recipes</span><span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">One fixed recipe per surface, taken from a desktop snapshot when the surface opens. Never animated. Radii are at the 720-unit reference; multiply by screen height ÷ 720 (×2 on the 1440 p monitor).</span></div>
+    <div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:200px 170px 110px 80px 220px minmax(260px,1fr) 220px;min-width:1260px;font-size:12px;line-height:1.4">
+        <div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Surface</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Source</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Radius</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Saturate</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Tint</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Ambient layer</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Sheen / extras</div>
+        <sc-for list="{{ bRows }}" as="b" hint-placeholder-count="6">
+          <div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-weight:600">{{ b.surf }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ b.source }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ b.radius }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ b.saturate }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-family:ui-monospace,Menlo,monospace;font-size:11px">{{ b.tint }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ b.ambient }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ b.sheen }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px"><span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Copy sheet</span><span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">Knob strings are set in Montserrat 500 at their real size and measured live. Meta lines: 12 px, ≤ 170 px. Headings: 12 px caps, 0.04 em tracking, ≤ 138 px (reaching r 112). Toasts and overlay copy have no knob limit.</span></div>
+    <div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:140px 260px minmax(280px,1fr) 80px 70px 60px;min-width:960px;font-size:12px;line-height:1.4;align-items:stretch">
+        <div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Surface</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Context</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Text</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Width</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)">Limit</div><div style="padding:6px 8px;font-weight:600;border-bottom:2px solid var(--color-text)"></div>
+        <sc-for list="{{ cRows }}" as="c" hint-placeholder-count="12">
+          <div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-weight:600">{{ c.surf }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ c.ctx }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);display:flex;align-items:center;min-width:0;overflow:hidden"><span style="font:{{ c.font }};letter-spacing:{{ c.ls }};white-space:{{ c.ws }};text-wrap:pretty">{{ c.text }}</span></div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-variant-numeric:tabular-nums">{{ c.w }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)">{{ c.lim }}</div><div style="padding:6px 8px;border-bottom:1px solid var(--color-divider);font-weight:600;color:{{ c.okCol }}">{{ c.ok }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px"><span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Settings · status strip (U14)</span><span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">There is no main window: the companion is the tray icon, the floating knob, the full-screen overlays and this Settings window. The strip at its top is where recovery lives. It follows the state picker.</span></div>
+    <div style="max-width:880px;background:#1B1A1A;color:#F3F2F2;font-family:Archivo,sans-serif;border:1px solid #444141">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #2D2B2B;font-size:12px;color:#BAB6B6"><img src="assets/icon/nano-d-app-small.svg" alt="" width="16" height="16"><span>Nano_D++ Settings</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:2px solid #444141">
+        <sc-for list="{{ stCols }}" as="c" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px;padding:16px;border-right:1px solid #2D2B2B">
+            <span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797">{{ c.name }}</span>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;flex:none;background:{{ c.dot }}"></span><strong style="font-size:15px">{{ c.state }}</strong></div>
+            <span style="font-size:13px;line-height:1.4;color:#BAB6B6">{{ c.detail }}</span>
+            <button style="align-self:flex-start;margin-top:4px;height:30px;padding:0 12px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};font:600 12px Archivo,sans-serif;text-align:left;cursor:pointer">{{ c.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 24px;padding:14px 16px;font-size:13px;color:#9B9797"><span>Window picker background · {{ pickBgName }}</span><span>Motion · {{ rmName }}</span><span>Floating knob · on</span><span>Start with Windows · on</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--color-text);padding-bottom:8px"><span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600">Decisions in this revision</span><span style="font-size:13px;color:var(--color-neutral-700);text-wrap:pretty">Full list with reasons in the changelog.</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;font-size:14px;line-height:1.5">
+      <div style="display:flex;flex-direction:column;gap:6px"><strong>32:9 rule</strong><span style="text-wrap:pretty">Scale by height; everything else is laid out in a centred 16:9 stage. Blur, ambient and dimming extend edge to edge. The two carousels extend sideways on the same pitch, with more cards visible and none shown below 40 % of their prepared size. Up next and the snap tray stay in the stage.</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><strong>Knob screen</strong><span style="text-wrap:pretty">Translate and opacity only, at 60 fps. No scaling; slides are 20 px at most; fades last at least 120 ms. Covers swap instantly. Text shadow is a hard 0 1px 0 at 80 % on top of the darker scrim. Headings may reach r 112 with 0.04 em tracking; mirror labels are RECENT, FAVOURITES and UP NEXT.</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><strong>Service truth</strong><span style="text-wrap:pretty">Play next, Up next and Seek work only while the Sonos queue is playing; elsewhere their buttons dim and a press says why. Like writes the Favorite star. Playlists start with the playable songs; albums are all-or-nothing. Starting shows Starting… on Home with the Working comet.</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><strong>LEDs</strong><span style="text-wrap:pretty">Warm #FFBE69 fixed all day; time of day only dims resting brightness. Amber #FF8338 from 80 %, red #FF0000 from 90 % and for failure. Paused Play breathes green. Lists use only their items’ colours. The ring glow uses six fixed levels.</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TAU = Math.PI * 2;
+const cl = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const eo = u => 1 - Math.pow(1 - cl(u), 3);
+const eio = u => { u = cl(u); return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
+const gs = (x, w) => Math.exp(-x * x / (2 * w * w));
+const md = i => ((Math.round(i) % 60) + 60) % 60;
+const cd = (i, j) => ((((i - j) % 60) + 90) % 60) - 30;
+const bump = (ms, a, b) => ms < a || ms > b ? 0 : Math.sin(Math.PI * (ms - a) / (b - a));
+const mix3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+const TODB = [[0, 0.55], [5, 0.6], [8, 0.95], [13, 1], [17, 1], [20, 0.85], [22.5, 0.65], [24, 0.55]];
+function warmAt(hr) { let i = 0; while (i < TODB.length - 2 && hr > TODB[i + 1][0]) i++; const a = TODB[i], b = TODB[i + 1], k = cl((hr - a[0]) / (b[0] - a[0])); return { c: [1, 190 / 255, 105 / 255], b: a[1] + (b[1] - a[1]) * k }; }
+const CURV = { OUT: [0.22, 1, 0.36, 1], IN: [0.4, 0, 1, 1], SPR: [0.34, 1.45, 0.64, 1] };
+function bez(p) { const cx = 3 * p[0], bx = 3 * (p[2] - p[0]) - cx, ax = 1 - cx - bx, cy = 3 * p[1], by = 3 * (p[3] - p[1]) - cy, ay = 1 - cy - by; const X = t => ((ax * t + bx) * t + cx) * t, Y = t => ((ay * t + by) * t + cy) * t; return x => { let lo = 0, hi = 1, t = x; for (let i = 0; i < 28; i++) { t = (lo + hi) / 2; if (X(t) < x) lo = t; else hi = t; } return Y(t); }; }
+const _st = {};
+function stair(name, ms) { const key = name + ms; if (_st[key]) return _st[key]; const f = bez(CURV[name]), n = Math.max(1, Math.round(ms / 16.667)), pts = []; for (let k = 0; k < n; k++) { const v = f(k / n).toFixed(4); pts.push(v + ' ' + (k / n * 100).toFixed(2) + '%', v + ' ' + ((k + 1) / n * 100).toFixed(2) + '%'); } pts.push('1 100%'); return (_st[key] = 'linear(' + pts.join(', ') + ')'); }
+function trn(parts, fps60) { return parts.map(p => p[0] + ' ' + p[1] + 'ms ' + (fps60 ? stair(p[2], p[1]) : 'cubic-bezier(' + CURV[p[2]].join(',') + ')') + (p[3] ? ' ' + p[3] + 'ms' : '')).join(', '); }
+const GLL = [0.14, 0.3, 0.45, 0.62, 0.81, 1], GLB = [6, 8, 10, 12, 15, 18];
+const GLI = v => { let b = 0; for (let i = 1; i < GLL.length; i++) if (Math.abs(GLL[i] - v) < Math.abs(GLL[b] - v)) b = i; return b; };
+const GLV = v => GLL[GLI(v)], GLOW = v => GLB[GLI(v)];
+const ERR = '#FF8474';
+const DUR = { tick: 180, bound: 460, wake: 520, reveal: 450, press: 220, fill: 760, drain: 860, sweep: 640, wash: 1100, half: 900, bloom: 900, scatter: 700, fail: 700, down: 1800 };
+const FG = ['fill', 'drain', 'sweep', 'wash', 'half', 'bloom', 'scatter', 'fail', 'down'];
+const I = {
+  back: 'M15 18l-6-6 6-6', play: 'M7 4.5v15l12-7.5z', pause: 'M8 5v14M16 5v14',
+  list: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01', win: 'M3 5h18v14H3zM3 9h18',
+  tracks: 'M5 5v14l9-7zM18 5v14', expand: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7',
+  clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0', heart: 'M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 22l8.8-8.6a5.5 5.5 0 0 0 0-7.8z',
+  rect: 'M3 5h18v14H3z', check: 'M20 6L9 17l-5-5',
+  queue: 'M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 12H3M16 6H3M12 18H3',
+  shuffle: 'M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M2 6h1.9c1.5 0 2.9.9 3.6 2.2M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8M18 14l4 4-4 4',
+  prev: 'M19 5v14l-9-7zM6 5v14', next: 'M11 12H3M16 6H3M16 18H3M18 9v6M21 12h-6', seek: 'M3 12h8.7M17.7 12H21M14.7 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z', sleeve: 'M3 5h12v14H3zM15 5.5a6.5 6.5 0 0 1 0 13M15 10.5a1.5 1.5 0 0 1 0 3', album: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6.5 12a5.5 5.5 0 0 1 5.5-5.5', note: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', dot: 'M12 11.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1z'
+};
+const HALF = { left: 'M3 5h9v14H3z', right: 'M12 5h9v14h-9z' };
+const WARM = [255, 190, 105], GREEN = [0, 255, 98], AMBER = [255, 131, 56], RED = [255, 0, 0], PINK = [255, 40, 90], NATIVE = [235, 235, 235];
+const isW = c => !!c && c[0] === 255 && c[1] === 190 && c[2] === 105;
+const cov = f => `url("assets/covers/${f}") center / cover no-repeat`;
+const ALB = [
+  { t: 'Promises', a: 'Floating Points, Pharoah Sanders & LSO', y: 2021, n: '9 movements', f: 'promises-floating-points-pharoah-sanders.png', c: [120, 150, 190] },
+  { t: 'Night Drive', a: 'Chromatics', y: 2007, n: '12 tracks', f: 'night-drive-chromatics-album-.jpg', c: [255, 40, 90] },
+  { t: 'Heligoland', a: 'Massive Attack', y: 2010, n: '10 tracks', f: 'heligoland-album-.png', c: [255, 120, 30] },
+  { t: 'Moon Safari', a: 'Air', y: 1998, n: '10 tracks', f: 'moon-safari.png', c: [60, 170, 255] },
+  { t: 'Hounds of Love', a: 'Kate Bush', y: 1985, n: '12 tracks', f: 'hounds-of-love.png', c: [160, 90, 255] },
+  { t: 'Elis & Tom', a: 'Elis Regina & Antônio Carlos Jobim', y: 1974, n: '14 tracks', f: 'elis-tom.jpg', c: [255, 190, 60] },
+  { t: 'Blue Lines', a: 'Massive Attack', y: 1991, n: '9 tracks', f: 'blue-lines.jpg', c: [255, 40, 20] },
+  { t: 'Tropicália ou Panis et Circencis', a: 'Various artists', y: 1968, n: '12 tracks', f: 'tropic-lia-ou-panis-et-circencis.jpg', c: [255, 150, 40] },
+  { t: 'Kind of Blue', a: 'Miles Davis', y: 1959, n: '5 tracks', f: 'kind-of-blue.jpg', c: [40, 120, 255] }
+];
+const PL = [
+  { t: 'Late Night Drive', a: [1, 6, 2, 3], n: '48 songs · 3 h 12 min', c: [255, 60, 110] },
+  { t: 'Sunday Morning', a: [5, 8, 3, 0], n: '36 songs · 2 h 20 min', c: [255, 190, 90] },
+  { t: 'Bossa & Tropicália', a: [5, 7, 8, 4], n: '52 songs · 3 h 01 min', c: [255, 150, 40] },
+  { t: 'Deep Focus', a: [0, 2, 8, 1], n: '27 songs · 2 h 45 min', c: [90, 150, 255] },
+  { t: 'Kitchen Dance', a: [4, 6, 3, 7], n: '61 songs · 4 h 05 min', c: [200, 90, 255] },
+  { t: 'Headphones Only', a: [0, 4, 2, 5], n: '22 songs · 1 h 58 min', c: [80, 200, 170] }
+];
+
+const PL_REAL = [
+  { t: 'Favorite Songs', a: [4, 1, 2, 3], n: '57 songs · 3 h 48 min', c: [255, 70, 70], len: 12, auto: true },
+  { t: 'PAPER LANTERN Ep. 1', a: [6, 7], n: '34 songs · 2 h 5 min', c: [150, 110, 255], len: 34, bad: 20 }
+];
+const TR = [
+  ['Movement 1', 'Movement 2', 'Movement 3', 'Movement 4', 'Movement 5', 'Movement 6', 'Movement 7', 'Movement 8', 'Movement 9'],
+  ['Night Drive', 'I Want Your Love', 'Running Up That Hill', 'Tick of the Clock', 'Healer'],
+  ['Pray for Rain', 'Babel', 'Splitting the Atom', 'Girl I Love You', 'Psyche', 'Flat of the Blade', 'Paradise Circus', 'Rush Minute', 'Saturday Come Slow', 'Atlas Air'],
+  ['La Femme d’Argent', 'Sexy Boy', 'All I Need', 'Kelly Watch the Stars', 'Talisman', 'Remember', 'You Make It Easy', 'Ce Matin-là', 'New Star in the Sky', 'Le Voyage de Pénélope'],
+  ['Running Up That Hill', 'Hounds of Love', 'The Big Sky', 'Mother Stands for Comfort', 'Cloudbusting', 'And Dream of Sheep', 'Under Ice', 'Waking the Witch', 'Watching You Without Me', 'Jig of Life', 'Hello Earth', 'The Morning Fog'],
+  ['Águas de Março', 'Pois É', 'Só Tinha de Ser com Você', 'Modinha', 'Triste', 'Corcovado', 'O Que Tinha de Ser', 'Por Toda a Minha Vida', 'Fotografia', 'Soneto de Separação', 'Chovendo na Roseira', 'Inútil Paisagem'],
+  ['Safe from Harm', 'One Love', 'Blue Lines', 'Be Thankful for What You’ve Got', 'Five Man Army', 'Unfinished Sympathy', 'Daydreaming', 'Lately', 'Hymn of the Big Wheel'],
+  ['Miserere Nobis', 'Coração Materno', 'Panis et Circencis', 'Lindonéia', 'Parque Industrial', 'Geléia Geral', 'Baby', 'Três Caravelas', 'Enquanto Seu Lobo Não Vem', 'Mamãe Coragem', 'Bat Macumba', 'Hino ao Senhor do Bonfim'],
+  ['So What', 'Freddie Freeloader', 'Blue in Green', 'All Blues', 'Flamenco Sketches']
+];
+const ALB0 = ALB.length;
+for (let k = ALB0; k < 24; k++) { ALB.push(Object.assign({}, ALB[k % ALB0])); TR.push(TR[k % ALB0]); }
+const GEN = [['#2b3a55', '#131a28', '#f3f2f2', [70, 120, 255]], ['#5a2e24', '#26130f', '#f6ebe4', [255, 100, 60]], ['#2f4a3a', '#15231b', '#ecf4ee', [60, 220, 120]], ['#4b3b63', '#1f182c', '#f1eef6', [150, 100, 255]], ['#6b5a2a', '#2c2410', '#f7f1df', [255, 190, 40]], ['#2a4f57', '#112326', '#e9f4f5', [40, 210, 230]], ['#5c2a3f', '#28111b', '#f6e9ef', [255, 60, 140]], ['#3d3d3d', '#171717', '#f3f2f2', [255, 190, 105]]];
+const genOf = it => { let x = 7; for (const ch of it.t + '|' + it.a) x = (x * 31 + ch.charCodeAt(0)) % 9973; return GEN[x % GEN.length]; };
+const shade = (c, k) => 'rgb(' + c.map(v => Math.round(v * k)).join(',') + ')';
+const tint = (c, k) => 'rgb(' + c.map(v => Math.round(v + (255 - v) * k)).join(',') + ')';
+const extGrad = c => 'radial-gradient(120% 120% at 50% 38%, ' + shade(c, 0.95) + ' 0%, ' + shade(c, 0.5) + ' 52%, ' + shade(c, 0.2) + ' 100%)';
+function artFor(it, mode) {
+  const g = genOf(it);
+  if (mode === 'none') return { base: g[1], grad: 'linear-gradient(160deg, ' + g[0] + ' 0%, ' + g[1] + ' 100%)', gradOp: 1, bg: 'none', inset: '0px', rule: 'none', gen: true, ld: false, ink: g[2], col: g[3] };
+  if (mode === 'loading') return { base: shade(it.c, 0.55), grad: 'none', gradOp: 0, bg: 'none', inset: '0px', rule: 'none', gen: false, ld: true, ink: tint(it.c, 0.8), col: it.c };
+  if (mode === 'small400' || mode === 'small300') return { base: shade(it.c, 0.3), grad: extGrad(it.c), gradOp: 1, bg: cov(it.f), inset: mode === 'small400' ? '6%' : '17%', rule: '0 18px 40px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.14)', gen: false, ld: false, ink: '#fff', col: it.c };
+  return { base: '#222', grad: 'none', gradOp: 0, bg: cov(it.f), inset: '0px', rule: 'none', gen: false, ld: false, ink: '#fff', col: it.c };
+}
+function queueFor(np, pls) {
+  if (np.kind === 'al') return TR[np.i].map((t, k) => ({ t, a: ALB[np.i].a, al: np.i, n: k + 1 }));
+  const p = np.p || (pls || PL)[np.i], n = p.len || 12;
+  return Array.from({ length: n }, (_, k) => { const al = p.a[k % p.a.length], L = TR[al]; return { t: L[(Math.floor(k / p.a.length) * 2 + k) % L.length], a: ALB[al].a, al, n: null, bad: p.bad === k }; });
+}
+const durOf = tr => { let x = 0; for (const ch of tr.t) x = (x * 31 + ch.charCodeAt(0)) % 997; return 170 + (x % 190); };
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function thumbs() {
+  const R = rs => rs.map(([x, y, w, h, c]) => `linear-gradient(${c},${c}) ${x}px ${y}px / ${w}px ${h}px no-repeat`).join(',');
+  const lines = (x, y, n, gap, wmax, c, h = 5, seed = 1) => Array.from({ length: n }, (_, i) => [x, y + i * gap, Math.round(wmax * (0.45 + 0.55 * Math.abs(Math.sin((i + 1) * 2.3 * seed)))), h, c]);
+  const chrome = page => [[0, 0, 480, 30, '#35363a'], [8, 6, 120, 24, '#202124'], [132, 6, 110, 24, '#2b2c30'], [0, 30, 480, 28, '#202124'], [40, 36, 300, 16, '#35363a']].concat(page);
+  return {
+    claude: R([[0, 0, 70, 300, '#1f1e1c'], ...lines(10, 20, 10, 22, 50, '#3a3935'), ...lines(110, 40, 9, 20, 300, '#b8b5ad', 5, 1.3), [110, 240, 300, 36, '#3a3935'], [0, 0, 480, 300, '#262624']]),
+    slack: R([[0, 0, 60, 300, '#3f0e40'], [60, 0, 110, 300, '#4a154b'], ...lines(72, 20, 11, 22, 80, '#9a7a9b'), [170, 0, 310, 36, '#222529'], ...lines(186, 56, 8, 26, 260, '#d1d2d3', 5, 1.7), [186, 256, 280, 30, '#2c2f33'], [0, 0, 480, 300, '#1a1d21']]),
+    chatgpt: R([[0, 0, 120, 300, '#171717'], ...lines(12, 20, 12, 20, 90, '#3a3a3a'), [200, 50, 200, 90, '#dcdcdc'], ...lines(160, 160, 5, 16, 270, '#8e8e8e', 5, 2.1), [160, 256, 280, 30, '#2f2f2f'], [0, 0, 480, 300, '#212121']]),
+    doc: R(chrome([[90, 70, 300, 230, '#ffffff'], ...lines(110, 90, 11, 18, 250, '#c8c8c8', 5, 1.1), [110, 90, 180, 10, '#303030'], [0, 58, 480, 242, '#e9eaed']])),
+    cal: R(chrome([[70, 110, 60, 22, '#f06292'], [140, 90, 60, 40, '#4fc3f7'], [210, 150, 60, 34, '#ff8a3d'], [280, 100, 60, 60, '#f06292'], [350, 170, 60, 30, '#4fc3f7'], [420, 120, 50, 26, '#b39ddb'], [140, 200, 60, 40, '#ff8a3d'], [280, 220, 60, 30, '#4fc3f7'], [70, 180, 60, 50, '#b39ddb'], ...[130, 200, 270, 340, 410].map(x => [x, 70, 1, 230, '#3c4043']), [0, 70, 60, 230, '#28292c'], [0, 58, 480, 242, '#202124']])),
+    files: R([[0, 0, 480, 34, '#2b2b2b'], [0, 34, 480, 30, '#202020'], [0, 64, 120, 236, '#1c1c1c'], ...lines(12, 76, 9, 22, 90, '#5e5e5e'), ...Array.from({ length: 9 }, (_, i) => [132, 76 + i * 24, 14, 12, i % 3 ? '#e8b64a' : '#8ab4f8']), ...lines(154, 79, 9, 24, 260, '#bdbdbd', 5, 1.9), [0, 0, 480, 300, '#191919']]),
+    bambu: R([[0, 0, 480, 32, '#ffffff'], [0, 32, 480, 26, '#f0f0f0'], [0, 58, 100, 242, '#f7f7f7'], ...lines(10, 70, 8, 24, 70, '#cfcfcf'), [380, 58, 100, 242, '#f7f7f7'], [390, 250, 80, 28, '#00ae42'], [180, 150, 120, 60, '#00ae42'], [200, 130, 80, 20, '#2bd06a'], [100, 58, 280, 242, '#3b3f44']])
+  };
+}
+const ic = f => `url("assets/apps/${f}") center / contain no-repeat`;
+
+class Component extends DCLogic {
+  state = this.fresh();
+  wrapRef = React.createRef(); stageRef = React.createRef(); knobRef = React.createRef(); cvRef = React.createRef();
+  fx = []; vt = 0; vel = 0; lastRot = 0; asleep = false; _ring = []; _btns = []; _cursor = 0;
+  cur = Array.from({ length: 60 }, () => ({ r: 1, g: 0.64, b: 0.33, a: 0 }));
+  bcur = Array.from({ length: 4 }, () => ({ r: 1, g: 0.64, b: 0.33, a: 0 }));
+  tint = [0, 0, 0];
+  play(type, p) {
+    if (this.state.rm && ['wake', 'sweep', 'scatter', 'reveal', 'tick'].includes(type)) return;
+    const e = Object.assign({ type, t0: this.vt, dur: DUR[type], at: this._cursor }, p || {});
+    if (type === 'fill' || type === 'drain') e.n = Math.round(this.state.vol / 2);
+    if (type === 'down') e.snap = this.cur.map(c => [c.r * c.a, c.g * c.a, c.b * c.a]);
+    if (FG.includes(type)) this.fx.forEach(f => { if (FG.includes(f.type) && f.kill == null) f.kill = this.vt; });
+    else if (type !== 'tick' && type !== 'press') this.fx = this.fx.filter(f => f.type !== type);
+    this.fx.push(e);
+  }
+  touch() {
+    if (this.asleep) { this.asleep = false; this.play('wake'); }
+    clearTimeout(this._sl); this._sl = setTimeout(() => { this.asleep = true; }, 5000);
+  }
+  loop = T => {
+    this.raf = requestAnimationFrame(this.loop);
+    if (this.lastT && T - this.lastT < 16) return;
+    const dt = Math.min(50, T - (this.lastT || T)); this.lastT = T; this.vt += dt;
+    try { this.draw(this.vt, dt); } catch (err) { }
+  };
+  draw(t, dt) {
+    const cv = this.cvRef.current; if (!cv) return;
+    const d0 = new Date(), tod = warmAt(d0.getHours() + d0.getMinutes() / 60), WM = tod.c, HOT = mix3(WM, [1, 1, 1], 0.5);
+    const s = this.state, off = s.sim.pc === 'off', asleep = this.asleep && !off;
+    const br = asleep ? (1 + 0.4 * Math.sin(t / 5200 * TAU)) * tod.b : 1;
+    const isWarm = isW;
+    const heat = s.mode === 'home' && !asleep && s.vol >= 90;
+    for (let i = 0; i < 60; i++) {
+      const r = this._ring[i], c = this.cur[i];
+      let ta = 0, tc = null;
+      if (r && r.a) {
+        tc = asleep || isWarm(r.c) ? WM : r.c.map(x => x / 255);
+        ta = asleep ? (r.a >= 0.99 ? 0.16 : r.a >= 0.5 ? 0.1 : 0.05) * br : r.a;
+        if (heat && r.c === RED) ta *= 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(t / (380 + (i * 97) % 260) + i * 1.9));
+        if (off && !s.native) ta *= 0.6 + 0.4 * Math.sin(t / 2600 * TAU);
+      }
+      const up = ta > c.a, tau = asleep ? (up ? 400 : 700) : up ? (ta >= 0.9 ? 10 : 55) : 140;
+      c.a += (ta - c.a) * (1 - Math.exp(-dt / tau));
+      if (tc) { const k = 1 - Math.exp(-dt / (c.a < 0.02 ? 1 : 70)); c.r += (tc[0] - c.r) * k; c.g += (tc[1] - c.g) * k; c.b += (tc[2] - c.b) * k; }
+    }
+    const pausedPlay = s.mode === 'home' && !s.playing && !asleep;
+    for (let j = 0; j < 4; j++) {
+      const b = this._btns[j], c = this.bcur[j]; if (!b) continue;
+      let ta = asleep ? (b.a >= 0.5 ? 0.12 : 0.04) * br : b.a;
+      if (j === 0 && pausedPlay) ta *= 0.55 + 0.45 * (0.5 + 0.5 * Math.cos(t / 2600 * TAU));
+      const up = ta > c.a, tau = asleep ? (up ? 400 : 700) : up ? 40 : 160;
+      c.a += (ta - c.a) * (1 - Math.exp(-dt / tau));
+      const tc = asleep || isWarm(b.c) ? WM : b.c.map(x => x / 255), k = 1 - Math.exp(-dt / 70);
+      c.r += (tc[0] - c.r) * k; c.g += (tc[1] - c.g) * k; c.b += (tc[2] - c.b) * k;
+    }
+    const m = new Float32Array(60).fill(1);
+    const O = Array.from({ length: 60 }, () => [0, 0, 0]), OB = Array.from({ length: 4 }, () => [0, 0, 0]);
+    let duck = 0;
+    const add = (i, c, a) => { if (a <= 0.001) return; const o = O[md(i)]; o[0] += c[0] * a; o[1] += c[1] * a; o[2] += c[2] * a; };
+    const addG = (pos, w, c, a) => { for (let k = Math.floor(pos - 3 * w); k <= Math.ceil(pos + 3 * w); k++) add(k, c, a * gs(k - pos, w)); };
+    const addB = (j, c, a) => { const o = OB[j]; o[0] += c[0] * a; o[1] += c[1] * a; o[2] += c[2] * a; };
+    const comet = (head, dir, len, c0, c1, a) => { for (let k = 0; k <= len; k++) addG(head - dir * k, 0.7, k ? c1 : c0, a * Math.pow(1 - k / (len + 1), 1.7)); };
+    const listMode = ['recent', 'explore', 'queue', 'windows'].includes(s.mode);
+    const cr = this._ring[this._cursor], tt = listMode && !asleep && cr && !isWarm(cr.c) ? cr.c.map(x => x / 255) : [0, 0, 0], tk = 1 - Math.exp(-dt / 220);
+    for (let q = 0; q < 3; q++) this.tint[q] += (tt[q] - this.tint[q]) * tk;
+    for (let i = 0; i < 60; i++) if (!(this._ring[i] && this._ring[i].a)) add(i, this.tint, 0.06);
+    if (this._working) comet(t / 1400 * 60, 1, 8, HOT, WM, 0.5);
+    if (asleep && s.playing && s.mode === 'home') addG(((t / 1000 + 50) % 214) / 214 * 60, 0.75, HOT, 0.26 * tod.b);
+    this.fx = this.fx.filter(e => {
+      const ms = t - e.t0, u = ms / e.dur; if (u > 1) return false;
+      let amp = 1; if (e.kill != null) { amp = 1 - (t - e.kill) / 120; if (amp <= 0) return false; }
+      const A = (i, c, a) => add(i, c, a * amp), AG = (p, w, c, a) => addG(p, w, c, a * amp), at = e.at;
+      if (FG.includes(e.type) && e.type !== 'down') duck = Math.max(duck, 0.35 * Math.sin(Math.PI * u) * amp);
+      switch (e.type) {
+        case 'wake': { const d = eo(u) * 30; for (let i = 0; i < 60; i++) A(i, HOT, 0.32 * (1 - u) * gs(Math.abs(cd(i, at)) - d, 3)); break; }
+        case 'tick': { A(at, HOT, 0.45 * Math.pow(1 - u, 2)); for (let k = 1; k <= e.len; k++) A(at - e.dir * k, WM, 0.38 * Math.pow(1 - k / (e.len + 1), 1.5) * (1 - u)); break; }
+        case 'bound': { const c = e.c || WM; A(at, c, 0.8 * Math.pow(1 - u, 2)); for (let k = 1; k <= 4; k++) A(at - e.dir * k, c, 0.5 * (1 - k / 5) * bump(ms, (4 - k) * 30, (4 - k) * 30 + 260)); break; }
+        case 'reveal': for (let i = 0; i < 60; i++) m[i] *= cl((ms - Math.abs(cd(i, 0)) * 8) / 130); break;
+        case 'press': addB(e.n, HOT, 0.6 * Math.pow(1 - u, 2)); break;
+        case 'fill': { const n = e.n, f = u * 1.15 * (n + 1); for (let k = 0; k <= n; k++) m[md(35 + k)] *= cl((f - k) / 2.5); AG(35 + Math.min(n, f), 0.9, HOT, 0.75 * (1 - cl((u - 0.85) / 0.15))); break; }
+        case 'drain': { const n = e.n, pos = n - eio(u) * (n + 6); for (let k = 0; k <= n; k++) m[md(35 + k)] *= 1 - 0.8 * gs(k - pos, 3.5) * amp; break; }
+        case 'sweep': comet(at + e.dir * 60 * eo(u), e.dir, 10, HOT, WM, 0.85 * (1 - Math.pow(u, 3)) * amp); break;
+        case 'wash': { const c = e.c.map(x => x / 255), d = eo(ms / 420) * 31, fade = ms < 520 ? 1 : 1 - eo((ms - 520) / 580); for (let i = 0; i < 60; i++) { const x = Math.abs(cd(i, at)); if (x <= d) A(i, c, 0.65 * fade); A(i, c, 0.45 * gs(x - d, 1.5) * (1 - cl(ms / 420))); m[i] *= 1 - 0.55 * fade * amp; } addB(3, c, 0.55 * fade * amp); break; }
+        case 'half': { const c = e.c.map(x => x / 255), fade = ms < 380 ? 1 : 1 - eo((ms - 380) / 520); for (let k = 1; k < 30; k++) { const i = e.side === 'left' ? 60 - k : k, d = cl(ms / 300) * 30; if (Math.abs(k - 15) <= d / 2 + 0.5) A(i, c, 0.75 * fade); } addB(e.side === 'left' ? 1 : 2, c, 0.6 * fade); break; }
+        case 'bloom': { const c = (e.c || [0, 255, 98]).map(x => x / 255), d = eo(u / 0.8) * 30; for (let i = 0; i < 60; i++) { const x = Math.abs(cd(i, at)); A(i, c, 0.9 * (1 - u * 0.5) * gs(x - d, 1.5)); if (x < d) A(i, c, 0.16 * Math.pow(1 - u, 1.5)); } AG(at + 30, 1, mix3(c, [1, 1, 1], 0.3), 0.8 * bump(ms, 560, 900)); break; }
+        case 'scatter': { const ORD = [0, 4, 8, 3, 7, 2, 6, 1, 5]; for (let k = 0; k < 9; k++) { const p = (e.seed + ORD[k] * 60 / 9) % 60, st = k * 55; AG(p, 0.8, HOT, 0.8 * bump(ms, st, st + 260)); } break; }
+        case 'fail': { const pos = s.rm ? at : at + 1.6 * Math.sin(ms / 1000 * TAU * 3.2) * (1 - eo(u)); AG(pos, 0.9, [1, 0, 0], 0.95 * (1 - u * u)); for (let k = -3; k <= 3; k++) m[md(at + k)] *= 1 - 0.6 * Math.sin(Math.PI * u); break; }
+        case 'down': { for (let i = 0; i < 60; i++) { m[i] *= cl((ms - 1250 - Math.abs(cd(i, 0)) * 12) / 200); const sn = e.snap[i]; A(i, sn, 1 - cl((ms - 80 - (60 - md(i - at)) * 16) / 110)); } break; }
+      }
+      return true;
+    });
+    const dpr = window.devicePixelRatio || 1, Wd = 380, Hd = 480;
+    if (cv.width !== Wd * dpr) { cv.width = Wd * dpr; cv.height = Hd * dpr; }
+    const x = cv.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, Wd, Hd);
+    x.fillStyle = '#171717'; x.beginPath(); x.arc(190, 190, 178, 0, TAU); x.fill();
+    x.strokeStyle = '#232323'; x.lineWidth = 2; x.stroke();
+    const tone = e => { const mx = Math.max(e[0], e[1], e[2]); if (mx <= 0.78) return e; const k = (0.78 + 0.22 * (1 - Math.exp(-(mx - 0.78) / 0.22))) / mx; return [e[0] * k, e[1] * k, e[2] * k]; };
+    const rr = (px, py, w, hh, r) => { x.beginPath(); if (x.roundRect) x.roundRect(px, py, w, hh, r); else x.rect(px, py, w, hh); x.fill(); };
+    const Rr = 152, bk = 1 - duck;
+    x.save(); x.translate(190, 190);
+    for (let i = 0; i < 60; i++) {
+      const c = this.cur[i], o = O[i], k = c.a * m[i] * bk;
+      const e = tone([c.r * k + o[0], c.g * k + o[1], c.b * k + o[2]]), mx = Math.max(e[0], e[1], e[2]);
+      x.save(); x.rotate(i * 6 * Math.PI / 180);
+      if (mx > 0.01) { const n = e.map(q => Math.round(q / mx * 255)).join(','); x.shadowColor = `rgba(${n},${(GLV(mx) * 0.95).toFixed(3)})`; x.shadowBlur = GLOW(mx); }
+      x.fillStyle = `rgb(${Math.round(36 + e[0] * 219)},${Math.round(36 + e[1] * 219)},${Math.round(36 + e[2] * 219)})`;
+      rr(-2.5, -Rr - 7, 5, 14, 2.5);
+      x.restore();
+    }
+    x.restore();
+    for (let j = 0; j < 4; j++) {
+      const c = this.bcur[j], o = OB[j], k = c.a;
+      const e = tone([c.r * k + o[0], c.g * k + o[1], c.b * k + o[2]]), mx = Math.max(e[0], e[1], e[2]);
+      const bx = 61 + j * 70, by = 398 + (this.state.press === j ? 2 : 0);
+      x.fillStyle = '#1d1d1d'; x.fillRect(bx, by, 48, 48);
+      x.strokeStyle = '#2c2c2c'; x.lineWidth = 1; x.strokeRect(bx + 0.5, by + 0.5, 47, 47);
+      x.save();
+      if (mx > 0.01) { const n = e.map(q => Math.round(q / mx * 255)).join(','); x.shadowColor = `rgba(${n},${GLV(mx).toFixed(3)})`; x.shadowBlur = GLOW(mx) + 2; x.shadowOffsetY = 3; }
+      x.fillStyle = `rgb(${Math.round(38 + e[0] * 217)},${Math.round(38 + e[1] * 217)},${Math.round(38 + e[2] * 217)})`;
+      x.fillRect(bx, by + 45, 48, 3);
+      x.restore();
+    }
+  }
+  componentDidUpdate() {
+    this.xfUpdate(); this.blink('lab', this._labKey); this.blink('meta', this._metaKey);
+    if (this._lastMode !== this.state.mode) { if (this._lastMode) this.play('reveal'); this._lastMode = this.state.mode; }
+    if (this._pendingTurn) {
+      const d = this._pendingTurn; this._pendingTurn = 0;
+      if (this._cursor === this._prevCursor) this.play('bound', { dir: d, c: this._ring[this._cursor] && this._ring[this._cursor].c.map(x => x / 255) });
+      else {
+        const now = performance.now(), dtR = Math.max(16, now - this.lastRot); this.lastRot = now;
+        this.vel = dtR > 400 ? 0 : this.vel * 0.55 + (1000 / dtR) * 0.45;
+        this.play('tick', { dir: Math.sign(cd(this._cursor, this._prevCursor)) || d, len: Math.round(cl((this.vel - 4) / 14) * 7) });
+      }
+    }
+  }
+
+  fresh() {
+    return {
+      mode: 'home', ret: 'home', playing: true, np: { kind: 'al', i: 4 }, vol: 54, volShow: 0,
+      rIdx: 0, src: 'recent', xIdx: { recent: 0, playlists: 0 }, xIn: false, xFade: false, xPlay: false, xOpen: false, xBump: 0, xEnt: false,
+      wOpen: false, wIn: false, sel: 1, left: null, right: null, wBump: 0, snapErr: null, deskNext: null,
+      desk: { mode: 'single', id: 0 }, deskOpen: null,
+      fly: null, toast: '', toastOn: false, press: -1, kmeta: null, busy: null,
+      lx: 0, lop: 1, ltr: 'none', labOp: 1, labTr: 'none', metaOp: 1, metaTr: 'none',
+      frame: '16', pickBg: 'frost', fps60: false, rm: false, native: false, nativePos: 0,
+      sim: { pc: 'ok', source: 'queue', sonosShuffle: 'off', repeat: 'off', pn: 'ok', start: 'ok', seek: 'ok', like: 'ok', upnext: 'normal', favs: 'real', art: 'mixed', snap: 'ok' },
+      tPos: 0, seek: false, seekState: null, pos: 74, queue: queueFor({ kind: 'al', i: 4 }), qOrder: Array.from({ length: 12 }, (_, i) => i), qNow: 4, qSel: 4, pnIdx: [], qOpen: false, qIn: false, qEnt: false, qFade: false, qPlay: false, qBump: 0, shuffle: false, liked: {}, likePop: null
+    };
+  }
+
+  get W() {
+    if (this._W) return this._W;
+    const T = thumbs();
+    return (this._W = [
+      { app: 'Google Chrome', title: 'Calendar · Week of Sep 22', desc: 'Riot Games · Google Calendar', th: T.cal, icBg: ic('chrome.png'), c: [255, 200, 40] },
+      { app: 'Claude', title: 'Nano D Control Center', desc: 'Conversation · desktop app', th: T.claude, icBg: ic('claude.png'), c: [255, 110, 60] },
+      { app: 'Slack', title: 'Danny Lewis', desc: 'Direct message · Riot Games', th: T.slack, icBg: ic('slack.png'), c: [230, 50, 200] },
+      { app: 'ChatGPT', title: 'PCB layout questions', desc: 'Conversation · desktop app', th: T.chatgpt, icBg: ic('chatgpt.png'), c: WARM },
+      { app: 'Google Chrome', title: 'Understand the PCB', desc: 'Engineering docs · 9 tabs', th: T.doc, icBg: ic('chrome.png'), c: [255, 200, 40] },
+      { app: 'Bambu Studio', title: 'Rack_Base(2)', desc: 'Unsaved changes · 3D print project', th: T.bambu, icBg: '#00ae42', letter: 'B', c: [0, 230, 90] },
+      { app: 'File Explorer', title: 'Downloads', desc: 'Folder · Minimized', th: T.files, icBg: '#e8b64a', letter: 'E', c: [255, 190, 60] }
+    ]);
+  }
+
+  componentDidMount() {
+    const fit = () => { const w = this.wrapRef.current && this.wrapRef.current.clientWidth; if (w) this.setState({ wrapW: w }); };
+    this.ro = new ResizeObserver(fit); this.wrapRef.current && this.ro.observe(this.wrapRef.current); fit();
+    this.kd = e => {
+      const tg = e.target && e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); this.turn(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); this.turn(-1); }
+      else if (['1', '2', '3', '4'].includes(e.key)) { if (!e.repeat) this.keyDown(+e.key); }
+    };
+    this.ku = e => { if (e.key === '1') this.keyUp(); };
+    window.addEventListener('keydown', this.kd); window.addEventListener('keyup', this.ku);
+    if (document.fonts) document.fonts.ready.then(() => this.forceUpdate());
+    this.wh = e => { e.preventDefault(); this.wacc = (this.wacc || 0) + e.deltaY + e.deltaX; while (Math.abs(this.wacc) >= 40) { const d = this.wacc > 0 ? 1 : -1; this.wacc -= d * 40; this.turn(d); } };
+    [this.wrapRef.current, this.knobRef.current].forEach(el => el && el.addEventListener('wheel', this.wh, { passive: false }));
+    this.timers = [];
+    this.raf = requestAnimationFrame(this.loop); this.touch();
+    this._pi = setInterval(() => {
+      const s = this.state; if (!s.playing || s.seek) return;
+      const tr = this.curTrack(), d = durOf(tr);
+      if (s.pos + 1 >= d) { if (s.qNow + 1 < s.qOrder.length) this.setState({ qNow: s.qNow + 1, pos: 0, seek: false }); else this.setState({ pos: 0, playing: false }); }
+      else this.setState({ pos: s.pos + 1 });
+    }, 1000);
+  }
+  componentWillUnmount() {
+    this.ro && this.ro.disconnect(); window.removeEventListener('keydown', this.kd); window.removeEventListener('keyup', this.ku); clearTimeout(this._hold);
+    [this.wrapRef.current, this.knobRef.current].forEach(el => el && el.removeEventListener('wheel', this.wh));
+    (this.timers || []).forEach(clearTimeout); cancelAnimationFrame(this.raf); clearTimeout(this._sl); clearInterval(this._pi); clearTimeout(this._sk);
+  }
+  later(ms, fn) { const t = setTimeout(fn, ms); this.timers.push(t); return t; }
+  raf2(fn) { requestAnimationFrame(() => requestAnimationFrame(fn)); }
+
+  overlayOpen() { const s = this.state; return s.xOpen || s.qOpen || s.wOpen; }
+  flash(msg, exit) {
+    if (exit) { this.later(360, () => this.flash(msg)); return; }
+    if (this.overlayOpen()) return;
+    clearTimeout(this._tt); this.setState({ toast: msg, toastOn: true }); this._tt = this.later(1800, () => this.setState({ toastOn: false }));
+  }
+  knobMeta(text, ms, col) { const d = ms || 1500; this.setState({ kmeta: { text, col: col || null, until: Date.now() + d } }); this.later(d + 30, () => this.forceUpdate()); }
+  flipLcd(dir) { const rm = this.state.rm; this.setState({ lx: rm ? 0 : dir * 20, lop: 0, ltr: 'none' }); this.raf2(() => this.setState({ lx: 0, lop: 1, ltr: trn([['opacity', 220, 'OUT'], ['transform', 380, 'OUT']], this.state.fps60) })); }
+  pressFx(n) { this.setState({ press: n - 1 }); clearTimeout(this._pt); this._pt = this.later(140, () => this.setState({ press: -1 })); }
+  bump(key, d) { if (this.state.rm) return; this.setState({ [key]: d }); this.later(160, () => this.setState({ [key]: 0 })); }
+  xfUpdate() {
+    const T = this._xfT; if (!T) return; this.xf = this.xf || {};
+    [['xAmb', T.xAmb, 200, T.xLive], ['qAmb', T.qAmb, 200, T.qLive], ['qBig', T.qBig, 120, T.qLive]].forEach(([name, val, delay, live]) => {
+      const key = JSON.stringify(val);
+      let f = this.xf[name];
+      if (!f) f = this.xf[name] = { a: val, b: val, on: 'a', want: key };
+      if (f.want === key) return;
+      f.want = key; clearTimeout(f.t);
+      if (!live) { f.a = val; f.b = val; f.on = 'a'; return; }
+      f.t = setTimeout(() => { if (f.on === 'a') { f.b = val; f.on = 'b'; } else { f.a = val; f.on = 'a'; } this.forceUpdate(); }, delay);
+    });
+  }
+  blink(name, key) {
+    const prev = this['_bk_' + name]; this['_bk_' + name] = key;
+    if (prev === undefined || prev === key) return;
+    const fps = name === 'meta' && this.state.fps60;
+    this.setState({ [name + 'Op']: 0, [name + 'Tr']: 'none' });
+    this.raf2(() => this.setState({ [name + 'Op']: 1, [name + 'Tr']: trn([['opacity', 160, 'OUT']], fps) }));
+  }
+
+  pls() { const f = this.state.sim.favs; return f === 'empty' ? [] : f === 'many' ? PL : PL_REAL; }
+  list(src) { return src === 'playlists' ? this.pls() : ALB; }
+  queue() { return this.state.queue; }
+  curTrack() { const s = this.state; return this.queue()[s.qOrder[s.qNow]]; }
+  likeKey(tr) { return tr.al + ':' + tr.t; }
+  isNC(k) { return this.state.sim.upnext === 'foreign' && k % 3 === 2; }
+  srcWhy(kind) {
+    const src = this.state.sim.source; if (src === 'queue') return null;
+    const T = {
+      seek: { airplay: 'Can’t seek · AirPlay', radio: 'Can’t seek · radio', linein: 'Can’t seek · line-in', none: 'Nothing playing' },
+      up: { airplay: 'Up next is in Music app', radio: 'Radio · no Up next', linein: 'Line-in · no Up next', none: 'Nothing playing' },
+      pn: { airplay: 'AirPlay · use Play', radio: 'Radio · use Play', linein: 'Line-in · use Play', none: 'Nothing playing · Play' }
+    };
+    return T[kind][src];
+  }
+  pnBlock() {
+    const s = this.state, why = this.srcWhy('pn');
+    if (why) return { k: why, t: s.sim.source === 'none' ? 'Nothing playing · use Play' : 'Not playing from the queue · use Play' };
+    if (s.sim.sonosShuffle === 'on') return { k: 'Shuffle on · turn it off', t: 'Shuffle is on · turn it off to play next' };
+    return null;
+  }
+  like(tr, k) {
+    const s = this.state, st = s.sim.like;
+    if (!tr || s.sim.upnext === 'loading' || (s.sim.upnext === 'longshuffle' && k > s.qNow)) return;
+    if (this.isNC(k)) { this.knobMeta('Not an Apple Music song', 2000); this.play('fail'); return; }
+    if (st === 'loading') { this.knobMeta('Checking likes…', 1500); return; }
+    if (st === 'expired') { this.knobMeta('Sign-in expired', 2200, ERR); this.play('fail'); this._exitToast = 'Apple Music sign-in expired · open Settings'; return; }
+    const key = this.likeKey(tr);
+    if (s.liked[key]) { this.knobMeta('Unfavourite in Music app', 2200); this.play('fail'); return; }
+    if (st === 'fail') { this.knobMeta('Didn’t save · try again', 2200, ERR); this.play('fail'); return; }
+    const on = true;
+    this.setState({ liked: Object.assign({}, s.liked, { [key]: on }), likePop: k });
+    this.later(420, () => this.setState({ likePop: null }));
+    this.play('bloom', { c: PINK });
+    this.knobMeta('Liked', 1500);
+  }
+  seekArm() { clearTimeout(this._sk); this._sk = this.later(3000, () => { const st = this.state.seekState; if (st === 'jump' || st === 'wait') return; this.exitSeek(); }); }
+  exitSeek() {
+    if (!this.state.seek) return; clearTimeout(this._sk);
+    if (this.state.seekState === 'wait') { clearTimeout(this._sks); this.sendSeek(); }
+    this.setState({ seek: false }); this.play('reveal');
+  }
+  sendSeek() {
+    const o = this.state.sim.seek; this.setState({ seekState: 'jump' });
+    this.later(o === 'slow' ? 5000 : 2700, () => {
+      if (this._seekAgain && o !== 'fail') { this._seekAgain = false; this.sendSeek(); return; }
+      if (this.state.seek) this.seekArm();
+      if (o === 'fail') { this.setState({ seekState: 'fail' }); this.play('fail'); this.later(2200, () => { if (this.state.seekState === 'fail') this.setState({ seekState: null }); }); }
+      else this.setState({ seekState: null });
+    });
+  }
+  toggleSeek() {
+    if (this.state.seek) { this.exitSeek(); return; }
+    const why = this.srcWhy('seek'); if (why) { this.knobMeta(why, 2000); this.play('fail'); return; }
+    this.setState({ seek: true, tPos: 0, seekState: null }); this.play('reveal'); this.seekArm();
+  }
+  skip() {
+    const s = this.state; if (!s.tPos) return;
+    const n = Math.max(0, Math.min(s.qOrder.length - 1, s.qNow + s.tPos));
+    if (n === s.qNow) { this.knobMeta(s.tPos > 0 ? 'End of queue' : 'Start of queue', 1500); this.play('fail'); return; }
+    const tr = this.queue()[s.qOrder[n]];
+    this.play('sweep', { dir: s.tPos });
+    this.setState({ qNow: n, tPos: 0, pos: 0, playing: true });
+    this.flash((s.tPos > 0 ? 'Next · ' : 'Previous · ') + tr.t);
+  }
+  openQueue() {
+    const why = this.srcWhy('up'); if (why) { this.knobMeta(why, 2000); this.play('fail'); return; }
+    const s = this.state; clearTimeout(this._tt);
+    this.setState({ toastOn: false, mode: 'queue', qOpen: true, qIn: false, qSel: s.qNow }); this.flipLcd(1);
+    this.raf2(() => { this.setState({ qIn: true, qEnt: true }); this.later(700, () => this.setState({ qEnt: false })); });
+  }
+  closeQueue() {
+    this.setState({ qOpen: false, mode: 'tracks' }); this.flipLcd(-1); this.later(360, () => this.setState({ qIn: false }));
+    if (this._exitToast) { this.flash(this._exitToast, true); this._exitToast = null; }
+  }
+  qLen() { const s = this.state; return s.sim.upnext === 'longshuffle' ? Math.min(s.qOrder.length, s.qNow + 2) : s.qOrder.length; }
+  toggleShuffle() {
+    const s = this.state; if (s.qFade || s.sim.upnext === 'loading') return;
+    if (s.sim.upnext === 'longshuffle') { this.knobMeta('Sonos is shuffling', 1500); return; }
+    const on = !s.shuffle, n = s.qOrder.length, head = s.qOrder.slice(0, s.qNow + 1);
+    const pn = s.pnIdx.filter(i => head.indexOf(i) < 0);
+    let rest = s.qOrder.slice(s.qNow + 1).filter(i => pn.indexOf(i) < 0);
+    if (on) { for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = rest[i]; rest[i] = rest[j]; rest[j] = t; } }
+    else rest = rest.slice().sort((a, b) => a - b);
+    const order = head.concat(pn, rest);
+    this.play('scatter', { seed: Math.random() * 60 });
+    this.setState({ qFade: true });
+    this.later(200, () => { this.setState({ shuffle: on, qOrder: order, qSel: Math.min(n - 1, s.qNow + 1), qFade: false, qIn: false }); this.raf2(() => { this.setState({ qIn: true, qEnt: true }); this.later(700, () => this.setState({ qEnt: false })); }); });
+    this.knobMeta(on ? 'Shuffle on' : 'Shuffle off · in order', 1500);
+  }
+  playQueued() {
+    const s = this.state; if (s.sim.upnext === 'loading' || (s.sim.upnext === 'longshuffle' && s.qSel > s.qNow)) return;
+    const tr = this.queue()[s.qOrder[s.qSel]];
+    this.setState({ qPlay: true });
+    this.later(380, () => { this.setState({ qOpen: false, qNow: s.qSel, playing: true, mode: 'home', tPos: 0, pos: 0 }); this.flipLcd(-1); this.play('wash', { c: ALB[tr.al].c }); this.flash('Playing ' + tr.t, true); });
+    this.later(760, () => this.setState({ qPlay: false, qIn: false }));
+  }
+  keyDown(n) { this.btn(n); if (n === 1) { clearTimeout(this._hold); this._hold = setTimeout(() => this.goHome(), 600); } }
+  keyUp() { clearTimeout(this._hold); }
+  goHome() {
+    const s = this.state; if (s.sim.pc === 'off' || (s.mode === 'home' && !this.overlayOpen())) return;
+    const up = { xOpen: false, qOpen: false, wOpen: false, mode: 'home', seek: false, tPos: 0 };
+    if (s.wOpen && s.deskNext) { up.desk = s.deskNext; up.deskNext = null; }
+    this.setState(up); this.flipLcd(-1);
+    this.later(360, () => this.setState({ xIn: false, qIn: false, wIn: false }));
+  }
+  lockNow() {
+    const s = this.state; if (!this.overlayOpen()) { this.knobMeta('No overlay open', 1200); return; }
+    const up = { xOpen: false, qOpen: false, wOpen: false, xIn: false, qIn: false, wIn: false, mode: s.xOpen ? 'recent' : s.qOpen ? 'tracks' : s.ret, toastOn: false };
+    if (s.wOpen && s.deskNext) { up.desk = s.deskNext; up.deskNext = null; }
+    this.setState(up);
+  }
+  setSim(k, v) {
+    const s = this.state; if (s.sim[k] === v) return;
+    const up = { sim: Object.assign({}, s.sim, { [k]: v }) };
+    if (k === 'pc') { up.native = false; if (v === 'off') { this.play('down'); Object.assign(up, { xOpen: false, qOpen: false, wOpen: false, xIn: false, qIn: false, wIn: false, mode: 'home', seek: false }); } else this.play('reveal'); }
+    if (k === 'favs') up.xIdx = Object.assign({}, s.xIdx, { playlists: 0 });
+    this.setState(up);
+  }
+
+  turn(d) {
+    const s = this.state; this.touch();
+    if (s.sim.pc === 'off') { this.setState({ native: true, nativePos: (s.nativePos + d + 60) % 60 }); return; }
+    this._pendingTurn = d; this._prevCursor = this._cursor;
+    const bnd = () => { this._pendingTurn = 0; this.play('bound', { dir: d, c: this._ring[this._cursor] && this._ring[this._cursor].c.map(x => x / 255) }); };
+    if (s.mode === 'home') { const v = Math.max(0, Math.min(100, s.vol + d)); const k = (s.volShow || 0) + 1; this.setState({ vol: v, volShow: k }); this.later(1400, () => { if (this.state.volShow === k) this.setState({ volShow: 0 }); }); return; }
+    if (s.mode === 'recent') { const n = s.rIdx + d; if (n < 0 || n >= ALB.length) { bnd(); return; } this.setState({ rIdx: n }); return; }
+    if (s.mode === 'explore') {
+      if (s.xFade || s.xPlay) { this._pendingTurn = 0; return; }
+      const L = this.list(s.src), n = s.xIdx[s.src] + d;
+      if (n < 0 || n >= L.length) { bnd(); this.bump('xBump', d); return; }
+      this.setState({ xIdx: Object.assign({}, s.xIdx, { [s.src]: n }) }); return;
+    }
+    if (s.mode === 'tracks' && s.seek) {
+      const D = durOf(this.curTrack()), max = D - 3, p = Math.max(0, Math.min(max, s.pos + d * 5));
+      this.seekArm();
+      if (p === s.pos) { bnd(); if (p === max) this.knobMeta('Stops 3 s before end', 1500); return; }
+      if (s.seekState === 'jump') { this._seekAgain = true; this.setState({ pos: p }); return; }
+      this.setState({ pos: p, seekState: 'wait' }); clearTimeout(this._sks); this._sks = this.later(250, () => this.sendSeek()); return;
+    }
+    if (s.mode === 'tracks') { const n = s.tPos + d; if (n < -1 || n > 1) { bnd(); return; } this.setState({ tPos: n }); return; }
+    if (s.mode === 'queue') {
+      if (s.qFade || s.qPlay) { this._pendingTurn = 0; return; }
+      const n = s.qSel + d;
+      if (n < 0 || n >= this.qLen()) { bnd(); this.bump('qBump', d); return; }
+      this.setState({ qSel: n }); return;
+    }
+    if (s.mode === 'windows') {
+      const n = s.sel + d;
+      if (n < 0 || n >= this.W.length) { bnd(); this.bump('wBump', d); return; }
+      this.setState({ sel: n });
+    }
+  }
+
+  btn(n) {
+    const s = this.state; this.pressFx(n); this.touch();
+    if (s.sim.pc === 'off') { this.setState({ native: true }); return; }
+    this.play('press', { n: n - 1 });
+    const starting = s.busy && s.busy.kind === 'start';
+    if (s.mode === 'home') {
+      if (n === 1) { if (starting) { this.knobMeta('Starting…', 1200); return; } this.setState({ playing: !s.playing }); this.play(s.playing ? 'drain' : 'fill'); }
+      else if (n === 2) { this.setState({ mode: 'recent' }); this.flipLcd(1); }
+      else if (n === 3) { this.setState({ mode: 'tracks', tPos: 0 }); this.flipLcd(1); }
+      else this.openWin('home');
+    } else if (s.mode === 'recent') {
+      if (n === 1) { this.setState({ mode: 'home' }); this.flipLcd(-1); }
+      else if (n === 2) this.openExplorer();
+      else if (n === 3) this.playNext(s.rIdx);
+      else this.playItem('al', s.rIdx);
+    } else if (s.mode === 'explore') {
+      if (n === 1) this.closeExplorer();
+      else if (n === 2) this.setSrc('recent');
+      else if (n === 3) this.setSrc('playlists');
+      else this.playFromExplorer();
+    } else if (s.mode === 'tracks') {
+      if (n === 1) { if (s.seek) this.exitSeek(); else { this.setState({ mode: 'home', tPos: 0 }); this.flipLcd(-1); } }
+      else if (n === 2) { if (s.seek) this.exitSeek(); this.openQueue(); }
+      else if (n === 3) this.toggleSeek();
+      else if (!s.seek) this.skip();
+    } else if (s.mode === 'queue') {
+      if (n === 1) this.closeQueue();
+      else if (n === 2) this.toggleShuffle();
+      else if (n === 3) this.like(this.queue()[s.qOrder[s.qSel]], s.qSel);
+      else this.playQueued();
+    } else if (s.mode === 'windows') {
+      if (n === 1) this.closeWin(true);
+      else if (n === 2) this.snap('left');
+      else if (n === 3) this.snap('right');
+      else this.switchTo();
+    }
+  }
+
+  playItem(kind, i) {
+    if (this.state.busy) return;
+    const pls = this.pls(), item = kind === 'pl' ? pls[i] : ALB[i], name = item.t, o = this.state.sim.start;
+    this.setState({ mode: 'home', busy: { kind: 'start' }, seek: false, tPos: 0 }); this.flipLcd(-1);
+    this.later(o === 'slow' ? 2600 : 1100, () => {
+      const blocked = kind === 'al' && o === 'blocked';
+      if (o === 'fail' || blocked) {
+        this.setState({ busy: null }); this.play('fail');
+        this.knobMeta(blocked ? 'Album unavailable' : 'Didn’t start', 2600, ERR);
+        this.flash(blocked ? name + ' can’t play · a song is unavailable' : 'Couldn’t start ' + name); return;
+      }
+      const nq = queueFor({ kind, i, p: kind === 'pl' ? item : null }, pls), qn = nq.length;
+      this.setState({ busy: null, queue: nq, np: { kind, i, p: kind === 'pl' ? item : null }, playing: true, rIdx: kind === 'al' ? i : this.state.rIdx, qOrder: Array.from({ length: qn }, (_, k) => k), qNow: 0, qSel: 0, pnIdx: [], shuffle: false, pos: 0 });
+      this.play('wash', { c: item.c });
+      if (kind === 'pl' && item.bad != null) { this.knobMeta('Playing ' + (qn - 1) + ' of ' + qn, 3000); this.flash('Playing ' + (qn - 1) + ' of ' + qn + ' · 1 song unavailable'); }
+      else this.flash('Playing ' + name);
+    });
+  }
+
+  playNext(i) {
+    const s = this.state; if (s.busy) return;
+    const why = this.pnBlock();
+    if (why) { this.knobMeta(why.k, 2200); this.flash(why.t); this.play('fail'); return; }
+    const all = TR[i].slice(0, 100).map((t, k) => ({ t, a: ALB[i].a, al: i, n: k + 1 })), n = all.length, slow = s.sim.pn === 'slow';
+    const step = k => { if (k > n) { this.pnDone(i, all); return; } this.setState({ busy: { kind: 'pn', k, n } }); this.later(k === 0 ? (slow ? 4500 : 400) : 500, () => step(k + 1)); };
+    step(0);
+  }
+  pnDone(i, all) {
+    const s = this.state, o = s.sim.pn; this.setState({ busy: null });
+    if (o === 'none') { this.knobMeta('Nothing added · retry', 2400, ERR); this.flash('Couldn’t queue ' + ALB[i].t + ' · nothing added'); this.play('fail'); return; }
+    if (o === 'changed') { this.knobMeta('Song changed · retry', 2400, ERR); this.flash('Song changed · try again'); this.play('fail'); return; }
+    const add = o === 'partial' ? all.slice(0, Math.ceil(all.length / 2)) : all;
+    const base = s.queue.length, idx = add.map((_, k) => base + k);
+    const order = s.qOrder.slice(0, s.qNow + 1).concat(idx, s.qOrder.slice(s.qNow + 1));
+    this.setState({ queue: s.queue.concat(add), qOrder: order, pnIdx: idx.concat(s.pnIdx) });
+    if (o === 'partial') { this.knobMeta('Partly queued', 2400, ERR); this.flash('Partly queued · check the Sonos queue'); this.play('fail'); return; }
+    this.knobMeta('Queued next', 1500); this.play('sweep', { dir: 1, at: 0 }); this.flash('Queued next · ' + ALB[i].t);
+  }
+  openExplorer() {
+    const s = this.state; clearTimeout(this._tt);
+    this.setState({ toastOn: false, mode: 'explore', xOpen: true, xIn: false, src: 'recent', xIdx: Object.assign({}, s.xIdx, { recent: s.rIdx }) });
+    this.flipLcd(1);
+    this.raf2(() => { this.setState({ xIn: true, xEnt: true }); this.later(700, () => this.setState({ xEnt: false })); });
+  }
+  closeExplorer() {
+    const s = this.state;
+    this.setState({ xOpen: false, mode: 'recent', rIdx: s.src === 'recent' ? s.xIdx.recent : s.rIdx });
+    this.flipLcd(-1);
+    this.later(360, () => this.setState({ xIn: false }));
+  }
+  setSrc(src) {
+    const s = this.state; if (s.src === src || s.xFade) return;
+    this.setState({ xFade: true });
+    this.later(190, () => { this.setState({ src, xFade: false, xIn: false }); this.flipLcd(src === 'playlists' ? 1 : -1); this.raf2(() => { this.setState({ xIn: true, xEnt: true }); this.later(700, () => this.setState({ xEnt: false })); }); });
+  }
+  playFromExplorer() {
+    const s = this.state, L = this.list(s.src), i = s.xIdx[s.src];
+    if (!L.length || s.sim.art === 'list' || s.busy) return;
+    this.setState({ xPlay: true });
+    this.later(380, () => { this.setState({ xOpen: false }); this.playItem(s.src === 'playlists' ? 'pl' : 'al', i); });
+    this.later(760, () => this.setState({ xPlay: false, xIn: false }));
+  }
+
+  openWin(ret) {
+    const s = this.state; clearTimeout(this._tt);
+    const cur = s.desk.mode === 'single' ? s.desk.id : s.desk.left;
+    const sel = Math.min(this.W.length - 1, cur === 0 ? 1 : 0);
+    this.setState({ toastOn: false, mode: 'windows', ret, wOpen: true, wIn: false, sel, left: null, right: null, deskOpen: s.desk, deskNext: null, snapErr: null });
+    this.flipLcd(1);
+    this.raf2(() => this.setState({ wIn: true }));
+  }
+  closeWin(back, forceDesk) {
+    const s = this.state, one = (s.left != null) !== (s.right != null);
+    const up = { wOpen: false, mode: s.ret, deskNext: null };
+    if (forceDesk) up.desk = forceDesk; else if (s.deskNext) up.desk = s.deskNext;
+    this.setState(up); this.flipLcd(-1);
+    if (back && one && s.deskNext && s.deskNext.mode === 'split') this.flash(this.W[s.deskNext.left].app + ' left · ' + this.W[s.deskNext.right].app + ' right', true);
+    this.later(320, () => this.setState({ wIn: false }));
+  }
+  deskFor(left, right, base) {
+    const bL = base.mode === 'split' ? base.left : base.id, bR = base.mode === 'split' ? base.right : base.id;
+    const L = left != null ? left : (bL !== right ? bL : null);
+    const R = right != null ? right : (bR !== left ? bR : null);
+    if (L != null && R != null && L !== R) return { mode: 'split', left: L, right: R };
+    return { mode: 'single', id: L != null ? L : R };
+  }
+  snap(side) {
+    const s = this.state, id = s.sel, w = this.W[id], o = s.sim.snap;
+    if (o !== 'ok') {
+      const t = o === 'hung' ? [w.app + ' isn’t responding', w.app + ' not responding'] : o === 'move' ? ['Couldn’t move ' + w.app, 'Couldn’t move ' + w.app] : [w.app + ' can’t fit half', w.app + ' can’t fit half'];
+      this.setState({ snapErr: { side, text: t[0] } }); this.knobMeta(t[1], 2400, ERR); this.play('fail');
+      this.later(2400, () => this.setState({ snapErr: null })); return;
+    }
+    const other = side === 'left' ? 'right' : 'left', nxt = { [side]: id, snapErr: null }; if (s[other] === id) nxt[other] = null;
+    const left = side === 'left' ? id : (nxt.left === null ? null : s.left), right = side === 'right' ? id : (nxt.right === null ? null : s.right);
+    const SW = this.SW(), off = (SW - 1280) / 2, trayOn = s.left != null || s.right != null;
+    const x0 = off + 440, y0 = 245 + (trayOn ? 0 : -44), hw = SW / 2, hx = side === 'left' ? 0 : hw, k = Math.min(hw / 400, 672 / 250), tx = hx + (hw - 400 * k) / 2, ty = (672 - 250 * k) / 2;
+    if (!s.rm) {
+      this.setState({ fly: { x0, y0, tf: 'none', go: false, thumb: w.th } });
+      this.raf2(() => this.setState({ fly: { x0, y0, tf: 'translate(' + (tx - x0).toFixed(1) + 'px,' + (ty - y0).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')', go: true, thumb: w.th } }));
+      this.later(700, () => this.setState({ fly: null }));
+    }
+    this.setState(Object.assign(nxt, { deskNext: this.deskFor(left, right, s.deskOpen || s.desk) }));
+    this.play('half', { side, c: w.c });
+    if (left != null && right != null) this.later(820, () => { this.closeWin(false); this.flash('Side by side · ' + this.W[left].app + ' and ' + this.W[right].app, true); });
+    else { const nextSel = this.W.findIndex((_, i) => i !== id && i !== left && i !== right); if (nextSel >= 0) this.later(420, () => this.setState({ sel: nextSel })); }
+  }
+  switchTo() {
+    const s = this.state, w = this.W[s.sel];
+    this.closeWin(false, { mode: 'single', id: s.sel });
+    this.play('wash', { c: w.c });
+    this.flash(w.app + ' · ' + w.title, true);
+  }
+  SW() { return this.state.frame === '32' ? 2560 : 1280; }
+  measure(text, surf) {
+    const c = this._mc || (this._mc = document.createElement('canvas').getContext('2d'));
+    const sz = surf === 'Knob line 14 px' ? 14 : surf === 'Knob title 22 px' ? 22 : 12;
+    c.font = '500 ' + sz + 'px Montserrat, sans-serif';
+    let w = c.measureText(text).width; if (surf === 'Knob heading') w += text.length * 0.48;
+    return Math.round(w);
+  }
+
+  pd = e => { const r = e.currentTarget.getBoundingClientRect(); this.c0 = [r.left + r.width / 2, r.top + r.height / 2]; this.a0 = Math.atan2(e.clientY - this.c0[1], e.clientX - this.c0[0]); this.acc = 0; e.currentTarget.setPointerCapture(e.pointerId); };
+  pm = e => {
+    if (!this.c0) return;
+    const a = Math.atan2(e.clientY - this.c0[1], e.clientX - this.c0[0]);
+    let d = a - this.a0; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+    this.a0 = a; this.acc += d * 180 / Math.PI;
+    const st = this.state.mode === 'home' || (this.state.mode === 'tracks' && this.state.seek) ? 360 / 67 : 18;
+    while (Math.abs(this.acc) >= st) { const k = this.acc > 0 ? 1 : -1; this.acc -= k * st; this.turn(k); }
+  };
+  pu = () => { this.c0 = null; };
+
+  renderVals() {
+    const s = this.state, W = this.W, OUT = 'cubic-bezier(0.22,1,0.36,1)', IN = 'cubic-bezier(0.4,0,1,1)';
+    const rgb = c => c.join(','), sim = s.sim, SW = this.SW(), wide = SW > 1280, rm = s.rm, fps = s.fps60;
+    const sc = Math.min(1, (s.wrapW || 1280) / SW), off = (SW - 1280) / 2;
+    const Q = s.queue, ct = Q[s.qOrder[s.qNow]];
+    const liked = tr => !!(tr && s.liked[tr.al + ':' + tr.t]);
+    const km = s.kmeta && Date.now() < s.kmeta.until ? s.kmeta : null;
+    const pcOff = sim.pc === 'off', art = sim.art, listLoad = art === 'list', un = sim.upnext;
+    const bgc = c => 'rgb(' + c.map(v => Math.round(v * 0.45)).join(',') + ')';
+    const dots = (n, idx) => ({ list: Array.from({ length: n }, (_, k) => ({ l: k * 14 + 'px' })), L: (640 - (n * 14 - 8) / 2) + 'px', W: Math.max(0, n * 14 - 8) + 'px', ind: 'translateX(' + idx * 14 + 'px)' });
+
+    // desktop (real windows never animate)
+    const dk = s.desk, HW = SW / 2, full = { x: 0, y: 0, w: SW, h: 672 };
+    const deskWins = W.map((w, i) => {
+      let r = full, op = 0, z = 1;
+      if (dk.mode === 'single' && dk.id === i) { op = 1; z = 2; }
+      if (dk.mode === 'split' && dk.left === i) { r = { x: 0, y: 0, w: HW, h: 672 }; op = 1; z = 2; }
+      if (dk.mode === 'split' && dk.right === i) { r = { x: HW, y: 0, w: HW, h: 672 }; op = 1; z = 2; }
+      return { x: r.x + 'px', y: r.y + 'px', w: r.w + 'px', h: r.h + 'px', op, z, title: w.title + ' — ' + w.app, icBg: w.icBg, letter: w.letter || '', thumb: w.th, inner: 'scale(' + (r.w / 480).toFixed(4) + ',' + ((r.h - 28) / 300).toFixed(4) + ')' };
+    });
+    const onDesk = i => (dk.mode === 'single' ? dk.id === i : dk.left === i || dk.right === i);
+    const taskIcons = [0, 1, 2, 3, 5, 6].map(i => ({ bg: W[i].icBg, letter: W[i].letter || '', line: onDesk(i) ? '#8ab4f8' : 'transparent' }));
+
+    // window picker
+    const X = wide ? [0, 280, 420, 545, 665, 780] : [0, 280, 400, 490, 540], S = wide ? [1, 0.56, 0.42, 0.4, 0.4, 0.4] : [1, 0.56, 0.34, 0.26, 0.2], O = wide ? [1, 0.95, 0.7, 0.45, 0.25, 0] : [1, 0.95, 0.6, 0, 0], MX = X.length - 1;
+    const cTr = rm ? 'opacity 200ms ' + OUT : 'transform 420ms ' + OUT + ', opacity 300ms ' + OUT;
+    const wCards = W.map((w, i) => {
+      const d = i - s.sel, a = Math.min(Math.abs(d), MX), sg = Math.sign(d);
+      const enter = s.wIn || rm ? '' : ' translateY(24px) scale(0.92)';
+      const side = s.left === i ? 'left' : s.right === i ? 'right' : null;
+      return {
+        tf: 'translate(-50%,-50%) translateX(' + sg * X[a] + 'px) scale(' + S[a] + ')' + enter, op: s.wIn ? O[a] : 0, z: 10 - a, pe: O[a] > 0.3 ? 'auto' : 'none', tr: cTr,
+        thumb: w.th, icBg: w.icBg, letter: w.letter || '', shade: d === 0 ? 0 : Math.min(0.55, 0.22 * a), shS: d === 0 ? 0 : 1, shB: d === 0 ? 1 : 0, ringOp: d === 0 ? 1 : 0,
+        hasBadge: !!side, badge: side === 'left' ? 'Left' : 'Right', badgeHalf: side ? HALF[side] : '',
+        pick: () => { if (d) this.setState({ sel: i }); else this.switchTo(); }
+      };
+    });
+    const wc = W[s.sel], trayOn = s.left != null || s.right != null || !!s.snapErr, oneSide = (s.left != null) !== (s.right != null);
+    const wSide = s.left === s.sel ? ' · Snapped left' : s.right === s.sel ? ' · Snapped right' : '';
+    const baseId = s.deskOpen ? (s.deskOpen.mode === 'single' ? s.deskOpen.id : s.deskOpen.left) : null;
+    const slot = (side, key) => {
+      const id = s[side], w = id != null ? W[id] : null, err = s.snapErr && s.snapErr.side === side, nm = side === 'left' ? 'Left' : 'Right';
+      const keep = !w && oneSide && baseId != null && baseId !== s.left && baseId !== s.right ? W[baseId] : null;
+      return { half: HALF[side], thumb: w ? w.th : 'none', fill: w ? 1 : 0, empty: w || keep ? 0 : 1, ghost: keep ? 0.35 : 0, ghostThumb: keep ? keep.th : 'none', icBg: w ? w.icBg : 'transparent', letter: w ? (w.letter || '') : '', key,
+        label: err ? s.snapErr.text : w ? nm + ' · ' + w.app : keep ? nm + ' · keeps ' + keep.app : 'Snap ' + side,
+        labCol: err ? ERR : keep ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.86)',
+        border: err ? '1px solid rgba(255,132,116,0.9)' : w ? '1px solid rgba(255,255,255,0.5)' : '1px dashed rgba(255,255,255,0.4)' };
+    };
+    const wD = dots(W.length, s.sel);
+
+    // music explorer
+    const L = this.list(s.src), xi = Math.max(0, Math.min(s.xIdx[s.src], L.length - 1)), isPlSrc = s.src === 'playlists';
+    const XX = wide ? [0, 300, 500, 680, 850, 1010, 1170, 1330, 1490] : [0, 300, 470, 590, 660], XS = wide ? [1, 0.6, 0.46, 0.42, 0.4, 0.4, 0.4, 0.4, 0.4] : [1, 0.6, 0.42, 0.3, 0.22], XO = wide ? [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.54, 0.5, 0] : [1, 0.92, 0.55, 0, 0], XSH = wide ? [0, 0.24, 0.34, 0.42, 0.48, 0.52, 0.55, 0.58, 0.6] : [0, 0.24, 0.48, 0.6, 0.6], XM = XX.length - 1;
+    const modeOf = (i, d) => { if (art === 'mixed') { if (Math.abs(d) >= (wide ? 7 : 3)) return 'loading'; if (i % 12 === 4) return 'small400'; if (i % 12 === 10) return 'small300'; if (i % 9 === 7) return 'none'; return 'full'; } return art === 'small' ? 'small400' : art === 'missing' ? 'none' : art === 'loading' ? 'loading' : 'full'; };
+    const xCards = L.map((it, i) => {
+      const d = i - xi, a = Math.min(Math.abs(d), XM), sg = Math.sign(d);
+      const hidden = !s.xIn || s.xFade, playing = s.xPlay && d === 0, ent = s.xEnt && !hidden && !rm, delay = ent ? a * 45 : 0;
+      const tf = 'translate(-50%,-50%) translateX(' + sg * XX[a] + 'px) scale(' + (playing ? 1.12 : XS[a]) + ')' + (hidden && !rm ? ' translateY(30px) scale(0.9)' : '');
+      const distinct = isPlSrc ? it.a.filter((v, k, arr) => arr.indexOf(v) === k) : [];
+      let tiles = isPlSrc ? (distinct.length >= 4 ? distinct.slice(0, 4).map((ai, k) => ({ col: String(1 + (k % 2)), row: String(1 + Math.floor(k / 2)), bg: cov(ALB[ai].f) })) : [{ col: '1 / 3', row: '1 / 3', bg: cov(ALB[distinct[0]].f) }]) : [{ col: '1 / 3', row: '1 / 3', bg: cov(it.f) }];
+      let A = artFor(it, isPlSrc ? 'full' : modeOf(i, d));
+      if (isPlSrc) A = Object.assign(A, { bg: 'none' });
+      if (listLoad) { tiles = []; A = Object.assign({}, A, { base: '#232325', grad: 'none', gradOp: 0, gen: false, ld: false }); }
+      else if (!isPlSrc) tiles = A.bg === 'none' ? [] : [{ col: '1 / 3', row: '1 / 3', bg: A.bg }];
+      const dur = hidden ? 170 : ent ? 440 : 420, dO = hidden ? 170 : ent ? 320 : 300, cv = hidden ? IN : OUT;
+      return { tf, op: hidden ? 0 : (s.xPlay && d !== 0 ? 0 : XO[a]), z: 20 - a, pe: XO[a] > 0.3 ? 'auto' : 'none', tiles, base: A.base, grad: A.grad, gradOp: A.gradOp, inset: A.inset, innerRule: A.rule, gen: A.gen, ld: A.ld, ink: A.ink, gt: it.t, ga: it.a || '',
+        tr: rm ? 'opacity 200ms ' + OUT : 'transform ' + dur + 'ms ' + cv + ' ' + delay + 'ms, opacity ' + dO + 'ms ' + cv + ' ' + delay + 'ms',
+        shade: XSH[a], shS: d === 0 ? 0 : 1, shB: d === 0 ? 1 : 0,
+        pick: () => { if (d) this.setState({ xIdx: Object.assign({}, s.xIdx, { [s.src]: i }) }); else this.playFromExplorer(); } };
+    });
+    const xc = L[xi] || null, xEmpty = isPlSrc && !L.length;
+    const xCur = !xc || listLoad ? { title: '', sub: '', meta: '' } : isPlSrc ? { title: xc.t, sub: xc.auto ? 'Favourite playlist · made by Apple Music' : 'Favourite playlist', meta: xc.n } : { title: xc.t, sub: xc.a, meta: xc.y + ' · ' + xc.n };
+    const xMode = xc && !isPlSrc ? modeOf(xi, 0) : 'full', xA = xc && !isPlSrc ? artFor(xc, xMode) : null;
+    const xAmbT = !xc || listLoad ? 'none' : isPlSrc ? cov(ALB[xc.a[0]].f) : xMode === 'none' ? xA.grad : xMode === 'loading' ? xA.base : cov(xc.f);
+    const xD = dots(listLoad ? 0 : L.length, xi);
+
+    // up next
+    const isPl = s.np.kind === 'pl', ctx = isPl ? s.np.p : ALB[s.np.i], foreign = un === 'foreign';
+    const qn = this.qLen(), qSel = Math.min(s.qSel, qn - 1);
+    const QY = [0, 100, 176, 236, 284], QS = [1, 0.78, 0.66, 0.58, 0.52], QO = [1, 0.72, 0.46, 0.24, 0];
+    const qRows = s.qOrder.slice(0, qn).map((qi, k) => {
+      const info = un === 'longshuffle' && k === qn - 1 && k > s.qNow;
+      const tr = Q[qi], d = k - qSel, a = Math.min(Math.abs(d), 4), sg = Math.sign(d);
+      const hidden = !s.qIn || s.qFade, ent = !rm && !hidden && s.qEnt, delay = ent ? a * 40 : 0;
+      const past = k < s.qNow, now = k === s.qNow, playing = s.qPlay && d === 0;
+      const ph = un === 'loading' && !now, nc = this.isNC(k), lk = liked(tr), pop = s.likePop === k, unknown = sim.like === 'loading';
+      const own = isPl || foreign || tr.al !== s.np.i, cv = hidden ? IN : OUT;
+      return {
+        tf: 'translateY(-50%) translateY(' + sg * QY[a] + 'px) scale(' + (playing ? 1.06 : QS[a]) + ')' + (hidden && !rm ? ' translateX(40px)' : ''),
+        op: hidden ? 0 : (s.qPlay && d !== 0 ? 0 : QO[a] * (past ? 0.6 : 1)),
+        tr: rm ? 'opacity 200ms ' + OUT : 'transform ' + (hidden ? 160 : 420) + 'ms ' + cv + ' ' + delay + 'ms, opacity ' + (hidden ? 160 : 300) + 'ms ' + cv + ' ' + delay + 'ms',
+        ph, phW: (40 + (k * 37) % 40) + '%',
+        showArt: !info && (ph || own), showNum: !info && !ph && !own,
+        art: ph ? 'rgba(255,255,255,0.1)' : art === 'missing' ? '#2A2A2C' : art === 'loading' ? bgc(ALB[tr.al].c) : cov(ALB[tr.al].f), num: tr.n ? String(tr.n).padStart(2, '0') : '',
+        t: ph ? '' : info ? 'Sonos is shuffling the rest' : tr.t,
+        sub: ph ? '' : info ? (s.qOrder.length - s.qNow - 1) + ' songs · order isn’t shown' : nc ? 'Local file · not in Apple Music' : own ? tr.a + ' · ' + ALB[tr.al].t : tr.a,
+        tag: ph || info ? '' : now ? 'Now playing' : past ? 'Played' : k === s.qNow + 1 ? 'Up next' : '',
+        tagCol: now ? '#6ED996' : 'rgba(255,255,255,0.7)',
+        heartOp: !ph && !info && !nc && !unknown && lk ? 1 : 0, heartTf: pop ? 'scale(1.5)' : lk ? 'scale(1)' : 'scale(0.4)',
+        ghostOp: ph || info ? 0 : nc ? 0.15 : unknown ? 0.3 : lk ? 0 : 0.45, dash: unknown && !nc ? '2.2 2.4' : 'none',
+        pick: () => { if (d) this.setState({ qSel: k }); else this.playQueued(); }
+      };
+    });
+    const ft = Q[s.qOrder[qSel]] || ct, ftNC = this.isNC(qSel);
+    const bigAl = !isPl && !foreign ? s.np.i : ft.al, small = art === 'small' || ftNC;
+    const bigMode = art === 'missing' ? 'none' : art === 'loading' ? 'loading' : small ? 'small400' : 'full';
+    const bA = artFor(ALB[bigAl], bigMode);
+    const bigT = { bg: bA.bg, grad: bA.grad === 'none' ? bA.base : bA.grad, inset: bigMode === 'small400' ? '11%' : '0px', rule: bA.rule, gen: bA.gen, ink: bA.ink, gt: ALB[bigAl].t, ga: ALB[bigAl].a };
+    const qAmbT = bigMode === 'none' ? bA.grad : bigMode === 'loading' ? bA.base : cov(ALB[bigAl].f);
+    this._xfT = { xAmb: xAmbT, qAmb: qAmbT, qBig: bigT, xLive: s.xOpen, qLive: s.qOpen };
+    const xf = this.xf || {}, lay = (name, fb) => xf[name] ? xf[name] : { a: fb, b: fb, on: 'a' };
+    const xa = lay('xAmb', xAmbT), qa = lay('qAmb', qAmbT), qb = lay('qBig', bigT);
+    const qCtx = foreign ? { title: 'Sonos queue', sub: 'Started in another app · ' + s.qOrder.length + ' songs' } : isPl ? { title: ctx.t, sub: 'Favourite playlist · ' + ctx.n } : { title: ctx.t, sub: ctx.a + ' · ' + ctx.y };
+
+    // knob
+    const tone = { nav: '#E6E6E6', go: '#6ED996', dim: '#5A5A5A', on: '#FFFFFF', off: '#7A7A7A', none: 'transparent' };
+    const F = (d, t, label, extra) => Object.assign({ d, fill: '', t, label }, extra || {});
+    const busy = s.busy, starting = busy && busy.kind === 'start', pnBusy = busy && busy.kind === 'pn';
+    const why = { pn: this.pnBlock(), up: this.srcWhy('up'), seek: this.srcWhy('seek') };
+    const artOf = al => art === 'missing' ? [artFor(ALB[al], 'none').grad, 0.8] : art === 'loading' ? [bgc(ALB[al].c), 0.8] : [cov(ALB[al].f), 0.8];
+    let foot, lcd, lart = 'none', artOp = 0, modeName;
+    const pos = (i, n) => (i + 1) + ' / ' + n;
+    const kt = def => km ? km.text : def;
+    if (pcOff) {
+      modeName = 'Knob · PC not connected';
+      foot = [0, 1, 2, 3].map(() => F('', 'none', s.native ? 'Knob profile (firmware)' : 'Not available'));
+      lcd = { label: '', title: '', sub: '', meta: '' };
+    } else if (s.mode === 'home') {
+      modeName = 'Home · now playing';
+      foot = [F(s.playing ? I.pause : I.play, starting ? 'dim' : s.playing ? 'nav' : 'go', starting ? 'Play / Pause · wait for Starting…' : s.playing ? 'Pause' : 'Play'), F(I.note, 'nav', 'Browse music'), F(I.list, 'nav', 'Tracks'), F(I.win, 'nav', 'Windows')];
+      lcd = { label: '', title: ct.t, sub: ct.a, meta: '' };
+      [lart, artOp] = artOf(ct.al);
+    } else if (s.mode === 'tracks') {
+      modeName = s.seek ? 'Tracks · seeking' : 'Tracks · on the knob';
+      const nx = Q[s.qOrder[s.qNow + 1]], pv = Q[s.qOrder[s.qNow - 1]];
+      const skipD = s.tPos < 0 ? I.prev : I.tracks, can = s.tPos !== 0;
+      foot = [F(I.back, 'nav', s.seek ? 'Back · finish seeking' : 'Back to Home'), F(I.expand, why.up ? 'dim' : 'nav', why.up ? 'Up next · not available' : 'Open Up next on screen'), F(I.seek, why.seek ? 'dim' : s.seek ? 'on' : 'nav', why.seek ? 'Seek · not available' : s.seek ? 'Seek on · press to finish' : 'Seek'), F(skipD, can && !s.seek ? 'go' : 'dim', s.tPos < 0 ? 'Previous track' : s.tPos > 0 ? 'Next track' : 'Skip · turn first')];
+      const nextLine = sim.sonosShuffle === 'on' ? 'Next: shuffle pick' : nx ? 'Next: ' + nx.t : sim.repeat === 'all' ? 'Next: back to track 1' : 'End of queue';
+      const prevLine = sim.sonosShuffle === 'on' ? 'Prev: last played' : pv ? 'Prev: ' + pv.t : 'Start of queue';
+      lcd = { label: 'TRACKS', title: s.tPos > 0 ? 'Next track' : s.tPos < 0 ? 'Previous track' : 'Turn to choose', sub: s.tPos > 0 ? nextLine : s.tPos < 0 ? prevLine : 'Now: ' + ct.t, meta: kt(s.tPos ? 'Press 4 to skip' : pos(s.qNow, s.qOrder.length) + (s.shuffle || sim.sonosShuffle === 'on' ? ' · shuffle' : '')) };
+      [lart, artOp] = artOf(ct.al);
+    } else if (s.mode === 'queue') {
+      modeName = 'Up next · on screen';
+      const infoSel = un === 'longshuffle' && qSel === qn - 1 && qSel > s.qNow, cantLike = un === 'loading' || infoSel || ftNC || sim.like === 'loading';
+      foot = [F(I.back, 'nav', 'Back to Tracks'), F(I.shuffle, un === 'loading' ? 'dim' : s.shuffle || un === 'longshuffle' ? 'on' : 'off', un === 'longshuffle' ? 'Shuffle · Sonos is shuffling' : s.shuffle ? 'Shuffle on' : 'Shuffle off'), (!cantLike && liked(ft) ? F(I.heart, 'on', 'Already liked · unfavourite in the Music app', { fill: I.heart, c: PINK, a: 0.3, ink: '#A3244A' }) : F(I.heart, cantLike ? 'dim' : 'nav', ftNC ? 'Like · not an Apple Music song' : sim.like === 'loading' ? 'Like · checking…' : 'Like · adds a Favorite star')), F(I.play, un === 'loading' || infoSel ? 'dim' : 'go', 'Play this track')];
+      lcd = { label: 'UP NEXT', title: un === 'loading' && qSel !== s.qNow ? '' : infoSel ? 'Shuffled by Sonos' : ft.t, sub: un === 'loading' && qSel !== s.qNow ? '' : infoSel ? '' : ft.a, meta: kt(un === 'loading' ? 'Loading queue…' : pos(qSel, qn) + (qSel === s.qNow ? ' · playing' : '')) };
+      [lart, artOp] = artOf(ft.al);
+    } else if (s.mode === 'recent') {
+      modeName = 'Recently Added · on the knob';
+      const a = ALB[s.rIdx], end = s.rIdx === ALB.length - 1;
+      foot = [F(I.back, 'nav', 'Back to Home'), F(I.expand, 'nav', 'Open on screen'), F(I.next, why.pn || busy ? 'dim' : 'nav', why.pn ? 'Play next · ' + why.pn.k : pnBusy ? 'Play next · queueing…' : 'Play next · keeps your queue'), F(I.play, busy ? 'dim' : 'go', 'Play · replaces queue')];
+      lcd = { label: 'RECENTLY ADDED', title: a.t, sub: a.a, meta: pnBusy ? (busy.k === 0 ? 'Finding songs…' : 'Queueing… ' + busy.k + ' of ' + busy.n) : kt(end ? ALB.length + ' / ' + ALB.length + ' · end' : pos(s.rIdx, ALB.length)) };
+      [lart, artOp] = artOf(a.al != null ? a.al : s.rIdx);
+      { const m = modeOf(s.rIdx, 0), A = artFor(a, m); lart = m === 'none' ? A.grad : m === 'loading' ? A.base : cov(a.f); }
+    } else if (s.mode === 'explore') {
+      modeName = 'Music explorer · on screen';
+      const dead = xEmpty || listLoad;
+      foot = [F(I.back, 'nav', 'Back to the knob list'), F(I.clock, s.src === 'recent' ? 'on' : 'off', 'Recently Added'), F(I.queue, isPlSrc ? 'on' : 'off', 'Favourite playlists'), F(I.play, dead ? 'dim' : 'go', 'Play')];
+      lcd = { label: isPlSrc ? 'FAVOURITES' : 'RECENT', title: xEmpty ? 'No favourites yet' : listLoad || !xc ? '' : xc.t, sub: xEmpty ? 'Star one in Music' : listLoad || !xc ? '' : isPlSrc ? xc.n.split(' · ')[0] : xc.a, meta: kt(listLoad ? 'Loading…' : xEmpty ? '' : pos(xi, L.length)) };
+      lart = xAmbT; artOp = xAmbT === 'none' ? 0 : 0.8;
+      if (!isPlSrc && xc && xMode === 'loading') lart = xA.base;
+    } else {
+      modeName = 'Windows · picker on screen';
+      const lc = s.left != null ? W[s.left].c : null, rc = s.right != null ? W[s.right].c : null;
+      foot = [F(I.back, 'nav', 'Back · restore focus'), F(I.rect, lc ? 'on' : 'nav', 'Snap left', { fill: HALF.left, c: lc }), F(I.rect, rc ? 'on' : 'nav', 'Snap right', { fill: HALF.right, c: rc }), F(I.check, 'go', 'Switch to window')];
+      const meta = s.left != null && s.right == null ? 'Left: ' + W[s.left].app + ' · pick right' : s.right != null && s.left == null ? 'Right: ' + W[s.right].app + ' · pick left' : '';
+      lcd = { label: '', title: wc.title, sub: wc.app, meta: kt(meta), icBg: wc.icBg, letter: wc.letter || '' };
+    }
+    lcd.metaCol = km && km.col ? km.col : '#7C7C7C';
+    const hSt = starting ? 'Starting…' : km && s.mode === 'home' ? km.text : s.volShow ? (s.vol === 0 ? 'Minimum' : s.vol === 100 ? 'Maximum' : '') : (s.playing ? '' : 'Paused');
+    const fx = [46, 89, 131, 174];
+    const footV = foot.map((f, i) => ({ d: f.d, fill: f.fill, x: fx[i] + 'px', col: f.ink || (f.c ? 'rgb(' + rgb(f.c) + ')' : tone[f.t]) }));
+    const kx = [61, 131, 201, 271];
+    const lvl = t => t === 'go' ? [GREEN, 1] : t === 'on' ? [WARM, 1] : t === 'off' ? [WARM, 0.3] : t === 'dim' ? [WARM, 0.14] : t === 'none' ? [WARM, 0] : [WARM, 0.7];
+    const keys = foot.map((f, i) => {
+      const lv = lvl(f.t), c = f.c || lv[0], a = f.a != null ? f.a : f.c ? 1 : lv[1];
+      return { _t: { c, a }, x: kx[i] + 'px', aria: 'Button ' + (i + 1) + ': ' + f.label, down: () => this.keyDown(i + 1), up: () => this.keyUp(), tf: s.press === i ? 'translateY(2px)' : 'none' };
+    });
+    const turnLbl = pcOff ? (s.native ? 'Turn: knob’s own profile lights' : 'Turn: hands lights to the knob profile') : s.mode === 'home' ? 'Turn: volume' : s.mode === 'windows' ? 'Turn: choose a window' : s.mode === 'tracks' ? (s.seek ? 'Turn: 5 s per detent' : 'Turn: Previous · Now · Next') : s.mode === 'queue' ? 'Turn: move through the queue' : 'Turn: choose an album';
+    const legend = foot.map((f, i) => ({ key: String(i + 1), d: f.d, fill: f.fill, label: (i === 0 && !pcOff ? f.label + ' · hold for Home' : f.label) })).concat([{ key: '↻', d: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5', fill: '', label: turnLbl }]);
+
+    // ring targets
+    const ring = Array(60).fill(null);
+    const put = (i, c, a) => { ring[((i % 60) + 60) % 60] = { c, a }; };
+    if (pcOff) {
+      if (s.native) put(s.nativePos, NATIVE, 0.62); else for (let k = 0; k < 12; k++) put(k * 5, AMBER, 0.12);
+    } else if (s.mode === 'home') {
+      const n = Math.floor(s.vol / 2), odd = s.vol % 2 === 1;
+      const colAt = k => s.vol >= 90 && k / 50 >= 0.9 ? RED : s.vol >= 80 && k / 50 >= 0.8 ? AMBER : WARM;
+      put(35, WARM, 0.3); put(25, WARM, 0.3);
+      for (let k = 0; k <= n; k++) put(35 + k, colAt(k), 0.62);
+      if (odd && n < 50) put(35 + n + 1, colAt(n + 1), 0.81);
+      put(35 + n, colAt(n), 1);
+    } else if (s.mode === 'tracks' && s.seek) {
+      const D = durOf(ct), n = Math.min(59, Math.floor(s.pos / D * 60));
+      for (let k = 0; k < 60; k++) put(k, WARM, k < n ? 0.62 : 0.3 * (k % 5 === 0 ? 1 : 0));
+      put(n, WARM, 1);
+    } else if (s.mode === 'tracks') {
+      [52, 53].forEach(i => put(i, WARM, s.tPos === -1 ? 1 : 0.3)); put(0, WARM, s.tPos === 0 ? 0.62 : 0.3); [7, 8].forEach(i => put(i, WARM, s.tPos === 1 ? 1 : 0.3));
+    } else if (s.mode === 'queue') {
+      if (un !== 'loading') {
+        const rows = un === 'longshuffle' ? s.qNow + 1 : qn, win = Math.min(20, rows), w0 = Math.max(0, Math.min(rows - win, qSel - 10)), c0 = w0 + Math.floor((win - 1) / 2), col = k => ALB[Q[s.qOrder[k]].al].c;
+        for (let k = w0; k < w0 + win; k++) put((k - c0) * 3, col(k), k < s.qNow ? 0.14 : k === s.qNow ? 0.7 : 0.45);
+        if (qSel < rows) put((qSel - c0) * 3, col(qSel), 1);
+      }
+    } else {
+      const items = s.mode === 'windows' ? W : s.mode === 'explore' ? L : ALB, cur = s.mode === 'windows' ? s.sel : s.mode === 'explore' ? xi : s.rIdx;
+      if (items.length && !(s.mode === 'explore' && listLoad)) {
+        const n = items.length, win = Math.min(20, n), w0 = Math.max(0, Math.min(n - win, cur - 10)), c0 = w0 + Math.floor((win - 1) / 2);
+        const colOf = (it, i) => s.mode === 'windows' || (s.mode === 'explore' && isPlSrc) ? it.c : artFor(it, modeOf(i, i - cur)).col;
+        for (let i = w0; i < w0 + win; i++) { const c = colOf(items[i], i); put((i - c0) * 3, c, isW(c) ? 0.3 : 0.45); }
+        put((cur - c0) * 3, colOf(items[cur], cur), 1);
+      }
+    }
+    let cu = 0; ring.forEach((r, i) => { if (r && r.a >= 1) cu = i; }); this._ring = ring; this._cursor = cu; this._btns = keys.map(k => k._t);
+    this._working = !!busy || s.seekState === 'jump' || (s.mode === 'queue' && un === 'loading') || (s.mode === 'explore' && listLoad);
+    this._labKey = s.mode + ':' + s.src + ':' + xi + ':' + qSel + ':' + s.sel;
+    this._metaKey = lcd.meta + '|' + hSt;
+
+    // tables
+    const R2 = window.NANO_R2 || { motion: [], blur: [], copy: [] };
+    const mRows = R2.motion.map(m => ({ surf: m.surf, el: m.el, prop: m.prop, from: m.from, to: m.to, ms: m.ms ? String(m.ms) : '—', delay: typeof m.delay === 'number' ? (m.delay ? m.delay + ' ms' : '0') : m.delay, curve: m.curve, when: m.when }));
+    const cRows = R2.copy.map(c => {
+      const knob = c.surf.indexOf('Knob') === 0, sz = c.surf === 'Knob line 14 px' ? 14 : c.surf === 'Knob title 22 px' ? 22 : 12;
+      const w = c.lim ? this.measure(c.text, c.surf) : null;
+      return { surf: c.surf, ctx: c.ctx, text: c.text, font: knob ? '500 ' + sz + 'px Montserrat, sans-serif' : '400 14px Archivo, sans-serif', ls: c.surf === 'Knob heading' ? '0.04em' : '0', ws: c.lim ? 'nowrap' : 'normal', w: w != null ? w + ' px' : '—', lim: c.lim ? '≤ ' + c.lim : '—', ok: w == null ? '' : w <= c.lim ? 'Fits' : 'Over', okCol: w == null || w <= c.lim ? 'var(--color-text)' : 'var(--color-accent-700)' };
+    });
+    const segBtn = act => ({ bg: act ? 'var(--color-text)' : 'transparent', fg: act ? 'var(--color-bg)' : 'var(--color-text)' });
+    const viewCtl = [
+      { label: 'Desktop frame', key: 'frame', opts: [['16', '16:9 · 2560 × 1440'], ['32', '32:9 · 5120 × 1440']] },
+      { label: 'Window picker background', key: 'pickBg', opts: [['frost', 'Frosted'], ['none', 'No background']] },
+      { label: 'Knob screen', key: 'fps60', opts: [[false, 'Browser rate'], [true, '60 fps preview']] },
+      { label: 'Motion', key: 'rm', opts: [[false, 'Full'], [true, 'Reduced']] }
+    ].map(g => ({ label: g.label, opts: g.opts.map(o => Object.assign({ label: o[1], on: () => this.setState({ [g.key]: o[0] }) }, segBtn(s[g.key] === o[0]))) }));
+    const SG = [
+      ['pc', 'PC connection', [['ok', 'Connected'], ['off', 'Not connected']], 'The ring drains into the cursor, then 12 amber marks breathe. Turning or pressing hands the lights to the knob’s own profile.'],
+      ['source', 'Playing source', [['queue', 'Sonos queue'], ['airplay', 'AirPlay'], ['radio', 'Radio'], ['linein', 'Line-in / TV'], ['none', 'Nothing']], 'Play next, Up next and Seek need the Sonos queue. Elsewhere their buttons dim and a press says why.'],
+      ['sonosShuffle', 'Sonos shuffle', [['off', 'Off'], ['on', 'On']], 'Blocks Play next; Tracks shows “Next: shuffle pick”.'],
+      ['repeat', 'Repeat', [['off', 'Off'], ['all', 'Repeat all']], 'Tracks on the last song shows “Next: back to track 1”.'],
+      ['pn', 'Play next outcome', [['ok', 'Queued (cached)'], ['slow', 'Uncached lookup (4.5 s)'], ['partial', 'Partly'], ['none', 'Nothing added'], ['changed', 'Song changed']], 'Recently Added, button 3. Queueing… counts songs as they are inserted.'],
+      ['start', 'Starting playback', [['ok', 'Starts'], ['slow', 'Slow'], ['fail', 'Didn’t start'], ['blocked', 'Album blocked']], 'Overlays close at 380 ms; Home shows Starting… with the Working comet; Play/Pause is disabled meanwhile. PAPER LANTERN plays 33 of 34.'],
+      ['seek', 'Seek', [['ok', 'Lands (2.7 s)'], ['slow', 'Slow (5 s)'], ['fail', 'Fails']], 'Tracks, button 3. The time stays frozen at the target with Jumping… and the Working comet until Sonos plays again. Turns during a jump retarget; one more jump is sent when it lands.'],
+      ['like', 'Like state', [['ok', 'Known'], ['loading', 'Not known yet'], ['fail', 'Save fails'], ['expired', 'Sign-in expired']], 'Up next, button 3. Like is add-only: on a liked row, 3 dims to pink 0.30 and a press says “Unfavourite in Music app”. Hearts: filled = liked, outline = not liked, dashed = not known yet, faint = not in Apple Music.'],
+      ['upnext', 'Up next', [['normal', 'Album'], ['loading', 'Loading'], ['foreign', 'From another app'], ['longshuffle', 'Sonos shuffle > 60']], 'From another app: 400 px art on the mat, local rows can’t be liked.'],
+      ['favs', 'Favourite playlists', [['real', 'Today (2)'], ['empty', 'Empty'], ['many', 'Many (sample)']], 'Explorer, button 3.'],
+      ['art', 'Artwork', [['full', '1200 px'], ['mixed', 'Real library mix'], ['small', 'Low-res'], ['missing', 'None'], ['loading', 'Loading'], ['list', 'Loading list']], 'Real library mix: most covers sharp, some low-res (400 / 300 px) extended with their own colours, some with no art, and cards beyond the preload window still loading. Applies to the explorer, Up next and the knob.'],
+      ['snap', 'Snap outcome', [['ok', 'Snaps'], ['hung', 'Not responding'], ['move', 'Couldn’t move'], ['fit', 'Can’t fit half']], 'Window picker, buttons 2 and 3.']
+    ];
+    const simGroups = SG.map(g => ({ label: g[1], hint: g[3], opts: g[2].map(o => Object.assign({ label: o[1], on: () => this.setSim(g[0], o[0]) }, segBtn(sim[g[0]] === o[0]))) }));
+    const OKC = '#6ED996', BADC = '#FF7A66';
+    const stCols = [
+      pcOff ? { name: 'Knob', state: 'Not connected', detail: 'Waiting for Nano_D++ on USB. The knob’s own controls still work.', dot: BADC, action: 'Troubleshoot…' } : { name: 'Knob', state: 'Connected', detail: 'Nano_D++ · USB · firmware 2.4', dot: OKC, action: 'Knob settings…' },
+      { name: 'Sonos', state: 'Den', detail: sim.source === 'queue' ? 'Playing from the Sonos queue · 192.168.1.40' : sim.source === 'airplay' ? 'Playing via AirPlay · 192.168.1.40' : sim.source === 'none' ? 'Idle · 192.168.1.40' : 'Playing ' + (sim.source === 'radio' ? 'radio' : 'line-in') + ' · 192.168.1.40', dot: OKC, action: 'Set manual IP…' },
+      sim.like === 'expired' ? { name: 'Apple Music', state: 'Sign-in expired', detail: 'Like and Favourite playlists are paused until you sign in again.', dot: BADC, action: 'Renew sign-in…', primary: true } : { name: 'Apple Music', state: 'Signed in', detail: 'Library and likes available', dot: OKC, action: 'Renew sign-in…' }
+    ].map(c => Object.assign(c, { bd: c.primary ? '#F3F2F2' : '#444141', bg: c.primary ? '#F3F2F2' : 'transparent', fg: c.primary ? '#1B1A1A' : '#F3F2F2' }));
+
+    const mc = (d, label, extra) => Object.assign({ d, fill: '', label, col: 'var(--color-text)' }, extra || {});
+    const mapRows = [
+      { name: 'Home', cells: [mc(I.pause, 'Play / Pause (green when paused)'), mc(I.note, 'Browse music'), mc(I.list, 'Tracks'), mc(I.win, 'Windows')] },
+      { name: 'Recently Added (knob)', cells: [mc(I.back, 'Back'), mc(I.expand, 'Open on screen'), mc(I.next, 'Play next'), mc(I.play, 'Play')] },
+      { name: 'Music explorer (screen)', cells: [mc(I.back, 'Back'), mc(I.clock, 'Recently Added'), mc(I.queue, 'Favourite playlists'), mc(I.play, 'Play')] },
+      { name: 'Tracks (knob)', cells: [mc(I.back, 'Back'), mc(I.expand, 'Open Up next'), mc(I.seek, 'Seek'), mc(I.tracks, 'Skip')] },
+      { name: 'Up next (screen)', cells: [mc(I.back, 'Back'), mc(I.shuffle, 'Shuffle'), mc(I.heart, 'Like'), mc(I.play, 'Play')] },
+      { name: 'Windows', cells: [mc(I.back, 'Back'), mc(I.rect, 'Snap left', { fill: HALF.left }), mc(I.rect, 'Snap right', { fill: HALF.right }), mc(I.check, 'Switch')] }
+    ];
+    const fly = s.fly;
+    const flyV = fly ? { x: fly.x0 + 'px', y: fly.y0 + 'px', tf: fly.tf, op: fly.go ? 0 : 1, thumb: fly.thumb, tr: fly.go ? 'transform 460ms ' + OUT + ', opacity 220ms ' + OUT + ' 380ms' : 'none' } : { x: '0px', y: '0px', tf: 'none', op: 0, thumb: 'none', tr: 'none' };
+    const vs = s.volShow && !pcOff;
+    const tabs = [{ key: '2', d: I.clock, label: 'Recently Added', on: s.src === 'recent' }, { key: '3', d: I.queue, label: 'Favourite playlists', on: isPlSrc }];
+
+    return {
+      wrapRef: this.wrapRef, stageRef: this.stageRef, knobRef: this.knobRef, cvRef: this.cvRef,
+      SW: SW + 'px', off: off + 'px', outerH: Math.round(720 * sc) + 'px', stageTf: 'scale(' + sc + ')',
+      viewCtl, simGroups, lockNow: () => this.lockNow(), mRows, bRows: R2.blur, cRows, stCols,
+      pickBgName: s.pickBg === 'frost' ? 'Frosted' : 'No background', rmName: rm ? 'Reduced' : 'Full',
+      deskWins, taskIcons,
+      wOp: s.wOpen ? 1 : 0, wPe: s.wOpen ? 'auto' : 'none', wCardsOp: s.wOpen ? 1 : 0, wBump: 'translateX(' + (-s.wBump * 12) + 'px)',
+      wFrostOp: s.pickBg === 'frost' ? 1 : 0, wFlatOp: s.pickBg === 'frost' ? 0 : 1, wTextSh: s.pickBg === 'frost' ? 'none' : '0 1px 2px rgba(0,0,0,0.6)',
+      wCards, wCur: { app: wc.app, title: wc.title, desc: wc.desc + wSide, icBg: wc.icBg, letter: wc.letter || '' },
+      wDots: wD.list, wDotsL: wD.L, wDotsW: wD.W, wInd: wD.ind, indTr: rm ? 'none' : 'transform 420ms ' + OUT,
+      slots: [slot('left', '2'), slot('right', '3')],
+      trayOp: trayOn ? 1 : 0, trayTf: trayOn || rm ? 'translateY(0) scale(1)' : 'translateY(-14px) scale(0.94)', wShift: trayOn ? 'translateY(0)' : 'translateY(-44px)',
+      fly: flyV, labOp: s.labOp, labTr: s.labTr,
+      xOp: s.xOpen ? 1 : 0, xPe: s.xOpen ? 'auto' : 'none', xBump: 'translateX(' + (-s.xBump * 14) + 'px)',
+      xAmbA: xa.a, xAmbB: xa.b, xAmbAOp: xa.on === 'a' ? 0.5 : 0, xAmbBOp: xa.on === 'b' ? 0.5 : 0,
+      xTabs: tabs.map(t => ({ key: t.key, d: t.d, label: t.label, op: t.on ? 1 : 0.55, sx: t.on ? 1 : 0 })),
+      xCards, xCur, xLabelOp: s.xFade || listLoad ? 0 : s.labOp, xEmpty,
+      xDots: xD.list, xDotsL: xD.L, xDotsW: xD.W, xInd: xD.ind, xIndOp: L.length && !listLoad ? 1 : 0,
+      xHints: [{ key: '1', label: 'Back' }, { key: '2', label: 'Recently Added' }, { key: '3', label: 'Playlists' }, { key: '4', label: 'Play' }],
+      qOp: s.qOpen ? 1 : 0, qPe: s.qOpen ? 'auto' : 'none', qRows, qCtx, qBump: 'translateY(' + (-s.qBump * 14) + 'px)', qPlateOp: s.qIn && !s.qPlay ? 1 : 0,
+      qAmbA: qa.a, qAmbB: qa.b, qAmbAOp: qa.on === 'a' ? 0.45 : 0, qAmbBOp: qa.on === 'b' ? 0.45 : 0,
+      qBigLayers: [Object.assign({ op: qb.on === 'a' ? 1 : 0 }, qb.a), Object.assign({ op: qb.on === 'b' ? 1 : 0 }, qb.b)],
+      qArtTf: s.qIn || rm ? 'none' : 'translateY(20px)', qArtOp: s.qIn ? 1 : 0,
+      qShuffle: un === 'longshuffle' ? 'Shuffle on · Sonos picks the order' : s.shuffle ? 'Shuffle on' : 'In order', qShuffleCol: s.shuffle || un === 'longshuffle' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+      qHints: [{ key: '1', label: 'Back' }, { key: '2', label: s.shuffle ? 'Shuffle off' : 'Shuffle' }, { key: '3', label: liked(ft) ? 'Liked' : 'Like' }, { key: '4', label: 'Play' }],
+      toast: s.toast, toastOp: s.toastOn ? 1 : 0, toastTf: s.toastOn ? 'translate(-50%,0) scale(1)' : (rm ? 'translate(-50%,0)' : 'translate(-50%,8px) scale(0.96)'),
+      isOffL: pcOff, offSub: s.native ? 'Knob controls still work' : 'Open Nano_D++ on your PC',
+      isHomeL: !pcOff && s.mode === 'home', isListL: !pcOff && ['recent', 'explore', 'queue'].includes(s.mode), isTracksL: !pcOff && s.mode === 'tracks' && !s.seek, isSeekL: !pcOff && s.mode === 'tracks' && s.seek, isWinL: !pcOff && s.mode === 'windows',
+      seekTime: mmss(s.pos), seekCap: ct.t,
+      seekDur: s.seekState === 'jump' ? 'Jumping…' : s.seekState === 'fail' ? 'Didn’t jump · try again' : km && s.mode === 'tracks' ? km.text : 'of ' + mmss(durOf(ct)),
+      seekCol: s.seekState === 'fail' ? ERR : '#A6A6A6',
+      hTitle: ct.t, hArtist: ct.a, hSt, hStCol: km && km.col && s.mode === 'home' ? km.col : '#7C7C7C', metaOp: s.metaOp, metaTr: s.metaTr,
+      volCap: s.playing ? ct.t : 'Paused · ' + ct.t, big: String(s.vol),
+      trkOp: vs ? 0 : 1, trkTf: vs && !rm ? 'translateY(-8px)' : 'none',
+      trkTr: vs ? trn([['opacity', 150, 'IN'], ['transform', 190, 'IN']], fps) : trn([['opacity', 320, 'OUT', 90], ['transform', 420, 'OUT', 90]], fps),
+      volOp: vs ? 1 : 0, volTf: vs || rm ? 'none' : 'translateY(6px)',
+      volTr: vs ? trn([['opacity', 180, 'OUT', 50], ['transform', 340, 'SPR', 50]], fps) : trn([['opacity', 170, 'IN'], ['transform', 190, 'IN']], fps),
+      tpc: s.tPos === -1 ? '#F2F2F2' : '#7C7C7C', tdc: s.tPos === 0 ? '#F2F2F2' : '#7C7C7C', tnc: s.tPos === 1 ? '#F2F2F2' : '#7C7C7C',
+      lcdScrimOp: s.mode === 'windows' || pcOff ? 0 : 1, footOp: 1, footTr: 'opacity 280ms ease',
+      artTr: trn([['opacity', 240, 'OUT']], fps),
+      lcd, lcdArt: pcOff || s.mode === 'windows' ? 'none' : lart, lcdArtOp: pcOff || s.mode === 'windows' ? 0 : artOp, foot: footV, keys, legend, modeName,
+      lcdTf: 'translateX(' + s.lx + 'px)', lcdOp: s.lop, lcdTr: s.ltr,
+      pd: this.pd, pm: this.pm, pu: this.pu,
+      reset: () => { this.timers.forEach(clearTimeout); this.timers = []; this.setState(Object.assign(this.fresh(), { wrapW: s.wrapW, frame: s.frame, pickBg: s.pickBg, fps60: s.fps60, rm: s.rm })); },
+      mapRows
+    };
+  }
+}
+</script>
+</body>
+</html>

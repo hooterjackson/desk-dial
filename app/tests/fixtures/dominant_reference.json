@@ -1,0 +1,111 @@
+{
+  "description": "dominant_rgb() of the design handoff sample covers and app icons. 'colors' is the NanoModel.COLORS map (knob-model.js loadColors keys, 'r,g,b' or null) to pre-populate golden fixtures; 'sources' maps each key to its asset.",
+  "algorithm": "control_center.artwork.dominant_rgb: EXIF transpose, RGBA, Pillow BOX 24x24 of the whole image, exact port of knob-model.js dominant()",
+  "pillow": "12.3.0",
+  "files": {
+    "covers/blue-lines.jpg": {
+      "value": 16766623,
+      "rgb": "255,214,159",
+      "hex": "#FFD69F"
+    },
+    "covers/elis-tom.jpg": {
+      "value": null,
+      "rgb": null,
+      "hex": null
+    },
+    "covers/heligoland-album-.png": {
+      "value": 16750356,
+      "rgb": "255,151,20",
+      "hex": "#FF9714"
+    },
+    "covers/hounds-of-love.png": {
+      "value": 14395391,
+      "rgb": "219,167,255",
+      "hex": "#DBA7FF"
+    },
+    "covers/kind-of-blue.jpg": {
+      "value": null,
+      "rgb": null,
+      "hex": null
+    },
+    "covers/moon-safari.png": {
+      "value": null,
+      "rgb": null,
+      "hex": null
+    },
+    "covers/night-drive-chromatics-album-.jpg": {
+      "value": 16741391,
+      "rgb": "255,116,15",
+      "hex": "#FF740F"
+    },
+    "covers/promises-floating-points-pharoah-sanders.png": {
+      "value": null,
+      "rgb": null,
+      "hex": null
+    },
+    "covers/tropic-lia-ou-panis-et-circencis.jpg": {
+      "value": 12124034,
+      "rgb": "184,255,130",
+      "hex": "#B8FF82"
+    },
+    "apps/chatgpt.png": {
+      "value": null,
+      "rgb": null,
+      "hex": null
+    },
+    "apps/chrome.png": {
+      "value": 1933055,
+      "rgb": "29,126,255",
+      "hex": "#1D7EFF"
+    },
+    "apps/claude.png": {
+      "value": 16747622,
+      "rgb": "255,140,102",
+      "hex": "#FF8C66"
+    },
+    "apps/slack.png": {
+      "value": 16760882,
+      "rgb": "255,192,50",
+      "hex": "#FFC032"
+    },
+    "apps/term.png": {
+      "value": 16756556,
+      "rgb": "255,175,76",
+      "hex": "#FFAF4C"
+    }
+  },
+  "colors": {
+    "al:Blue Lines": "255,214,159",
+    "al:Elis & Tom": null,
+    "al:Heligoland": "255,151,20",
+    "al:Hounds of Love": "219,167,255",
+    "al:Kind of Blue": null,
+    "al:Moon Safari": null,
+    "al:Night Drive": "255,116,15",
+    "al:Promises": null,
+    "al:Tropicália ou Panis et Circencis": "184,255,130",
+    "app:ChatGPT": null,
+    "app:Chrome": "29,126,255",
+    "app:Claude": "255,140,102",
+    "app:Codex": null,
+    "app:Slack": "255,192,50",
+    "app:Terminal": "255,175,76"
+  },
+  "sources": {
+    "al:Blue Lines": "assets/covers/blue-lines.jpg",
+    "al:Elis & Tom": "assets/covers/elis-tom.jpg",
+    "al:Heligoland": "assets/covers/heligoland-album-.png",
+    "al:Hounds of Love": "assets/covers/hounds-of-love.png",
+    "al:Kind of Blue": "assets/covers/kind-of-blue.jpg",
+    "al:Moon Safari": "assets/covers/moon-safari.png",
+    "al:Night Drive": "assets/covers/night-drive-chromatics-album-.jpg",
+    "al:Promises": "assets/covers/promises-floating-points-pharoah-sanders.png",
+    "al:Tropicália ou Panis et Circencis": "assets/covers/tropic-lia-ou-panis-et-circencis.jpg",
+    "app:ChatGPT": "assets/apps/chatgpt.png",
+    "app:Chrome": "assets/apps/chrome.png",
+    "app:Claude": "assets/apps/claude.png",
+    "app:Codex": "assets/apps/chatgpt.png",
+    "app:Slack": "assets/apps/slack.png",
+    "app:Terminal": "assets/apps/term.png"
+  }
+}

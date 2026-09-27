@@ -1,0 +1,31 @@
+# UTF-8
+#
+# Desk Dial's exe version resource (rename-desk-dial.md 3.1), read by Build-Desktop.ps1 through
+# PyInstaller's --version-file. With it Task Manager, the notification source and Settings > Taskbar
+# show "Desk Dial" instead of the exe name. Desktop v7 = 7.0.0.0.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(7, 0, 0, 0),
+    prodvers=(7, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        '040904B0',
+        [StringStruct('FileDescription', 'Desk Dial'),
+        StringStruct('FileVersion', '7.0.0.0'),
+        StringStruct('InternalName', 'DeskDial'),
+        StringStruct('OriginalFilename', 'DeskDial.exe'),
+        StringStruct('ProductName', 'Desk Dial'),
+        StringStruct('ProductVersion', '7.0.0.0')])
+      ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)

@@ -1,0 +1,231 @@
+{
+  "generatedBy": "harness/export_handoff_icons.cjs",
+  "contract": "PRESENTATION_V5.md section 9",
+  "source": "design_handoff_nano_d_master_r2.1/prototypes/Browse and Snap.dc.html I/HALF (BS:485-495); home, more, cancel: the cc5.3 paths, unchanged",
+  "viewBox": 24,
+  "strokes": {
+    "16": "2.3",
+    "20": "2.3",
+    "26": "2.1"
+  },
+  "tokens": [
+    {
+      "token": "play",
+      "id": 1,
+      "design": "play",
+      "fill": false
+    },
+    {
+      "token": "pause",
+      "id": 2,
+      "design": "pause",
+      "fill": false
+    },
+    {
+      "token": "list",
+      "id": 3,
+      "design": "note",
+      "fill": false
+    },
+    {
+      "token": "win",
+      "id": 4,
+      "design": "win",
+      "fill": false
+    },
+    {
+      "token": "tracks",
+      "id": 5,
+      "design": "list",
+      "fill": false
+    },
+    {
+      "token": "back",
+      "id": 6,
+      "design": "back",
+      "fill": false
+    },
+    {
+      "token": "home",
+      "id": 7,
+      "design": "legacy home",
+      "fill": false
+    },
+    {
+      "token": "more",
+      "id": 8,
+      "design": "legacy more",
+      "fill": false
+    },
+    {
+      "token": "prev",
+      "id": 9,
+      "design": "prev",
+      "fill": false
+    },
+    {
+      "token": "next",
+      "id": 10,
+      "design": "tracks",
+      "fill": false
+    },
+    {
+      "token": "switch",
+      "id": 11,
+      "design": "check",
+      "fill": false
+    },
+    {
+      "token": "cancel",
+      "id": 12,
+      "design": "legacy cancel",
+      "fill": false
+    },
+    {
+      "token": "expand",
+      "id": 13,
+      "design": "expand",
+      "fill": false
+    },
+    {
+      "token": "clock",
+      "id": 14,
+      "design": "clock",
+      "fill": false
+    },
+    {
+      "token": "playlists",
+      "id": 15,
+      "design": "queue",
+      "fill": false
+    },
+    {
+      "token": "playnext",
+      "id": 16,
+      "design": "next",
+      "fill": false
+    },
+    {
+      "token": "seek",
+      "id": 17,
+      "design": "seek",
+      "fill": false
+    },
+    {
+      "token": "shuffle",
+      "id": 18,
+      "design": "shuffle",
+      "fill": false
+    },
+    {
+      "token": "heart",
+      "id": 19,
+      "design": "heart",
+      "fill": false
+    },
+    {
+      "token": "snapleft",
+      "id": 20,
+      "design": "rect+HALF.left",
+      "fill": true
+    },
+    {
+      "token": "snapright",
+      "id": 21,
+      "design": "rect+HALF.right",
+      "fill": true
+    },
+    {
+      "token": "dotfill",
+      "id": null,
+      "design": "internal",
+      "fill": true
+    },
+    {
+      "token": "heartfill",
+      "id": null,
+      "design": "internal heart filled",
+      "fill": true
+    }
+  ],
+  "firmwareSizes": {
+    "play": [
+      20,
+      26
+    ],
+    "pause": [
+      20,
+      26
+    ],
+    "list": [
+      20,
+      26
+    ],
+    "win": [
+      20,
+      26
+    ],
+    "tracks": [
+      20,
+      26
+    ],
+    "back": [
+      20
+    ],
+    "home": [
+      20
+    ],
+    "more": [
+      20
+    ],
+    "prev": [
+      16,
+      20
+    ],
+    "next": [
+      16,
+      20
+    ],
+    "switch": [
+      20
+    ],
+    "cancel": [
+      20
+    ],
+    "expand": [
+      20
+    ],
+    "clock": [
+      20
+    ],
+    "playlists": [
+      20
+    ],
+    "playnext": [
+      20
+    ],
+    "seek": [
+      20
+    ],
+    "shuffle": [
+      20
+    ],
+    "heart": [
+      20
+    ],
+    "snapleft": [
+      20
+    ],
+    "snapright": [
+      20
+    ],
+    "dotfill": [
+      16
+    ],
+    "heartfill": [
+      20
+    ]
+  },
+  "firmwareMaskBytes": 12948,
+  "desktopSizes": "every wire token and heartfill at 16, 20 and 26 px (dotfill at 16 px); @2x/@3x in assets/lcd-icons"
+}
