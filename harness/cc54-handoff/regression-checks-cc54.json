@@ -1,0 +1,811 @@
+{
+  "about": "cc5.4 LCD regression checks (harness/cc54_report.py, PRESENTATION_V5.md 15.3) over the LVGL 9.0 harness renders of the v5 renderer",
+  "renders": "<repo>\\harness\\cc54-handoff",
+  "pass": true,
+  "checks": {
+    "parse": {
+      "pass": true,
+      "summary": "131 frames_v5.json inputs a cc5.4 parser accepts and 102 cc5_frames.json cases rendered through cc_parse_frame (+43 harness frames); 0 rejected, 0 missing"
+    },
+    "safe_circle": {
+      "pass": true,
+      "summary": "293 art-less renders: text and icon ink inside r104, heading ink inside r112 (912 heading px between r104 and r112; worst radius 107.7)"
+    },
+    "heading_fit": {
+      "pass": true,
+      "summary": "headings: 'FAVOURITES' -> [('FAVOURITES', 1)]; 'RECENT' -> [('RECENT', 1)]; 'RECENTLY ADDED' -> [('RECENTLY ADDED', 1)]; 'RECENTLY ADDED FROM ALL SOURCES' -> [('RECENTLY ADDED F…', 0)]; 'RECENTLY ADDED · P12' -> [('RECENT · P12', 1)]; 'RECENTLY ADDED · P2' -> [('RECENT · P2', 1)]; 'RECENTLY ADDED · P3' -> [('RECENT · P3', 1)]; 'SEEK' -> [('SEEK', 1)]; 'TRACKS' -> [('TRACKS', 1)]; 'UP NEXT' -> [('UP NEXT', 1)]"
+    },
+    "verbatim_text": {
+      "pass": true,
+      "summary": "712 drawn labels equal the wire text or its prefix + U+2026"
+    },
+    "label_bounds": {
+      "pass": true,
+      "summary": "every drawn line fits its label box"
+    },
+    "ellipsis_honest": {
+      "pass": true,
+      "summary": "1500 frame-driven labels: U+2026 only where the text cannot fit (34 ellipsized); 7/7 harness fitting cases",
+      "ellipsized": [
+        "ra-na list.title: 'Vespertine / (Live at Royal…'",
+        "tr-done tracks.subtitle: 'Now: Unfinished Sym…'",
+        "stress-long-accented-title-volume home.title: 'Tropicália ou / Panis et…'",
+        "stress-long-accented-title-volume home.artist: 'Caetano Veloso, Gilbe…'",
+        "stress-long-accented-title-browsing list.title: 'Tropicália ou / Panis et…'",
+        "stress-long-accented-title-browsing list.subtitle: 'Caetano Veloso, Gilbe…'",
+        "home-pidle-vol volume.caption: 'Paused · Cloudbusti…'",
+        "flash-ok-tracks tracks.subtitle: 'Now: Unfinished Sym…'",
+        "ra-last-p3 list.title: 'Selected / Ambient…'",
+        "syn-windows-long-meta windows.title: 'Quarterly planning / — engineering…'",
+        "syn-accents list.title: 'Łódź · Kraków / — Žižek’s…'",
+        "syn-accents list.subtitle: 'Dvořák, Chopin & Ősz…'",
+        "syn-win-overflow windows.title: 'Supercalifragilisticex / pialidocious_Super…'",
+        "syn-win-words-overflow windows.title: 'Quarterly planning / review with the…'",
+        "syn-recent-long-word list.subtitle: 'Mary Poppins Origina…'",
+        "v5.budget-windows-worst windows.app: 'Microsoft Word — Do…'",
+        "v5.budget-windows-worst windows.title: 'Quarterly business / review — final draft…'",
+        "v5.budget-windows-worst windows.meta: 'Couldn’t move this windo…'",
+        "v5.budget-windows-worst-16b-labels windows.app: 'Microsoft Word — Do…'",
+        "v5.budget-windows-worst-16b-labels windows.title: 'Quarterly business / review — final draft…'",
+        "v5.budget-windows-worst-16b-labels windows.meta: 'Couldn’t move this windo…'",
+        "v5.budget-windows-escape-heavy windows.app: '\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"…'",
+        "v5.budget-windows-escape-heavy windows.title: '\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\" / \"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"…'",
+        "v5.budget-windows-escape-heavy windows.meta: 'Couldn’t move this windo…'",
+        "v5.budget-upnext-worst list.title: 'A very long / song title —…'",
+        "v5.budget-upnext-worst list.subtitle: 'A long list of artists, fe…'",
+        "v5.budget-explorer-worst list.title: 'Favourite / playlist with a…'",
+        "v5.budget-home-worst volume.caption: 'A very long song titl…'",
+        "v5.budget-seek-worst seek.caption: 'A very long song titl…'",
+        "v5-idle-v6-label idle.word: 'Play/Pa…'",
+        "v5-windows-accent windows.title: 'Quarterly planning / — engineering…'",
+        "v5-windows-snap-navy windows.title: 'Quarterly planning / — engineering…'",
+        "v5-windows-snap-warm windows.title: 'Quarterly planning / — engineering…'",
+        "a2-tracks-bright-dim tracks.subtitle: 'Now: Unfinished Sym…'"
+      ]
+    },
+    "css_baselines": {
+      "pass": true,
+      "summary": "baselines vs the CSS line boxes: heading [43]/43, home.artist [128]/128, home.title [81]/81, idle.word [145]/145, list.meta [138]/138, list.subtitle [120]/120, list.title [73]/73, offline.subtitle [118]/118, offline.title [91]/91, seek.caption [66]/66, seek.line [142]/142, seek.time [116]/116, status [145]/145, tracks.meta [141]/141, tracks.subtitle [124]/124, tracks.title [75]/75, volume.caption [66]/66, volume.digits [116]/116, volume.percent [116]/116, windows.app [94]/94, windows.meta [151]/151, windows.title [114]/114"
+    },
+    "footer_static": {
+      "pass": true,
+      "summary": "1123 footer icons at x [56, 99, 141, 184], rows 154..173; 4 liked hearts drawn heartfill #A3244A; footer never translates, opaque during screen changes",
+      "static": [
+        "recent-to-upnext: 8 captures, footer pixels identical True",
+        "upnext-to-explorer: 8 captures, footer pixels identical True"
+      ],
+      "inks": [
+        "like-lands slot 2: {0: ('#E6E6E6', 'heartfill@20'), 40: ('#B3526F', 'heartfill@20'), 80: ('#A62C50', 'heartfill@20'), 120: ('#A3254B', 'heartfill@20'), 160: ('#A3244A', 'heartfill@20'), 200: ('#A3244A', 'heartfill@20')}",
+        "shuffle-on slot 1: {0: ('#7A7A7A', 'shuffle@20'), 40: ('#E0E0E0', 'shuffle@20'), 80: ('#FAFAFA', 'shuffle@20'), 120: ('#FEFEFE', 'shuffle@20'), 160: ('#FFFFFF', 'shuffle@20'), 200: ('#FFFFFF', 'shuffle@20')}"
+      ]
+    },
+    "idle_row": {
+      "pass": true,
+      "summary": "5 idle renders; v7 Home labels Play 26 px, Pause 37 px, Browse 45 px, Tracks 39 px, Win 24 px",
+      "reported": [
+        "'Play/Pause' -> 'Play/Pa…' (53 px): a v6 host's Home slot-0 label: ellipsized on cc5.4 (section 2.3); v7 sends Play / Pause (VOC-D08, P5-12)"
+      ]
+    },
+    "seek_digits": {
+      "pass": true,
+      "summary": "21 distinct Seek times: cc_font_48t, tracking -1, baseline 116; digit cells per length {4: 1, 6: 1, 5: 1} (1 = 0 px jitter); \":\" drawn; detents start no animation"
+    },
+    "windows_geometry": {
+      "pass": true,
+      "summary": "24 Windows renders with meta: title at 99 (top 98), meta at 139 (top 140), no overlap",
+      "pairs": [
+        "wi-closed: 1 lines, gap 24",
+        "wi-fail: 1 lines, gap 25",
+        "stress-closed-window: 1 lines, gap 24",
+        "pend-wi-claude: 2 lines, gap 7",
+        "pend-wi-chrome: 1 lines, gap 25",
+        "pend-wi-codex: 2 lines, gap 7",
+        "flash-err-wi-fail: 1 lines, gap 25",
+        "wi-closed-claude: 2 lines, gap 7",
+        "syn-windows-long-meta: 2 lines, gap 4",
+        "syn-win-diag-log: 2 lines, gap 4",
+        "v5.v5-windows-snap-p5: 2 lines, gap 4",
+        "v5.v5-windows-snap-p4: 2 lines, gap 4",
+        "v5.color-without-lit-host-strips: 2 lines, gap 4",
+        "v5.color-lit-off-host-strips: 2 lines, gap 4",
+        "v5.color-zero-lit-on-slimmed: 2 lines, gap 4",
+        "v5.moment-snap-side-right: 2 lines, gap 4",
+        "v5.moment-color-snap: 2 lines, gap 4",
+        "v5.budget-windows-worst: 2 lines, gap 6",
+        "v5.budget-windows-worst-16b-labels: 2 lines, gap 6",
+        "v5.budget-windows-escape-heavy: 2 lines, gap 6",
+        "v5.gating-p4-no-v5: 2 lines, gap 4",
+        "v5-windows-snap-navy: 2 lines, gap 4",
+        "v5-windows-snap-warm: 2 lines, gap 4",
+        "a2-win-icon-closed: 1 lines, gap 24"
+      ]
+    },
+    "art_rules": {
+      "pass": true,
+      "summary": "art only on ['explorer', 'nowPlaying', 'recent', 'seek', 'tracks', 'upnext', 'volume'] (never idle, windows, notice, offline or without a key): 202 renders with art; artDim 112; never translates; show/hide 240 ms OUT; instant swaps",
+      "notes": [
+        "to-windows: {0: 255, 60: 59, 120: 9, 240: 0, 300: 0}",
+        "from-windows: {0: 0, 60: 195, 120: 245, 240: 255, 300: 255}",
+        "to-idle: {0: 255, 60: 59, 120: 9, 240: 0, 300: 0}",
+        "from-idle: {0: 0, 60: 195, 120: 245, 240: 255, 300: 255}",
+        "to-notice: {0: 255, 60: 59, 120: 9, 240: 0, 300: 0}",
+        "from-notice: {0: 0, 60: 195, 120: 245, 240: 255, 300: 255}",
+        "key-cleared: {0: 255, 60: 59, 120: 9, 240: 0, 300: 0}",
+        "key-back: {0: 0, 60: 195, 120: 245, 240: 255, 300: 255}",
+        "late arrival: {0: 0, 60: 195, 120: 245, 240: 255}"
+      ]
+    },
+    "slides": {
+      "pass": true,
+      "summary": "109 steps with an expected direction (the 8.7 flip table in v5-flips, the cc5 sequences, artwork2 and v5 timelines)",
+      "steps": [
+        "volume-reveal-hide rot: +0",
+        "volume-reveal-hide volAck: +0",
+        "volume-reveal-hide volHide: +0",
+        "idle-entry-exit btn: +0",
+        "idle-entry-exit playAck: +0",
+        "idle-entry-exit pIdle: +0",
+        "idle-entry-exit rot: +0",
+        "idle-entry-exit volAck: +0",
+        "idle-entry-exit volHide: +0",
+        "idle-entry-exit btn: +0",
+        "idle-entry-exit playAck: +0",
+        "screen-deeper-back btn: +20",
+        "screen-deeper-back loaded: +0",
+        "screen-deeper-back rot: +0",
+        "screen-deeper-back btn: +20",
+        "screen-deeper-back loaded: +0",
+        "screen-deeper-back btn: -20",
+        "screen-deeper-back btn: -20",
+        "screen-deeper-back btn: +20",
+        "screen-deeper-back btn: -20",
+        "heartbeat-identical volAck: +0",
+        "external-volume external: +0",
+        "external-volume volHide: +0",
+        "external-volume extClear: +0",
+        "tracks-skip-recentre btn: +20",
+        "tracks-skip-recentre rot: +0",
+        "tracks-skip-recentre btn: +0",
+        "tracks-skip-recentre skipDone: +0",
+        "tracks-skip-recentre flashEnd: +0",
+        "v5-flips home-to-recent: +20",
+        "v5-flips recent-detent: +0",
+        "v5-flips recent-to-explorer: +20",
+        "v5-flips tab-0-to-1: +20",
+        "v5-flips tab-1-to-0: -20",
+        "v5-flips explorer-to-recent: -20",
+        "v5-flips recent-to-home: -20",
+        "v5-flips home-to-tracks: +20",
+        "v5-flips tracks-detent: +0",
+        "v5-flips tracks-to-seek: +0",
+        "v5-flips seek-to-upnext: +20",
+        "v5-flips upnext-to-tracks: -20",
+        "v5-flips seek-on: +0",
+        "v5-flips seek-off: +0",
+        "v5-flips tracks-to-home: -20",
+        "v5-flips home-to-windows: +20",
+        "v5-flips windows-to-home: -20",
+        "v5-flips home-to-upnext: +20",
+        "v5-flips hold-to-home: -20",
+        "v5-flips control-id-change: +0",
+        "v5-flips home-layout-change: +0",
+        "v5-footer-static recent-to-upnext: +20",
+        "v5-footer-static upnext-to-explorer: +20",
+        "v5-rest meta-change: +0",
+        "v5-rest title-change: +0",
+        "v5-rest meta-and-title: +0",
+        "v5-rest to-home: -20",
+        "v5-rest status-change: +0",
+        "v5-rest home-title: +0",
+        "v5-rest to-tracks: +20",
+        "v5-rest tracks-meta: +0",
+        "v5-rest to-seek: +0",
+        "v5-rest seek-line: +0",
+        "v5-rest seek-time: +0",
+        "v5-rest to-windows: +20",
+        "v5-rest windows-meta: +0",
+        "v5-rest meta-with-screen-change: -20",
+        "v5-ink like-lands: +0",
+        "v5-ink shuffle-on: +0",
+        "v5-ink to-explorer: +20",
+        "v5-ink tab-switch: +20",
+        "v5-ink to-idle-nothing: -20",
+        "v5-ink play-becomes-available: +0",
+        "v5-reduced home-to-recent: +0",
+        "v5-reduced recent-to-home: +0",
+        "v5-reduced full-motion-again: +20",
+        "v5-seek 0:00: +0",
+        "v5-seek 0:01: +0",
+        "v5-seek 0:09: +0",
+        "v5-seek 0:10: +0",
+        "v5-seek 0:59: +0",
+        "v5-seek 1:00: +0",
+        "v5-seek 1:01: +0",
+        "v5-seek 1:14: +0",
+        "v5-seek 1:59: +0",
+        "v5-seek 8:00: +0",
+        "v5-seek 9:59: +0",
+        "v5-seek 10:00: +0",
+        "v5-seek 10:01: +0",
+        "v5-seek 16:39: +0",
+        "v5-seek 20:34: +0",
+        "v5-seek 59:59: +0",
+        "v5-seek 60:00: +0",
+        "v5-seek 60:01: +0",
+        "v5-seek 599:59: +0",
+        "v5-seek 999:58: +0",
+        "v5-art to-windows: +20",
+        "v5-art from-windows: -20",
+        "v5-art to-idle: +0",
+        "v5-art from-idle: +0",
+        "v5-art to-notice: +0",
+        "v5-art from-notice: +0",
+        "v5-art key-cleared: +0",
+        "v5-art key-back: +0",
+        "v5-art instant-swap: +0",
+        "v5-twin-fade content-fade: +20",
+        "a2-heartbeat windows: +20",
+        "a2-decode-fail other-key: +0",
+        "a2-slide-decode slide-decode: +20",
+        "a2-slide-decode slide-back: -20"
+      ]
+    },
+    "motion": {
+      "pass": true,
+      "summary": "content 220/380, reveal, idle stagger and fades, footer 160/280+140, meta/status 160 at rest, instant titles and Seek lines",
+      "notes": [
+        "meta-change list.meta opacity +0/+80/+160: [0, 245, 255]",
+        "status-change status opacity +0/+80/+160: [0, 245, 255]",
+        "tracks-meta tracks.meta opacity +0/+80/+160: [0, 245, 255]",
+        "windows-meta windows.meta opacity +0/+80/+160: [0, 245, 255]"
+      ]
+    },
+    "reduced_motion": {
+      "pass": true,
+      "summary": "reducedMotion true: no translate in any capture (content, track, volume, idle row); content fade 220 ms; stagger kept",
+      "notes": [
+        "home-to-recent content opacity +0/+110/+220: [0, 245, 255]",
+        "recent-to-home content opacity +0/+110/+220: [0, 245, 255]"
+      ]
+    },
+    "twins": {
+      "pass": true,
+      "summary": "exactly the twelve twins (heading, home.title, home.artist, volume.caption, volume.digits, volume.percent, list.title, list.subtitle, tracks.title, tracks.subtitle, seek.caption, seek.time): black, text_opa 204, +1 px, same text and visibility; none elsewhere"
+    },
+    "twin_fade": {
+      "pass": true,
+      "summary": "47 probed frames of the content, track and volume fades vs a group-composited reference: differences only inside label ink boxes (outside: none), there <= 28 levels per channel over the cover (K1 erratum R-b) and <= 36 where a label of another layer fading in the same capture overlaps (the volume reveals; K1 erratum R-g), identical at 0/255; worst per layer and what lies under the label ink: {'content/cover': 26, 'track/cover': 21, 'track/overlap': 24, 'volume/cover': 25, 'volume/overlap': 35}",
+      "probes": [
+        "v5-twin-fade content opa 0 +0: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 94 +20: max |d| inside ink boxes 26 (over the cover 26; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 161 +40: max |d| inside ink boxes 21 (over the cover 21; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 203 +60: max |d| inside ink boxes 16 (over the cover 16; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 227 +80: max |d| inside ink boxes 15 (over the cover 15; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 241 +100: max |d| inside ink boxes 11 (over the cover 11; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 245 +110: max |d| inside ink boxes 12 (over the cover 12; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 248 +120: max |d| inside ink boxes 9 (over the cover 9; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 251 +140: max |d| inside ink boxes 10 (over the cover 10; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 253 +160: max |d| inside ink boxes 1 (over the cover 1; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 254 +180: max |d| inside ink boxes 1 (over the cover 1; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 254 +200: max |d| inside ink boxes 1 (over the cover 1; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 255 +220: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 255 +300: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade content opa 255 +380: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 255 +0: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 247 +20: max |d| inside ink boxes 12 (over the cover 12; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 226 +40: max |d| inside ink boxes 17 (over the cover 17; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 213 +50: max |d| inside ink boxes 19 (over the cover 19; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 198 +60: max |d| inside ink boxes 23 (over the cover 17; where a label of another fading layer overlaps 23, 834 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 163 +80: max |d| inside ink boxes 21 (over the cover 21; where a label of another fading layer overlaps 21, 656 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 122 +100: max |d| inside ink boxes 22 (over the cover 21; where a label of another fading layer overlaps 22, 636 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 76 +120: max |d| inside ink boxes 24 (over the cover 21; where a label of another fading layer overlaps 24, 616 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 27 +140: max |d| inside ink boxes 18 (over the cover 16; where a label of another fading layer overlaps 18, 629 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +150: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +160: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +180: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +190: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +200: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +230: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +340: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +390: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade track opa 0 +460: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 255 +0: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 248 +20: max |d| inside ink boxes 9 (over the cover 9; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 232 +40: max |d| inside ink boxes 13 (over the cover 13; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 209 +60: max |d| inside ink boxes 16 (over the cover 16; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 180 +80: max |d| inside ink boxes 21 (over the cover 21; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 147 +100: max |d| inside ink boxes 23 (over the cover 23; where a label of another fading layer overlaps 23, 1061 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 109 +120: max |d| inside ink boxes 35 (over the cover 25; where a label of another fading layer overlaps 35, 969 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 68 +140: max |d| inside ink boxes 35 (over the cover 21; where a label of another fading layer overlaps 35, 964 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 23 +160: max |d| inside ink boxes 23 (over the cover 17; where a label of another fading layer overlaps 23, 956 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 0 +170: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 0 +180: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 0 +190: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 0 +200: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+        "v5-twin-fade volume opa 0 +240: max |d| inside ink boxes 0 (over the cover 0; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)"
+      ],
+      "worst": {
+        "content/cover": 26,
+        "track/cover": 21,
+        "track/overlap": 24,
+        "volume/cover": 25,
+        "volume/overlap": 35
+      }
+    },
+    "art_async": {
+      "pass": true,
+      "summary": "R5 with a fake decoder that behaves as the shipped cc_art_decode.cpp with cc_jpeg.cpp's abort hook (a cancel stops the decode at the next of 15 MCU bands, K1 12.5.4 step 2, lead ruling R-f; results through cc_art_decode_result()): only the resting key ever shows (a), the previous cover stays (b), the front buffer is never written (c), stale and aborted results discarded (d), failures hide (e), no-art layouts and releases cancel (f), a spin back continues, and one after the abort landed re-posts the key (g), a 20-key spin ends with the resting cover within one decode time (+ one band) of the last detent (h); the result mapping over its domain; src/cc_art_decode.cpp decodes with &cancelled and maps through cc_art_decode_result() (source scan)",
+      "runs": [
+        "a-keys-inside-one-decode: shown [[0, 'a5-k39'], [184, 'a5-k02']], requests 3, aborts 2, stale 0",
+        "b-previous-stays: shown [[0, 'a5-k39'], [150, 'a5-k03']], requests 1, aborts 0, stale 0",
+        "d-stale-discarded: shown [[0, 'a5-k39'], [250, 'a5-k05']], requests 2, aborts 0, stale 1",
+        "e-failed-hides: shown [[0, 'a5-k39'], [100, '']], requests 1, aborts 0, stale 0",
+        "f-no-art-layout: shown [[0, 'a5-k39'], [239, '']], requests 1, aborts 1, stale 0",
+        "f-release: shown [[0, 'a5-k39']], requests 1, aborts 1, stale 0",
+        "g-spin-back: shown [[0, 'a5-k39'], [120, 'a5-k08']], requests 1, aborts 0, stale 0",
+        "g-spin-back-after-abort: shown [[0, 'a5-k39'], [152, 'a5-k30']], requests 2, aborts 1, stale 0",
+        "h-spin-20-keys: shown [[0, 'a5-k39'], [1704, 'a5-k29']], requests 20, aborts 19, stale 0",
+        "h-spin-20-keys-d46: shown [[0, 'a5-k39'], [46, 'a5-k10'], [129, 'a5-k11'], [212, 'a5-k12'], [295, 'a5-k13'], [378, 'a5-k14'], [461, 'a5-k15'], [544, 'a5-k16'], [627, 'a5-k17'], [710, 'a5-k18'], [793, 'a5-k19'], [876, 'a5-k20'], [959, 'a5-k21'], [1042, 'a5-k22'], [1125, 'a5-k23'], [1208, 'a5-k24'], [1291, 'a5-k25'], [1374, 'a5-k26'], [1457, 'a5-k27'], [1540, 'a5-k28'], [1623, 'a5-k29']], requests 20, aborts 0, stale 0",
+        "h-spin-20-keys-d154: shown [[0, 'a5-k39'], [1732, 'a5-k29']], requests 20, aborts 19, stale 0",
+        "(h) h-spin-20-keys: 120 ms decodes (8 ms bands), last detent +1577, resting cover at +1704 (127 ms after it; K1 limit: one decode + one band + one pass = 129 ms)",
+        "(h) h-spin-20-keys-d154: 154 ms decodes (11 ms bands), last detent +1577, resting cover at +1732 (155 ms after it; K1 limit: one decode + one band + one pass = 166 ms)",
+        "(h) h-spin-20-keys-d46: 46 ms decodes (4 ms bands), last detent +1577, resting cover at +1623 (46 ms after it; K1 limit: one decode + one band + one pass = 51 ms)"
+      ]
+    },
+    "offline": {
+      "pass": true,
+      "summary": "5 offline renders: Waiting for PC (1 line) / Open Desk Dial on your PC (two balanced lines, Open Desk Dial / on your PC, the name never split) / Knob controls still work (1 line at -1 px tracking, K1 8.10 and R-c), no heading, footer or cover; entry 220/160/240, native swap 160 (a native tap between two passes, through cc_offline_input_update), next claim 220/240/280+140, no slide, no native frame",
+      "notes": [
+        "disc: ['Open Desk\\xa0Dial', 'on your PC']",
+        "stress-disconnected: ['Open Desk\\xa0Dial', 'on your PC']",
+        "disc-reconnecting: ['Open Desk\\xa0Dial', 'on your PC']",
+        "v5-offline: ['Open Desk\\xa0Dial', 'on your PC']",
+        "v5-offline-native: ['Knob controls still work']",
+        "pins at +0 {'cover': 'a2-den', 'icon': None}, at +300 {'cover': None, 'icon': None}"
+      ]
+    },
+    "copy": {
+      "pass": true,
+      "summary": "122 knob strings (VOC section 9 incl. the firmware-local offline strings, CC5 15.2-15.3) rendered in their elements: whole, within the App C limits and the chord, on the line count an element specifies (10 placeholder/exception rows reported)",
+      "reported": [
+        "knob.meta.snap.left_set [meta] 'Left: Chrome · pick right': 'Left: Chrome · pick right' [145] (limit 170, chord [170]; one line 145 px) -- placeholder",
+        "knob.meta.snap.right_set [meta] 'Right: Chrome · pick left': 'Right: Chrome · pick left' [145] (limit 170, chord [170]; one line 145 px) -- placeholder",
+        "knob.meta.snap.hung [meta] 'Chrome not responding': 'Chrome not responding' [146] (limit 170, chord [170]; one line 146 px) -- placeholder",
+        "knob.meta.snap.move [meta] 'Couldn’t move Chrome': 'Couldn’t move Chrome' [141] (limit 170, chord [170]; one line 141 px) -- placeholder",
+        "knob.meta.snap.fit [meta] 'Chrome can’t fit half': 'Chrome can’t fit half' [124] (limit 170, chord [170]; one line 124 px) -- placeholder",
+        "knob.line.tracks.now [line_tracks] 'Now: Cloudbusting': 'Now: Cloudbusting' [140] (limit 170, chord [170]; one line 140 px) -- placeholder",
+        "knob.line.tracks.next [line_tracks] 'Next: Hounds of Love': 'Next: Hounds of Love' [153] (limit 170, chord [170]; one line 153 px) -- placeholder",
+        "knob.line.tracks.prev [line_tracks] 'Prev: Running Up That Hill': 'Prev: Running Up Tha…' [168] (limit 170, chord [170]; one line 191 px) -- placeholder",
+        "knob.caption.volume_paused [caption] 'Paused · Cloudbusting': 'Paused · Cloudbusti…' [156] (limit 170, chord [162]; one line 166 px) -- placeholder",
+        "label.home.play_pause_v6 [idle_word] 'Play/Pause': 'Play/Pa…' [53] (limit 46, chord [60]; one line 66 px) -- a v6 host's Home slot-0 label: ellipsized on cc5.4 (section 2.3); v7 sends Play / Pause (VOC-D08, P5-12)"
+      ],
+      "strings": [
+        "knob.heading.recent [heading] 'RECENTLY ADDED': 'RECENTLY ADDED' [128] (limit 138, chord []; one line 128 px)",
+        "knob.heading.explorer_recent [heading] 'RECENT': 'RECENT' [56] (limit 138, chord []; one line 56 px)",
+        "knob.heading.explorer_favourites [heading] 'FAVOURITES': 'FAVOURITES' [87] (limit 138, chord []; one line 87 px)",
+        "knob.heading.upnext [heading] 'UP NEXT': 'UP NEXT' [61] (limit 138, chord []; one line 61 px)",
+        "knob.heading.tracks [heading] 'TRACKS': 'TRACKS' [54] (limit 138, chord []; one line 54 px)",
+        "knob.heading.seek [heading] 'SEEK': 'SEEK' [35] (limit 138, chord []; one line 35 px)",
+        "knob.meta.position [meta] '999 / 999': '999 / 999' [52] (limit 170, chord [170]; one line 52 px)",
+        "knob.meta.position_end [meta] '999 / 999 · end': '999 / 999 · end' [84] (limit 170, chord [170]; one line 84 px)",
+        "knob.meta.playnext.progress [meta] 'Queueing… 100 of 100': 'Queueing… 100 of 100' [128] (limit 170, chord [170]; one line 128 px)",
+        "knob.meta.playnext.resolving [meta] 'Finding songs…': 'Finding songs…' [93] (limit 170, chord [170]; one line 93 px)",
+        "knob.meta.playnext.ok [meta] 'Queued next': 'Queued next' [78] (limit 170, chord [170]; one line 78 px)",
+        "knob.meta.playnext.nothing [meta] 'Nothing added · retry': 'Nothing added · retry' [129] (limit 170, chord [170]; one line 129 px)",
+        "knob.meta.playnext.partial [meta] 'Partly queued': 'Partly queued' [85] (limit 170, chord [170]; one line 85 px)",
+        "knob.meta.playnext.song_changed [meta] 'Song changed · retry': 'Song changed · retry' [125] (limit 170, chord [170]; one line 125 px)",
+        "knob.meta.playnext.airplay [meta] 'AirPlay · use Play': 'AirPlay · use Play' [102] (limit 170, chord [170]; one line 102 px)",
+        "knob.meta.playnext.radio [meta] 'Radio · use Play': 'Radio · use Play' [94] (limit 170, chord [170]; one line 94 px)",
+        "knob.meta.playnext.linein [meta] 'Line-in · use Play': 'Line-in · use Play' [101] (limit 170, chord [170]; one line 101 px)",
+        "knob.meta.playnext.none [meta] 'Nothing playing · Play': 'Nothing playing · Play' [132] (limit 170, chord [170]; one line 132 px)",
+        "knob.meta.playnext.shuffle [meta] 'Shuffle on · turn it off': 'Shuffle on · turn it off' [125] (limit 170, chord [170]; one line 125 px)",
+        "knob.meta.loading [meta] 'Loading…': 'Loading…' [57] (limit 170, chord [170]; one line 57 px)",
+        "knob.meta.tracks.hint [meta] 'Press 4 to skip': 'Press 4 to skip' [86] (limit 170, chord [170]; one line 86 px)",
+        "knob.meta.tracks.position_shuffle [meta] '999 / 999 · shuffle': '999 / 999 · shuffle' [101] (limit 170, chord [170]; one line 101 px)",
+        "knob.meta.upnext.airplay [meta] 'Up next is in Music app': 'Up next is in Music app' [138] (limit 170, chord [170]; one line 138 px)",
+        "knob.meta.upnext.radio [meta] 'Radio · no Up next': 'Radio · no Up next' [111] (limit 170, chord [170]; one line 111 px)",
+        "knob.meta.upnext.linein [meta] 'Line-in · no Up next': 'Line-in · no Up next' [118] (limit 170, chord [170]; one line 118 px)",
+        "knob.meta.upnext.none [meta] 'Nothing playing': 'Nothing playing' [97] (limit 170, chord [170]; one line 97 px)",
+        "knob.meta.seek.radio [meta] 'Can’t seek · radio': 'Can’t seek · radio' [102] (limit 170, chord [170]; one line 102 px)",
+        "knob.meta.seek.airplay [meta] 'Can’t seek · AirPlay': 'Can’t seek · AirPlay' [114] (limit 170, chord [170]; one line 114 px)",
+        "knob.meta.seek.linein [meta] 'Can’t seek · line-in': 'Can’t seek · line-in' [109] (limit 170, chord [170]; one line 109 px)",
+        "knob.meta.seek.no_length [meta] 'Can’t seek · no length': 'Can’t seek · no length' [129] (limit 170, chord [170]; one line 129 px)",
+        "knob.meta.upnext.position_playing [meta] '999 / 999 · playing': '999 / 999 · playing' [105] (limit 170, chord [170]; one line 105 px)",
+        "knob.meta.upnext.loading [meta] 'Loading queue…': 'Loading queue…' [98] (limit 170, chord [170]; one line 98 px)",
+        "knob.meta.like.on [meta] 'Liked': 'Liked' [32] (limit 170, chord [170]; one line 32 px)",
+        "knob.meta.like.unknown [meta] 'Checking likes…': 'Checking likes…' [94] (limit 170, chord [170]; one line 94 px)",
+        "knob.meta.like.not_catalog [meta] 'Not an Apple Music song': 'Not an Apple Music song' [150] (limit 170, chord [170]; one line 150 px)",
+        "knob.meta.like.signin_expired [meta] 'Sign-in expired': 'Sign-in expired' [90] (limit 170, chord [170]; one line 90 px)",
+        "knob.meta.like.failed [meta] 'Didn’t save · try again': 'Didn’t save · try again' [129] (limit 170, chord [170]; one line 129 px)",
+        "knob.meta.like.unlike_in_music [meta] 'Unfavourite in Music app': 'Unfavourite in Music app' [150] (limit 170, chord [170]; one line 150 px)",
+        "knob.meta.shuffle.on [meta] 'Shuffle on': 'Shuffle on' [60] (limit 170, chord [170]; one line 60 px)",
+        "knob.meta.shuffle.off [meta] 'Shuffle off · in order': 'Shuffle off · in order' [116] (limit 170, chord [170]; one line 116 px)",
+        "knob.meta.shuffle.sonos [meta] 'Sonos is shuffling': 'Sonos is shuffling' [104] (limit 170, chord [170]; one line 104 px)",
+        "knob.meta.shuffle.queue_changed [meta] 'Queue changed': 'Queue changed' [96] (limit 170, chord [170]; one line 96 px)",
+        "knob.meta.shuffle.failed [meta] 'Didn’t shuffle · try again': 'Didn’t shuffle · try again' [142] (limit 170, chord [170]; one line 142 px)",
+        "knob.meta.shuffle.nothing [meta] 'Nothing to shuffle': 'Nothing to shuffle' [109] (limit 170, chord [170]; one line 109 px)",
+        "knob.meta.snap.left_set [meta] 'Left: Chrome · pick right': 'Left: Chrome · pick right' [145] (limit 170, chord [170]; one line 145 px)",
+        "knob.meta.snap.right_set [meta] 'Right: Chrome · pick left': 'Right: Chrome · pick left' [145] (limit 170, chord [170]; one line 145 px)",
+        "knob.meta.snap.hung [meta] 'Chrome not responding': 'Chrome not responding' [146] (limit 170, chord [170]; one line 146 px)",
+        "knob.meta.snap.move [meta] 'Couldn’t move Chrome': 'Couldn’t move Chrome' [141] (limit 170, chord [170]; one line 141 px)",
+        "knob.meta.snap.fit [meta] 'Chrome can’t fit half': 'Chrome can’t fit half' [124] (limit 170, chord [170]; one line 124 px)",
+        "knob.meta.skip.end [meta] 'End of queue': 'End of queue' [80] (limit 170, chord [170]; one line 80 px)",
+        "knob.meta.skip.start [meta] 'Start of queue': 'Start of queue' [85] (limit 170, chord [170]; one line 85 px)",
+        "knob.meta.tracks.skipping [meta] 'Skipping…': 'Skipping…' [60] (limit 170, chord [170]; one line 60 px)",
+        "knob.meta.skip.prev_unavailable [meta] 'Previous unavailable': 'Previous unavailable' [123] (limit 170, chord [170]; one line 123 px)",
+        "knob.meta.skip.next_unavailable [meta] 'Next unavailable': 'Next unavailable' [100] (limit 170, chord [170]; one line 100 px)",
+        "knob.meta.item_unavailable [meta] 'Not available': 'Not available' [78] (limit 170, chord [170]; one line 78 px)",
+        "knob.meta.sonos_unavailable [meta] 'Sonos unavailable': 'Sonos unavailable' [108] (limit 170, chord [170]; one line 108 px)",
+        "knob.meta.library_error [meta] 'Library not loaded': 'Library not loaded' [110] (limit 170, chord [170]; one line 110 px)",
+        "knob.meta.signin_expired [meta] 'Sign-in expired': 'Sign-in expired' [90] (limit 170, chord [170]; one line 90 px)",
+        "knob.meta.busy.starting [meta] 'Starting…': 'Starting…' [56] (limit 170, chord [170]; one line 56 px)",
+        "knob.meta.busy.pausing [meta] 'Pausing…': 'Pausing…' [57] (limit 170, chord [170]; one line 57 px)",
+        "knob.meta.busy.shuffling [meta] 'Shuffling…': 'Shuffling…' [61] (limit 170, chord [170]; one line 61 px)",
+        "knob.meta.group_changed [meta] 'Speaker group changed': 'Speaker group changed' [144] (limit 170, chord [170]; one line 144 px)",
+        "knob.meta.stage_unavailable [meta] 'Couldn’t open on screen': 'Couldn’t open on screen' [147] (limit 170, chord [170]; one line 147 px)",
+        "knob.meta.windows.switching [meta] 'Switching…': 'Switching…' [68] (limit 170, chord [170]; one line 68 px)",
+        "knob.meta.windows.no_focus [meta] 'Didn’t come forward · retry': 'Didn’t come forward · retry' [164] (limit 170, chord [170]; one line 164 px)",
+        "knob.meta.windows.closed [meta] 'Closed · can’t switch': 'Closed · can’t switch' [123] (limit 170, chord [170]; one line 123 px)",
+        "knob.meta.windows_still_works [meta] 'Windows still works': 'Windows still works' [119] (limit 170, chord [170]; one line 119 px)",
+        "knob.status.starting [status] 'Starting…': 'Starting…' [56] (limit 160, chord [160]; one line 56 px)",
+        "knob.status.pausing [status] 'Pausing…': 'Pausing…' [57] (limit 160, chord [160]; one line 57 px)",
+        "knob.status.partial [status] 'Playing 99 of 100': 'Playing 99 of 100' [100] (limit 160, chord [160]; one line 100 px)",
+        "knob.status.start_failed [status] 'Didn’t start': 'Didn’t start' [68] (limit 160, chord [160]; one line 68 px)",
+        "knob.status.album_blocked [status] 'Album unavailable': 'Album unavailable' [112] (limit 160, chord [160]; one line 112 px)",
+        "knob.status.paused [status] 'Paused': 'Paused' [45] (limit 160, chord [160]; one line 45 px)",
+        "knob.status.group_changed [status] 'Speaker group changed': 'Speaker group changed' [144] (limit 160, chord [160]; one line 144 px)",
+        "knob.status.connecting [status] 'Connecting knob': 'Connecting knob' [104] (limit 160, chord [160]; one line 104 px)",
+        "knob.status.sonos_unavailable [status] 'Sonos unavailable': 'Sonos unavailable' [108] (limit 160, chord [160]; one line 108 px)",
+        "knob.status.setting [status] 'Setting…': 'Setting…' [51] (limit 160, chord [160]; one line 51 px)",
+        "knob.status.changed_elsewhere [status] 'Changed on Sonos': 'Changed on Sonos' [114] (limit 160, chord [160]; one line 114 px)",
+        "knob.status.minimum [status] 'Minimum': 'Minimum' [59] (limit 160, chord [160]; one line 59 px)",
+        "knob.status.maximum [status] 'Maximum': 'Maximum' [62] (limit 160, chord [160]; one line 62 px)",
+        "knob.status.nothing_playing [status] 'Nothing playing': 'Nothing playing' [97] (limit 160, chord [160]; one line 97 px)",
+        "knob.line.tracks.now [line_tracks] 'Now: Cloudbusting': 'Now: Cloudbusting' [140] (limit 170, chord [170]; one line 140 px)",
+        "knob.line.tracks.next [line_tracks] 'Next: Hounds of Love': 'Next: Hounds of Love' [153] (limit 170, chord [170]; one line 153 px)",
+        "knob.line.tracks.prev [line_tracks] 'Prev: Running Up That Hill': 'Prev: Running Up Tha…' [168] (limit 170, chord [170]; one line 191 px)",
+        "knob.line.tracks.next_shuffle [line_tracks] 'Next: shuffle pick': 'Next: shuffle pick' [125] (limit 170, chord [170]; one line 125 px)",
+        "knob.line.tracks.prev_shuffle [line_tracks] 'Prev: last played': 'Prev: last played' [117] (limit 170, chord [170]; one line 117 px)",
+        "knob.line.tracks.next_wrap [line_tracks] 'Next: back to track 1': 'Next: back to track 1' [144] (limit 170, chord [170]; one line 144 px)",
+        "knob.line.tracks.end [line_tracks] 'End of queue': 'End of queue' [99] (limit 170, chord [170]; one line 99 px)",
+        "knob.line.tracks.start [line_tracks] 'Start of queue': 'Start of queue' [105] (limit 170, chord [170]; one line 105 px)",
+        "knob.line.seek.length [line_seek] 'of 999:59': 'of 999:59' [65] (limit 170, chord [170]; one line 65 px)",
+        "knob.line.seek.jumping [line_seek] 'Jumping…': 'Jumping…' [76] (limit 170, chord [170]; one line 76 px)",
+        "knob.line.seek.failed [line_seek] 'Didn’t jump · try again': 'Didn’t jump · try again' [164] (limit 170, chord [170]; one line 164 px)",
+        "knob.line.seek.limit [line_seek] 'Stops 3 s before end': 'Stops 3 s before end' [149] (limit 170, chord [170]; one line 149 px)",
+        "knob.title.favourites_empty [title] 'No favourites yet': 'No favourites / yet' [148, 34] (limit 170, chord [162, 170]; one line 188 px)",
+        "knob.title.upnext_sonos_card [title] 'Shuffled by Sonos': 'Shuffled / by Sonos' [94, 101] (limit 170, chord [162, 170]; one line 201 px)",
+        "knob.title.looking_for_sonos [title] 'Looking for Sonos…': 'Looking / for Sonos…' [90, 120] (limit 170, chord [162, 170]; one line 216 px)",
+        "knob.title.sonos_unavailable [title] 'Sonos unavailable': 'Sonos / unavailable' [68, 127] (limit 170, chord [162, 170]; one line 201 px)",
+        "knob.title.recent_empty [title] 'Nothing recently added': 'Nothing / recently added' [92, 166] (limit 170, chord [162, 170]; one line 264 px)",
+        "knob.title.signin_expired [title] 'Apple Music sign-in expired': 'Apple Music / sign-in expired' [137, 165] (limit 170, chord [162, 170]; one line 308 px)",
+        "knob.title.library_error [title] 'Library not loaded': 'Library / not loaded' [77, 120] (limit 170, chord [162, 170]; one line 203 px)",
+        "knob.title.tracks.choose [title_tracks] 'Turn to choose': 'Turn to choose' [166] (limit 170, chord [166]; one line 166 px)",
+        "knob.title.tracks.prev [title_tracks] 'Previous track': 'Previous track' [158] (limit 170, chord [166]; one line 158 px)",
+        "knob.title.tracks.next [title_tracks] 'Next track': 'Next track' [115] (limit 170, chord [166]; one line 115 px)",
+        "knob.title.no_windows [title_windows] 'No eligible windows': 'No eligible windows' [161] (limit 170, chord [170, 170]; one line 161 px)",
+        "knob.sub.favourites_empty [sub] 'Star one in Music': 'Star one in Music' [125] (limit 170, chord [170]; one line 125 px)",
+        "knob.sub.playlist_count [sub] '999 songs': '999 songs' [74] (limit 170, chord [170]; one line 74 px)",
+        "knob.sub.recent_empty [sub] 'Apple Music library': 'Apple Music library' [139] (limit 170, chord [170]; one line 139 px)",
+        "knob.sub.signin_expired [sub] 'Renew on your PC': 'Renew on your PC' [134] (limit 170, chord [170]; one line 134 px)",
+        "knob.sub.library_error [sub] 'Home, then Browse': 'Home, then Browse' [144] (limit 170, chord [170]; one line 144 px)",
+        "knob.sub.looking_for_sonos [sub] 'Looking for Sonos…': 'Looking for Sonos…' [141] (limit 170, chord [170]; one line 141 px)",
+        "knob.caption.now_playing [caption] 'Now playing': 'Now playing' [91] (limit 170, chord [162]; one line 91 px)",
+        "knob.caption.nothing_playing [caption] 'Nothing playing': 'Nothing playing' [118] (limit 170, chord [162]; one line 118 px)",
+        "knob.caption.volume_paused [caption] 'Paused · Cloudbusting': 'Paused · Cloudbusti…' [156] (limit 170, chord [162]; one line 166 px)",
+        "label.home.play [idle_word] 'Play': 'Play' [26] (limit 46, chord [60]; one line 26 px)",
+        "label.home.pause [idle_word] 'Pause': 'Pause' [37] (limit 46, chord [60]; one line 37 px)",
+        "label.home.browse [idle_word] 'Browse': 'Browse' [45] (limit 46, chord [60]; one line 45 px)",
+        "label.home.tracks [idle_word] 'Tracks': 'Tracks' [39] (limit 46, chord [60]; one line 39 px)",
+        "label.home.win [idle_word] 'Win': 'Win' [24] (limit 46, chord [60]; one line 24 px)",
+        "label.home.play_pause_v6 [idle_word] 'Play/Pause': 'Play/Pa…' [53] (limit 46, chord [60]; one line 66 px)",
+        "knob.title.offline [offline_title] 'Waiting for PC': 'Waiting for PC' [163] (limit 170, chord []; one line 163 px; 1 line(s) specified, 1 drawn)",
+        "knob.sub.offline [offline_sub] 'Open Desk\\xa0Dial on your PC': 'Open Desk\\xa0Dial / on your PC' [114, 80] (limit 170, chord []; one line 198 px; 2 line(s) specified, 2 drawn)",
+        "knob.sub.offline_native [offline_sub_native] 'Knob controls still work': 'Knob controls still work' [148] (limit 170, chord []; one line 148 px; 1 line(s) specified, 1 drawn)"
+      ]
+    },
+    "icons": {
+      "pass": true,
+      "summary": "30 token/size masks drawn: every 9.1 wire token at 20 px, heartfill@20, the 26 px idle set and prev/dotfill/next at 16 px (byte identity and fills: font_tests.py (g))"
+    },
+    "v5_bounded": {
+      "pass": true,
+      "summary": "1382 renders (cases, timeline captures, twin probes): bounded layers draw exactly the pixels of 240 x 240 layers"
+    },
+    "heartbeat": {
+      "pass": true,
+      "summary": "14 identical frames: 0 animations, 0 text sets, nothing changed, 0 redraw flushes"
+    },
+    "latency": {
+      "pass": true,
+      "summary": "a detent left to the refresh timer waits up to 33 ms (LV_DEF_REFR_PERIOD 33; v5 detents animate their meta fade: True); lcd_thread presents every changed render with lv_refr_now(), animated or not, which draws it in the same pass (3 flushes; section 12.2 \"detent text swap <= 5 ms\")"
+    },
+    "lcd_cadence": {
+      "pass": true,
+      "summary": "lcdLateRefrs / lcdMaxGapMs on the animation cadence (cc_anim_cadence_poll, section 12.3) at 16 ms: 0 late and a worst interval of 16 ms over 312 animation-timer runs through slides, volume reveal/hide, idle, a detent 2 s after a slide, cover fades and offline in/out (the flush-to-flush measure it replaced: 19 late, worst 1974 ms on the same run); a 60 ms stall counts 1 (64 ms); 7 sampler and 9 offline-input vectors",
+      "notes": [
+        "the flush-to-flush measure lcd_thread used before (replayed on the same no-stall run): 19 late, worst 1974 ms",
+        "+0 slide-deeper: cadence late 0 / max 0 ms; flush-to-flush late 0 / max 0 ms",
+        "+600 slide-back: cadence late 0 / max 16 ms; flush-to-flush late 2 / max 374 ms",
+        "+1200 volume-reveal: cadence late 0 / max 16 ms; flush-to-flush late 3 / max 374 ms",
+        "+1800 volume-hide: cadence late 0 / max 16 ms; flush-to-flush late 6 / max 374 ms",
+        "+2400 idle-enter: cadence late 0 / max 16 ms; flush-to-flush late 7 / max 374 ms",
+        "+3400 idle-exit: cadence late 0 / max 16 ms; flush-to-flush late 13 / max 374 ms",
+        "+4400 slide-deeper-again: cadence late 0 / max 16 ms; flush-to-flush late 14 / max 374 ms",
+        "+6600 detent-2s-after-the-slide: cadence late 0 / max 16 ms; flush-to-flush late 16 / max 1974 ms",
+        "+7400 cover-hide: cadence late 0 / max 16 ms; flush-to-flush late 16 / max 1974 ms",
+        "+8000 cover-show: cadence late 0 / max 16 ms; flush-to-flush late 17 / max 1974 ms",
+        "+8600 offline-in: cadence late 0 / max 16 ms; flush-to-flush late 17 / max 1974 ms",
+        "+9400 native-tap: cadence late 0 / max 16 ms; flush-to-flush late 19 / max 1974 ms",
+        "+10200 claim: cadence late 0 / max 16 ms; flush-to-flush late 19 / max 1974 ms"
+      ]
+    },
+    "heap": {
+      "pass": true,
+      "summary": "LVGL heap peak 31952 B used (48.8 % of 65536; limit 34816 B, section 12.2), max_used 17589, sampled 31952, fragmentation 6 %; x64 pointers: an upper bound for the ESP32-S3",
+      "lvgl_peak": 31952
+    },
+    "vectors": {
+      "pass": true,
+      "summary": "cc_mmss / cc_accent_ink / cc_button_tone + cc_button_ink == the frames_v5.json vectors (700); accent_ink and sat over 5832 grid colours == presentation.py"
+    },
+    "mirror_parity": {
+      "pass": true,
+      "summary": "293 cases: lcd_preview.compose draws the same strings, baselines, pens (+-1 px), inks, icons and art decisions as the harness"
+    },
+    "jpeg_glue": {
+      "pass": true,
+      "summary": "covers decoded by 'cc_jpeg.cpp'; built from '<repo>/firmware/src' (the real src/) and '<repo>/harness/tjpgd_shim'"
+    },
+    "a2_cover_exact": {
+      "pass": true,
+      "summary": "10 cover renders: every art-only pixel (outside the label and twin boxes) equals cc_jpeg_decode_240's output (artDim: LVGL mix at 112), 0 px differ",
+      "covers": [
+        "a2-np-den: a2-den 0 of 51226 art-only px differ (max |d| 0)",
+        "a2-np-detail: a2-detail 0 of 52138 art-only px differ (max |d| 0)",
+        "a2-np-bright-dim: a2-bright x image_opa 112 0 of 47918 art-only px differ (max |d| 0)",
+        "a2-recent-bright: a2-bright 0 of 48697 art-only px differ (max |d| 0)",
+        "a2-recent-den-dim: a2-den x image_opa 112 0 of 48312 art-only px differ (max |d| 0)",
+        "a2-tracks-den: a2-den 0 of 47016 art-only px differ (max |d| 0)",
+        "a2-tracks-bright-dim: a2-bright x image_opa 112 0 of 46857 art-only px differ (max |d| 0)",
+        "a2-swap/back-to-a+0: a2-swap-a x image_opa 112 0 of 49459 art-only px differ (max |d| 0)",
+        "a2-decode-fail/other-key+300: a2-den 0 of 51226 art-only px differ (max |d| 0)",
+        "a2-slide-decode/slide-decode+380: a2-slide 0 of 48697 art-only px differ (max |d| 0)"
+      ]
+    },
+    "a2_cover_fullres": {
+      "pass": true,
+      "summary": "JPEG covers on nowPlaying/recent/tracks x artDim vs a Pillow decode: luma >= 40 dB and above a 120 px round trip, RGB >= 30 dB; decoded, never upscaled, pinned",
+      "covers": [
+        "a2-np-den (nowPlaying): luma 45.8 dB (120 px round trip 38.9), RGB 40.1 dB over 51226 px",
+        "a2-np-detail (nowPlaying): luma 46.7 dB (120 px round trip 23.4), RGB 39.6 dB over 52138 px",
+        "a2-np-bright-dim (nowPlaying, artDim): luma 48.2 dB (120 px round trip 42.0), RGB 39.1 dB over 47918 px",
+        "a2-recent-bright (recent): luma 46.0 dB (120 px round trip 35.5), RGB 33.6 dB over 48697 px",
+        "a2-recent-den-dim (recent, artDim): luma 49.4 dB (120 px round trip 48.1), RGB 44.6 dB over 48312 px",
+        "a2-tracks-den (tracks): luma 46.2 dB (120 px round trip 40.2), RGB 40.6 dB over 47016 px",
+        "a2-tracks-bright-dim (tracks, artDim): luma 48.1 dB (120 px round trip 41.9), RGB 39.1 dB over 46857 px"
+      ]
+    },
+    "a2_cover_none": {
+      "pass": true,
+      "summary": "2 renders whose cover cannot be drawn show no art and hold no pin",
+      "cases": [
+        "a2-np-decode-fail: art hidden, decodes 1, errors 1, pin None",
+        "a2-np-cover-absent: art hidden, decodes 0, errors 0, pin None"
+      ]
+    },
+    "a2_icon": {
+      "pass": true,
+      "summary": "3 app icon renders (payload pixels exact open, x 0.35 closed)",
+      "icons": [
+        "a2-win-icon: ic-code at (104, 42, 135, 73), opa 255, max |d| 0",
+        "a2-win-icon-closed: ic-chat at (104, 42, 135, 73), opa 88, max |d| 9 x 89/255",
+        "a2-win-icon-nosub: ic-code at (104, 42, 135, 73), opa 255, max |d| 0"
+      ]
+    },
+    "a2_letter": {
+      "pass": true,
+      "summary": "56 letter tiles: first code point (ASCII a-z upper-cased); tile sat(accent) with a #FFFFFF initial when the selected entry has an accent, else #444 / #F2F2F2 (section 5.3)",
+      "samples": [
+        "'\"\"\"\"\"\"\"\"\"\"\"\"'->'\"' on #444444",
+        "''->'' on #444444",
+        "'ChatGPT'->'C' on #444444",
+        "'Chrome'->'C' on #0872FF",
+        "'Claude'->'C' on #FF5B24",
+        "'Codex'->'C' on #444444",
+        "'Discord'->'D' on #2033FF",
+        "'Microsoft Te'->'M' on #00FF00",
+        "'Microsoft Te'->'M' on #444444",
+        "'Microsoft Wo'->'M' on #444444",
+        "'Notepad'->'N' on #444444",
+        "'OneNote'->'O' on #444444",
+        "'Slack'->'S' on #FFB50F",
+        "'Terminal'->'T' on #FF9818",
+        "'Visual Studi'->'V' on #444444",
+        "'Word'->'W' on #07FF86",
+        "'codex'->'C' on #444444",
+        "'slack'->'S' on #444444",
+        "'écran partag'->'é' on #444444"
+      ]
+    },
+    "a2_media_pins": {
+      "pass": true,
+      "summary": "288 case renders: the store pins exactly the cover and icon drawn from it (10 pins)"
+    },
+    "a2_heartbeat": {
+      "pass": true,
+      "summary": "9 identical artwork2 frames: no decode, icon copy, swap, animation, text set or redraw"
+    },
+    "a2_timelines": {
+      "pass": true,
+      "summary": "late icon instant; late JPEG cover 240 ms fade; swap/reuse; decode failure; pins; a decode never shortens a screen change",
+      "notes": [
+        "late JPEG cover opacity at +0/+60/+120/+240/+270: [0, 195, 245, 255, 255]"
+      ]
+    },
+    "a2_handback": {
+      "pass": true,
+      "summary": "cc_display_release_media() releases the pins; the return re-pins and decodes nothing",
+      "steps": [
+        "host-cover: pins 'a2-den'/None, art True, icon False, decodes 0, upscales 0, releases [12, 3]",
+        "handback-cover: pins None/None, art True, icon False, decodes 0, upscales 0, releases [13, 3]",
+        "return-cover: pins 'a2-den'/None, art True, icon False, decodes 0, upscales 0, releases [13, 3]",
+        "host-icon: pins None/'ic-code', art False, icon True, decodes 0, upscales 0, releases [14, 3]",
+        "handback-icon: pins None/None, art False, icon True, decodes 0, upscales 0, releases [14, 4]",
+        "return-evicted: pins None/None, art True, icon False, decodes 0, upscales 0, releases [14, 4]",
+        "windows-evicted: pins None/None, art False, icon False, decodes 0, upscales 0, releases [14, 4]"
+      ]
+    },
+    "a2_one_buffer": {
+      "pass": true,
+      "summary": "cc_display_create(front, nullptr): covers decoded in place (exact pixels), no reuse, a failed in-place decode hides the art and the next key decodes again, identical frames inert, handback return decodes nothing",
+      "notes": [
+        "a2-np-den: a2-den 0 of 51226 art-only px differ (max |d| 0)",
+        "a2-np-detail: a2-detail 0 of 52138 art-only px differ (max |d| 0)",
+        "a2-np-bright-dim: a2-bright x image_opa 112 0 of 47918 art-only px differ (max |d| 0)",
+        "a2-recent-bright: a2-bright 0 of 48697 art-only px differ (max |d| 0)",
+        "a2-recent-den-dim: a2-den x image_opa 112 0 of 48312 art-only px differ (max |d| 0)",
+        "a2-tracks-den: a2-den 0 of 47016 art-only px differ (max |d| 0)",
+        "a2-tracks-bright-dim: a2-bright x image_opa 112 0 of 46857 art-only px differ (max |d| 0)",
+        "a2-swap/back-to-a+0: a2-swap-a x image_opa 112 0 of 49459 art-only px differ (max |d| 0)",
+        "a2-decode-fail/other-key+300: a2-den 0 of 51226 art-only px differ (max |d| 0)",
+        "a2-slide-decode/slide-decode+380: a2-slide 0 of 48697 art-only px differ (max |d| 0)",
+        "host-cover: pins 'a2-den'/None, art True, icon False, decodes 0, upscales 0, releases [11, 3]",
+        "handback-cover: pins None/None, art True, icon False, decodes 0, upscales 0, releases [12, 3]",
+        "return-cover: pins 'a2-den'/None, art True, icon False, decodes 0, upscales 0, releases [12, 3]",
+        "host-icon: pins None/'ic-code', art False, icon True, decodes 0, upscales 0, releases [13, 3]",
+        "handback-icon: pins None/None, art False, icon True, decodes 0, upscales 0, releases [13, 4]",
+        "return-evicted: pins None/None, art True, icon False, decodes 0, upscales 0, releases [13, 4]",
+        "windows-evicted: pins None/None, art False, icon False, decodes 0, upscales 0, releases [13, 4]"
+      ]
+    }
+  },
+  "deviations": [
+    {
+      "id": "WP1-D1",
+      "title": "twin_fade: layer fades differ from the design's group fade by up to 26 levels over the cover (within lead ruling R-b's bound of 28; 16 before the erratum) and 35 where the labels of two fading layers overlap (the volume reveals; within lead ruling R-g's bound of 36)",
+      "check": "twin_fade",
+      "status": "resolved: K1 errata of lead rulings R-b (<= 28 over the cover) and R-g (<= 36 where the labels of two fading layers overlap, the volume reveals); confirm both by eye in the hardware window (K1 15.4)",
+      "contract": "PRESENTATION_V5.md 8.5.3 / 16.1 P5-13 and 15.3 twin_fade after the R-b and R-g errata (16.7 E-b, 16.8 E-g): <= 28 per channel inside label ink boxes over the cover, <= 36 where a label ink box of another layer fading in the same capture overlaps; no difference outside them",
+      "ruling": "R-g (2026-09-26): a per-class bound of 36 for the volume-reveal overlap class (two text layers fading over 150-190 ms), R-b's bound unchanged for every other in-box pixel; the first option below, with a flat measured bound instead of the per-pixel model; confirmed by eye in the hardware window",
+      "measured": {
+        "over_the_cover": {
+          "worst": 26,
+          "per_layer": {
+            "content": 26,
+            "track": 21,
+            "volume": 25
+          },
+          "under_at_worst": 68,
+          "pixel": [
+            92,
+            57
+          ],
+          "probe": "v5-twin-fade content opa 94 +20: max |d| inside ink boxes 26 (over the cover 26; where a label of another fading layer overlaps 0, 0 px), outside 0 (0 px)",
+          "worst_excess_over_the_float_model": 14.1
+        },
+        "where_fading_layers_overlap": {
+          "worst": 35,
+          "per_layer": {
+            "track": 24,
+            "volume": 35
+          },
+          "under_at_worst": 123,
+          "pixel": [
+            71,
+            64
+          ],
+          "probe": "v5-twin-fade volume opa 109 +120: max |d| inside ink boxes 35 (over the cover 25; where a label of another fading layer overlaps 35, 969 px), outside 0 (0 px)",
+          "worst_excess_over_the_float_model": 17.4
+        },
+        "failing_probes": 0
+      },
+      "cause": [
+        "Over the cover (content, track and volume fades; worst 26 in the content fade, with 68 under the ink there): P5-13 models the error as 0.8a(1 - a) x what lies under the label (<= 15 for the <= 74.5 composite), 12.7 at that pixel. LVGL blends the twin and then the label into the RGB565 framebuffer, each blend rounded to 5/6-bit channels (a 5-bit step is 8.2 levels); the float model leaves that per-primitive arithmetic out, and it accounts for the rest.",
+        "Where the labels of two fading layers overlap (worst 35 in the volume fade, with 123 under the ink there; per layer {'track': 24, 'volume': 35}): the volume caption and the home title cross-fade in the same place in both volume reveals (K1 8.8). Reveal-out: the volume layer fades out over 170 ms while the track layer fades back in after 90 ms, so from +90 ms the caption lies over partly visible title ink, not the dark composite: the float model alone gives 24.1 at that pixel, above the 15 of P5-13 before any RGB565 rounding. Reveal-in: the caption fades in (after 50 ms) above the title fading out over 150 ms. P5-13 covers neither case, and a single bound set from the over-the-cover worst would still fail here."
+      ],
+      "options": [
+        "A lead ruling for the overlap class only (R-b's 28 stays for the cover): a separate bound limited to labels of layers that fade in the same capture, derived from P5-13's model at each pixel rather than from the measured worst -- |d| <= 0.8a(1 - a) x u + R, with u the brightest channel under the label ink and R the RGB565 term (measured above the model: 14.1 over the cover, 17.4 in the overlap class); its worst case is the title ink under the caption at a = 0.5 (0.2 x 242 = 48.4, plus R). The difference is a slightly darker caption interior while the two labels cross-fade (volume 180/170 ms), to be confirmed by eye with the rest of R-b.",
+        "Remove the overlap: sequence the volume reveals so the two layers never fade at once (reveal-in: the volume fade-in after the track has faded out, delay 150 instead of 50 ms; reveal-out: the track fade-in after the volume has faded out, delay 170 instead of 90 ms). A K1 8.8 motion change for the design owner; the caption and title then no longer cross-fade, and R-b's one bound applies as written. Not measured in the harness.",
+        "Not an option: hiding the volume caption twin during the reveal-out. K1 8.5.3 rejected hiding twins during fades, and the shadow-edge pixels would then differ from the group reference by up to 0.8a x the ink under them, which fails the same check."
+      ]
+    },
+    {
+      "id": "WP1-D2",
+      "title": "R5: a superseded cover decode stops at the next MCU band (K1 12.5.4 step 2, lead ruling R-f: cc_art_decode.cpp decodes with &cancelled through cc_jpeg.cpp's abort hook), so after a fast spin the resting cover arrives within one decode time plus one band of the last detent (K1 12.5.7(h))",
+      "check": "art_async (h)",
+      "status": "resolved",
+      "contract": "PRESENTATION_V5.md 12.5.4 step 2 (decode with &cancel; JDR_INTR at the next MCU band), 12.5.7 (h) and 12.5.7's jpeg_tests.py abort-at-every-band case",
+      "measured": {
+        "spins": [
+          {
+            "run": "h-spin-20-keys",
+            "decode_ms": 120,
+            "band_ms": 8,
+            "detent_ms": 83,
+            "last_detent": 1577,
+            "arrival": 1704,
+            "after_last_detent_ms": 127,
+            "k1_limit_ms": 129,
+            "meets_k1": true
+          },
+          {
+            "run": "h-spin-20-keys-d154",
+            "decode_ms": 154,
+            "band_ms": 11,
+            "detent_ms": 83,
+            "last_detent": 1577,
+            "arrival": 1732,
+            "after_last_detent_ms": 155,
+            "k1_limit_ms": 166,
+            "meets_k1": true
+          },
+          {
+            "run": "h-spin-20-keys-d46",
+            "decode_ms": 46,
+            "band_ms": 4,
+            "detent_ms": 83,
+            "last_detent": 1577,
+            "arrival": 1623,
+            "after_last_detent_ms": 46,
+            "k1_limit_ms": 51,
+            "meets_k1": true
+          }
+        ],
+        "aborts_in_run_a": 2
+      },
+      "cause": "src/cc_art_decode.cpp run() decodes with cc_jpeg_decode_240(stage, bytes, dst, &cancelled) and maps the result through cc_art_decode_result() (cc_art_decode.h: an abort the decoder saw stays aborted, never failed); cc_jpeg.cpp polls the flag between MCU rows (JDR_INTR, CC_JPEG_ABORTED, the decoder reusable; jpeg_tests.py aborts at every band of 24 samples). The harness fake stops at the next of 15 bands like it. Measured: 127 ms with 120 ms decodes (limit 129), 155 ms with 154 ms decodes (limit 166), 46 ms with 46 ms decodes (limit 51).",
+      "options": []
+    },
+    {
+      "id": "WP1-D3",
+      "title": "every string with a specified line count is drawn on it",
+      "check": "copy, offline",
+      "status": "resolved",
+      "contract": "PRESENTATION_V5.md 8.10 (`Knob controls still work`, 1 line, 167.5 px) and 8.6.11 (a string that fails with the real font build goes to K3's copy approval pass, never to a smaller font)",
+      "measured": [],
+      "cause": "LVGL sums whole-pixel kerned advances (lv_text_get_width); the design's 167.5 px uses fractional advances. The renderer then balances the text over two lines (no ellipsis).",
+      "options": [
+        "Approve two balanced lines for this string (an 8.6.11 exception; the knob already draws `Knob controls` / `still work`).",
+        "Approve a shorter string in K3's copy pass that measures <= 170 px with the knob font (lcd_preview.measure(text, 14) or this harness)."
+      ]
+    },
+    {
+      "id": "WP1-D4",
+      "title": "offline sub-line: a native button press swaps it (counter defined in control_center.cpp)",
+      "check": "firmware source scan (the LCD side is covered by lcd_cadence offline_input and the offline timeline)",
+      "status": "resolved",
+      "contract": "PRESENTATION_V5.md 8.10: the first native input is an FOC position change or a button state change while unclaimed (AL 8.1)",
+      "measured": {
+        "definitions": [
+          "control_center.cpp"
+        ]
+      },
+      "cause": "The HMI sees native presses (hmi_thread.cpp sets native_button in its unclaimed branch) but exports no counter; lcd_thread.cpp declares uint32_t cc_native_key_edges() weak and falls back to the FOC position while it is not linked in.",
+      "options": [
+        "HMI / control_center owner: define uint32_t cc_native_key_edges() -- +1 for every debounced press and release the unclaimed (native) button branch handles, since boot, wrapping, one aligned 32-bit word readable from the LCD thread -- with exactly that signature; the LCD side needs no change.",
+        "Until then: list it as an open K1 8.10 gap in the release notes."
+      ]
+    }
+  ]
+}

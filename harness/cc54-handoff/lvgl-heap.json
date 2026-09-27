@@ -1,0 +1,12 @@
+{
+  "lv_mem_size": 65536,
+  "total_size": 59168,
+  "free_size": 28944,
+  "free_biggest_size": 27488,
+  "max_used": 17589,
+  "peak_used_sampled": 31952,
+  "used_pct": 52,
+  "frag_pct": 6,
+  "pointer_bytes": 8,
+  "note": "Host x64 build: LVGL objects carry 8-byte pointers, so this over-estimates the ESP32-S3 (4-byte) use."
+}
