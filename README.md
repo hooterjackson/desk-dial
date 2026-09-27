@@ -99,10 +99,10 @@ The Sonos queue with covers: spin through it, <b>Like</b> a song, <b>Shuffle</b>
 
 ### Windows picker
 
-<p>
-  <img src="docs/media/window-picker-16x9.png" alt="Windows picker: a carousel of live window previews over a frosted desktop" width="49%">
-  <img src="docs/media/window-picker-snap-16x9.png" alt="Windows picker after Snap left, with the tray showing the left half filled" width="49%">
-</p>
+<picture>
+  <source srcset="docs/media/desktop-picker-16x9.webp" type="image/webp">
+  <img src="docs/media/desktop-picker-16x9.gif" alt="Windows picker: turning through live window previews, snapping Slack to the left and Terminal to the right, then switching to Chrome" width="100%">
+</picture>
 
 Turn through live previews of your open windows, then <b>Switch</b>, or <b>Snap left</b> one window
 and <b>Snap right</b> another to put them side by side.
@@ -112,6 +112,11 @@ and <b>Snap right</b> another to put them side by side.
 <picture>
   <source srcset="docs/media/desktop-explorer-32x9.webp" type="image/webp">
   <img src="docs/media/desktop-explorer-32x9.gif" alt="The Music explorer on a 32:9 super-ultrawide monitor, with more covers on each side" width="100%">
+</picture>
+
+<picture>
+  <source srcset="docs/media/desktop-picker-32x9.webp" type="image/webp">
+  <img src="docs/media/desktop-picker-32x9.gif" alt="The Windows picker on a 32:9 super-ultrawide monitor, snapping two windows side by side" width="100%">
 </picture>
 
 The same explorer on a 32:9 super-ultrawide, with more of the carousel in view.
