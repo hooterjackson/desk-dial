@@ -10,6 +10,7 @@
 #include "cc_alive.h"
 #include "cc_diag.h"
 #include "cc_led_rmt.h"
+#include "cc_sleep.h"
 
 // TinyUSB (Arduino-ESP32 core): the DTR test USBCDC::write() itself uses.
 extern "C" bool tud_cdc_n_connected(uint8_t itf);
@@ -64,6 +65,9 @@ constexpr uint16_t kHoldMs = 600;
 // HMI thread and never nest.
 CCFrame cc_hmi_frame;
 uint32_t cc_hmi_frame_id = 0;
+// Inactivity sleep (cc_sleep.h): the presses that woke the knob, swallowed with their long press
+// and release. HMI thread only (AceButton calls the handlers from check() on this thread).
+CCSleepButtons sleep_buttons;
 
 // Refreshes cc_hmi_frame only when the presentation state moved (1.0.0-cc5.2), exactly
 // like the LCD thread's render_host_frame(): the counter changes with every frame, control
@@ -351,6 +355,7 @@ void HmiThread::run() {
         cc_crumb_hmi(CC_HMI_STEP_CONFIG);
         handleSettings();
         handleConfig();
+        cc_sleep_tick();                  // inactivity timer: awake -> dim -> asleep (cc_sleep.h)
         bool claimed = cc_claimed();
         if (claimed != cc_was_claimed) {
             num_key_codes = 0; memset(current_key_codes, 0, sizeof(current_key_codes));
@@ -395,6 +400,12 @@ void HmiThread::run() {
                 cc_led_id = 0;
                 FastLED.setDither(BINARY_DITHER);   // the native path's frames as in 1.0.0-cc5.3
             }
+            // Inactivity sleep (cc_sleep.h): every ring and button LED off. The engine (or the
+            // native path) keeps running underneath, so a wake shows its current frame again.
+            if (cc_sleep_state() == CC_SLEEP_ASLEEP) {
+                fill_solid(leds, NANO_LED_A_NUM, CRGB::Black);
+                fill_solid(ledsp, NANO_LED_B_NUM, CRGB::Black);
+            }
             // Bounded since 1.0.0-cc5.2 (cc_led_rmt.h): the strips' crumbs (show-ring,
             // show-buttons, led-recover) follow this one, and a failed transmit is recovered
             // and counted, never waited for.
@@ -437,6 +448,15 @@ HmiThreadButtonHandler::HmiThreadButtonHandler(uint8_t _index) : index(_index) {
 
 
 void HmiThreadButtonHandler::handleEvent(AceButton* button, uint8_t eventType, uint8_t buttonState) {
+    // Inactivity sleep (cc_sleep.h): every press and release is physical input (it restarts the
+    // dim/sleep timer). A press that wakes the knob from asleep only wakes it: that press, its long
+    // press and its release are dropped here, before any key state, KeyEvt, HID, audio, LED or
+    // native-edge effect, in every mode. The next press acts normally.
+    const bool pressed = eventType == AceButton::kEventPressed;
+    const bool released = eventType == AceButton::kEventReleased;
+    const bool woke = (pressed || released) && cc_sleep_input() && pressed;
+    if (sleep_buttons.filter(index, pressed ? CC_SLEEP_KEY_PRESS : released ? CC_SLEEP_KEY_RELEASE : CC_SLEEP_KEY_OTHER,
+                             woke)) return;
     if (cc_claimed()) {
         if (eventType == AceButton::kEventLongPressed) {
             // PRESENTATION_V5 11.2 step 2 (VOC 2.5): a hold only for the raw at physical slot 0 (the

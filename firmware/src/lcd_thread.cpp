@@ -7,6 +7,7 @@
 #include "cc_jpeg.h"
 #include "cc_diag.h"
 #include "cc_art_decode.h"
+#include "cc_sleep.h"
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_freertos_hooks.h>
@@ -119,6 +120,25 @@ static uint32_t cc_build_binary() {
 static const uint8_t LEDC_CH_LCD_BKL = 0; // LEDC Channel for LCD Backlight
 static uint16_t LEDC_MAX_BLK = 3200; // Maximum Brightness for Active Mode
 static uint16_t LEDC_MIN_BLK = LEDC_MAX_BLK / 10; // Minimum Brightness for Idle Mode
+
+// Inactivity dim / sleep (cc_sleep.h). Every backlight write of this thread goes through
+// lcd_backlight(): it records the duty the display path wants (the native 5 s idle dim, the
+// PC-driven render's LEDC_MAX_BLK) and writes that duty clamped by the sleep state (dim:
+// CC_SLEEP_DIM_DUTY at most, asleep: 0). lcd_backlight_apply() runs every LCD pass so a state change
+// reaches the panel within one pass; the LEDC register is written only when the duty changes.
+static uint16_t blk_wanted = 0;
+static int32_t blk_written = -1;
+static void lcd_backlight_apply() {
+    const uint16_t duty = cc_sleep_duty(cc_sleep_state(), blk_wanted);
+    if (static_cast<int32_t>(duty) != blk_written) {
+        ledcWrite(LEDC_CH_LCD_BKL, duty);
+        blk_written = duty;
+    }
+}
+static void lcd_backlight(uint16_t duty) {
+    blk_wanted = duty;
+    lcd_backlight_apply();
+}
 
 static uint8_t last_orientation = -1;
 
@@ -332,7 +352,7 @@ static void counter_handler(lv_timer_t * postimer) {
         lv_obj_add_flag( ui_dataScreen, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag( ui_msgModal2, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_arc_color(ui_Arc1, lv_color_hex(0x565656), LV_PART_INDICATOR | LV_STATE_DEFAULT );
-        ledcWrite(0, LEDC_MIN_BLK); // Set Backlight to Min Brightness
+        lcd_backlight(LEDC_MIN_BLK); // Set Backlight to Min Brightness (clamped by cc_sleep)
         overlay_toggle = !overlay_toggle;
     }
     if (!com_thread.global_sleep_flag && !overlay_toggle){
@@ -341,8 +361,8 @@ static void counter_handler(lv_timer_t * postimer) {
         lv_obj_add_flag( ui_IdleCatShadow, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag( ui_dataScreen, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_arc_color(ui_Arc1, lv_color_hex(0xFF7D00), LV_PART_INDICATOR | LV_STATE_DEFAULT );
-        ledcWrite(0, LEDC_MAX_BLK); // Set Backlight to Max Brightness
-        overlay_toggle = !overlay_toggle;          
+        lcd_backlight(LEDC_MAX_BLK); // Set Backlight to Max Brightness (clamped by cc_sleep)
+        overlay_toggle = !overlay_toggle;
     }
 }
 
@@ -586,7 +606,7 @@ void render_host_frame() {
         mediaVersion = mediaNow;
         decodeVersion = decodeNow;
         cc_display_version = version;
-        ledcWrite(0,LEDC_MAX_BLK);
+        lcd_backlight(LEDC_MAX_BLK);     // full, unless the knob is dim or asleep (cc_sleep.h)
         // Every changed render reaches the panel in this pass (section 12.2: a detent's text swap
         // <= 5 ms), animated or not: v5 detents start a meta fade, and waiting for the refresh timer
         // would delay the new title by up to one period. The animation continues on the timer.
@@ -701,7 +721,7 @@ void LcdThread::run() {
 
 
     ui_init(); // Initialize UI
-    ledcWrite(0, LEDC_MAX_BLK); // Initialize Backlight to Max Brightness
+    lcd_backlight(LEDC_MAX_BLK); // Initialize Backlight to Max Brightness
 
     /*
         Main Loop for LVGL
@@ -721,6 +741,7 @@ void LcdThread::run() {
 
         cc_crumb_lcd(CC_LCD_STEP_TIMERS);
         lv_timer_handler();
+        lcd_backlight_apply();            // inactivity dim / sleep state changes (cc_sleep.h)
         perfCadence();
         // {"diag":"?"} margins, sampled here because LVGL is not thread-safe.
         const uint32_t now = millis();

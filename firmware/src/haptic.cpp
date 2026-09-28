@@ -121,6 +121,17 @@ void HapticInterface::rebase_runtime(DetentProfile profile, uint16_t position) {
     motor->move(0);
 }
 
+void HapticInterface::reanchor(void) {
+    haptic_state.detent_origin = motor->shaft_angle;
+    haptic_state.attract_angle = motor->shaft_angle;
+    haptic_state.last_attract_angle = motor->shaft_angle;
+    haptic_state.atLimit = false;
+    haptic_state.wasAtLimit = false;
+    haptic_state.last_pos = haptic_state.current_pos;
+    haptic_pid->reset();
+    motor->move(0);
+}
+
 /**
  * Handles scaling the P term error and clamping error to prevent overshoot.
  * The scaled P error helps to prevent steady state error due to lack of I term (for "rolling" reasons).

@@ -64,6 +64,9 @@ public:
     void init(void);
     void haptic_loop(void);
     void rebase_runtime(DetentProfile profile, uint16_t position);
+    // Inactivity wake (cc_sleep.h): the current profile, position and gains kept, the detent grid
+    // and attractor moved to the shaft angle (as rebase_runtime does), limit flags cleared.
+    void reanchor(void);
     void HapticEventCallback(HapticEvt);
     void UserHapticEventCallback(HapticEvt, float, uint16_t);
 

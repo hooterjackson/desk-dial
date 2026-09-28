@@ -2,6 +2,7 @@
 #include "cc_display.h"   // CCLcdPerf, cc_lcd_perf_read() (lcd_thread.cpp)
 #include "cc_jpeg.h"
 #include "cc_media.h"
+#include "cc_sleep.h"
 #include <Arduino.h>
 #include <esp_attr.h>
 #include <esp_err.h>
@@ -322,6 +323,13 @@ void cc_diag_live(JsonObject d) {
     for (uint8_t i = 0; i < CC_LIVE_COUNT; ++i)
         if (wdt_watched[i]) watched.add(kLiveNames[i]);
     diag_leds(d);
+    // Inactivity dim / sleep (cc_sleep.h, additive, read-only): the state, the time since the last
+    // physical input and the two compiled timeouts (a short-timeout test build shows here).
+    const CCSleepSnapshot sleep = cc_sleep_snapshot();
+    d["sleepState"] = cc_sleep_state_name(sleep.state);
+    d["idleMs"] = sleep.idleMs;
+    d["sleepDimMs"] = kCCSleepDimMs;
+    d["sleepOffMs"] = kCCSleepOffMs;
 }
 
 void cc_diag_media(JsonObject d) {

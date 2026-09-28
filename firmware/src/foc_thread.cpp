@@ -3,6 +3,7 @@
 #include "HapticCommander.h"
 #include "./com_thread.h"
 #include "control_center.h"
+#include "cc_sleep.h"
 
 
 /*
@@ -74,6 +75,7 @@ void FocThread::run() {
     bool runtime_active = false;
     HapticState previous;
     uint32_t runtime_id = 0;
+    CCSleepFoc sleep_foc;   // inactivity sleep: the knob watcher and the motor on/off (cc_sleep.h)
     while (true) {
         CCControl control;
         if (cc_take_request(control)) {
@@ -102,7 +104,21 @@ void FocThread::run() {
             xQueueReset(_q_angleevt_out);
             cc_motor_ready(runtime_id,serial_last_pos);
         }
-        if (cc_claimed() && cc_input_id() != runtime_id) { motor.loopFOC(); motor.move(0); }
+        // Inactivity sleep (cc_sleep.h), on this thread only: the driver is disabled while the
+        // knob sleeps and the shaft angle is still read (loopFOC()/move() update it with the motor
+        // off), so a turn can wake it. No haptic loop runs while the motor is off: the position
+        // cannot move, so no p event, native value or LED detent comes from the wake turn. On
+        // enable the detents are re-anchored at the shaft angle found (same position).
+        const CCSleepFocStep sleepStep = sleep_foc.step(static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS),
+                                                        motor.shaft_angle, cc_sleep_state() == CC_SLEEP_ASLEEP);
+        if (sleepStep.input) cc_sleep_input();
+        if (sleepStep.action == CC_SLEEP_MOTOR_DISABLE) motor.disable();
+        else if (sleepStep.action == CC_SLEEP_MOTOR_ENABLE) {
+            motor.enable();
+            haptic.reanchor();
+            serial_last_pos = haptic.haptic_state.current_pos;
+        }
+        if (sleep_foc.motorOff() || (cc_claimed() && cc_input_id() != runtime_id)) { motor.loopFOC(); motor.move(0); }
         else haptic.haptic_loop();
         float ang = encoder.getAngle();
         unsigned long now = micros();

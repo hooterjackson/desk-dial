@@ -67,6 +67,8 @@ between windows. Desk Dial is the Windows companion app and firmware that turn t
             draws a lap of it.</li>
         <li><b>Haptics</b>: every mode has its own detents and end stops.</li>
         <li>Hold the first button for 600 ms to go home from anywhere.</li>
+        <li><b>Sleep</b>: after 10 minutes untouched the screen dims; after an hour the screen, lights
+            and motor turn off. The first turn or press only wakes it, so nothing changes by accident.</li>
       </ul>
     </td>
   </tr>
