@@ -1,0 +1,66 @@
+name: Feature request
+description: Suggest a new screen, gesture, service or setting for Desk Dial.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. Desk Dial is a one-person project tested on one knob, so the most useful requests describe a real moment at the desk rather than a feature list. Not sure whether it is a bug or an idea? Ask in Discussions first.
+
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and discussions and did not find this idea.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The moment
+      description: What are you doing at the desk, and what gets in the way today? One or two sentences.
+      placeholder: "When I am on a call I want to mute the speaker with one press without leaving the window I am in..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like the knob to do
+      description: Describe it as you would use it. Which screen, which button (1 to 4, left to right), tap or hold, turn left or right, what the screen and LEDs should show.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Music (Sonos or Apple Music)
+        - Windows (picker, snapping, volume)
+        - Lights (Home Assistant)
+        - Onshape
+        - Feel, sound or LEDs
+        - Settings or the Windows app
+        - Firmware or the knob's own screen
+        - Installing, flashing or updating
+        - Something else
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: Keyboard shortcut, phone app, another gadget, nothing. This helps judge how much the idea would save.
+
+  - type: dropdown
+    id: help
+    attributes:
+      label: Could you help?
+      options:
+        - I can test a build on my knob
+        - I can write code (Python or C++)
+        - I can help with wording, media or docs
+        - I would rather just use it

@@ -1,0 +1,128 @@
+name: Bug report
+description: Something in Desk Dial or the knob firmware does not behave as described.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Desk Dial is tested on one knob (the author's), so reports from other desks are the main way bugs get found. Short and specific beats long and vague.
+
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and did not find this one.
+          required: true
+
+  - type: input
+    id: desk-dial-version
+    attributes:
+      label: Desk Dial version
+      description: |
+        In File Explorer, right-click `DeskDial.exe` › Properties › Details, and copy the "Product version" line.
+      placeholder: "e.g. {{RELEASE}}"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Knob firmware
+      description: |
+        Open Settings from the Desk Dial tray icon. The status strip at the top shows the knob as "Connected · USB · firmware …". Copy the text after "firmware". If the strip says "Not connected", write that instead.
+      placeholder: "e.g. {{RELEASE}}, or Not connected"
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Press Win+R, type `winver`, press Enter, and copy the version and build (for example "Windows 11 24H2, build 26100").
+      placeholder: "e.g. Windows 11 24H2 (build 26100)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: knob
+    attributes:
+      label: Which knob
+      description: Desk Dial is written for the Nano_D++ from Karl Malota's store. Other builds of the board may differ.
+      options:
+        - Nano_D++ from Karl's store (store.binaris.io)
+        - Self-built or other variant (say which below)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: services
+    attributes:
+      label: Services set up in Desk Dial
+      description: Tick everything you have configured in Settings, even if the bug is not about it.
+      multiple: true
+      options:
+        - None (knob and Windows only)
+        - Sonos
+        - Apple Music
+        - Home Assistant
+    validations:
+      required: true
+
+  - type: textarea
+    id: did
+    attributes:
+      label: What you did
+      description: The exact steps, in order. Name the screen on the knob and the buttons as "tap 1", "hold 4" and so on (buttons are numbered 1 to 4, left to right).
+      placeholder: |
+        1. On the Home screen, tapped button 1 (Music).
+        2. Turned the knob three clicks to the right.
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: saw
+    attributes:
+      label: What you saw
+      description: What the knob's screen, the LEDs, the PC and the tray icon showed. A photo or short video of the knob helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often
+      options:
+        - Every time
+        - Often
+        - Once or twice
+        - Only once so far
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (redacted)
+      description: |
+        Logs live in `%LOCALAPPDATA%\DeskDial\logs` (paste that path into the File Explorer address bar).
+
+        - Attach or paste the tail of `app.log` from around the time it happened.
+        - Attach `status.json` if the bug involves the knob connection, the picker, lights or Onshape. **First replace your Windows user name** in the `executable` and `dataDir` lines with `USER`.
+
+        Please do **not** attach anything from the `data\` or `backups\` folders: `credentials.bin` holds your encrypted keys and tokens, `settings.json` holds your speaker and Home Assistant addresses, and the backups hold your knob's serial number. The logs never contain tokens.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Monitor layout (one 16:9, a 32:9 ultrawide, several screens), other knob or hotkey software running, a second Nano_D++ plugged in, a non-US keyboard layout for Onshape, and so on.

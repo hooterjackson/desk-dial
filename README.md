@@ -1,251 +1,283 @@
 # Desk Dial
 
-**A haptic knob for your desk that puts Sonos, Apple Music and Windows under one dial.**
-
-Turn it to set the volume, browse your newest albums on its round screen, skip and seek, or flip
-between windows. Desk Dial is the Windows companion app and firmware that turn the
-[Nano_D++](https://github.com/katbinaris/NanoD_RatchetH1) haptic knob into a music and desk controller.
+**A haptic knob for your desk that puts your speakers, your music library, your lights, your windows and your CAD model under one dial.**
 
 <p align="center">
-  <picture>
-    <source srcset="docs/media/knob-hero.webp" type="image/webp">
-    <img src="docs/media/knob-hero.gif" alt="The knob: turning it raises the volume while the LED arc follows, Browse opens Recently Added with album covers on the round screen, Back returns home and the volume goes back down" width="400">
-  </picture>
+  <picture><source srcset="docs/media/hero.webp" type="image/webp"><img src="docs/media/hero.gif" alt="A round knob with a small screen: a turn raises the volume while an arc of light follows it, a press opens a list of album covers, a long press on the first button brings the Home screen back" width="720"></picture>
 </p>
 
-> **Status: early.** Windows only, Sonos and Apple Music only. See [Status](#status).
+<p align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/hooterjackson/desk-dial" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-blue" alt="Platform: Windows 10 and 11">
+</p>
 
-## What it does
+Windows 10 and 11 only · needs a Nano_D++ knob and a USB-C cable · tested on one knob (mine) · feedback welcome
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source srcset="docs/media/knob-volume.webp" type="image/webp">
-        <img src="docs/media/knob-volume.gif" alt="Turning the volume from 66 to 97 percent: the warm arc turns amber past 80 percent and red past 90 percent" width="100%">
-      </picture>
-      <h3>Volume you can feel</h3>
-      Turn for Sonos group volume, one percent per detent. The ring draws the level as a warm-white
-      arc that turns <b>amber from 80 %</b> and <b>red from 90 %</b>, and the screen shows it in big digits.
-    </td>
-    <td width="50%" valign="top">
-      <picture>
-        <source srcset="docs/media/knob-browse.webp" type="image/webp">
-        <img src="docs/media/knob-browse.gif" alt="Browsing Recently Added on the knob: album covers change on the round screen, the ring lights in each album's colour, Play flashes the album colour" width="100%">
-      </picture>
-      <h3>Your newest music, with covers</h3>
-      <b>Browse</b> shows Apple Music <i>Recently added</i> with album art on the round screen, and the
-      ring lights in each album's colour. <b>Play</b> starts it on Sonos, <b>Play next</b> queues it.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source srcset="docs/media/desktop-floating-knob.webp" type="image/webp">
-        <img src="docs/media/desktop-floating-knob.gif" alt="A floating copy of the knob slides in at the left edge of the desktop when the knob is turned, and slides out a moment later" width="100%">
-      </picture>
-      <h3>A knob mirror on screen</h3>
-      Touch the real knob and a copy of it, screen and LEDs, slides in at the edge of your desktop.
-      It is drawn at your display's refresh rate (240 Hz capable), never takes focus, and slides
-      away 2.5 s after you stop.
-    </td>
-    <td width="50%" valign="top">
-      <picture>
-        <source srcset="docs/media/knob-wake.webp" type="image/webp">
-        <img src="docs/media/knob-wake.gif" alt="The ring at rest in a steady dim warm white, brightening when the knob is turned, and settling back to rest" width="100%">
-      </picture>
-      <h3>"Warm · alive" lights</h3>
-      At rest the ring glows a steady, dim warm white (#FF8424). Touch it and it brightens, draws what
-      you are doing, and flashes an accent when something happens. Five seconds later it settles again.
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2" valign="top">
-      <h3>And the rest of the desk</h3>
-      <ul>
-        <li><b>Tracks and Seek</b>: skip, or scrub through the song in 5-second steps while the ring
-            draws a lap of it.</li>
-        <li><b>Haptics</b>: every mode has its own detents and end stops.</li>
-        <li>Hold the first button for 600 ms to go home from anywhere.</li>
-        <li><b>Sleep</b>: after 10 minutes untouched the screen dims; after an hour the screen, lights
-            and motor turn off. The first turn or press only wakes it, so nothing changes by accident.</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+<!-- VIDEO -->
+*A short video with sound will play here: under a minute of the real knob on a desk, from volume to lights to the window picker. Until it is recorded, the loops below show every feature rendered from the project's own code.*
 
-## On your desktop
+**Contents:** [Thank you, Karl](#thank-you-karl) · [Will it work for me?](#will-it-work-for-me) · [Quickstart](#quickstart) · [Feature tour](#feature-tour) · [Feature deep dives](#feature-deep-dives) · [Setup guides](#setup-guides) · [Privacy and what it touches](#privacy-and-what-it-touches) · [Update, uninstall, go back](#update-uninstall-go-back) · [FAQ and troubleshooting](#faq-and-troubleshooting) · [For makers](#for-makers) · [What's new](#whats-new-since-the-last-release) · [Credits](#credits) · [Limits and known issues](#limits-and-known-issues) · [License](#license)
 
-The knob drives full-screen overlays on your monitor. They never take focus, keep pace with
-high-refresh displays, and lay out for 16:9 screens and 32:9 super-ultrawides.
+## Thank you, Karl
 
-### Music explorer
+**Thank you, Karl.** Desk Dial exists because [Karl Malota (katbinaris)](https://github.com/katbinaris) designed the Nano_D++ and open-sourced its [firmware](https://github.com/katbinaris/NanoD_RatchetH1) and [hardware](https://github.com/katbinaris/Nano_D_PlusPlus). Desk Dial's knob firmware builds directly on his: the motor control, haptics, display and LED foundations are his and his contributors' work. With his permission, it also adapts ideas and code from his newer `feat/firmware-esp-idf-quadra` branch: the Onshape app UI on the knob (the cube, the command cards and wheel, parameter mode, the plasma and the pixel font), the click and thump sound synthesis, and the haptic-effect ideas. Desk Dial is a separate hobby project and is not an official Nano_D product.
 
-<picture>
-  <source srcset="docs/media/desktop-explorer-16x9.webp" type="image/webp">
-  <img src="docs/media/desktop-explorer-16x9.gif" alt="The Music explorer opens over a frosted desktop, the knob browses Recently Added covers, switches to the Favourite playlists tab, browses playlist mosaics, and Play grows the chosen card and closes the overlay" width="100%">
-</picture>
+## Will it work for me?
 
-Browse <i>Recently added</i> with the knob, switch to <i>Favourite playlists</i>, and press
-<b>Play</b>: the card grows, Sonos starts it, and the overlay steps aside.
+**You need**
 
-### Up next
+- A **Nano_D++** knob: buy one from [Karl's store](https://store.binaris.io/products/nano_d-sensory-hid) or build one from the [hardware files](https://github.com/katbinaris/Nano_D_PlusPlus). Desk Dial expects exactly one knob plugged in.
+- A **Windows 10 or 11 PC** and a **USB-C cable** that carries data.
+- Half an hour, once, to back up the knob and put the Desk Dial firmware on it (you can go back to Karl's firmware at any time).
 
-<picture>
-  <source srcset="docs/media/desktop-upnext-16x9.webp" type="image/webp">
-  <img src="docs/media/desktop-upnext-16x9.gif" alt="Up next opens on a playlist queue, the knob spins through the songs, Like fills a heart, Shuffle reorders what is left, and Play starts a song and closes the overlay" width="100%">
-</picture>
+**What each service unlocks**
 
-The Sonos queue with covers: spin through it, <b>Like</b> a song, <b>Shuffle</b> what is left
-(songs you added with <i>Play next</i> stay right after the current one), and <b>Play</b> any row.
+| Feature | Nothing extra | Sonos | Apple Music | Home Assistant |
+|---|:-:|:-:|:-:|:-:|
+| Window picker: live previews, switch, snap two windows side by side | ✓ | | | |
+| Onshape mode: zoom, orbit, pan, undo, command wheel (Chrome or Edge) | ✓ | | | |
+| Knob feel, sounds, lights, the Navigator card | ✓ | | | |
+| Speaker volume, play and pause, skip, seek | | ✓ | | |
+| Up next: your speaker's queue on the knob and the PC | | ✓ | ✓ covers and Like | |
+| Recently added albums and favourite playlists, Play and Play next | | ✓ | ✓ | |
+| Lights: brightness, colour temperature, scenes, all off and back on | | | | ✓ |
+
+With none of the services set up, Desk Dial is still a window picker and an Onshape controller with a good feel; the Music and Lights screens tell you what to set up.
+
+**Costs and barriers up front**
+
+- Sonos: nothing beyond the speakers. You type one speaker's address; Desk Dial controls the group it belongs to.
+- Apple Music: an Apple Music subscription **and** an Apple Developer Program membership (99 USD per year, as of 2026-09-30) to create a MusicKit key. Without the membership there is no album browsing, no Play next and no Like; volume and the queue still work over Sonos alone.
+- Home Assistant: a running Home Assistant on your network and a long-lived access token from your profile.
+- Onshape: an Onshape account and Chrome or Edge.
+
+**Not supported today**
+
+- macOS and Linux. Spotify and other music services. Philips Hue or other lights without Home Assistant. Firefox for Onshape mode. More than one knob.
+
+## Quickstart
+
+1. **Back up the knob and flash Desk Dial's firmware.** Follow the [flashing guide](docs/flashing.md); it saves the knob's current firmware first so you can put Karl's back later. *You should see* the knob restart into Karl's usual screen; it changes only once Desk Dial connects.
+2. **Download and unzip the app.** Get the Desk Dial zip from the [latest release](../../releases/latest), unzip it anywhere (it is portable, there is no installer) and run `DeskDial.exe`. Windows SmartScreen will say "Windows protected your PC" because the exe is not signed: click **More info**, then **Run anyway**. If Smart App Control (Windows 11) blocks it outright, see the [FAQ](docs/faq.md). *You should see* the Settings window open.
+3. **First run.** Desk Dial lives in the tray; hover the icon and it reads "Desk Dial · Knob connected". Plug the knob in if you have not. *You should see* the knob's Home screen with four words along the bottom: Music · Win · Lights · Play.
+4. **Connect your services (optional).** In Settings: [Sonos](docs/setup/sonos.md), [Apple Music](docs/setup/apple-music.md), [Home Assistant](docs/setup/home-assistant.md), [Onshape](docs/setup/onshape.md). Each page is a few minutes. *You should see* the matching knob screen stop saying "Not connected" or "Sonos unavailable".
+5. **Try these first.** Turn the knob: the speaker volume moves one percent per click and the ring of lights follows. Press button 1 (the leftmost) for Music, then button 2 for Recent and turn through your newest albums. Hold button 1 to come straight back Home from anywhere. On Home, press button 2: the window picker opens on your monitor. *You should see* the knob's screen name the four buttons on every screen, so you never have to remember them.
+6. **Get help.** Something odd? Read the [FAQ](docs/faq.md), then open an [issue](../../issues) with your Windows version and what the tray and the knob said, or ask on Karl's [Discord](https://discord.gg/mVTvppcfp6). *You should see* a reply from a human, eventually.
+
+A **detent** is one click of the knob as you turn it. The knob's motor makes the clicks, so each screen has its own feel.
+
+## Feature tour
+
+### Music
+
+<picture><source srcset="docs/media/music-volume.webp" type="image/webp"><img src="docs/media/music-volume.gif" alt="Turning the knob raises the volume from 66 to 97 percent; the warm arc of light turns amber past 80 percent and red past 90 percent" width="480"></picture>
+
+**Volume.** On Home and in Music, turning sets your Sonos group's volume, one percent per click, with a gentle click under your fingers. The ring draws the level as a warm arc that turns amber from 80 % and red from 90 % (with "LEDs" set to Colour). Button 4 is Play/Pause on both screens.
+
+<picture><source srcset="docs/media/music-lists.webp" type="image/webp"><img src="docs/media/music-lists.gif" alt="Album covers slide across the round screen as the knob turns; button 3 swaps the list to playlists and back; the ring lights in each cover's colour" width="480"></picture>
+
+**Lists.** Press 1 on Home for Music, then 2 for Recent: your newest Apple Music albums with covers, 20 clicks per turn. Button 3 toggles to your favourite playlists and back. Button 4 plays the one in focus on Sonos. The ring picks up each cover's colour.
+
+<picture><source srcset="docs/media/music-tracks-seek.webp" type="image/webp"><img src="docs/media/music-tracks-seek.gif" alt="The Tracks screen scrolls through the queue; Seek scrubs through the playing song in five-second steps while the ring draws a lap of the song" width="480"></picture>
+
+**Tracks and Seek.** Button 3 in Music opens Tracks, the whole queue; turn to a song and press 4 to jump to it. Press 3 again for Seek: the knob turns into a smooth, click-free scrubber, 5 seconds per step, stopping 3 seconds before the end. Button 3 sets the position, button 1 cancels.
+
+<picture><source srcset="docs/media/music-playpause.webp" type="image/webp"><img src="docs/media/music-playpause.gif" alt="Pressing button 4 pauses the music: the pause icon morphs into a play icon and the button's light pulses green; pressing again resumes" width="480"></picture>
+
+**Play/Pause.** Button 4 on Home and in Music. Every accepted press ticks; a press the screen cannot act on gives a soft refusal instead.
+
+<picture><source srcset="docs/media/music-hold-queue.webp" type="image/webp"><img src="docs/media/music-hold-queue.gif" alt="Holding button 4 on an album for one second: the screen flashes Queued and a warm comet runs a lap of the ring" width="480"></picture>
+
+**Hold to queue.** In Recent or Playlists, hold 4 for a second: the album plays next, after the current song, with a green landing and a comet lap on the ring. In Up next, hold 4 moves the focused song to play next.
+
+<picture><source srcset="docs/media/desktop-explorer-16x9.webp" type="image/webp"><img src="docs/media/desktop-explorer-16x9.gif" alt="A full-screen music explorer over a frosted desktop: the knob browses rows of covers, switches to playlists, and Play grows the chosen card and closes the overlay" width="480"></picture>
+
+**Music explorer and Up next on the PC.** Press 2 in Recent for Full screen: the same list fills your monitor with bigger covers, never taking focus from what you were doing. In Tracks, button 2 opens Up next: the queue with covers, Shuffle on 2, Like on 3, Play on 4. Like only adds a favourite; a liked row says "Unfavourite in Music app".
+
+### Lights
+
+<picture><source srcset="docs/media/lights-brightness.webp" type="image/webp"><img src="docs/media/lights-brightness.gif" alt="The Lights screen: turning the knob dims the room from 80 to 30 percent with a heavier click; a bar and a big number follow" width="480"></picture>
+
+Press 3 on Home. Turning sets the brightness of every light in your Home Assistant area, one percent per click, with a heavier click than volume. Button 3 switches the knob to colour temperature, 100 K per click from 2200 K to 6500 K with a fine 36-click turn. Button 2 opens your area's scenes (up to 20); turn and press 4 to run one. Button 4 is **All off**: it first saves how the lights were, so **Turn on** brings exactly that back. From Home, hold 4 to put brightness on the knob without leaving Home.
+
+<picture><source srcset="docs/media/lights-scenes.webp" type="image/webp"><img src="docs/media/lights-scenes.gif" alt="A list of scene names with 12 coarse clicks per turn; button 4 runs the focused scene and the screen says Scene running" width="480"></picture>
 
 ### Windows picker
 
-<picture>
-  <source srcset="docs/media/desktop-picker-16x9.webp" type="image/webp">
-  <img src="docs/media/desktop-picker-16x9.gif" alt="Windows picker: turning through live window previews, snapping Slack to the left and Terminal to the right, then switching to Chrome" width="100%">
-</picture>
+<picture><source srcset="docs/media/desktop-picker-16x9.webp" type="image/webp"><img src="docs/media/desktop-picker-16x9.gif" alt="Live previews of open windows fan out across a 16:9 monitor; the knob turns through them, snaps one to the left and one to the right, then switches to a third" width="480"></picture>
 
-Turn through live previews of your open windows, then <b>Switch</b>, or <b>Snap left</b> one window
-and <b>Snap right</b> another to put them side by side.
+Press 2 on Home. Live previews of your open windows fan out on the monitor of the window you were in, 12 coarse clicks per turn. Button 4 switches to the one in focus. Button 2 snaps it to the left half, button 3 to the right half; after a pair the picker closes with the two windows side by side. It closes by itself after 60 seconds untouched. A 16:9 monitor shows two cards on each side of the focus; a 32:9 super-ultrawide shows four.
 
-### On a 32:9 ultrawide
+<picture><source srcset="docs/media/desktop-picker-32x9.webp" type="image/webp"><img src="docs/media/desktop-picker-32x9.gif" alt="The same window picker on a 32:9 super-ultrawide monitor, with four previews on each side of the focused one" width="480"></picture>
 
-<picture>
-  <source srcset="docs/media/desktop-explorer-32x9.webp" type="image/webp">
-  <img src="docs/media/desktop-explorer-32x9.gif" alt="The Music explorer on a 32:9 super-ultrawide monitor, with more covers on each side" width="100%">
-</picture>
+### Onshape
 
-<picture>
-  <source srcset="docs/media/desktop-picker-32x9.webp" type="image/webp">
-  <img src="docs/media/desktop-picker-32x9.gif" alt="The Windows picker on a 32:9 super-ultrawide monitor, snapping two windows side by side" width="100%">
-</picture>
+<picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="480"></picture>
 
-The same explorer on a 32:9 super-ultrawide, with more of the carousel in view.
+With Onshape mode set to Manual or Auto in Settings, point at your model in Chrome or Edge and the knob becomes a CAD controller. Turn alone to zoom. Hold 1 and turn to tilt, hold 2 to orbit, hold 4 to pan. Tap 3 for Undo; hold 3 for Karl's command wheel: Sketch, Extrude, Fillet, the views and more, each sent as Onshape's own keyboard shortcut. Hold all four buttons for a second to go Home. Auto recognises Onshape from the browser tab's title or address (cad.onshape.com and company workspaces); nothing is logged. The tilt direction and non-US keyboard layouts are not yet tested on real hardware.
 
-The four buttons change meaning with the mode, and the screen always shows what they do:
+### The Navigator
 
-<p align="center">
-  <img src="docs/media/knob-screens.png" alt="The knob's screens: Home, Volume, Recently Added, Music explorer mirror, Tracks, Seek, Up next and Windows" width="820">
-</p>
+<picture><source srcset="docs/media/navigator.webp" type="image/webp"><img src="docs/media/navigator.gif" alt="A small frosted card at the left edge of the desktop shows the knob's current screen, the four button words and a HOLD hint, then fades four seconds after the last turn" width="480"></picture>
+
+Touch the knob and a compact glass card appears at the left edge of your main monitor: the path you are in, the four button words, and what a hold does (1 Home, 4 and its action). It is click-through and never takes focus. It fades 4 seconds after your last input, 20 seconds while you browse a list. Settings › General lets you pin it or turn it off. It hides while the explorer, Up next, the picker or Onshape is on screen.
+
+### Feel and sound
+
+<picture><source srcset="docs/media/feel-and-sound.webp" type="image/webp"><img src="docs/media/feel-and-sound.gif" alt="The knob turning through volume clicks into the end stop and letting go, with two strips underneath: the motor's torque against the angle (teeth for the clicks, a cliff at the wall, a flat line once the knob rests) and the sound the speaker plays at each moment (tock, thud, thump)" width="480"></picture>
+
+Each screen has its own feel: smooth clicks for volume, heavier for brightness, a fine 36-click turn for colour temperature, 20 per turn in lists, 12 coarse clicks for windows and scenes, and a click-free fluid scrub for Seek. Every list and value has a wall at each end; nothing wraps around. Each click has a sound from the knob's own speaker: a wooden tock, a fine click, a thud at a wall or a coarse step, a thump when a hold lands. Settings › Knob has "Knob sounds" On/Off with a volume slider (0 to 100 in steps of 5, default 100) and "Reduced haptics", which softens every step and silences the clicks while the walls still stop you. The motor goes quiet 250 ms after you let go and wakes on about one click of movement, so a resting knob is silent.
+
+<p><picture><source srcset="docs/media/feel-gallery-dark.png" media="(prefers-color-scheme: dark)"><img src="docs/media/feel-gallery.png" alt="Five torque-against-angle curves, one per feel: smooth volume teeth, heavier brightness teeth, flat-topped list and coarse teeth, fine temperature teeth, each ending in the wall's cliff" width="720"></picture></p>
+
+### The lights
+
+<picture><source srcset="docs/media/leds-moments.webp" type="image/webp"><img src="docs/media/leds-moments.gif" alt="The 60-light ring: a pink bloom on Like, a half-ring wash on Snap, a scatter on Shuffle, a warm comet lap on Queued, a glow at the end stop on a refused turn, and a slow amber waiting pattern when the PC is away" width="480"></picture>
+
+Sixty lights around the screen plus the lights under the four buttons. At rest, 5 seconds after your last touch, the ring settles to one steady dim warm glow; it never breathes. While you work it draws what you do: the volume arc, the cover's colour in lists, a pink bloom on Like, a half-ring wash on Snap, a scatter on Shuffle, a comet lap on Queued, a glow at the wall when a turn is refused. When the PC goes away the ring drains to twelve slow amber waiting marks. Settings › Knob › LEDs: Colour, or Warm only.
+
+### Settings
+
+Settings opens from the tray. **Knob:** Knob sounds and Volume, Reduced haptics, Recalibrate motor (about 10 seconds, hands off; not yet tested on real hardware), LEDs, Onshape mode. **General:** Motion (Match Windows, Full, Reduced) for the screen animations, Navigator (Auto-hide, Pinned, Off). **Windows:** Switcher background (Frosted or No background). **Music:** the speaker's address, Apple Team ID, MusicKit Key ID, Choose .p8 key, Authorize Apple Music, Album artwork On/Off. **Home Assistant:** Address, Long-lived access token, Area, Test connection, Save.
 
 <details>
-<summary><b>More screenshots</b>: Music explorer, Up next, LED states, app icons</summary>
+<summary><b>Motion gallery</b>: how screens slide, grow and settle on the knob</summary>
 
-<p align="center">
-  <img src="docs/media/music-explorer-16x9.png" alt="Music explorer, Recently added tab" width="49%">
-  <img src="docs/media/music-explorer-playlists-16x9.png" alt="Music explorer, Favourite playlists tab" width="49%">
-  <img src="docs/media/up-next-16x9.png" alt="Up next with a playlist queue, Shuffle and Like" width="49%">
-</p>
-<p align="center">
-  <img src="docs/media/led-ring.png" alt="LED ring states: volume at 54, 86 and 95 percent, Browse in album colours, Seek lap, resting" width="820">
-</p>
-<p align="center">
-  <img src="docs/media/app-icons.png" alt="App icon and tray icons for dark and light taskbars, knob connected and missing" width="560">
-</p>
+<picture><source srcset="docs/media/motion-gallery.webp" type="image/webp"><img src="docs/media/motion-gallery.gif" alt="Eight small loops of the knob's screen: a screen pushing in, a list gliding one row, the content stretching at a wall, a button icon squashing under a press, an icon popping on a landing, Pause morphing into Play, the hold fill rising on button 4, and the breadcrumb cross-fading" width="720"></picture>
+
+Settings › General › Motion: "Match Windows" follows your Windows animation setting, "Full" always animates, "Reduced" cuts the movement.
 </details>
 
-## How it works
+<details>
+<summary><b>A day with Desk Dial</b>: morning to night in one minute</summary>
+
+<picture><source srcset="docs/media/story-day.webp" type="image/webp"><img src="docs/media/story-day.gif" alt="A day in loops: a morning album from Recent starts on the speaker, a model turns in Onshape during the day, and in the evening the lights dim and an Evening scene runs" width="720"></picture>
+
+Everything in this clip is rendered from the project's code with invented albums, rooms and windows.
+</details>
+
+## Feature deep dives
+
+One page per feature, with every button and every edge case: [Music](docs/features/music.md) · [Lights](docs/features/lights.md) · [Windows picker](docs/features/windows.md) · [Onshape](docs/features/onshape.md) · [The Navigator and the PC overlays](docs/features/desktop-companions.md) · [Feel and sound](docs/features/feel-and-sound.md) · [The lights](docs/features/leds.md) · [Settings](docs/features/settings.md).
+
+Print the one-page [cheat sheet](docs/cheat-sheet.png) ([PDF](docs/cheat-sheet.pdf)) and keep it under the knob until the button words sink in.
+
+<p align="center"><img src="docs/media/knob-screens.png" alt="The knob's screens side by side: Home, Music, Recent, Tracks, Seek, Up next, Lights, Scenes, Windows and Onshape, each with its four button words" width="720"></p>
+
+## Setup guides
+
+- [Sonos](docs/setup/sonos.md): type one speaker's address; Desk Dial controls its group.
+- [Apple Music](docs/setup/apple-music.md): developer membership, MusicKit key, the consent page.
+- [Home Assistant](docs/setup/home-assistant.md): address, long-lived access token, area, test and save.
+- [Onshape](docs/setup/onshape.md): Chrome or Edge, Manual or Auto.
+- [Flashing the knob](docs/flashing.md) · [Recovery](docs/recovery.md) · [Compatibility](docs/compatibility.md)
+
+## Privacy and what it touches
+
+- **Nothing leaves your PC except to the services you set up**: your Sonos speaker on your network, Apple's Music API and cover servers, and your Home Assistant. No telemetry, no update check.
+- **Secrets are encrypted** with Windows DPAPI for your user account in `%LOCALAPPDATA%\DeskDial`: the MusicKit key, the Apple Music user token and the Home Assistant token. They are never written to logs or to `settings.json`.
+- **`settings.json` is plain text**: the speaker address, the Home Assistant address and area, and your settings.
+- **Logs** (`logs\app.log`, 1 MB × 3, `crash.log`) and a `status.json` rewritten every second hold file paths that include your Windows user name, the area and light ids, never tokens. One inventory of the knob (with its serial number) is saved per connection in `backups\` and never pruned.
+- **Window titles** are read when the picker opens, shown on the knob over USB and never logged. The Onshape title and address-bar check runs on every tick, even with Onshape mode Off; it reads the host only.
+- **Apple Music** is read-only except for Like (one request that adds a favourite). The developer token is signed on your PC; consent happens on a page served from 127.0.0.1 in your browser.
+- **Home Assistant** over `http://` crosses your network unencrypted and the app does not warn you yet; a self-signed `https://` certificate will likely be rejected (not yet tested on real hardware). "All off" writes one scene, `scene.desk_dial_snapshot`, into your Home Assistant.
+- **Nothing is stored on the knob.** Covers live in memory only.
+
+More in [docs/privacy.md](docs/privacy.md).
+
+## Update, uninstall, go back
+
+- **Update the app:** quit Desk Dial from the tray, unzip the new release over the old folder (or anywhere else) and run `DeskDial.exe`. Your settings stay in `%LOCALAPPDATA%\DeskDial`. See the [CHANGELOG](CHANGELOG.md).
+- **Update the firmware:** the [flashing guide](docs/flashing.md), same steps as the first time.
+- **Uninstall:** quit Desk Dial, remove any start-up task or shortcut you made yourself (none is created for you), delete the unzipped folder and `%LOCALAPPDATA%\DeskDial`. There is no uninstaller because nothing was installed.
+- **Go back to Karl's firmware:** the [flashing guide](docs/flashing.md) restores the backup it made. If the knob will not start, see [recovery](docs/recovery.md).
+
+## FAQ and troubleshooting
+
+**The tray says "Knob not found".** Try another USB-C cable (some carry power only) and another port. Desk Dial looks for exactly one Nano_D++; unplug any second one.
+
+**The tray says "Stock firmware · display/control extension required".** The knob still runs Karl's firmware. Flash Desk Dial's: [flashing guide](docs/flashing.md).
+
+**Button 2 on Home does nothing and the status says "F24 is unavailable".** Windows only lets the picker come to the front through a hotkey the knob sends, F24. Another app has claimed that key; close it.
+
+**The knob says "Sonos unavailable" or Settings says "Can't reach Sonos on this network".** Check the speaker's address in Settings › Music and that the PC and the speaker are on the same network. Windows features keep working meanwhile.
+
+**Snap says "Couldn't move …".** Windows running as administrator cannot be moved by an ordinary app. Switch to it instead.
+
+More in [docs/faq.md](docs/faq.md).
+
+## For makers
+
+### How it works
 
 ```mermaid
 flowchart LR
   subgraph KNOB["Nano_D++ knob (ESP32-S3 firmware)"]
     LCD["Round 240 × 240 screen<br/>LVGL"]
-    LEDS["60-LED ring + 4 button LEDs<br/>'Warm · alive' engine"]
-    HAP["Haptic motor<br/>detents per mode"]
+    LEDS["60-light ring + button lights"]
+    HAP["Haptic motor<br/>one feel per screen, sounds"]
   end
   subgraph PC["Desk Dial (Windows app)"]
-    CTRL["Controller<br/>modes, buttons, screens"]
-    OVL["Overlays<br/>Music explorer, Up next,<br/>window picker, floating knob"]
+    CTRL["Controller<br/>screens, buttons, holds"]
+    OVL["Overlays<br/>Music explorer, Up next,<br/>window picker, Navigator"]
   end
-  KNOB <-- "USB serial<br/>JSON frames, covers, icons ⇄<br/>turns and presses" --> CTRL
+  KNOB <-- "USB serial<br/>JSON lines, covers, icons ⇄<br/>turns, presses, holds" --> CTRL
   CTRL --- OVL
-  CTRL -- "local network (UPnP)" --> SONOS["Sonos speakers"]
+  CTRL -- "local network" --> SONOS["Sonos speakers"]
   CTRL -- "Apple Music API" --> AM["Apple Music library"]
+  CTRL -- "WebSocket + REST" --> HA["Home Assistant"]
+  CTRL -- "mouse, keys" --> ONS["Onshape in Chrome or Edge"]
   OVL -- "window previews, snapping" --> WIN["Windows desktop"]
 ```
 
-- **The app does the thinking.** It talks to Sonos and Apple Music, and for every screen change it
-  sends the knob one small JSON frame: the layout, the text, the ring and the button icons.
-- **The knob does the drawing.** It renders the screen with LVGL, runs the LED choreography itself
-  and answers with turns and presses. Album covers travel as 240 × 240 JPEGs and are cached on the knob.
-- **Nothing is stored on the knob.** When the app lets go, the knob returns to its own firmware
-  interface.
-- **Sonos** changes use the speakers' local interface and are confirmed by reading them back.
-  **Apple Music** uses your MusicKit authorization, stored encrypted with Windows DPAPI.
-- **The desktop overlays** run on the Windows compositor, so they keep up with high-refresh
-  monitors. The floating knob runs the same LED engine as the knob, so both glow the same way.
+The app does the thinking and the knob does the drawing. They talk over USB serial in a line-based JSON protocol: the app sends a screen (layout, text, ring, button icons, the feel) and the knob answers with turns, presses and holds; at connection the two negotiate what the knob can do (its display, its sounds, its haptic effects) so an older knob keeps working with fewer features. The protocol is documented in [firmware/CONTROL_CENTER.md](firmware/CONTROL_CENTER.md).
 
-## Hardware
+### Build from source
 
-| Part | Details |
-|---|---|
-| Knob | [Nano_D++](https://github.com/katbinaris/NanoD_RatchetH1) haptic knob |
-| Microcontroller | ESP32-S3 |
-| Screen | 240 × 240 round LCD |
-| Lights | 60-LED ring around the screen, 4 button LEDs |
-| Input | Haptic knob (brushless motor with detents and end stops), 4 buttons |
-| Connection | USB to a Windows PC |
+[docs/building.md](docs/building.md) covers the firmware (PlatformIO) and the app (Python, PyInstaller). The repository: `app/` the Windows app, `firmware/` the knob firmware, `harness/` a PC renderer of the knob's real screens, `tools/` the scripts that render the media on this page, `docs/`.
 
-You also need Sonos speakers on the same network and an Apple Music subscription.
+### Contributing
 
-## Install
+Issues and pull requests are welcome; please use the issue templates (bug report, feature request). To add an integration, start from the Home Assistant module: one adapter with a read side and a write side, a Settings page, and a knob screen described to the controller. Open an issue before a big change so we can talk about the knob's button budget: there are only four.
 
-1. Download the latest **Desk Dial** zip and the **knob firmware** from the
-   [Releases](../../releases) page.
-2. **Flash the knob** with the script included in the firmware download. It backs up the knob's
-   current firmware first, verifies the new one after flashing, and rolls back automatically if
-   anything goes wrong.
-3. **Unzip Desk Dial** and run its setup once: pick your Sonos speaker and authorize Apple Music.
-   Then start Desk Dial. It lives in the tray and finds the knob over USB.
+Talk: [Issues](../../issues) here, or Karl's [Discord](https://discord.gg/mVTvppcfp6) for everything Nano_D.
 
-## Build from source
+## What's new since the last release
 
-The repository is laid out like this:
+{{RELEASE}}
 
-| Folder | What's inside |
-|---|---|
-| `app/` | The Windows companion (Python). Install its requirements, run it, or package it with PyInstaller. |
-| `firmware/` | The knob firmware (PlatformIO, Arduino framework). |
-| `harness/` | A host harness that renders the firmware's real LVGL screens on a PC, for checks and previews. |
-| `tools/` | Helper scripts, including the ones that render the images on this page. |
-| `docs/` | Documentation and media. |
+- **Home Assistant** lights and scenes: brightness, colour temperature, scenes, all off and back on.
+- **The Navigator**, a glass card on the PC that mirrors the knob's state. It replaces the floating knob of the earlier release, which is no longer shown; the tray's "Show knob" does nothing with the current firmware.
+- **Onshape mode** with Karl's knob UI: the cube, the command wheel and cards, parameter mode.
+- **Walls** at every end, **hold tension** and a **thump** when a hold lands, and **rest sleep**: a silent motor when you let go.
+- **Screen motion** on the knob, with a Motion setting.
+- **Knob sounds** with a volume slider; **Reduced haptics** and **Reduced motion**.
+- **The launcher Home**: Music · Win · Lights · Play, with hold 1 as Home from everywhere.
 
-Each folder's README has the exact commands.
-
-## Status
-
-Desk Dial is early software that works day to day on one desk. Known limitations:
-
-- **Screen animations on the knob run at about 15 fps today.** Making them smoother is being
-  worked on. (The animations on this page are rendered from the firmware's renderer at 30 fps.)
-- **Windows only.**
-- **Sonos and Apple Music only.**
+Full list in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits
 
-- **[katbinaris](https://github.com/katbinaris)** designed the Nano_D++ knob and wrote its open-source
-  firmware, [NanoD_RatchetH1](https://github.com/katbinaris/NanoD_RatchetH1). Desk Dial's firmware
-  builds directly on it: the motor control, haptics, display and LED plumbing all come from his work.
-  Thank you for making such a lovely device open.
-- Firmware libraries: [LVGL](https://lvgl.io), [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI),
-  [FastLED](https://github.com/FastLED/FastLED), [SimpleFOC](https://simplefoc.com),
-  [ArduinoJson](https://arduinojson.org), [Adafruit TinyUSB](https://github.com/adafruit/Adafruit_TinyUSB_Arduino)
-  and [AceButton](https://github.com/bxparks/AceButton).
-- App libraries: [SoCo](https://github.com/SoCo/SoCo), [Pillow](https://python-pillow.org),
-  [pySerial](https://github.com/pyserial/pyserial), [pystray](https://github.com/moses-palmer/pystray),
-  [Requests](https://requests.readthedocs.io), [PyJWT](https://github.com/jpadilla/pyjwt) and
-  [PyInstaller](https://pyinstaller.org).
-- Typefaces: Montserrat and Archivo, under the SIL Open Font License.
+- **[Karl Malota (katbinaris)](https://github.com/katbinaris)** designed the Nano_D++ and wrote its [firmware](https://github.com/katbinaris/NanoD_RatchetH1) and [hardware](https://github.com/katbinaris/Nano_D_PlusPlus). With his permission Desk Dial adapts, from his `feat/firmware-esp-idf-quadra` branch, the Onshape app UI on the knob (cube, cards, wheel, parameter screen, plasma, Silkscreen pixel font, icons), the click and thump sound synthesis, and the haptic effect player with its table of feels. His firmware credits [@runger](https://github.com/runger1101001) (Richard Unger).
+- **Firmware libraries:** [LVGL](https://lvgl.io) 9.0.0, [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) 2.5.43, [FastLED](https://github.com/FastLED/FastLED) 3.6.0, [Simple FOC](https://simplefoc.com) 2.3.3, [SimpleFOCDrivers](https://github.com/simplefoc/Arduino-FOC-drivers) 1.0.7, [ArduinoJson](https://arduinojson.org) 7.0.2, [Adafruit TinyUSB](https://github.com/adafruit/Adafruit_TinyUSB_Arduino) 3.1.0, [AceButton](https://github.com/bxparks/AceButton) 1.10.1, [MIDI Library](https://github.com/FortySevenEffects/arduino_midi_library) 5.0.2, [SparkFun STUSB4500](https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library) 1.1.5.
+- **App libraries:** [pySerial](https://github.com/pyserial/pyserial) 3.5, [SoCo](https://github.com/SoCo/SoCo) 0.31.2, [PyJWT](https://github.com/jpadilla/pyjwt) 2.14.0, [Pillow](https://python-pillow.org) 12.3.0, [Requests](https://requests.readthedocs.io) 2.34.2, [websocket-client](https://github.com/websocket-client/websocket-client) 1.8.0, [pystray](https://github.com/moses-palmer/pystray) 0.19.5, [PyInstaller](https://pyinstaller.org) 6.22.3.
+- **Typefaces:** Archivo, Montserrat and Silkscreen, under the SIL Open Font License.
 - Designed with Claude Design and built with Claude Code.
+- Apple, Apple Music and MusicKit are trademarks of Apple Inc.; Sonos is a trademark of Sonos, Inc.; Windows is a trademark of Microsoft; Home Assistant is a trademark of the Open Home Foundation; Onshape is a trademark of PTC. Desk Dial is not affiliated with any of them.
 
-<sub>About the images: every animation and screenshot here is rendered headlessly from the project's own
-code (the knob's LCD from the firmware's renderer, the lights from the LED engine, the overlays from
-the app's renderers) with invented albums, artists, playlists and windows. None of it is a photo of
-the device or a capture of a real desktop.</sub>
+<sub>About the images: every animation and screenshot on this page is rendered from the project's own code (the knob's screen from the firmware's renderer, the lights from the LED engine, the overlays from the app's renderers) with invented albums, artists, playlists, rooms and windows. Real footage, where it appears, is marked as such.</sub>
+
+## Limits and known issues
+
+- Tested on one knob, mine. Other knobs may need "Recalibrate motor"; that path is not yet tested on real hardware.
+- Sonos: a default room id can make a different household fail with "The selected Sonos room is no longer available" — being fixed.
+- Home Assistant over `http://` sends the token unencrypted on your network with no warning yet; self-signed `https://` is not yet tested on real hardware.
+- The exe is unsigned; Smart App Control can block it. No installer, auto-start or uninstaller ships today.
+- Onshape: Chrome and Edge only; tilt direction, tool search hits and non-US keyboard layouts are unverified; shortcuts are sent as US virtual keys.
+- When no app holds the knob for two seconds it is designed to send Windows volume up and down (36 clicks per turn, no end stop); not yet verified on real hardware.
+- The Onshape title and address check runs even with Onshape mode Off.
 
 ## License
 
-[MIT](LICENSE). The knob firmware in `firmware/` builds on the Nano_D++ firmware by
-[katbinaris](https://github.com/katbinaris/NanoD_RatchetH1), shared here with the author's blessing; see
-[NOTICE](NOTICE) for details.
+[MIT](LICENSE). The knob firmware in `firmware/` builds on the Nano_D++ firmware by [Karl Malota](https://github.com/katbinaris/NanoD_RatchetH1), shared with his permission; see [NOTICE.md](NOTICE.md).
