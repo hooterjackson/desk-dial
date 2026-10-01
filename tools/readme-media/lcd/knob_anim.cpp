@@ -2,18 +2,32 @@
 // (cc_display.cpp on LVGL 9.0.0, the firmware lv_conf.h, PARTIAL mode with the firmware's 11,520 B
 // draw buffer), on a fake millisecond tick, and writes one 240x240 RGB888 raster per output frame.
 //
-// Usage: knob-anim <script.json> <out.rgb>
+// Usage: knob-anim <script.json> <out.rgb> [<png-dir>]
 //
 // script.json:
 //   { "fps": 30, "duration_ms": 6000, "start_ms": 0,
 //     "covers": { "<artKey>": "<path to 240 px baseline JPEG>" , ... },
 //     "icons":  { "<iconKey>": "<path to 2048 B RGB565 LE 32x32>", ... },
-//     "steps":  [ { "at": 0, "frame": { ...wire frame (what the companion sends)... } }, ... ] }
+//     "steps":  [ <step>, ... ] }
+//
+// A step is {"at": <fake ms>, ...} plus exactly one of (the r4 input moments mirror lcd_thread.cpp's
+// render_host_frame, src/lcd_thread.cpp:716-720, and the harness's step kinds, work/lcd-preview/main.cpp):
+//   "frame":   { ...wire frame (what the companion sends)... }    cc_display_render(); leaves the offline layer
+//   "keys":    <bitmask of physical slots down, bit n = slot n>    cc_display_input(mask) now and on EVERY later
+//                                                                 fake-ms pass until the next "keys" step
+//                                                                 (M7 press squash, M10 hold fill on slot 3)
+//   "wall":    +1 | -1                                             cc_display_wall(dir) once (M13 wall stretch)
+//   "offline": true | false                                        true: cc_display_offline(native) on every pass
+//                                                                 until a frame or "offline": false; "native": true
+//                                                                 on the same step flags the first native input
+//   "release": true                                                cc_display_release_media() (native handback)
 //
 // Frames go through the firmware parser cc_parse_frame() and cc_display_render(), exactly like
 // lcd_thread on the knob; covers come from a store stand-in (every cover is "committed" from the
 // start) and are decoded by the firmware's cc_jpeg.cpp. Output frames are sampled every 1000/fps ms
-// after start_ms (an exact present at that tick). Headless: no window, no USB, no network.
+// after start_ms (an exact present at that tick). With <png-dir>, every sampled frame is also written
+// there as <png-dir>/<index>.ppm (binary P6, zero-padded 5-digit index; no image library needed).
+// Headless: no window, no USB, no network.
 #include "lvgl.h"
 #include <ArduinoJson.h>
 #include "cc_display.h"
@@ -76,9 +90,69 @@ static void present() {
     lv_refr_now(display);
 }
 
+enum StepKind : uint8_t { STEP_FRAME, STEP_KEYS, STEP_WALL, STEP_OFFLINE, STEP_RELEASE };
+
+struct Step {
+    uint32_t at;
+    StepKind kind;
+    CCFrame frame;      // STEP_FRAME
+    uint8_t keys;       // STEP_KEYS
+    int8_t wall;        // STEP_WALL
+    bool offline;       // STEP_OFFLINE: the layer goes up (true) or stops being driven (false)
+    bool native;        // STEP_OFFLINE: the layer's first native input
+};
+
+static Step parseStep(JsonVariantConst s) {
+    Step st = {};
+    st.at = s["at"].as<uint32_t>();
+    const std::string where = " at " + std::to_string(st.at);
+    int kinds = 0;
+    if (!s["frame"].isNull()) {
+        ++kinds;
+        st.kind = STEP_FRAME;
+        if (!cc_parse_frame(s["frame"], st.frame)) throw std::runtime_error("frame rejected by cc_parse_frame" + where);
+    }
+    if (!s["keys"].isNull()) {
+        ++kinds;
+        st.kind = STEP_KEYS;
+        const int keys = s["keys"].as<int>();
+        if (keys < 0 || keys > 0x0F) throw std::runtime_error("keys must be a 4-bit mask" + where);
+        st.keys = static_cast<uint8_t>(keys);
+    }
+    if (!s["wall"].isNull()) {
+        ++kinds;
+        st.kind = STEP_WALL;
+        const int dir = s["wall"].as<int>();
+        if (dir != 1 && dir != -1) throw std::runtime_error("wall must be +1 or -1" + where);
+        st.wall = static_cast<int8_t>(dir);
+    }
+    if (!s["offline"].isNull()) {
+        ++kinds;
+        st.kind = STEP_OFFLINE;
+        st.offline = s["offline"].as<bool>();
+        st.native = s["native"] | false;
+    }
+    if (!s["release"].isNull()) {
+        ++kinds;
+        st.kind = STEP_RELEASE;
+        if (!s["release"].as<bool>()) throw std::runtime_error("release must be true" + where);
+    }
+    if (kinds != 1) throw std::runtime_error("a step needs exactly one of frame / keys / wall / offline / release" + where);
+    return st;
+}
+
+static void writePpm(const fs::path& p, const std::vector<uint8_t>& rgb) {
+    FILE* f = nullptr;
+    fopen_s(&f, p.string().c_str(), "wb");
+    if (!f) throw std::runtime_error("cannot create " + p.string());
+    std::fprintf(f, "P6\n%d %d\n255\n", W, H);
+    std::fwrite(rgb.data(), 1, rgb.size(), f);
+    std::fclose(f);
+}
+
 int main(int argc, char** argv) try {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: knob-anim <script.json> <out.rgb>\n");
+        std::fprintf(stderr, "usage: knob-anim <script.json> <out.rgb> [<png-dir>]\n");
         return 2;
     }
     const std::vector<uint8_t> text = readFile(argv[1]);
@@ -88,12 +162,18 @@ int main(int argc, char** argv) try {
     const uint32_t fps = script["fps"] | 30u;
     const uint32_t duration = script["duration_ms"] | 3000u;
     const uint32_t start = script["start_ms"] | 0u;
+    if (fps == 0) throw std::runtime_error("fps must be > 0");
     for (JsonPairConst kv : script["covers"].as<JsonObjectConst>())
         media[CC_DISPLAY_MEDIA_COVER][kv.key().c_str()] = readFile(kv.value().as<const char*>());
     for (JsonPairConst kv : script["icons"].as<JsonObjectConst>()) {
         auto bytes = readFile(kv.value().as<const char*>());
         if (bytes.size() != CC_ICON_BYTES) throw std::runtime_error("icon is not 32x32 RGB565");
         media[CC_DISPLAY_MEDIA_ICON][kv.key().c_str()] = std::move(bytes);
+    }
+    fs::path pngDir;
+    if (argc >= 4) {
+        pngDir = argv[3];
+        fs::create_directories(pngDir);
     }
 
     lv_init();
@@ -110,13 +190,10 @@ int main(int argc, char** argv) try {
     lv_obj_t* screen = cc_display_create(art240[0], art240[1]);
     lv_screen_load(screen);
 
-    struct Step { uint32_t at; CCFrame frame; };
     std::deque<Step> steps;
-    for (JsonVariantConst s : script["steps"].as<JsonArrayConst>()) {
-        steps.push_back({s["at"].as<uint32_t>(), CCFrame{}});
-        if (!cc_parse_frame(s["frame"], steps.back().frame))
-            throw std::runtime_error("frame rejected by cc_parse_frame at " + std::to_string(steps.back().at));
-    }
+    for (JsonVariantConst s : script["steps"].as<JsonArrayConst>()) steps.push_back(parseStep(s));
+    for (size_t i = 1; i < steps.size(); ++i)
+        if (steps[i].at < steps[i - 1].at) throw std::runtime_error("steps must be sorted by \"at\"");
 
     FILE* out = nullptr;
     fopen_s(&out, argv[2], "wb");
@@ -124,9 +201,40 @@ int main(int argc, char** argv) try {
     std::vector<uint8_t> rgb(static_cast<size_t>(W) * H * 3);
     size_t next = 0;
     uint32_t frames = 0;
+    // The per-pass input state, as lcd_thread's render_host_frame samples it every pass (lcd_thread.cpp:716-720):
+    // the key mask goes to cc_display_input() on every pass (a changed mask is the edge the renderer acts on, and
+    // the hold fill matures inside later calls); while the offline layer is up, cc_display_offline() runs instead
+    // (the harness's advance(), work/lcd-preview/main.cpp:369-370).
+    uint8_t keys = 0;
+    bool offlineLive = false;
+    bool offlineNative = false;
     const uint32_t end = start + duration;
     for (fakeNow = 0; fakeNow <= end; ++fakeNow) {
-        while (next < steps.size() && steps[next].at <= fakeNow) cc_display_render(steps[next++].frame, nullptr);
+        while (next < steps.size() && steps[next].at <= fakeNow) {
+            const Step& st = steps[next++];
+            switch (st.kind) {
+                case STEP_FRAME:
+                    offlineLive = false;
+                    cc_display_render(st.frame, nullptr);
+                    break;
+                case STEP_KEYS:
+                    keys = st.keys;
+                    break;
+                case STEP_WALL:
+                    cc_display_wall(st.wall);
+                    break;
+                case STEP_OFFLINE:
+                    offlineLive = st.offline;
+                    offlineNative = st.offline && st.native;
+                    break;
+                case STEP_RELEASE:
+                    offlineLive = false;
+                    cc_display_release_media();
+                    break;
+            }
+        }
+        if (offlineLive) cc_display_offline(offlineNative);
+        else cc_display_input(keys);
         lv_timer_handler();
         if (fakeNow >= start) {
             const uint64_t rel = fakeNow - start;
@@ -140,12 +248,22 @@ int main(int argc, char** argv) try {
                     rgb[3 * i + 2] = static_cast<uint8_t>((c & 31) * 255 / 31);
                 }
                 std::fwrite(rgb.data(), 1, rgb.size(), out);
+                if (!pngDir.empty()) {
+                    char name[32];
+                    std::snprintf(name, sizeof name, "%05u.ppm", frames);
+                    writePpm(pngDir / name, rgb);
+                }
                 ++frames;
             }
         }
     }
     std::fclose(out);
     std::printf("knob-anim: %u frames (%u fps, %u ms)\n", frames, fps, duration);
+    const CCDisplayStats& st = cc_display_stats();
+    std::printf("knob-anim: stats renders=%u slides=%u presses=%u holdFills=%u landings=%u pops=%u walls=%u "
+                "wallBounces=%u morphs=%u glides=%u\n",
+                st.renders, st.slides, st.presses, st.holdFills, st.landings, st.pops, st.walls, st.wallBounces,
+                st.morphs, st.glides);
     return 0;
 } catch (const std::exception& e) {
     std::fprintf(stderr, "knob-anim: %s\n", e.what());

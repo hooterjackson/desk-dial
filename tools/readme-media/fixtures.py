@@ -24,13 +24,13 @@ ALBUMS = [
 TRACKS = [
     ["First Light", "Perihelion", "Slow Orbit", "Weightless Hour", "Blue Shift", "Satellite Hearts",
      "Night Side", "Return Window", "Afterburn"],
-    ["Low Tide Neon", "Harbour Signals", "Palm Static", "Sodium Coast", "Undertow", "Glass Pier"],
+    ["Low Tide Neon", "Harbour Signals", "Palm Static", "Sodium Coast", "Low Harbour", "Glass Pier"],
     ["Pressure Front", "Glass Weather", "Rain on Aluminium", "Fog Index", "Clearing", "Barometer",
      "Soft Front", "Isobars", "Blue Hour", "Long Range"],
     ["Copper Sun", "Varanda", "Maré Alta", "Cidade Lenta", "Laranja", "Samba de Sal", "Poente",
      "Beira-Mar"],
     ["Lantern Light", "Harbour Song", "Paper Boats", "Evening Ferry", "Rope & Anchor", "Low Lamps",
-     "The Long Pier", "Dockside Waltz", "Lanterns Out", "Morning Fog", "Salt Wind", "Home Port"],
+     "The Long Pier", "Dockside Waltz", "Lanterns Out", "Harbour Mist", "Salt Wind", "Home Port"],
     ["Insert Coin", "High Score", "Pixel Rain", "Arcade Lights", "Continue?", "Level Nine",
      "Game Over Waltz", "Last Credit"],
     ["Birch", "Notebook", "Early Frost", "Field Recording", "Meadow Line", "Kettle", "Lantern",
@@ -46,16 +46,17 @@ PLAYLISTS = [  # (title, album indexes, colour, length)
     ("Road Trip Mix", [1, 5, 7, 3], (255, 60, 110), 61),
     ("Rainy Day Jazz", [6, 2, 8, 0], (80, 200, 170), 22),
 ]
-# (app, title, description, accent rgb, thumbnail kind)
+# (app, title, description, accent rgb, thumbnail kind). Every app name is invented (no real product
+# names, no real logos: the picker draws a letter tile or a synthetic icon); titles are generic.
 WINDOWS = [
-    ("Code", "dial_ui.py · Desk Dial", "Editor", (0, 122, 204), "code"),
-    ("Chrome", "Weather · 7-day forecast", "Browser tab", (255, 200, 40), "web"),
-    ("Figma", "Dial faceplate · v4", "Design file", (162, 89, 255), "design"),
-    ("Slack", "#hardware", "Channel", (230, 50, 200), "chat"),
-    ("Notion", "Release checklist", "Workspace page", (230, 230, 230), "doc"),
-    ("Terminal", "PowerShell", "Administrator", (40, 40, 40), "term"),
-    ("File Explorer", "Downloads", "Folder", (255, 190, 60), "files"),
-    ("Excel", "Budget 2026.xlsx", "Workbook", (30, 160, 90), "sheet"),
+    ("Ledger", "dial_ui.py · Desk Dial", "Editor", (0, 122, 204), "code"),
+    ("Draft", "Weather · 7-day forecast", "Browser tab", (255, 200, 40), "web"),
+    ("Canvas", "Dial faceplate · v4", "Design file", (162, 89, 255), "design"),
+    ("Chatter", "#hardware", "Channel", (230, 50, 200), "chat"),
+    ("Notes", "Release checklist", "Workspace page", (230, 230, 230), "doc"),
+    ("Shell", "Session 1", "Terminal", (40, 40, 40), "term"),
+    ("Files", "Downloads", "Folder", (255, 190, 60), "files"),
+    ("Grid", "Budget 2026", "Workbook", (30, 160, 90), "sheet"),
 ]
 ROOM = "Living Room"
 
