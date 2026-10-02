@@ -30,7 +30,7 @@ Two things never cross the network at all: the knob's profile backups and your w
 
 ### How the Home Assistant token travels
 
-If the address you enter starts with `http://`, the token and every command cross your LAN unencrypted. Anyone able to capture traffic on that network could read the token and use it against your Home Assistant. Use `https://` if your installation offers it. The app does not warn you about `http://` yet.
+If the address you enter starts with `http://`, the token and every command cross your LAN unencrypted. Anyone able to capture traffic on that network could read the token and use it against your Home Assistant. Use `https://` if your installation offers it. Settings shows a warning under the address when it starts with `http://`, and still allows it.
 
 With `https://` the certificate is checked in the normal way, so a self-signed certificate will most likely be refused ("Can’t reach Home Assistant on this network."). Not yet tested on real hardware.
 
@@ -112,7 +112,7 @@ The knob keeps whatever firmware is on it. To return to Karl's firmware see the 
 
 ## Limits and known issues
 
-- No warning in the app when the Home Assistant address uses `http://`, so the token travels unencrypted on your LAN.
+- Home Assistant over `http://` is allowed (with a warning in Settings), so the token can travel unencrypted on your LAN.
 - Self-signed Home Assistant certificates are likely to be refused; not yet tested on real hardware.
 - The Onshape title and address-bar check runs on every tick even with Onshape mode Off. It keeps nothing, but it is work the app does whether you use Onshape or not.
 - `status.json` and `app.log` contain your Windows user name in file paths.

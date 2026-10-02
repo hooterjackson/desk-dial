@@ -24,6 +24,8 @@ Desk Dial does not search the network for speakers. You type the address yoursel
 
 ## Step 2: type it in Settings
 
+<p><img src="../media/settings-music.png" alt="The Music page of Desk Dial Settings, with the speaker's IP address typed in and the status strip above reading Living Room, Playing from the Sonos queue" width="420"></p>
+
 1. Right-click the Desk Dial icon in the tray and open Settings. (The first run opens Settings on its own.)
 2. Choose the Music page from the list on the left.
 3. Type the address in the speaker IP field at the top. It must be a valid IP address; otherwise Save refuses with "Enter a valid speaker IP and each index 0, 1, 2, 3 once."

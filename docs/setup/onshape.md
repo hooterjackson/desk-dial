@@ -12,6 +12,8 @@ Onshape mode is tested on one knob (the author's) and one PC. It is the newest p
 
 ## Turn it on
 
+<p><img src="../media/settings-knob.png" alt="The Knob page of Desk Dial Settings, with Onshape mode Off, Manual or Auto" width="420"></p>
+
 1. Open Desk Dial's Settings from the tray icon.
 2. Go to **Knob** and find **Onshape mode**. It has three choices: **Off**, **Manual** and **Auto**. Off is the default.
 3. Pick one and save. The choice applies at once.

@@ -69,6 +69,8 @@ On a 16:9 monitor you see the centre window and two on each side. On a 32:9 ultr
 
 ## Settings
 
+<p><img src="../media/settings-windows.png" alt="The Windows page of Desk Dial Settings: Switcher background, Frosted or No background" width="420"></p>
+
 **Settings › Windows › Switcher background:** *Frosted* (the default) blurs the whole screen behind the previews; *No background* dims it instead. On a PC that does not allow the window mode the frost needs, only Frosted is offered and a note says so. Applies as soon as you click Save.
 
 **Settings › General › Motion:** *Match Windows* follows the Animation effects switch in Windows Settings › Accessibility › Visual effects; *Full* and *Reduced* force it either way. With reduced motion the previews jump into place and only fade, there is no slide when the picker opens and no flying preview when you snap. Applies when you click Save; the knob's own animations follow the same choice.

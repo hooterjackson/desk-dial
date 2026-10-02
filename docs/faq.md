@@ -121,4 +121,4 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 - Sonos: a built-in default for the speaker's room can make other households fail with "The selected Sonos room is no longer available". This is being fixed.
 - Onshape: Chrome and Edge only; keyboard shortcuts are sent as US-layout virtual keys, so other keyboard layouts are unverified.
 - The program is unsigned; SmartScreen warns on the first start and Smart App Control may block it.
-- The Home Assistant token crosses your network unencrypted when the address starts with `http://`; the app does not warn about this yet.
+- The Home Assistant token crosses your network unencrypted when the address starts with `http://`; Settings shows a warning under the address when it does.

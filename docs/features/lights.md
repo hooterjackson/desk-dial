@@ -107,6 +107,6 @@ On a blocked screen a turn is refused with a short deny glow and buttons 2 to 4 
 - A turn sets every light that is on to the same value; you cannot dim one light of the area from the knob.
 - The scene list is capped at 20 entries and includes scripts and automations assigned to the area as well as scenes.
 - All off writes a scene named `scene.desk_dial_snapshot` into your Home Assistant and overwrites it each time. Delete it if you stop using Desk Dial.
-- Over plain `http://` the access token crosses your network unencrypted; the app does not warn about this yet. A self-signed `https://` certificate is likely to be rejected.
+- Over plain `http://` the access token crosses your network unencrypted; Settings warns about this under the address. A self-signed `https://` certificate is likely to be rejected.
 - The knob polls Home Assistant every 2 seconds while Lights is open, on top of its live connection.
 - Tested on one knob and one Home Assistant install (the author's).

@@ -8,6 +8,8 @@ Desk Dial is tested on one knob (the author's). This page describes Desk Dial {{
 
 ## General
 
+
+<p><img src="../media/settings-general.png" alt="Desk Dial Settings, General page: the status strip for the knob, Sonos, Apple Music and Home Assistant above the page list; Motion set to Match Windows and Navigator set to Auto-hide" width="420"></p>
 **Motion** · Match Windows / Full / Reduced · default Match Windows
 
 How much the screens Desk Dial draws on the PC animate (the full-screen list, Up next, the window switcher). Match Windows follows the Animation effects switch in Windows Settings; Full always animates; Reduced keeps motion to a minimum.
@@ -18,6 +20,8 @@ The Navigator is the small glass card at the left edge of your main monitor that
 
 ## Music
 
+
+<p><img src="../media/settings-music.png" alt="Desk Dial Settings, Music page: the speaker IP, Apple Team ID and MusicKit Key ID fields with placeholder values, Choose .p8 key, Album artwork On, Authorize Apple Music" width="420"></p>
 **Speaker IP** · a text field · default a placeholder address
 
 The IPv4 address of one Sonos speaker on your network, for example 192.0.2.20. You find it in the Sonos app under the speaker's About settings. Desk Dial controls the group that speaker belongs to. There is no discovery: the address has to be typed. A changed address takes effect after you quit Desk Dial from the tray and open it again. (In this build the field's label still carries a room name from the author's own home; it is being generalised.)
@@ -46,12 +50,16 @@ Apple Music needs an Apple Developer Program membership (paid yearly), a MusicKi
 
 ## Windows
 
+
+<p><img src="../media/settings-windows.png" alt="Desk Dial Settings, Windows page: Switcher background set to Frosted" width="420"></p>
 **Switcher background** · Frosted / No background · default Frosted
 
 The backdrop of the window switcher that opens from Home button 2. Frosted blurs the whole screen behind the window cards; No background shows the cards over your desktop as it is. On a PC whose window mode does not allow No background, only Frosted is offered and a note says so. Applies when saved.
 
 ## Home Assistant
 
+
+<p><img src="../media/settings-home-assistant.png" alt="Desk Dial Settings, Home Assistant page after Test connection: an https address, an empty token field, the area Living Room, Connected, and the area's four lights with their brightness and colour temperature" width="420"></p>
 This page has its own Save and Cancel buttons. The intro reads: the knob controls every light in the area you choose, including lights you add later; the area's scenes, scripts and automations appear in the knob's Scenes list.
 
 **Address** · a text field · hint http://homeassistant.local:8123
@@ -72,10 +80,12 @@ Connects with the address and token above and lists the areas. While it runs the
 
 Under the status, the page lists the lights of the chosen area with an on / off / unavailable dot each, and the scenes, scripts and automations the knob's Scenes list will offer (up to 20).
 
-Over plain `http://` the token crosses your network unencrypted; the app does not warn about this yet. A self-signed `https://` certificate will most likely be rejected, because certificate checking is on.
+Over plain `http://` the token crosses your network unencrypted, and a line under the address says so: "The token travels unencrypted on your network; use https:// if Home Assistant has a certificate." A self-signed `https://` certificate will most likely be rejected, because certificate checking is on.
 
 ## Knob
 
+
+<p><img src="../media/settings-knob.png" alt="Desk Dial Settings, Knob page: the USB port, button order, LEDs Colour, Onshape mode Off, Knob sounds On at 100 percent, Reduced haptics Off" width="420"></p>
 **Knob USB port** · a text field
 
 The serial port of the knob (for example COM8). Desk Dial finds the knob by its USB identity and fills this in itself when it connects; you normally never edit it.
@@ -94,7 +104,7 @@ Off never enters Onshape mode. Manual adds an "Onshape mode" item to the tray me
 
 **Knob sounds** · On / Off · default On, with **Volume** · a slider 0 to 100 % in steps of 5 · default 100 %
 
-The clicks the knob's speaker plays with its detents. Both apply the moment you change them (the slider when you release it) and are saved at once. Values, walls and the clickless Seek scrub stay silent either way.
+The clicks the knob's speaker plays with its detents. Both apply the moment you change them (the slider when you release it) and are saved at once. Every turn, wall and press has its sound; Reduced haptics keeps the sounds of presses and landings but silences the clicks.
 
 **Reduced haptics** · Off / On · default Off
 
@@ -136,6 +146,6 @@ These are plain keys in `data\settings.json`. Edit the file while Desk Dial is n
 - No speaker discovery: the Sonos address is typed by hand, and a changed address needs a restart.
 - Being fixed: a default room identifier in the settings makes a different Sonos household fail with "The selected Sonos room is no longer available".
 - The speaker field is still labelled with the author's room name.
-- The Home Assistant token travels unencrypted over `http://` and the app does not warn about it yet.
+- The Home Assistant token travels unencrypted over `http://`; Settings warns about it but still allows it.
 - Recalibrate motor is not yet tested on real hardware.
 - No installer, no auto-start and no uninstaller ship today; see the README for the manual steps.

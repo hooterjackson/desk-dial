@@ -20,6 +20,8 @@ The token acts as you. Desk Dial only uses it for lights, scenes, scripts and au
 
 ## Step 2: Enter the address and token
 
+<p><img src="../media/settings-home-assistant.png" alt="The Home Assistant page of Desk Dial Settings after a successful Test connection: an https address, the area Living Room and its four lights" width="420"></p>
+
 On the PC, right-click the Desk Dial icon in the tray, open **Settings**, then the **Home Assistant** page.
 
 **Address.** Type the address you use in your browser, in the form `http://host:port` or `https://host:port`. The field suggests `http://homeassistant.local:8123`, which is the default for a standard installation. Any path prefix is allowed; a user name, password, `?` or `#` in the address is refused. Examples:
@@ -27,7 +29,7 @@ On the PC, right-click the Desk Dial icon in the tray, open **Settings**, then t
 - `http://192.0.2.10:8123`
 - `https://ha.example.net`
 
-**http or https?** Prefer https when your Home Assistant offers it. Over plain http the token travels across your local network unencrypted on every request, and Desk Dial does not warn you about this yet. Over https, Desk Dial checks the certificate like a browser does: a certificate from a public authority (for example through Nabu Casa or Let's Encrypt) works, but a self-signed certificate will very likely be rejected and the test will report that it cannot reach Home Assistant. There is no setting to skip the check.
+**http or https?** Prefer https when your Home Assistant offers it. Over plain http the token travels across your local network unencrypted on every request, and Settings shows a warning under the address when it starts with `http://`. Over https, Desk Dial checks the certificate like a browser does: a certificate from a public authority (for example through Nabu Casa or Let's Encrypt) works, but a self-signed certificate will very likely be rejected and the test will report that it cannot reach Home Assistant. There is no setting to skip the check.
 
 **Long-lived access token.** Paste the token. The field hides it; **Show** reveals it while you check. Once saved, a token is never shown again; the caption changes to "saved (leave empty to keep it)".
 
@@ -91,7 +93,7 @@ Everything else in Desk Dial works without it: music, the Windows picker and Ons
 ## Limits and known issues
 
 - **One area, lights only.** Switches, covers, fans and media players in the area are ignored. Colour (hue) is not controlled, only brightness and colour temperature.
-- **Plain http sends the token unencrypted** on your local network, and Desk Dial does not warn about it yet. Use https where you can.
+- **Plain http sends the token unencrypted** on your local network. Settings warns about it; use https where you can.
 - **Self-signed certificates are rejected.** Certificate checking is always on and there is no override. Use a trusted certificate or http on a network you trust.
 - **Re-authorising Apple Music with a new .p8 key erases the saved Home Assistant token.** You will see **Token rejected** or **Not connected** afterwards; paste the token again and Save. Set up Apple Music first.
 - **At most 20 scenes** are listed.

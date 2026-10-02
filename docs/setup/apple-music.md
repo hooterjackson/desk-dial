@@ -31,6 +31,8 @@ Desk Dial checks that the Team ID and Key ID are exactly 10 letters or digits an
 
 ## Step 2: Enter the key in Settings › Music
 
+<p><img src="../media/settings-music.png" alt="The Music page of Desk Dial Settings: Apple Team ID and MusicKit Key ID with placeholder values, Choose .p8 key and Authorize Apple Music" width="420"></p>
+
 1. On the PC, right-click the Desk Dial icon in the tray and open **Settings**, then the **Music** page.
 2. Type your **Apple Team ID** and **MusicKit Key ID**.
 3. Press **Choose .p8 key** and pick the file you downloaded.

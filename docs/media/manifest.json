@@ -1,18 +1,18 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-02T17:26:41+00:00",
+  "generated_at": "2026-10-02T20:17:33+00:00",
   "firmware": {
     "version": "1.0.0-cc5.7",
-    "git": "533d2fa2536ba8755c1096b758de77bcc0bb3e35",
-    "dirty": false
+    "git": "dafe3128de8f9249170af4ecf2be6c190af0663d",
+    "dirty": true
   },
   "app": {
     "version": "7.3.2.0",
-    "tree": "6cfb1562752cf4e96ae862c2ecbff65627099a7e4e38005ff2b37425750571d8"
+    "tree": "acfbcd82f06c99624fbf1b2fa8f499d05860e5474550a1335f814416b7a82e8b"
   },
   "pipeline": {
-    "git": "539e27b63d603e38d23a8fb62fd82765383e6b12",
-    "tree": "a28c4552e4e75f8bb1d1ca8e443d5bfc3559c231ca7a41ec3b79b2d627dcdeac"
+    "git": "52c108489b1223a3bc1e45f6266ad1b26ead186e",
+    "tree": "46e1057aad57afd26d627f6f702b0ed1ab575633f10b8a77a8d716448e70076a"
   },
   "files": [
     {
@@ -611,6 +611,71 @@
       "frames": 75,
       "fps": 7.73,
       "duration_ms": 9702,
+      "data": "fictional"
+    },
+    {
+      "name": "settings-general.png",
+      "scene": "app-settings",
+      "source": "app stage renderer",
+      "bytes": 16606,
+      "sha256": "3b23ab1d1ec16c8b63b62682c215b04681ded1abed4de131e91152af67184b4c",
+      "width": 616,
+      "height": 890,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "settings-home-assistant.png",
+      "scene": "app-settings",
+      "source": "app stage renderer",
+      "bytes": 22597,
+      "sha256": "db0e52265030106afdc1090bbf5daeff4717f4692a6650abaaeef3403e58de4b",
+      "width": 616,
+      "height": 1093,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "settings-knob.png",
+      "scene": "app-settings",
+      "source": "app stage renderer",
+      "bytes": 25940,
+      "sha256": "396d8046a86e9a6a44721f2ec4badfdc548a9de5d3ad84af4001da277d688728",
+      "width": 616,
+      "height": 1392,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "settings-music.png",
+      "scene": "app-settings",
+      "source": "app stage renderer",
+      "bytes": 18905,
+      "sha256": "64289d4aa84baf39282864642264f99c29b8f1386994620e5acf86a92c405e2c",
+      "width": 616,
+      "height": 1093,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "settings-windows.png",
+      "scene": "app-settings",
+      "source": "app stage renderer",
+      "bytes": 15260,
+      "sha256": "ce54e2d8fc61641cca36bba2c9eb9f05b8eedfad87c644d1e26838c5194f077c",
+      "width": 616,
+      "height": 1093,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
       "data": "fictional"
     },
     {

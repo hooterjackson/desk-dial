@@ -116,7 +116,7 @@ All of these live in Desk Dial Settings on your PC (right-click the tray icon). 
 - the hold tension is off;
 - the walls stay, but without the thud.
 
-The note under this setting in the current app still says that values, walls and fluid turns stay silent; the current firmware makes them sound, as described above. The note is out of date.
+The note under these settings reads: "Every turn, wall and press has a sound and a haptic; the volume sets how loud. Reduced haptics: softer steps, one pulse instead of a thump or buzz; the ends still stop the knob."
 
 **Motion** (Settings › General): Match Windows, Full or Reduced. Match Windows follows the Windows "Animation effects" switch. Reduced reaches the knob too: the screen replaces its moves with 160 ms fades and the ring drops its decorative effects. The eight screen moments and what Reduced does to each are listed on the [LEDs](leds.md) page.
 
@@ -134,7 +134,6 @@ Two protections are in the current firmware. Both were tuned against a model of 
 
 - The feel per screen, the walls, the sounds and rest sleep have been checked by hand on one knob. The fold-back and the spin trip have only been tested in a model (above).
 - Recalibrate motor has not yet been tested on real hardware.
-- The Reduced haptics note in Settings is out of date: it says values, walls and fluid turns are silent, and they are not.
 - With Karl's stock firmware, or with an older Desk Dial, the knob keeps the stock feel and makes no sound. The per-screen feels, the sounds and the pulses are only sent to a knob whose firmware reports that it supports them; see the [compatibility table](../compatibility.md) and the [firmware protocol](../../firmware/CONTROL_CENTER.md).
 - The tock is deliberately quiet at the default volume; the thump is the loudest sound. If you hear nothing at all, check Knob sounds is On and the volume is above 0.
 - The model behind the gallery assumes a motor constant, a rotor inertia and a friction value (none of them measured), so the mN·m scale is indicative only.

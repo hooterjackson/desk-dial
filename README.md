@@ -137,6 +137,8 @@ Sixty lights around the screen plus the lights under the four buttons. At rest, 
 
 ### Settings
 
+<p><img src="docs/media/settings-knob.png" alt="Desk Dial Settings, Knob page: LEDs Colour, Onshape mode Off, Knob sounds On at 100 percent, Reduced haptics Off, with the status strip for the knob, Sonos, Apple Music and Home Assistant above" width="360"></p>
+
 Settings opens from the tray. **Knob:** Knob sounds and Volume, Reduced haptics, Recalibrate motor (about 10 seconds, hands off; not yet tested on real hardware), LEDs, Onshape mode. **General:** Motion (Match Windows, Full, Reduced) for the screen animations, Navigator (Auto-hide, Pinned, Off). **Windows:** Switcher background (Frosted or No background). **Music:** the speaker's address, Apple Team ID, MusicKit Key ID, Choose .p8 key, Authorize Apple Music, Album artwork On/Off. **Home Assistant:** Address, Long-lived access token, Area, Test connection, Save.
 
 <details>
@@ -179,7 +181,7 @@ Print the one-page [cheat sheet](docs/media/cheat-sheet.png) ([PDF](docs/cheat-s
 - **Logs** (`logs\app.log`, 1 MB × 3, `crash.log`) and a `status.json` rewritten every second hold file paths that include your Windows user name, the area and light ids, never tokens. One inventory of the knob (with its serial number) is saved per connection in `backups\` and never pruned.
 - **Window titles** are read when the picker opens, shown on the knob over USB and never logged. The Onshape title and address-bar check runs on every tick, even with Onshape mode Off; it reads the host only.
 - **Apple Music** is read-only except for Like (one request that adds a favourite). The developer token is signed on your PC; consent happens on a page served from 127.0.0.1 in your browser.
-- **Home Assistant** over `http://` crosses your network unencrypted and the app does not warn you yet; a self-signed `https://` certificate will likely be rejected (not yet tested on real hardware). "All off" writes one scene, `scene.desk_dial_snapshot`, into your Home Assistant.
+- **Home Assistant** over `http://` crosses your network unencrypted, and Settings warns you when the address starts with `http://`; a self-signed `https://` certificate will likely be rejected (not yet tested on real hardware). "All off" writes one scene, `scene.desk_dial_snapshot`, into your Home Assistant.
 - **Nothing is stored on the knob.** Covers live in memory only.
 
 More in [docs/privacy.md](docs/privacy.md).
@@ -270,7 +272,7 @@ Full list in the [CHANGELOG](CHANGELOG.md).
 
 - Tested on one knob, mine. Other knobs may need "Recalibrate motor"; that path is not yet tested on real hardware.
 - Sonos: a default room id can make a different household fail with "The selected Sonos room is no longer available" — being fixed.
-- Home Assistant over `http://` sends the token unencrypted on your network with no warning yet; self-signed `https://` is not yet tested on real hardware.
+- Home Assistant over `http://` sends the token unencrypted on your network (Settings warns about it); self-signed `https://` is not yet tested on real hardware.
 - The exe is unsigned; Smart App Control can block it. No installer, auto-start or uninstaller ships today.
 - Onshape: Chrome and Edge only; tilt direction, tool search hits and non-US keyboard layouts are unverified; shortcuts are sent as US virtual keys.
 - When no app holds the knob for two seconds it is designed to send Windows volume up and down (36 clicks per turn, no end stop); not yet verified on real hardware.
