@@ -169,7 +169,7 @@ Print the one-page [cheat sheet](docs/media/cheat-sheet.png) ([PDF](docs/cheat-s
 - [Apple Music](docs/setup/apple-music.md): developer membership, MusicKit key, the consent page.
 - [Home Assistant](docs/setup/home-assistant.md): address, long-lived access token, area, test and save.
 - [Onshape](docs/setup/onshape.md): Chrome or Edge, Manual or Auto.
-- [Flashing the knob](docs/flashing.md) · [Recovery](docs/recovery.md) · [Compatibility](docs/compatibility.md)
+- [Flashing the knob](docs/flashing.md) · [Recovery](docs/recovery.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md)
 
 ## Privacy and what it touches
 
@@ -233,7 +233,7 @@ The app does the thinking and the knob does the drawing. They talk over USB seri
 
 ### Build from source
 
-[docs/building.md](docs/building.md) covers the firmware (PlatformIO) and the app (Python, PyInstaller). The repository: `app/` the Windows app, `firmware/` the knob firmware, `harness/` a PC renderer of the knob's real screens, `tools/` the scripts that render the media on this page, `docs/`.
+Build the firmware with [docs/build-firmware.md](docs/build-firmware.md) (PlatformIO) and the app with [docs/build-app.md](docs/build-app.md) (Python, PyInstaller). The repository: `app/` the Windows app, `firmware/` the knob firmware, `harness/` a PC renderer of the knob's real screens, `tools/` the scripts that render the media on this page, `docs/`.
 
 ### Contributing
 
