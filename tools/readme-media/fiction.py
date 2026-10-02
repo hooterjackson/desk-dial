@@ -103,6 +103,11 @@ BLOCKLIST = ("Kate Bush", "Massive Attack", "Air", "Floating Points", "Chromatic
              "Miles", "Jobim", "Tropic", "192.168", "RINCON", "Danny", "Bambu", "Claude", "Slack",
              "ChatGPT", "Chrome", "Figma", "Spotify", "Steam", "Undertow", "Morning Fog", "Night Drive",
              "Hounds of Love", "Sample track", r"C:\\Users", "mzstatic")
+try:                                   # plus the owner's private terms, kept outside the repo (gates.PRIVATE_TERMS)
+    from gates import PRIVATE_TERMS as _PRIVATE
+    BLOCKLIST = BLOCKLIST + tuple(_PRIVATE)
+except Exception:
+    pass
 _BLOCK_RE = re.compile("|".join(r"(?<![A-Za-z])" + re.escape(word) + r"(?![a-z])" for word in BLOCKLIST))
 
 

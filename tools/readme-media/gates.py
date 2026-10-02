@@ -55,8 +55,12 @@ CAPS = {
     "total": 12.0 * MB,     # the README's WebP-path weight
 }
 
+# Generic terms only. The owner's private terms (room, household, names, device and account identifiers) live in a
+# file OUTSIDE the repo, so this public file never lists them: $DESK_DIAL_PRIVATE_BLOCKLIST, or
+# ../readme-work/private-blocklist.txt next to the repo (one term per line, # for comments). Without that file the
+# gate still runs on the generic terms and says so.
 BLOCKLIST = (
-    "192.168.", "RINCON", 
+    "192.168.", "RINCON",
     "Kate Bush", "Massive Attack", "Floating Points", "Chromatics", "Miles Davis", "Jobim", "Tropic",
     "Danny Lewis", "Bambu", "Claude ·", "Slack", "ChatGPT", "Google Chrome", "Figma", "Spotify",
     "Steam", "homeassistant.local",
@@ -84,6 +88,18 @@ def _pattern(term: str) -> re.Pattern:
     return re.compile(re.escape(term))
 
 
+def _private_terms():
+    import os
+    path = Path(os.environ.get("DESK_DIAL_PRIVATE_BLOCKLIST") or (REPO.parent / "readme-work" / "private-blocklist.txt"))
+    if not path.exists():
+        print(f"blocklist: no private term list at {path} (generic terms only)", flush=True)
+        return ()
+    return tuple(line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+                 if line.strip() and not line.lstrip().startswith("#"))
+
+
+PRIVATE_TERMS = _private_terms()
+BLOCKLIST = BLOCKLIST + PRIVATE_TERMS
 PATTERNS = {t: _pattern(t) for t in BLOCKLIST}
 
 
