@@ -1,22 +1,29 @@
-"""Full-screen desktop animations for the README ("On your desktop").
+"""Full-screen desktop animations for the README ("On your desktop"), 7-9 s each at 30 fps.
 
-* explorer-16x9 / explorer-32x9: the Music explorer opens over the desktop, browses Recently Added,
-  switches to Favourite playlists, browses, plays one (the centre card grows, the overlay holds
-  380 ms, then fades) and closes.
-* upnext-16x9: Up next opens on a playlist queue, spins through it, likes a song, shuffles what is
-  left (the rows fade out and re-enter in the new order) and plays a row.
-* picker-16x9 / picker-32x9: the Windows picker opens, browses the carousel, snaps one window to
-  the LEFT half and another to the RIGHT half (the pair close), and the two windows end up side by
-  side; then a plain Switch to a third window.
+* desktop-explorer-16x9 / desktop-explorer-32x9: the Music explorer opens over the desktop, browses
+  Recently Added, switches to Favourite playlists, browses, plays one (the centre card grows, the
+  overlay holds 380 ms, then fades) and closes.
+* desktop-upnext-16x9: Up next opens on a playlist queue, spins through it, likes a song, shuffles
+  what is left (the rows fade out and re-enter in the new order) and plays a row.
+* desktop-picker-16x9 / desktop-picker-32x9: the Windows picker opens, browses the carousel, snaps
+  one window to the LEFT half and another to the RIGHT half (the pair close), and the two windows
+  end up side by side; then a plain Switch to a third window. The windows are fixtures.WINDOWS
+  (invented apps: Ledger, Draft, Canvas, Chatter, Notes, Shell, Files, Grid; letter tiles, no logos).
 
 The explorer and Up next are the companion's own stage engine (control_center.stage) on its fake
 device and fake clock, drawn by its PIL reference renderer and composited over a synthetic desktop
-with the overlay's own alpha. The picker is the production CarouselPresenter running inline on the
-app's golden-test fake backend, fake NanoD-snap and fake clock; its frames are composited the way
-the windows stack (desktop, frosted glass, DWM thumbnails at the engine's own rects and opacities,
-chrome band, label and dots layers), like tests/test_carousel_goldens.py does. The knob inputs and
-the snap answers are scripted; every animation's timing is the engine's own. No window is shown,
-the screen is never read, and all data is fictional (fixtures.py).
+with the overlay's own alpha. The explorer's key hints are the app's own ``scene_music.EXPLORER_HINTS``
+(1 Back - 2 Recently Added - 3 Playlists - 4 Play). The picker is the production CarouselPresenter
+running inline on the app's golden-test fake backend, fake NanoD-snap and fake clock; its frames are
+composited the way the windows stack (desktop, frosted glass, DWM thumbnails at the engine's own
+rects and opacities, chrome band, label and dots layers), like tests/test_carousel_goldens.py does.
+The knob inputs and the snap answers are scripted; every animation's timing is the engine's own.
+
+Output: 16:9 clips 1120 x 630, 32:9 clips 1400 x 394 (rendered at 1280 x 720 / 2560 x 720 and
+resampled); WebP <= 2.0 MB (quality stepped down), GIF fallback <= 2.9 MB (gates.CAPS). No window is
+shown, the screen is never read, and all data is fictional (fixtures.py).
+
+Registry contract: SCENES = {name: (source label, fn)}; fn(ctx) returns the Paths it wrote.
 """
 from __future__ import annotations
 
@@ -31,21 +38,29 @@ from companion import APP_DIR
 
 TS, SIM = D.TS, D.SIM
 FPS = 30
+STAGE = "app stage renderer"
+CAROUSEL = "app carousel"
+WEBP_CAP = 2_000_000          # gates.CAPS["desktop"]
+GIF_CAP = 2_900_000           # gates.CAPS["gif"]
+SIZE_16x9 = (1120, 630)
+SIZE_32x9 = (1400, 394)
 
 
 # ------------------------------------------------------------------ encoding
-def encode(frames, fps, stem, out_dir, webp_budget=5_000_000, gif_budget=8_800_000):
-    """Animated WebP (full size, every frame; quality lowered only if needed to fit the budget) and
-    a GIF fallback (global palette, no dither), shrunk and thinned until it fits its budget."""
+def encode(frames, fps, stem, out_dir, webp_budget=WEBP_CAP, gif_budget=GIF_CAP):
+    """Animated WebP (full size, every frame; quality lowered until it fits the budget) and a GIF
+    fallback (global palette, no dither), thinned and shrunk until it fits its budget."""
+    out_dir = Path(out_dir)
     dur = round(1000 / fps)
     webp = out_dir / f"{stem}.webp"
-    for q in (92, 88, 84, 80, 72, 64):
+    for q in (84, 78, 72, 66, 60, 54, 48, 42):
         frames[0].save(webp, save_all=True, append_images=frames[1:], duration=dur, loop=0, quality=q, method=5)
         if webp.stat().st_size <= webp_budget:
             break
     gif = out_dir / f"{stem}.gif"
     w0 = frames[0].size[0]
-    for width, step in ((w0, 2), (min(w0, 960), 2), (min(w0, 800), 2), (min(w0, 720), 3), (640, 3), (560, 3)):
+    for width, step in ((min(w0, 960), 2), (min(w0, 800), 2), (min(w0, 720), 3), (640, 3), (560, 3), (480, 4),
+                        (420, 4)):
         scale = width / w0
         size = (round(frames[0].size[0] * scale / 2) * 2, round(frames[0].size[1] * scale / 2) * 2)
         fr = [f if f.size == size else f.resize(size, Image.Resampling.LANCZOS) for f in frames[::step]]
@@ -84,6 +99,7 @@ def run_stage(monitor, plan, end_ms, out_size):
 
 
 def explorer_plan():
+    """Open on Recently Added (item 2), three detents, Playlists, two detents, Play: ~7.5 s."""
     def hl(i):
         return lambda rig: rig.presenter.explorer_highlight({"index": i, "control_id": 1, "bump": 0})
 
@@ -99,23 +115,24 @@ def explorer_plan():
     def play(rig):
         rig.presenter.explorer_close({"t0": rig.now(), "reason": "play", "close_at_ms": 380})
 
-    plan = [(500, open_)]
-    t = 1700
-    for i in (2, 3, 4, 5):
+    plan = [(400, open_)]
+    t = 1400
+    for i in (2, 3, 4):
         plan.append((t, hl(i)))
-        t += 650
-    t += 500
+        t += 550
+    t += 350
     plan.append((t, favourites))
-    t += 1300
-    for i in (1, 2, 3):
+    t += 1100
+    for i in (1, 2):
         plan.append((t, hl(i)))
-        t += 700
-    t += 600
+        t += 600
+    t += 500
     plan.append((t, play))
-    return plan, t + 1500
+    return plan, t + 1300
 
 
 def upnext_plan():
+    """Open on a playlist queue, spin ahead and back, like a song, shuffle the rest, play: ~8.5 s."""
     from stills import upnext_payload
     state = {}
 
@@ -148,26 +165,25 @@ def upnext_plan():
     def play(rig):
         rig.presenter.upnext_close({"t0": rig.now(), "reason": "play", "close_at_ms": 380})
 
-    plan = [(500, open_)]
-    t = 1800
-    for i in (5, 6, 7, 8, 9, 10):
+    plan = [(400, open_)]
+    t = 1500
+    for i in (5, 6, 7, 8):
         plan.append((t, hl(i)))
-        t += 420
-    t += 300
-    for i in (9, 8, 7, 6):
+        t += 380
+    t += 250
+    for i in (7, 6):
         plan.append((t, hl(i)))
         t += 200
-    t += 700
+    t += 500
     plan.append((t, like))
-    t += 1300
+    t += 1000
     plan.append((t, shuffle))
-    t += 1500
-    for i in (6, 7):
-        plan.append((t, hl(i)))
-        t += 550
-    t += 400
+    t += 1200
+    plan.append((t, hl(6)))
+    t += 550
+    t += 300
     plan.append((t, play))
-    return plan, t + 1500
+    return plan, t + 1300
 
 
 # ------------------------------------------------------------------ the Windows picker
@@ -175,7 +191,8 @@ DESK_WINDOWS = ((0, (0.06, 0.1, 0.42, 0.62)), (1, (0.46, 0.18, 0.9, 0.8)), (4, (
 
 
 class Picker:
-    """The production CarouselPresenter on the golden tests' fake backend, stepped on its clock."""
+    """The production CarouselPresenter on the golden tests' fake backend, stepped on its clock.
+    Items, labels, thumbnails and the desktop's windows all come from fixtures.WINDOWS."""
 
     def __init__(self, ratio):
         sys.path.insert(0, str(Path(APP_DIR) / "tests"))
@@ -284,6 +301,8 @@ class Picker:
 
 
 def picker_frames(ratio, out_size):
+    """Open on the window you are in (Ledger), snap Chatter left and Shell right, then switch to
+    Canvas: ~9 s."""
     pk = Picker(ratio)
     frames = []
 
@@ -293,59 +312,83 @@ def picker_frames(ratio, out_size):
             frames.append(img if img.size == out_size else img.resize(out_size, Image.Resampling.LANCZOS))
             pk.step(1 / FPS)
 
-    hold(0.6)
-    pk.open(0)                              # opens on the window you are in (Code)
-    hold(1.2)
+    hold(0.3)
+    pk.open(0)                              # opens on the window you are in (Ledger)
+    hold(0.8)
     for i in (1, 2, 3):
         pk.p.highlight(i)
-        hold(0.55)
-    job = pk.snap(3, "left")                # Snap left: the window flies into the left half
-    hold(0.5)
+        hold(0.4)
+    job = pk.snap(3, "left")                # Snap left: Chatter flies into the left half
+    hold(0.45)
     pk.land(job, 3, "left")
-    hold(1.0)
+    hold(0.6)
     for i in (4, 5):
         pk.p.highlight(i)
-        hold(0.55)
-    job = pk.snap(5, "right")               # Snap right: the second half; the pair is complete
-    hold(0.5)
+        hold(0.4)
+    job = pk.snap(5, "right")               # Snap right: Shell takes the second half; the pair is complete
+    hold(0.45)
     pk.land(job, 5, "right")
-    hold(0.35)
+    hold(0.3)
     pk.p.play_pair_exit()                   # the adapter's pair close: focus, exit, hide
     pk.p.hide()
-    hold(0.6)
+    hold(0.5)
     pk.showing = False
-    hold(1.8)                               # the two windows side by side
+    hold(0.9)                               # the two windows side by side
     pk.open(0)                              # a plain Switch
-    hold(1.0)
+    hold(0.6)
     for i in (1, 2):
         pk.p.highlight(i)
-        hold(0.55)
-    hold(0.3)
-    target = 2
+        hold(0.4)
+    hold(0.2)
+    target = 2                              # Canvas
     pk.p.play_switch_exit()
     pk.p.hide()
     w, h = pk.size
     pk.raise_(target, (int(0.18 * w), int(0.12 * h), int(0.82 * w), int(0.88 * h)))
-    hold(0.6)
+    hold(0.5)
     pk.showing = False
-    hold(1.4)
+    hold(0.6)
     pk.p.close()
     return frames
 
 
 # ------------------------------------------------------------------ entry
+JOBS = {
+    "explorer-16x9": lambda: run_stage((0, 0, 1280, 720), *explorer_plan(), SIZE_16x9),
+    "explorer-32x9": lambda: run_stage((0, 0, 2560, 720), *explorer_plan(), SIZE_32x9),
+    "upnext-16x9": lambda: run_stage((0, 0, 1280, 720), *upnext_plan(), SIZE_16x9),
+    "picker-16x9": lambda: picker_frames("16x9", SIZE_16x9),
+    "picker-32x9": lambda: picker_frames("32x9", SIZE_32x9),
+}
+
+
 def render(out_dir, work, which):
-    jobs = {
-        "explorer-16x9": lambda: run_stage((0, 0, 1280, 720), *explorer_plan(), (1280, 720)),
-        "explorer-32x9": lambda: run_stage((0, 0, 2560, 720), *explorer_plan(), (1600, 450)),
-        "upnext-16x9": lambda: run_stage((0, 0, 1280, 720), *upnext_plan(), (1280, 720)),
-        "picker-16x9": lambda: picker_frames("16x9", (1280, 720)),
-        "picker-32x9": lambda: picker_frames("32x9", (1600, 450)),
-    }
+    """[(name, frame count, webp, gif)] for every name of ``which`` (keys of JOBS)."""
+    out_dir, work = Path(out_dir), Path(work)
     results = []
     for name in which:
-        frames = jobs[name]()
+        frames = JOBS[name]()
         for k in (len(frames) // 5, len(frames) // 2, 4 * len(frames) // 5):
             frames[k].save(work / f"fs-{name}-{k}.png")
         results.append((name, len(frames)) + encode(frames, FPS, f"desktop-{name}", out_dir))
     return results
+
+
+def _scene(which, source):
+    def run(ctx) -> list[Path]:
+        out = []
+        for stem, n, webp, gif in render(ctx.out, ctx.work, [which]):
+            ctx.log(f"{stem}: {n} frames at {FPS} fps ({n / FPS:.1f} s), webp {webp.stat().st_size} B, "
+                    f"gif {gif.stat().st_size} B")
+            out += [ctx.produced(webp, source), ctx.produced(gif, source)]
+        return out
+    return run
+
+
+SCENES = {
+    "desktop-explorer-16x9": (STAGE, _scene("explorer-16x9", STAGE)),
+    "desktop-explorer-32x9": (STAGE, _scene("explorer-32x9", STAGE)),
+    "desktop-upnext-16x9": (STAGE, _scene("upnext-16x9", STAGE)),
+    "desktop-picker-16x9": (CAROUSEL, _scene("picker-16x9", CAROUSEL)),
+    "desktop-picker-32x9": (CAROUSEL, _scene("picker-32x9", CAROUSEL)),
+}

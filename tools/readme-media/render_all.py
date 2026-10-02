@@ -162,6 +162,12 @@ def main(argv=None):
         shutil.rmtree(tmp, ignore_errors=True)
     else:
         t0 = time.time()
+        # A --scenes subset: the files it did not touch keep the scene and source the last manifest gave them.
+        prev = out / "manifest.json"
+        if a.scenes and prev.exists():
+            import json as _json
+            for f in _json.loads(prev.read_text(encoding="utf-8")).get("files", []):
+                ctx.entries.setdefault(f["name"], (f.get("scene", ""), f.get("source", "")))
         man = M.write(out, ctx.entries, context)
         print(f"manifest.json: {len(man['files'])} files, firmware {man['firmware']['version']} "
               f"({'dirty' if man['firmware']['dirty'] else 'clean'}), app {man['app']['version']}", flush=True)

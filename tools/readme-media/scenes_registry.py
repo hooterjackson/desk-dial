@@ -113,17 +113,27 @@ def scene_stills(ctx: Context) -> list[Path]:
     return [ctx.produced(ctx.out / n, src) for n, src in names if (ctx.out / n).exists()]
 
 
+# The scene modules, in render order. Each exposes SCENES = {name: (source, fn)}; fn(ctx) tags its own files.
+# A module that is missing or fails to import is reported and skipped, so one broken scene never blocks the rest.
+SCENE_MODULES = ("hero_scene", "rec_scenes", "desktop_fullscreen", "navigator_scene", "panel_scenes",
+                 "gallery_scenes", "social_preview")
+IMPORT_ERRORS: dict[str, str] = {}
+
+
+def _discover():
+    import importlib
+    out = {}
+    for mod in SCENE_MODULES:
+        try:
+            m = importlib.import_module(mod)
+        except Exception as e:  # noqa: BLE001  (reported by render_all --list and at render time)
+            IMPORT_ERRORS[mod] = f"{type(e).__name__}: {e}"
+            continue
+        for name, entry in getattr(m, "SCENES", {}).items():
+            fn = entry[1] if isinstance(entry, tuple) else entry
+            out[name] = fn
+    return out
+
+
 # name -> callable(ctx) -> list[Path]; insertion order is the render order.
-SCENES = {
-    "hero": _knob_loop("hero"),
-    "volume": _knob_loop("volume"),
-    "browse": _knob_loop("browse"),
-    "wake": _knob_loop("wake"),
-    "floating": _desktop("floating"),
-    "stills": scene_stills,
-    "explorer-16x9": _fullscreen("explorer-16x9", STAGE),
-    "explorer-32x9": _fullscreen("explorer-32x9", STAGE),
-    "upnext-16x9": _fullscreen("upnext-16x9", STAGE),
-    "picker-16x9": _fullscreen("picker-16x9", CAROUSEL),
-    "picker-32x9": _fullscreen("picker-32x9", CAROUSEL),
-}
+SCENES = _discover()

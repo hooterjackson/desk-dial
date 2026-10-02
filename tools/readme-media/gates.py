@@ -49,6 +49,7 @@ CAPS = {
     "hero": 1.0 * MB,       # the hero loop's WebP (file stem "hero" or "<prefix>-hero")
     "loop": 1.2 * MB,       # every other animated WebP that is not a desktop-* clip
     "desktop": 2.0 * MB,    # desktop-*.webp full-screen clips
+    "story": 1.6 * MB,      # story-*.webp, the 18 s "A day with Desk Dial" sequence
     "still": 300 * KB,      # PNG / SVG stills
     "gif": 2.9 * MB,        # every GIF fallback (not counted in the total)
     "total": 12.0 * MB,     # the README's WebP-path weight
@@ -67,6 +68,7 @@ ALLOWLIST = {
     "docs/setup/onshape.md": {"Google Chrome"},
     "docs/faq.md": {"Spotify", "homeassistant.local"},
     "docs/setup/home-assistant.md": {"homeassistant.local"},
+    "docs/features/settings.md": {"homeassistant.local"},   # the Address field's real hint text
     "tools/readme-media/fiction.py": set(BLOCKLIST),   # the fixtures' own self-check copy of the blocklist
 }
 TEXT_SUFFIXES = {".md", ".json", ".py"}
@@ -99,6 +101,8 @@ def category(name: str) -> str:
         return "hero"
     if stem.startswith("desktop-"):
         return "desktop"
+    if stem.startswith("story-"):
+        return "story"
     return "loop"
 
 
@@ -137,6 +141,8 @@ def budget(out_dir: Path, readme_path: Path, caps: dict = CAPS) -> tuple[bool, s
     base = readme_path.parent
     seen = set()
     for ref, counted, how in readme_images(readme_path):
+        if ref.startswith(("http://", "https://")):
+            continue   # external badges (shields.io): a few KB each, not ours to size
         path = (base / ref).resolve()
         if (out_dir / Path(ref).name).exists():      # weigh the folder being rendered (or checked)
             path = (out_dir / Path(ref).name).resolve()

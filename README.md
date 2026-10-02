@@ -109,7 +109,7 @@ Press 3 on Home. Turning sets the brightness of every light in your Home Assista
 
 Press 2 on Home. Live previews of your open windows fan out on the monitor of the window you were in, 12 coarse clicks per turn. Button 4 switches to the one in focus. Button 2 snaps it to the left half, button 3 to the right half; after a pair the picker closes with the two windows side by side. It closes by itself after 60 seconds untouched. A 16:9 monitor shows two cards on each side of the focus; a 32:9 super-ultrawide shows four.
 
-<picture><source srcset="docs/media/desktop-picker-32x9.webp" type="image/webp"><img src="docs/media/desktop-picker-32x9.gif" alt="The same window picker on a 32:9 super-ultrawide monitor, with four previews on each side of the focused one" width="480"></picture>
+On a 32:9 super-ultrawide the picker shows four previews on each side; see it on the [Windows picker page](docs/features/windows.md).
 
 ### Onshape
 
@@ -133,9 +133,7 @@ Each screen has its own feel: smooth clicks for volume, heavier for brightness, 
 
 ### The lights
 
-<picture><source srcset="docs/media/leds-moments.webp" type="image/webp"><img src="docs/media/leds-moments.gif" alt="The 60-light ring: a pink bloom on Like, a half-ring wash on Snap, a scatter on Shuffle, a warm comet lap on Queued, a glow at the end stop on a refused turn, and a slow amber waiting pattern when the PC is away" width="480"></picture>
-
-Sixty lights around the screen plus the lights under the four buttons. At rest, 5 seconds after your last touch, the ring settles to one steady dim warm glow; it never breathes. While you work it draws what you do: the volume arc, the cover's colour in lists, a pink bloom on Like, a half-ring wash on Snap, a scatter on Shuffle, a comet lap on Queued, a glow at the wall when a turn is refused. When the PC goes away the ring drains to twelve slow amber waiting marks. Settings › Knob › LEDs: Colour, or Warm only.
+Sixty lights around the screen plus the lights under the four buttons. At rest, 5 seconds after your last touch, the ring settles to one steady dim warm glow; it never breathes. While you work it draws what you do: the volume arc, the cover's colour in lists, a pink bloom on Like, a half-ring wash on Snap, a scatter on Shuffle, a comet lap on Queued, a glow at the wall when a turn is refused. When the PC goes away the ring drains to twelve slow amber waiting marks. Settings › Knob › LEDs: Colour, or Warm only. Every moment is animated on [the lights page](docs/features/leds.md).
 
 ### Settings
 
@@ -144,15 +142,15 @@ Settings opens from the tray. **Knob:** Knob sounds and Volume, Reduced haptics,
 <details>
 <summary><b>Motion gallery</b>: how screens slide, grow and settle on the knob</summary>
 
-<picture><source srcset="docs/media/motion-gallery.webp" type="image/webp"><img src="docs/media/motion-gallery.gif" alt="Eight small loops of the knob's screen: a screen pushing in, a list gliding one row, the content stretching at a wall, a button icon squashing under a press, an icon popping on a landing, Pause morphing into Play, the hold fill rising on button 4, and the breadcrumb cross-fading" width="720"></picture>
+Eight short loops of the knob's screen moves (a screen pushing in, a list gliding, the stretch at a wall, a press, a landing, the Pause-to-Play morph, the hold fill, the breadcrumb cross-fade) are on [the lights and motion page](docs/features/leds.md).
 
 Settings › General › Motion: "Match Windows" follows your Windows animation setting, "Full" always animates, "Reduced" cuts the movement.
 </details>
 
 <details>
-<summary><b>A day with Desk Dial</b>: morning to night in one minute</summary>
+<summary><b>A day with Desk Dial</b>: morning to evening in eighteen seconds</summary>
 
-<picture><source srcset="docs/media/story-day.webp" type="image/webp"><img src="docs/media/story-day.gif" alt="A day in loops: a morning album from Recent starts on the speaker, a model turns in Onshape during the day, and in the evening the lights dim and an Evening scene runs" width="720"></picture>
+<picture><source srcset="docs/media/story-day.webp" type="image/webp"><img src="docs/media/story-day.gif" alt="A day with the knob: in the morning the volume comes up and an album from Recently Added starts; in the evening the lights dim and the Evening scene runs; the knob comes back Home" width="720"></picture>
 
 Everything in this clip is rendered from the project's code with invented albums, rooms and windows.
 </details>
@@ -161,7 +159,7 @@ Everything in this clip is rendered from the project's code with invented albums
 
 One page per feature, with every button and every edge case: [Music](docs/features/music.md) · [Lights](docs/features/lights.md) · [Windows picker](docs/features/windows.md) · [Onshape](docs/features/onshape.md) · [The Navigator and the PC overlays](docs/features/desktop-companions.md) · [Feel and sound](docs/features/feel-and-sound.md) · [The lights](docs/features/leds.md) · [Settings](docs/features/settings.md).
 
-Print the one-page [cheat sheet](docs/cheat-sheet.png) ([PDF](docs/cheat-sheet.pdf)) and keep it under the knob until the button words sink in.
+Print the one-page [cheat sheet](docs/media/cheat-sheet.png) ([PDF](docs/cheat-sheet.pdf)) and keep it under the knob until the button words sink in.
 
 <p align="center"><img src="docs/media/knob-screens.png" alt="The knob's screens side by side: Home, Music, Recent, Tracks, Seek, Up next, Lights, Scenes, Windows and Onshape, each with its four button words" width="720"></p>
 

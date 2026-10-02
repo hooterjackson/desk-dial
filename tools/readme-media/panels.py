@@ -182,9 +182,15 @@ def _volts_axes(c: _Canvas, box, vmax=CAP_VOLTS, left_label=True, right_label=Tr
     return y_of
 
 
+FEEL_NAMES = {"detent.value": "Volume", "detent.dimmer": "Brightness", "detent.list": "Lists",
+              "detent.coarse": "Windows and scenes", "detent.fine": "Colour temperature",
+              "fluid.scrub": "Seek", "fluid.light": "Onshape, button held", "free.spin": "Long lists"}
+
+
 def _trace_title(tr) -> str:
-    per = tr.get("detents_per_turn", "?")
-    return f"{tr.get('feel', '')}   {tr.get('law', '')}   Kp {tr.get('kp_a_per_rad', 0):g} A/rad   {per}/turn"
+    per = tr.get("detents_per_turn") or tr.get("detents") or ""
+    name = FEEL_NAMES.get(tr.get("feel", ""), tr.get("feel", ""))
+    return f"{name} · {per} clicks per turn" if per else name
 
 
 def _draw_static_curve(c: _Canvas, tr, box, y_of, with_dot_theta=None, label_axis=True, size=11):
@@ -331,7 +337,7 @@ def torque_strip(trace, t_ms, size, theme, static=None) -> Image.Image:
         sy_of = _volts_axes(c, sbox, right_label=False)
         _draw_static_curve(c, static, sbox, sy_of, with_dot_theta=now["theta_deg"] - _origin_deg(trace, static, now))
         c.vtext((14, (y0 + y1) / 2), "% of the 2.2 V cap", 11, t["muted"])
-        c.text((sbox[0], y1 + 20), "law around one detent, shaft angle", 10, t["muted"])
+        c.text((sbox[0], y1 + 20), "one click and the end stop, by knob angle", 10, t["muted"])
     else:
         c.vtext((14, (y0 + y1) / 2), "% of the 2.2 V cap", 11, t["muted"])
     return c.finish()
@@ -392,7 +398,7 @@ def sound_strip(bank, events, t_ms, size, theme, window_ms=None) -> Image.Image:
     if t_ms is not None:
         xc = x_of(max(w0, min(w1, t_ms)))
         c.line([(xc, y0), (xc, y1)], t["cursor"], 1)
-    c.text((left, 6), f"click bank, {rate} Hz mono (audio/cc_sound.h)", 11, t["text"])
+    c.text((left, 6), "what the knob's speaker plays", 11, t["text"])
     c.text((W - right, 6), f"{(w1 - w0) / 1000:.1f} s window", 10, t["muted"], anchor="ra")
     return c.finish()
 
@@ -410,14 +416,12 @@ def feel_gallery(static_traces, theme) -> Image.Image:
         box = (ox + 44, 48, ox + pw - 40, 48 + ph - 90)
         y_of = _volts_axes(c, box, left_label=True, right_label=True, size=10)
         _draw_static_curve(c, tr, box, y_of, size=10)
-        c.text((ox + 44, 10), key, 14, t["text"])
-        c.text((ox + 44, 28), f"{tr['law']}   Kp {tr['kp_a_per_rad']:g} A/rad   Kd {tr['kd_a_per_rad_s']:g}   "
-                              f"{tr['detents_per_turn']}/turn ({tr['detent_width_deg']:.1f}°)", 10, t["muted"])
+        c.text((ox + 44, 10), FEEL_NAMES.get(key, key), 14, t["text"])
+        c.text((ox + 44, 28), f"{tr['detents_per_turn']} clicks per turn, one every {tr['detent_width_deg']:.1f}°", 10, t["muted"])
         peak = tr["summary"]["well_peak_volts"]
-        c.text((ox + 44, box[3] + 24), f"well ±{peak:.2f} V ({peak / CAP_VOLTS * 100:.0f} % of cap, "
-                                       f"{peak * MNM_PER_VOLT:.1f} mN·m)   wall to {tr['summary']['max_abs_volts']:.1f} V",
-               10, t["text"])
-        c.text((ox + 44, box[3] + 40), "pos {pos} of {lo}..{hi}; shaded: past the end, the wall".format(**tr), 10, t["muted"])
+        c.text((ox + 44, box[3] + 24), f"a click pushes back up to {peak / CAP_VOLTS * 100:.0f} % of full force; "
+                                       f"the end stop reaches 100 %", 10, t["text"])
+        c.text((ox + 44, box[3] + 40), "shaded: past the last click, the end stop", 10, t["muted"])
         c.vtext((ox + 12, (box[1] + box[3]) / 2), "% of the 2.2 V cap", 10, t["muted"])
         c.vtext((ox + pw - 10, (box[1] + box[3]) / 2), "mN·m (Kt 0.04 assumed)", 10, t["muted"])
     c.text((W - 16, H - 16), "firmware feel laws cc_haptic_fx.h: SINE A sin(2πe/w), A = Kp·w/2; SAW Kp·e, limited to 0.4 A (2.12 V); "
@@ -432,7 +436,7 @@ def sound_bank_sheet(bank, theme) -> Image.Image:
     H = 44 + rh * len(rows) + 30
     c = _Canvas((W, H), theme)
     t = c.t
-    c.text((16, 10), f"the click bank: four sounds rendered once at boot (audio/cc_sound.h, {rate} Hz, 16-bit mono)", 13, t["text"])
+    c.text((16, 10), "the four sounds the knob's speaker plays", 13, t["text"])
     c.text((W - 16, 12), "left: waveform (full scale ±32768)   right: DFT magnitude, 0..6 kHz, dB", 10, t["muted"], anchor="ra")
     for r, name in enumerate(rows):
         smp = bank["samples"][name]
