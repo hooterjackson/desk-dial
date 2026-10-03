@@ -36,7 +36,7 @@ between `<!-- media-table -->` and `<!-- /media-table -->` in `docs/media/README
 exits non-zero after every step has run, so one log shows everything.
 
 Options: `--scenes hero stills` renders a subset; `--skip-build` reuses `--build`; `--no-logo`
-builds `app-canvas-anim` with a text badge instead of the Onshape icon (the public default);
+builds `app-canvas-anim` with a plain badge instead of the Onshape logo (the public media show the real logo);
 `--list` prints the registered scenes. `render_media.py` is a thin alias that forwards to
 `render_all.py`.
 

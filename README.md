@@ -14,9 +14,6 @@
 
 Windows 10 and 11 only · needs a Nano_D++ knob and a USB-C cable · tested on one knob (mine) · feedback welcome
 
-<!-- VIDEO -->
-*A short video with sound will play here: under a minute of the real knob on a desk, from volume to lights to the window picker. Until it is recorded, the loops below show every feature rendered from the project's own code.*
-
 **Contents:** [Thank you, Karl](#thank-you-karl) · [Will it work for me?](#will-it-work-for-me) · [Quickstart](#quickstart) · [Feature tour](#feature-tour) · [Feature deep dives](#feature-deep-dives) · [Setup guides](#setup-guides) · [Privacy and what it touches](#privacy-and-what-it-touches) · [Update, uninstall, go back](#update-uninstall-go-back) · [FAQ and troubleshooting](#faq-and-troubleshooting) · [For makers](#for-makers) · [What's new](#whats-new-since-the-last-release) · [Credits](#credits) · [Limits and known issues](#limits-and-known-issues) · [License](#license)
 
 ## Thank you, Karl
@@ -27,7 +24,7 @@ Windows 10 and 11 only · needs a Nano_D++ knob and a USB-C cable · tested on o
 
 **You need**
 
-- A **Nano_D++** knob: buy one from [Karl's store](https://store.binaris.io/products/nano_d-sensory-hid) or build one from the [hardware files](https://github.com/katbinaris/Nano_D_PlusPlus). Desk Dial expects exactly one knob plugged in.
+- A **Nano_D++** knob, designed by Karl Malota ([hardware files](https://github.com/katbinaris/Nano_D_PlusPlus)). Desk Dial expects exactly one knob plugged in.
 - A **Windows 10 or 11 PC** and a **USB-C cable** that carries data.
 - Half an hour, once, to back up the knob and put the Desk Dial firmware on it (you can go back to Karl's firmware at any time).
 

@@ -49,8 +49,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | music-volume.webp | 851,468 | 396x396 | 247 | 27.72 |
 | navigator.gif | 1,292,373 | 1120x630 | 107 | 8.13 |
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
-| onshape-knob.gif | 172,718 | 418x484 | 55 | 5.8 |
-| onshape-knob.webp | 200,518 | 418x484 | 75 | 7.73 |
+| onshape-knob.gif | 173,916 | 418x484 | 55 | 5.8 |
+| onshape-knob.webp | 202,092 | 418x484 | 75 | 7.73 |
 | settings-general.png | 17,229 | 616x890 | 1 |  |
 | settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
 | settings-knob.png | 26,291 | 616x1392 | 1 |  |

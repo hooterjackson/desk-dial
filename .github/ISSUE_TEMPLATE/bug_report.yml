@@ -49,9 +49,9 @@ body:
     id: knob
     attributes:
       label: Which knob
-      description: Desk Dial is written for the Nano_D++ from Karl Malota's store. Other builds of the board may differ.
+      description: Desk Dial is written for Karl Malota's Nano_D++. Other builds of the board may differ.
       options:
-        - Nano_D++ from Karl's store (store.binaris.io)
+        - Nano_D++
         - Self-built or other variant (say which below)
         - Not sure
     validations:

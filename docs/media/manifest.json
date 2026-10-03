@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-03T03:59:42+00:00",
+  "generated_at": "2026-10-03T04:12:45+00:00",
   "firmware": {
     "version": "1.0.0-cc5.7",
     "git": "1bf6b69b09031f39266b9c1991648237ddeb0c6c",
@@ -11,8 +11,8 @@
     "tree": "ff46240ca7650e2a34466d38d366a7e9254e130d3686445ab9c3292ab6a4fefe"
   },
   "pipeline": {
-    "git": "2db272fcfaa24f9800ef9ff650de1e24348eb152",
-    "tree": "62b29669b001abad14035df76981ecf4766b16c6fce9a8391fc04e86a900b0d6"
+    "git": "1e1c414e769cfefdaff0443d6b0f3a0d79b063af",
+    "tree": "bc2647dc6ad9c3de2f57ff9e4a716b47ceb12b886d2f270c6aa00ce6c6653b18"
   },
   "files": [
     {
@@ -591,8 +591,8 @@
       "name": "onshape-knob.gif",
       "scene": "onshape-knob",
       "source": "firmware app canvas",
-      "bytes": 172718,
-      "sha256": "9c3b42582f3aaf54bb7670c5bfc5caf43620a17be47ecda50af4396753dcffe4",
+      "bytes": 173916,
+      "sha256": "3d95521322b14cb472406edae55a8b45ae2e5d9e6706a7f61f5e28c4d4dc4fcc",
       "width": 418,
       "height": 484,
       "frames": 55,
@@ -604,8 +604,8 @@
       "name": "onshape-knob.webp",
       "scene": "onshape-knob",
       "source": "firmware app canvas",
-      "bytes": 200518,
-      "sha256": "996ddbcc5cf2d42d8976770287a993241aa4309b92b5719d30e85f74eb56061e",
+      "bytes": 202092,
+      "sha256": "b4308d6677efc76e820514c398d7a28afc05e33871db889cce432bace0106dad",
       "width": 418,
       "height": 484,
       "frames": 75,

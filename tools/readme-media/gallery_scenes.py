@@ -33,7 +33,8 @@ knob-anim's own stats line (pops, morphs, glides, holdFills, walls, presses) is 
 
 onshape-knob.webp / .gif (9.8 s): onshape_scenes.frames(onshape_scenes.SCENES["onshape-knob"](), app-canvas-anim,
 work) on knob_scenes.KnobDevice(scale=1.1) with the ring and the button lights all dark (the knob turns its LEDs
-off in Onshape mode). Render with a --no-logo build (the public default): the scene warns otherwise.
+off in Onshape mode). The public media show the knob's real Onshape screen, logo included (the owner's
+decision, 2026-10-03); a --no-logo build swaps the logo for a plain badge.
 
 Registry contract: SCENES = {name: (source label, fn)}; fn(ctx) returns the Paths it wrote, each tagged with
 ctx.produced(path, source). Imports stay inside the functions. No device, no window, no network.
@@ -452,8 +453,8 @@ ONSHAPE_SCALE = 1.1
 def scene_onshape_knob(ctx) -> list[Path]:
     import knob_scenes as K
     import onshape_scenes as O
-    if not ctx.no_logo:
-        ctx.log("warning: not a --no-logo build: the app-canvas frames carry the firmware's Onshape icon")
+    if ctx.no_logo:
+        ctx.log("note: a --no-logo build: the Onshape logo is replaced by a plain badge")
     lcd = O.frames(O.SCENES["onshape-knob"](), ctx.exe("app-canvas-anim"), Path(ctx.work) / "onshape")
     dev = K.KnobDevice(scale=ONSHAPE_SCALE)
     dark_ring, dark_buttons = [(0.0, 0.0, 0.0)] * 60, [(0.0, 0.0, 0.0)] * 4

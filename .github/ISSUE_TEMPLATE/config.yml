@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Ask a question or share a setup
-    url: https://github.com/hooterjackson/desk-dial/discussions
-    about: Questions, "is this normal?", show your desk, and anything that is not a confirmed bug.
   - name: Nano_D++ community on Discord
     url: https://discord.gg/mVTvppcfp6
-    about: Karl Malota's Discord for the knob itself, its stock firmware and other integrations.
+    about: Questions, "is this normal?", showing your desk, and everything about the knob itself. Karl Malota's Discord.
