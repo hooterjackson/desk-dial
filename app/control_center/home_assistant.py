@@ -203,7 +203,7 @@ def valid_entity(entity_id, domains=None):
 
 
 def valid_area(area_id):
-    """A Home Assistant area id: a lower-case slug (``den``, ``living_room``, or an older hex id)."""
+    """A Home Assistant area id: a lower-case slug (``office``, ``living_room``, or an older hex id)."""
     return isinstance(area_id, str) and 1 <= len(area_id) <= 100 and set(area_id) <= _AREA_CHARS
 
 
