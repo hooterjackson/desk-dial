@@ -214,9 +214,11 @@ def scene_hero(ctx) -> list[Path]:
     frames = hero_frames(rec, ctx.knob_anim, ctx.work)
     for k in (0, len(frames) // 3, 2 * len(frames) // 3):
         frames[k].save(Path(ctx.work) / f"hero-peek-{k}.png")
-    gif, webp = R.save_loop(frames, rec["fps"], "hero", ctx.out, webp_cap=WEBP_CAP, gif_cap=GIF_CAP)
-    ctx.log(f"hero: {len(frames)} frames at {rec['fps']} fps, webp {webp.stat().st_size} B, gif {gif.stat().st_size} B")
+    import knob_scenes as K
     cards = navigator_cards(frames, ctx.out)
+    gif, webp = R.save_loop(K.rounded(frames, 24 * RES), rec["fps"], "hero", ctx.out, webp_cap=WEBP_CAP,
+                            gif_cap=GIF_CAP)                      # rounded corners: 24 CSS px at 720
+    ctx.log(f"hero: {len(frames)} frames at {rec['fps']} fps, webp {webp.stat().st_size} B, gif {gif.stat().st_size} B")
     return [ctx.produced(webp, LCD), ctx.produced(gif, LCD)] + [ctx.produced(p, LCD) for p in cards]
 
 
@@ -232,6 +234,8 @@ def navigator_cards(frames, out_dir):
     for i, c in enumerate(crops):
         img.paste(c, (i * (c.width + gap), 0))
     webp, png = out_dir / "navigator-cards.webp", out_dir / "navigator-cards.png"
+    import knob_scenes as K
+    img = K.rounded([img], 24 * RES)[0]                      # 24 CSS px at the 540 px display
     img.save(webp, quality=86, method=6)
     img.save(png, optimize=True)
     return [webp, png]

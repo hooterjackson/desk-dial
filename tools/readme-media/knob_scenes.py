@@ -313,6 +313,7 @@ class KnobDevice:
     def _base(self):
         s = self.s
         img = Image.new("RGB", self.size, BG)
+        self.body_mask = self.shadow_mask = None
         if self.crop_ring:
             return img
         W, H = self.size
@@ -325,6 +326,10 @@ class KnobDevice:
         mask = mask.resize((W, H), Image.Resampling.LANCZOS)
         sh = mask.filter(ImageFilter.GaussianBlur(8 * s)).point(lambda v: v * 150 // 255)
         img.paste((0, 0, 0), (0, round(5 * s)), sh)
+        # the same two masks, kept for transparent(): the body's antialiased outline and its drop shadow
+        self.body_mask = mask
+        self.shadow_mask = Image.new("L", (W, H), 0)
+        self.shadow_mask.paste(sh, (0, round(5 * s)))
         img.paste(body, (0, 0), mask)
         edge = Image.new("L", (W * ss, H * ss), 0)
         d = ImageDraw.Draw(edge)
@@ -357,6 +362,18 @@ class KnobDevice:
             glows.append((box, st.crop(box).filter(ImageFilter.GaussianBlur(5 * s))))
         return caps, strips, glows
 
+    def transparent(self, img):
+        """A composed frame cut out of its flat backdrop: the body opaque (its own outline mask) over its drop
+        shadow as black with partial alpha, everything else transparent, so it sits on any page colour.
+        A crop_ring device has no body: returned unchanged."""
+        if self.body_mask is None:
+            return img
+        shadow = Image.new("RGBA", self.size, (0, 0, 0, 0))
+        shadow.putalpha(self.shadow_mask)
+        body = img.convert("RGBA")
+        body.putalpha(self.body_mask)
+        return Image.alpha_composite(shadow, body)
+
     def compose(self, lcd_rgb, ring, buttons):
         img = self.base.copy()
         lcd = lcd_rgb.resize((self.lcd_px,) * 2, Image.Resampling.LANCZOS).convert("RGBA")
@@ -380,6 +397,22 @@ class KnobDevice:
         return img
 
 
+def rounded(frames, radius):
+    """Dark README panels as deliberate tiles: each frame RGBA with its corners cut to ``radius`` px
+    (antialiased), so on GitHub's white page they read as rounded dark cards, not black boxes."""
+    w, h = frames[0].size
+    ss = 4
+    m = Image.new("L", (w * ss, h * ss), 0)
+    ImageDraw.Draw(m).rounded_rectangle((0, 0, w * ss - 1, h * ss - 1), radius=radius * ss, fill=255)
+    m = m.resize((w, h), Image.Resampling.LANCZOS)
+    out = []
+    for f in frames:
+        f = f.convert("RGBA")
+        f.putalpha(m)
+        out.append(f)
+    return out
+
+
 # ------------------------------------------------------------------ encoding
 GIF_BUDGET = 2_900_000
 
@@ -390,6 +423,13 @@ def _gif(frames, fps, path, scale, step, colors):
         size = (round(w * scale / 2) * 2, round(h * scale / 2) * 2)
         frames = [f.resize(size, Image.Resampling.LANCZOS) for f in frames]
     frames = frames[::step]
+    if frames[0].mode == "RGBA":                     # a GIF has no soft alpha: flatten onto GitHub's light page
+        flat = []
+        for f in frames:
+            bg = Image.new("RGB", f.size, (255, 255, 255))
+            bg.paste(f, (0, 0), f)
+            flat.append(bg)
+        frames = flat
     sample = [frames[k] for k in range(0, len(frames), max(1, len(frames) // 12))]
     w, h = frames[0].size
     sheet = Image.new("RGB", (w, h * len(sample)))

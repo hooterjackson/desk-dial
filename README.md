@@ -1,4 +1,4 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-hero-dark.png"><img src="docs/media/head-hero.png" alt="Desk Dial A haptic knob for music, lights, windows and CAD." width="880"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-hero-dark.png"><img src="docs/media/head-hero.png" alt="Desk Dial. A haptic knob for music, lights, windows and CAD." width="880"></picture></p>
 
 <p align="center">
   <picture><source srcset="docs/media/hero.webp" type="image/webp"><img src="docs/media/hero.gif" alt="A round knob with a small screen: a turn raises the volume while an arc of light follows it, a press opens a list of album covers, a long press on the first button brings the Home screen back, and a small glass card on the PC follows every step" width="720"></picture>
@@ -22,9 +22,7 @@
 
 <a name="music"></a>
 <p align="center"><b>Music</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-volume-dark.png"><img src="docs/media/head-music-volume.png" alt="Every percent, a click." width="880"></picture></p>
-
-<p align="center">Each click moves your Sonos volume 1 %, with a firm wall at each end. The top of the ring's arc glows amber past 80 % and red past 90 %.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-volume-dark.png"><img src="docs/media/head-music-volume.png" alt="Every percent, a click. Sonos volume, 1 % per click, with a firm wall at each end." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-volume.webp" type="image/webp"><img src="docs/media/music-volume.gif" alt="Turning the knob raises the volume from 66 to 97 percent; the warm arc of light turns amber past 80 percent and red past 90 percent" width="475"></picture></a></p>
 
@@ -32,9 +30,7 @@
 
 <br>
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-albums-dark.png"><img src="docs/media/head-music-albums.png" alt="Your library, on the knob." width="880"></picture></p>
-
-<p align="center">Recently Added and your favourite playlists, with covers on the knob. Press 4 to play; hold it to play next. Open Seek and the clicks give way to a smooth scrub.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-albums-dark.png"><img src="docs/media/head-music-albums.png" alt="Your library, on the knob. Recently Added and your playlists, with covers on the round screen." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-lists.webp" type="image/webp"><img src="docs/media/music-lists.gif" alt="Album covers slide across the round screen as the knob turns; button 3 swaps the list to playlists and back; the ring lights in each cover's colour" width="475"></picture></a></p>
 
@@ -42,9 +38,7 @@
 
 <br>
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-explorer-dark.png"><img src="docs/media/head-music-explorer.png" alt="Full screen when you want it." width="880"></picture></p>
-
-<p align="center">Send the list to your monitor. The explorer and Up next fill the screen without taking focus. In Up next, Shuffle and Like are one press away.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-explorer-dark.png"><img src="docs/media/head-music-explorer.png" alt="Full screen when you want it. Your albums and Up next on the monitor, without taking focus." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/desktop-companions.md"><picture><source srcset="docs/media/desktop-explorer-16x9.webp" type="image/webp"><img src="docs/media/desktop-explorer-16x9.gif" alt="A full-screen music explorer over a frosted desktop: the knob browses rows of covers, switches to playlists, and Play grows the chosen card and closes the overlay" width="880"></picture></a></p>
 
@@ -54,9 +48,7 @@
 
 <a name="lights"></a>
 <p align="center"><b>Lights</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-lights-dark.png"><img src="docs/media/head-lights.png" alt="Dim, warm or set a scene." width="880"></picture></p>
-
-<p align="center">For your Home Assistant lights: brightness, warmth from 2200 K to 6500 K and scenes, with a little heavier click than volume. All off remembers how the lights were, so Turn on brings them back.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-lights-dark.png"><img src="docs/media/head-lights.png" alt="Dim, warm or set a scene. Brightness, warmth and scenes for your Home Assistant lights." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/lights.md"><picture><source srcset="docs/media/lights-brightness.webp" type="image/webp"><img src="docs/media/lights-brightness.gif" alt="The Lights screen: turning the knob dims the room from 80 to 30 percent with a heavier click; a bar and a big number follow" width="475"></picture></a></p>
 
@@ -66,9 +58,7 @@
 
 <a name="windows"></a>
 <p align="center"><b>Windows</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-windows-dark.png"><img src="docs/media/head-windows.png" alt="Every open window, one turn away." width="880"></picture></p>
-
-<p align="center">Live previews fan out. Turn to choose, press to switch, or snap two side by side, on anything from 16:9 to 32:9.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-windows-dark.png"><img src="docs/media/head-windows.png" alt="Every open window, one turn away. Live previews. Turn to choose, press to switch, or snap two side by side." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/windows.md"><picture><source srcset="docs/media/desktop-picker-16x9.webp" type="image/webp"><img src="docs/media/desktop-picker-16x9.gif" alt="Live previews of open windows fan out across a 16:9 monitor; the knob turns through them, snaps one to the left and one to the right, then switches to a third" width="880"></picture></a></p>
 
@@ -78,9 +68,7 @@
 
 <a name="onshape"></a>
 <p align="center"><b>Onshape</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-onshape-dark.png"><img src="docs/media/head-onshape.png" alt="Zoom, orbit and pan in Onshape." width="880"></picture></p>
-
-<p align="center">Point at your model in Chrome or Edge. Turn to zoom; hold a button and turn to tilt, orbit or pan. Tap 3 to undo, hold 3 for Karl's command wheel.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-onshape-dark.png"><img src="docs/media/head-onshape.png" alt="Zoom, orbit and pan in Onshape. Turn to zoom. Hold a button and turn to tilt, orbit or pan." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/onshape.md"><picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="475"></picture></a></p>
 
@@ -88,9 +76,7 @@
 
 <a name="apps"></a>
 <p align="center"><b>More apps</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-apps-dark.png"><img src="docs/media/head-apps.png" alt="Figma, Plasticity, Blender and AutoCAD." width="880"></picture></p>
-
-<p align="center">Karl Malota's app profiles give each program its own knob: what turning does, what the buttons do, and its own screen. Set an app to Auto and Desk Dial switches to it whenever the app is in front.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-apps-dark.png"><img src="docs/media/head-apps.png" alt="Figma, Plasticity, Blender and AutoCAD. Karl Malota's app profiles give each program its own knob." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/apps.md"><picture><source srcset="docs/media/apps-strip.webp" type="image/webp"><img src="docs/media/apps-strip.png" alt="Karl Malota's pixel-art app icons: Onshape, tested; Figma and Plasticity, not yet tested; Blender and AutoCAD, basic" width="880"></picture></a></p>
 
@@ -100,9 +86,7 @@
 
 <a name="navigator"></a>
 <p align="center"><b>The Navigator</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-navigator-dark.png"><img src="docs/media/head-navigator.png" alt="Always know what each button does." width="880"></picture></p>
-
-<p align="center">A small glass card at the edge of your screen shows where you are and what the four buttons do, then fades. It never takes focus.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-navigator-dark.png"><img src="docs/media/head-navigator.png" alt="Always know what each button does. A small glass card shows where you are and what the four buttons do." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/desktop-companions.md"><picture><source srcset="docs/media/navigator-cards.webp" type="image/webp"><img src="docs/media/navigator-cards.png" alt="Two Navigator cards: browsing Recently Added with the album Glass Weather, the four button words and the hold hints; then the song Copper Sun playing, with the volume at 62 percent and Home, Recent, Tracks and Pause on the buttons" width="540"></picture></a></p>
 
@@ -112,9 +96,7 @@
 
 <a name="feel-and-sound"></a>
 <p align="center"><b>Feel and sound</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-feel-dark.png"><img src="docs/media/head-feel.png" alt="A different feel for each control." width="880"></picture></p>
-
-<p align="center">Soft for volume, heavier for brightness, coarse for windows, smooth for scrubbing. A tock as you turn, a thud at a wall. When you let go, the motor goes quiet.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-feel-dark.png"><img src="docs/media/head-feel.png" alt="A different feel for each control. Soft for volume, coarse for windows, smooth for scrubbing." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/feel-and-sound.md"><picture><source srcset="docs/media/feel-wide.webp" type="image/webp"><img src="docs/media/feel-wide.gif" alt="The knob turning the volume up to the end, with two strips beside it that draw themselves as it goes: what you feel, an orange line of evenly spaced clicks, then the wall pushing back, then a flat line once the motor rests; and what you hear, a white mark for every tock and two heavier orange marks for the thuds at the wall" width="880"></picture></a></p>
 
@@ -124,9 +106,7 @@
 
 <a name="the-ring"></a>
 <p align="center"><b>The ring</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-ring-dark.png"><img src="docs/media/head-ring.png" alt="The ring shows what the knob is doing." width="880"></picture></p>
-
-<p align="center">Sixty LEDs draw the volume, take on each album's colour and bloom when you press Like. At rest they settle to one steady warm glow.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-ring-dark.png"><img src="docs/media/head-ring.png" alt="The ring shows what the knob is doing. Sixty LEDs show the volume, the album, and what just happened." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, a green flash as Play next lands, and a glow at the end stop" width="880"></picture></a></p>
 
@@ -136,9 +116,7 @@
 
 <a name="settings"></a>
 <p align="center"><b>Settings</b></p>
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-settings-dark.png"><img src="docs/media/head-settings.png" alt="Set the sound, the feel and the motion." width="880"></picture></p>
-
-<p align="center">Turn the knob's sounds down or off, soften the haptics, calm the motion, and choose how the lights and the Navigator behave.</p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-settings-dark.png"><img src="docs/media/head-settings.png" alt="Set the sound, the feel and the motion. Turn the sounds down, soften the haptics, calm the motion." width="880"></picture></p>
 
 <p align="center"><a href="docs/features/settings.md"><img src="docs/media/settings-knob.png" alt="Desk Dial Settings, Knob page: LEDs Colour, Onshape mode Off, Knob sounds On at 100 percent, Reduced haptics Off, with the status strip for the knob, Sonos, Apple Music and Home Assistant above" width="308"></a></p>
 

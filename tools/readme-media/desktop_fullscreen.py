@@ -53,14 +53,19 @@ SIZE_32x9 = (1400, 394)
 
 
 # ------------------------------------------------------------------ encoding
-def encode(frames, fps, stem, out_dir, webp_budget=WEBP_CAP, gif_budget=GIF_CAP):
+def encode(frames, fps, stem, out_dir, webp_budget=WEBP_CAP, gif_budget=GIF_CAP, round_px=0):
     """Animated WebP (full size, every frame; quality lowered until it fits the budget) and a GIF
     fallback (global palette, no dither), thinned and shrunk until it fits its budget."""
     out_dir = Path(out_dir)
     dur = round(1000 / fps)
     webp = out_dir / f"{stem}.webp"
+    if round_px:                                      # the README's clips: rounded corners (alpha) on the WebP only
+        import knob_scenes as K
+        wf = K.rounded(frames, round_px)
+    else:
+        wf = frames
     for q in (84, 78, 72, 66, 60, 54, 48, 42):
-        frames[0].save(webp, save_all=True, append_images=frames[1:], duration=dur, loop=0, quality=q, method=5)
+        wf[0].save(webp, save_all=True, append_images=wf[1:], duration=dur, loop=0, quality=q, method=5)
         if webp.stat().st_size <= webp_budget:
             break
     gif = out_dir / f"{stem}.gif"
@@ -378,7 +383,8 @@ def render(out_dir, work, which):
         frames, fps = JOBS[name]()
         for k in (len(frames) // 5, len(frames) // 2, 4 * len(frames) // 5):
             frames[k].save(work / f"fs-{name}-{k}.png")
-        results.append((name, len(frames), fps) + encode(frames, fps, f"desktop-{name}", out_dir))
+        rp = 48 if frames[0].size == SIZE_2X else 0     # 24 CSS px on the README's 880 px clips
+        results.append((name, len(frames), fps) + encode(frames, fps, f"desktop-{name}", out_dir, round_px=rp))
     return results
 
 

@@ -142,7 +142,9 @@ def render(ctx):
 
 def scene(ctx) -> list[Path]:
     import recording
+    import knob_scenes as K
     frames, fps = render(ctx)
+    frames = K.rounded(frames, 36)               # 24 CSS px at the 880 px display width
     frames[len(frames) * 2 // 3].save(Path(ctx.work) / "feel-wide-peek.png")
     gif, webp = recording.save_loop(frames, fps, "feel-wide", ctx.out, webp_cap=WEBP_CAP)
     ctx.log(f"feel-wide: {len(frames)} frames {W}x{H}, webp {webp.stat().st_size} B, gif {gif.stat().st_size} B")

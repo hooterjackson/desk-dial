@@ -76,10 +76,12 @@ def render(app, work):
 
 
 def scene(ctx) -> list[Path]:
-    img = render(ctx.app, Path(ctx.work) / "apps-strip")
+    from PIL import Image
+    import knob_scenes as K
+    img = K.rounded([render(ctx.app, Path(ctx.work) / "apps-strip")], 48)[0]   # 24 CSS px at the 880 px display
     out = Path(ctx.out)
     png, webp = out / "apps-strip.png", out / "apps-strip.webp"
-    img.quantize(colors=256, method=2, dither=0).save(png, optimize=True)
+    img.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(png, optimize=True)
     img.save(webp, quality=90, method=6)
     ctx.log(f"apps-strip: {img.size}, png {png.stat().st_size} B, webp {webp.stat().st_size} B")
     return [ctx.produced(webp, SOURCE), ctx.produced(png, SOURCE)]

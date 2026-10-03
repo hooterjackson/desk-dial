@@ -117,12 +117,15 @@ def led_frames(rec, t_start=0, t_end=None):
     return [out[c] for c in caps]
 
 
-def knob_frames(rec, knob_anim, work, scale=1.1, crop_ring=False, t_start=0, t_end=None, tag=""):
+def knob_frames(rec, knob_anim, work, scale=1.1, crop_ring=False, t_start=0, t_end=None, tag="", transparent=False):
+    """transparent: RGBA frames, the knob cut out of its backdrop (KnobDevice.transparent) for the README's
+    standalone knob loops; composites (hero, feel panel) keep the opaque backdrop they key or paste."""
     lcd = lcd_frames(rec, knob_anim, work, t_start, t_end, tag)
     leds = led_frames(rec, t_start, t_end)
     dev = K.KnobDevice(scale=scale, crop_ring=crop_ring)
     n = min(len(lcd), len(leds))
-    return [dev.compose(lcd[k], *leds[k]) for k in range(n)]
+    frames = [dev.compose(lcd[k], *leds[k]) for k in range(n)]
+    return [dev.transparent(f) for f in frames] if transparent else frames
 
 
 def save_loop(frames, fps, stem, out_dir, webp_cap=WEBP_CAP, gif_cap=GIF_CAP, colors=192):

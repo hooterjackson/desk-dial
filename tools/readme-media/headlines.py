@@ -31,28 +31,45 @@ LINE = 1.06                   # line height, in font sizes
 INK = {"light": (29, 29, 31), "dark": (245, 245, 247)}       # Apple-style near-black / near-white
 QUIET = {"light": (110, 110, 115), "dark": (134, 134, 139)}  # secondary line
 
+def _chapter(headline, subhead):
+    """A chapter banner: the headline, then one grey subhead line in the same face (Apple's pattern)."""
+    return dict(lines=[(headline, 72, WEIGHT, "ink"), (subhead, 34, 560, "quiet")], top=40, bottom=24, gap=18)
+
+
 # key -> list of (text, CSS px size, weight, colour role); top/bottom padding in CSS px
 HEADLINES = {
     "hero": dict(lines=[("Desk Dial", 112, 760, "ink"),
                         ("A haptic knob for music, lights, windows and CAD.", 40, 560, "quiet")],
                  top=8, bottom=12, gap=22),
-    "music-volume": dict(lines=[("Every percent, a click.", 72, WEIGHT, "ink")]),
-    "music-albums": dict(lines=[("Your library, on the knob.", 72, WEIGHT, "ink")]),
-    "music-explorer": dict(lines=[("Full screen when you want it.", 72, WEIGHT, "ink")]),
-    "lights": dict(lines=[("Dim, warm or set a scene.", 72, WEIGHT, "ink")]),
-    "windows": dict(lines=[("Every open window, one turn away.", 72, WEIGHT, "ink")]),
-    "onshape": dict(lines=[("Zoom, orbit and pan in Onshape.", 72, WEIGHT, "ink")]),
-    "apps": dict(lines=[("Figma, Plasticity, Blender and AutoCAD.", 72, WEIGHT, "ink")]),
-    "navigator": dict(lines=[("Always know what each button does.", 72, WEIGHT, "ink")]),
-    "feel": dict(lines=[("A different feel for each control.", 72, WEIGHT, "ink")]),
-    "ring": dict(lines=[("The ring shows what the knob is doing.", 72, WEIGHT, "ink")]),
-    "settings": dict(lines=[("Set the sound, the feel and the motion.", 72, WEIGHT, "ink")]),
+    "music-volume": _chapter("Every percent, a click.",
+                             "Sonos volume, 1 % per click, with a firm wall at each end."),
+    "music-albums": _chapter("Your library, on the knob.",
+                             "Recently Added and your playlists, with covers on the round screen."),
+    "music-explorer": _chapter("Full screen when you want it.",
+                               "Your albums and Up next on the monitor, without taking focus."),
+    "lights": _chapter("Dim, warm or set a scene.",
+                       "Brightness, warmth and scenes for your Home Assistant lights."),
+    "windows": _chapter("Every open window, one turn away.",
+                        "Live previews. Turn to choose, press to switch, or snap two side by side."),
+    "onshape": _chapter("Zoom, orbit and pan in Onshape.",
+                        "Turn to zoom. Hold a button and turn to tilt, orbit or pan."),
+    "apps": _chapter("Figma, Plasticity, Blender and AutoCAD.",
+                     "Karl Malota's app profiles give each program its own knob."),
+    "navigator": _chapter("Always know what each button does.",
+                          "A small glass card shows where you are and what the four buttons do."),
+    "feel": _chapter("A different feel for each control.",
+                     "Soft for volume, coarse for windows, smooth for scrubbing."),
+    "ring": _chapter("The ring shows what the knob is doing.",
+                     "Sixty LEDs show the volume, the album, and what just happened."),
+    "settings": _chapter("Set the sound, the feel and the motion.",
+                         "Turn the sounds down, soften the haptics, calm the motion."),
 }
 
 
 def alt(key: str) -> str:
     """The image's alt text: its words, lines joined with a space."""
-    return " ".join(text for text, *_ in HEADLINES[key]["lines"])
+    parts = [text for text, *_ in HEADLINES[key]["lines"]]
+    return " ".join(t if t[-1:] in ".!?" or i == len(parts) - 1 else t + "." for i, t in enumerate(parts))
 
 
 # ---------------------------------------------------------------- the font

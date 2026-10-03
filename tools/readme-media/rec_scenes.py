@@ -79,7 +79,7 @@ def recording_path(work, name: str, log=print) -> Path:
 def cut_frames(rec, knob_anim, work, t_start, t_end, crop_ring, tag=""):
     import recording
     return recording.knob_frames(rec, knob_anim, work, scale=KNOB_SCALE, crop_ring=crop_ring, t_start=t_start,
-                                 t_end=t_end, tag=tag)
+                                 t_end=t_end, tag=tag, transparent=True)
 
 
 # ------------------------------------------------------------------ the loops

@@ -350,6 +350,7 @@ def scene_ring_moments(ctx) -> list[Path]:
         for j, tf in enumerate(per_tile):
             img.paste(tf[k], (pad + (j % cols) * (tw + gap), pad + (j // cols) * (th + RING_CAPTION_H + gap)))
         frames.append(img)
+    frames = K.rounded(frames, 28)               # 24 CSS px at the 880 px display width
     gif, webp = _save(frames, "ring-moments", ctx)
     return [ctx.produced(webp, LED), ctx.produced(gif, LED)]
 
@@ -512,7 +513,7 @@ def scene_onshape_knob(ctx) -> list[Path]:
     lcd = O.frames(O.SCENES["onshape-knob"](), ctx.exe("app-canvas-anim"), Path(ctx.work) / "onshape")
     dev = K.KnobDevice(scale=ONSHAPE_SCALE)
     dark_ring, dark_buttons = [(0.0, 0.0, 0.0)] * 60, [(0.0, 0.0, 0.0)] * 4
-    frames = [dev.compose(f, dark_ring, dark_buttons) for f in lcd]
+    frames = [dev.transparent(dev.compose(f, dark_ring, dark_buttons)) for f in lcd]   # cut out, like the other knob loops
     gif, webp = _save(frames, "onshape-knob", ctx)
     return [ctx.produced(webp, APP_CANVAS), ctx.produced(gif, APP_CANVAS)]
 
