@@ -157,6 +157,15 @@ SCRIPTS = ("build_nanod_cc5.py", "package_nanod_cc5.py", "nanod_enter_bootloader
 FLASHING = ("backup_nanod_cc5.py", "install_nanod_cc5.py", "rollback_nanod_cc5.py")
 BACKUPS = ROOT / "backups"
 needs_tooling = unittest.skipIf(t is None, "tools/nanod_cc5_tooling.py is not present")
+
+
+def _runbook(name):
+    """Text of an install runbook in app/firmware/ (RECOVERY.md, BUILD-cc5*.md). Those are the author's
+    private install records and are not in the public repository: the test is skipped there."""
+    path = ROOT / "firmware" / name
+    if not path.is_file():
+        raise unittest.SkipTest(f"app/firmware/{name} is a private install runbook (not in the public repository)")
+    return path.read_text(encoding="utf-8")
 # The 2026-09-26 window's ladder (PRESENTATION_V5 12.6), retired since A's rollback (tooling.RETIRED_BINARIES). The
 # flow tests of that window run their scripts with these as the active binaries (HardwareFreeScriptTest
 # .active_binaries), so the mechanism they pin stays tested; the fix-binary tests use the real ACTIVE_BINARIES (D, E).
@@ -4081,7 +4090,7 @@ class ScriptStaticTests(unittest.TestCase):
     def recovery_blocks(self, heading, end, count, within=None):
         """The stripped lines of each PowerShell block in RECOVERY.md between two headings
         (searched from `within`, a section heading, when given)."""
-        text = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        text = _runbook("RECOVERY.md")
         if within:
             text = text[text.index(within):]
         section = text[text.index(heading):text.index(end)]
@@ -4090,7 +4099,7 @@ class ScriptStaticTests(unittest.TestCase):
         return [[line.strip() for line in block.strip().splitlines()] for block in blocks]
 
     def manual_rollback_blocks(self):
-        self.assertIn('.casefold() == "nano_d"', (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8"))
+        self.assertIn('.casefold() == "nano_d"', _runbook("RECOVERY.md"))
         return self.recovery_blocks("### Firmware, manual esptool fallback", "### Leave the bootloader without writing", 4)
 
     def test_recovery_manual_rollback_stops_on_failure_and_resets_last(self):
@@ -4192,14 +4201,14 @@ class ScriptStaticTests(unittest.TestCase):
         the cc4 image. A partly written app0 fails that verify, and the block throws before its reset.
         """
         [leave] = self.recovery_blocks("### Leave the bootloader without writing", "### After the rollback", 1)
-        build = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
+        build = _runbook("BUILD-cc5.md")
         abort_section = build[build.index("### Abort before any write"):build.index("### Firmware rollback, cc5 -> cc4")]
         [abort] = [[line.strip() for line in block.strip().splitlines()]
                    for block in re.findall(r"```powershell\n(.*?)```", abort_section, re.S)]
         # 1.0.0-cc5.3: RECOVERY.md section 6 leaves on the installed cc5.3 image, BUILD-cc5.3.md aborts on cc5.2.
         [leave6] = self.recovery_blocks("### cc5.3: Leave the bootloader without writing", "### cc5.3: After the rollback",
                                         1, within=self.SECTION6)
-        build53 = (ROOT / "firmware" / "BUILD-cc5.3.md").read_text(encoding="utf-8")
+        build53 = _runbook("BUILD-cc5.3.md")
         abort53 = build53[build53.index("### Abort before any write"):build53.index("### Firmware rollback, cc5.3 -> cc5.2")]
         [abort6] = [[line.strip() for line in block.strip().splitlines()]
                     for block in re.findall(r"```powershell\n(.*?)```", abort53, re.S)]
@@ -4241,7 +4250,7 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertLess(flags, version)                                 # the flags are cleared even when it throws
         # The same check the script makes (nanod_cc5_tooling.assert_flash_environment).
         self.assertIn('getattr(esptool, "__version__", None)', self.source("nanod_cc5_tooling.py"))
-        section = " ".join((ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8").split())
+        section = " ".join(_runbook("RECOVERY.md").split())
         self.assertIn("A wrong Python or esptool, a file hash or the ROM port is never a reason for the manual "
                       "blocks", section)
 
@@ -4252,10 +4261,10 @@ class ScriptStaticTests(unittest.TestCase):
         $x.profiles.Count) is always 1 and a check built on it is NO-GO on every run.
         """
         for doc in ("BUILD-cc5.md", "BUILD-cc5.3.md", "RECOVERY.md"):
-            text = (ROOT / "firmware" / doc).read_text(encoding="utf-8")
+            text = _runbook(doc)
             self.assertIsNone(re.search(r"\.profiles\)?\.Count\b", text), doc)
         for doc in ("BUILD-cc5.md", "BUILD-cc5.3.md"):
-            build = (ROOT / "firmware" / doc).read_text(encoding="utf-8")
+            build = _runbook(doc)
             self.assertEqual(build.count("@($inventory.profiles.PSObject.Properties).Count -ne 10"), 1, doc)   # step 2
             self.assertEqual(build.count("@($after.profiles.PSObject.Properties).Count -ne 10"), 1, doc)       # step 8a
         device = (ROOT / "control_center" / "device.py").read_text(encoding="utf-8")
@@ -4291,7 +4300,7 @@ class ScriptStaticTests(unittest.TestCase):
                 self.assertIn(interpreter, lines[:first], lines[1])   # set in this block, never inherited
 
     def test_build_cc5_blocks_set_their_interpreter_and_arm_every_exit_code_check(self):
-        text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
+        text = _runbook("BUILD-cc5.md")
         tail = text[text.index("## Hardware window (Stage 10)"):]
         blocks = [[line.strip() for line in block.strip().splitlines()]
                   for block in re.findall(r"```powershell\n(.*?)```", tail, re.S)]
@@ -4303,7 +4312,7 @@ class ScriptStaticTests(unittest.TestCase):
                     self.assertTrue(any(line.startswith(f"${name} = 'C:\\") for line in lines[:uses[0]]), (name, lines[1]))
 
     def test_build_cc5_signals_guards_and_rollback_block(self):
-        text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
+        text = _runbook("BUILD-cc5.md")
         window = text[text.index("## Hardware window (Stage 10)"):text.index("## Rollback and abort")]
         steps = re.split(r"^### Step \d+\. ", window, flags=re.M)[1:]
         self.assertEqual(len(steps), 10)
@@ -4350,7 +4359,7 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertNotIn("2,174,149", text)
         # The BUILD firmware rollback is the RECOVERY scripted block, character for character.
         rollback = text[text.index("### Firmware rollback, cc5 -> cc4"):text.index("### Desktop rollback")]
-        recovery = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        recovery = _runbook("RECOVERY.md")
         scripted = recovery[recovery.index("### Firmware, scripted"):recovery.index("`nanod_enter_bootloader_v2.py` finds")]
         self.assertEqual(re.findall(r"```powershell\n(.*?)```", rollback, re.S),
                          re.findall(r"```powershell\n(.*?)```", scripted, re.S))
@@ -4368,7 +4377,7 @@ class ScriptStaticTests(unittest.TestCase):
         """Every trace either rollback path (cc5 -> cc4 and cc5.3 -> cc5.2) leaves is what finalize looks for."""
         finalize_source = self.source("finalize_nanod_cc5.py")
         finalize = load_script("finalize_nanod_cc5.py")
-        recovery = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        recovery = _runbook("RECOVERY.md")
         rollback = self.source("rollback_nanod_cc5.py")
         for prefix in ("cc5", "cc5.3"):                                       # manual block 1's folders
             self.assertIn(rf"backups\{prefix}-manual-rollback-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')",
@@ -4423,7 +4432,7 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertIn(r"'.\backups\nanod-current-partitions.bin'", recovery)  # section 3's read
 
     def test_recovery_section5_paths_and_commands(self):
-        text = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        text = _runbook("RECOVERY.md")
         section = text[text.index("## 5. cc5 -> cc4 rollback"):text.index(self.SECTION6)]
         self.assert_absolute_existing_paths(section)
         self.assertIn(r"<repo>\tools\nanod-flash-venv\Scripts\python.exe", section)
@@ -4463,7 +4472,7 @@ class ScriptStaticTests(unittest.TestCase):
             self.assertRegex(target, r"^(?:'[A-Za-z]:\\|-[cmu]?$)", target)
 
     def test_build_cc5_runbook_follows_stage_10(self):
-        text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
+        text = _runbook("BUILD-cc5.md")
         self.assert_absolute_existing_paths(text)
         window = text[text.index("## Hardware window (Stage 10)"):text.index("## Rollback and abort")]
         starts = [m.start() for m in re.finditer(r"^### Step (\d+)\. ", window, re.M)]
@@ -4506,7 +4515,7 @@ class ScriptStaticTests(unittest.TestCase):
     V4_PENDING = ("\\desktop-dist-v4\\",)
 
     def build53(self):
-        text = (ROOT / "firmware" / "BUILD-cc5.3.md").read_text(encoding="utf-8")
+        text = _runbook("BUILD-cc5.3.md")
         window = text[text.index("## Hardware window (Stage 10)"):text.index("## Rollback and abort")]
         starts = [m.start() for m in re.finditer(r"^### Step (\d+)\. ", window, re.M)]
         self.assertEqual(re.findall(r"^### Step (\d+)\. ", window, re.M), [str(n) for n in range(1, 11)])
@@ -4613,7 +4622,7 @@ class ScriptStaticTests(unittest.TestCase):
                                                     "{ throw 'NOT RUN: run 9a in this window first; nothing was installed' }")
         # The BUILD firmware rollback is the RECOVERY.md section 6 scripted block, character for character.
         rollback = text[text.index("### Firmware rollback, cc5.3 -> cc5.2"):text.index("### Desktop rollback, v4 -> v3")]
-        recovery = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        recovery = _runbook("RECOVERY.md")
         section6 = recovery[recovery.index(self.SECTION6):]
         scripted = section6[section6.index("### cc5.3: Firmware, scripted"):section6.index("`nanod_enter_bootloader_v2.py` behaves")]
         self.assertEqual(re.findall(r"```powershell\n(.*?)```", rollback, re.S),
@@ -4645,7 +4654,7 @@ class ScriptStaticTests(unittest.TestCase):
             self.assertIn(f"backups\\{cc53.rollback_app.name}'", block)
             self.assertIn("diagnostics\\cc5.3-preparation.json'", block)
             self.assertIn(r"backups\cc5.3-manual-rollback-' + (Get-Date)", block)
-        section6 = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        section6 = _runbook("RECOVERY.md")
         section6 = section6[section6.index(self.SECTION6):section6.index("## Reference")]
         code6 = "\n".join(re.findall(r"```powershell\n(.*?)```", section6, re.S))
         self.assertNotIn("nanod-cc4-before-cc5", code6)                    # the cc5.2 history pair is never used
@@ -4669,7 +4678,7 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertTrue(blocks[2][1].startswith("if (-not $app0Verified) { throw"))
 
     def test_recovery_section6_paths_and_commands(self):
-        text = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
+        text = _runbook("RECOVERY.md")
         section = text[text.index(self.SECTION6):text.index("## Reference")]
         self.assert_absolute_existing_paths(section)
         self.assertIn("-Bundle desktop-dist-v3 -Mirror", section)
