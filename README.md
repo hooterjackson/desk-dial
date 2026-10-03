@@ -198,7 +198,7 @@ flowchart LR
   OVL -- "window previews, snapping" --> WIN["Windows desktop"]
 ```
 
-The app does the thinking and the knob does the drawing: they talk over USB in a line-based JSON protocol, documented in [firmware/CONTROL_CENTER.md](firmware/CONTROL_CENTER.md). Build the [firmware](docs/build-firmware.md) and the [app](docs/build-app.md) yourself, or add an app with a profile ([profiles/README.md](profiles/README.md)); issues and pull requests are welcome, and for a big change please open an issue first, because the knob has only four buttons to share.
+The app does the thinking and the knob does the drawing: they talk over USB in a line-based JSON protocol, documented in [firmware/CONTROL_CENTER.md](firmware/CONTROL_CENTER.md). Build the [firmware](docs/build-firmware.md) and the [app](docs/build-app.md) yourself, or add an app with a profile ([app/profiles/README.md](app/profiles/README.md)); issues and pull requests are welcome, and for a big change please open an issue first, because the knob has only four buttons to share.
 
 ## What's new in v2.0.0
 

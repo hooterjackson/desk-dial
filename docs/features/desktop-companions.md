@@ -67,7 +67,7 @@ Desk Dial's icon sits in the tray. The tooltip reads "Desk Dial · Knob connecte
 | Show knob | See the next section |
 | Open Settings… | Opens the Settings window |
 | Connect knob / Disconnect knob | Attaches to or releases the knob's USB port |
-| App mode › | A submenu with a toggle for each app set to Manual in Settings › Apps (ticked while it is on); with none, "Set an app to Manual in Settings › Apps". See [Apps](apps.md) |
+| App mode › | A submenu listing every app (ticked while it is on); picking one turns it on or off if it is Manual or Auto in Settings › Apps. See [Apps](apps.md) |
 | Quit | Stops Desk Dial. Closing Settings does not quit; only this does |
 
 <img src="../media/app-icons.png" alt="The Desk Dial app icon and the tray icon in its dark and light variants at 16, 20, 24 and 32 pixels" width="480">

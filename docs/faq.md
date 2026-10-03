@@ -126,6 +126,7 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 - Exactly one knob per PC.
 - The offline Windows-volume mode of the firmware has not yet been tested on real hardware.
 - Onshape and the other apps: Chromium browsers only, not Firefox. Shortcuts follow your keyboard layout ("Not on this keyboard" when a key is missing); non-US layouts are not yet tried on real hardware.
-- Figma and Plasticity are not yet tested; Blender and AutoCAD are basic (the knob scrolls only). See [Apps](features/apps.md).
+- Figma and Plasticity are not yet tested; Blender and AutoCAD are basic (the knob scrolls only).
+- Apps running as administrator can't receive the knob's input (Windows blocks it) and the knob shows no message: run them normally. See [Apps](features/apps.md).
 - The program is unsigned; SmartScreen warns on the first start and Smart App Control may block it.
 - The Home Assistant token crosses your network unencrypted when the address starts with `http://`; Settings shows a warning under the address when it does.

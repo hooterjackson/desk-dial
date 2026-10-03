@@ -28,7 +28,7 @@ In both Manual and Auto, the knob only sends input to Onshape while an Onshape w
 
 ### The tray item
 
-The tray's **App mode** menu lists the apps you set to Manual; with none, it shows "Set an app to Manual in Settings › Apps". If a toggle does nothing, it tells you why in a short message:
+The tray's **App mode** menu lists every app; picking Onshape turns it on or off. If that does nothing, it tells you why in a short message:
 
 - "Turn Onshape on in Settings › Apps first." (the setting is Off);
 - "Onshape needs the knob connected (firmware with the r3 screens)." (no knob, or an older knob);
@@ -45,7 +45,7 @@ Auto looks at the window in front, several times a second, and asks two question
 
 Switching tabs inside one browser window is noticed too. Window titles and addresses are compared and dropped; they are never written to a log or a file.
 
-The check runs only while some app is set to Auto or one is on. With every app Off or on Manual (and none on), Desk Dial reads nothing about the window in front.
+The check runs only for apps set to Manual or Auto (and the one that is on). With every app Off, Desk Dial reads nothing about the window in front.
 
 ## The pointer must be over the model
 

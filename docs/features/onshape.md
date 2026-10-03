@@ -69,7 +69,7 @@ The Onshape screen on the knob is Karl Malota's design, adapted with his permiss
 - **The cube** follows the knob's shaft directly, from the knob's own angle sensor, with no round trip through the PC: it spins while you orbit, pitches while you tilt, slides while you pan and grows while you zoom. When you let go of orbit or tilt it eases back to a clean isometric pose over about a fifth of a second. The cube is a picture of the knob's movement, not a copy of your model.
 - **The legend** under the buttons reads TILT · ORBIT · WHEEL · PAN. A held button lights its label.
 - **Undo** flashes the screen briefly.
-- **Point at the model** appears for two seconds when the pointer was not over Onshape and the input was refused.
+- **Point at the model** appears for two seconds when the pointer was not over Onshape and the input was refused; **Click the model first** ("Keys go to the page") when a shortcut needs the page to have keyboard focus.
 - **The idle plasma**: after five seconds without input the screen drifts into a slow colour ripple around the Onshape icon, in teal, green and lime. Any input ends it.
 
 ## Feel and sound
