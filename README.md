@@ -26,7 +26,7 @@
 
 <p align="center">Turn for your Sonos speakers, with a firm wall at each end. The ring follows the level and warms to amber past 80 % and red past 90 %.</p>
 
-<p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-volume.webp" type="image/webp"><img src="docs/media/music-volume.gif" alt="Turning the knob raises the volume from 66 to 97 percent; the warm arc of light turns amber past 80 percent and red past 90 percent" width="396"></picture></a></p>
+<p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-volume.webp" type="image/webp"><img src="docs/media/music-volume.gif" alt="Turning the knob raises the volume from 66 to 97 percent; the warm arc of light turns amber past 80 percent and red past 90 percent" width="475"></picture></a></p>
 
 <p align="center"><sub>Needs Sonos</sub></p>
 
@@ -36,7 +36,7 @@
 
 <p align="center">Recently Added and your favourite playlists, with covers on the knob. Press 4 to play; hold it to play next. Open Seek and the clicks give way to a smooth scrub.</p>
 
-<p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-lists.webp" type="image/webp"><img src="docs/media/music-lists.gif" alt="Album covers slide across the round screen as the knob turns; button 3 swaps the list to playlists and back; the ring lights in each cover's colour" width="418"></picture></a></p>
+<p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-lists.webp" type="image/webp"><img src="docs/media/music-lists.gif" alt="Album covers slide across the round screen as the knob turns; button 3 swaps the list to playlists and back; the ring lights in each cover's colour" width="475"></picture></a></p>
 
 <p align="center"><sub>Needs Sonos and Apple Music (Apple Developer membership, 99 USD a year)</sub></p>
 
@@ -58,7 +58,7 @@
 
 <p align="center">For your Home Assistant lights: brightness, warmth from 2200 K to 6500 K and scenes, with a heavier click than volume. All off remembers how things were, so Turn on brings them back.</p>
 
-<p align="center"><a href="docs/features/lights.md"><picture><source srcset="docs/media/lights-brightness.webp" type="image/webp"><img src="docs/media/lights-brightness.gif" alt="The Lights screen: turning the knob dims the room from 80 to 30 percent with a heavier click; a bar and a big number follow" width="396"></picture></a></p>
+<p align="center"><a href="docs/features/lights.md"><picture><source srcset="docs/media/lights-brightness.webp" type="image/webp"><img src="docs/media/lights-brightness.gif" alt="The Lights screen: turning the knob dims the room from 80 to 30 percent with a heavier click; a bar and a big number follow" width="475"></picture></a></p>
 
 <p align="center"><sub>Needs Home Assistant</sub> &nbsp;·&nbsp; <a href="docs/features/lights.md">Everything Lights does ›</a></p>
 

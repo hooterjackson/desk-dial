@@ -46,7 +46,7 @@ REPO = HERE.parent.parent
 
 KB, MB = 1_000, 1_000_000
 CAPS = {
-    "hero": 1.0 * MB,       # the hero loop's WebP (file stem "hero" or "<prefix>-hero")
+    "hero": 1.7 * MB,       # the hero loop's WebP (file stem "hero" or "<prefix>-hero"), a 2x render since 2026-10-03
     "loop": 1.2 * MB,       # every other animated WebP that is not a desktop-* clip
     "desktop": 2.0 * MB,    # desktop-*.webp full-screen clips
     "story": 1.6 * MB,      # story-*.webp, the 18 s "A day with Desk Dial" sequence

@@ -101,7 +101,7 @@ source) plus every bare `<img>` and Markdown image. `gates.budget` prints a tabl
 
 | class | files | cap |
 |---|---|---|
-| hero | the hero loop's WebP (stem `hero` or `*-hero`) | 1.0 MB |
+| hero | the hero loop's WebP (stem `hero` or `*-hero`) | 1.7 MB |
 | loop | every other animated WebP | 1.2 MB |
 | desktop | `desktop-*.webp` full-screen clips | 2.0 MB |
 | still | PNG / SVG | 300 KB |
@@ -109,3 +109,16 @@ source) plus every bare `<img>` and Markdown image. `gates.budget` prints a tabl
 | total | the README's WebP-path weight | 12 MB |
 
 `python tools/readme-media/gates.py budget|blocklist|sizes` runs one gate alone.
+
+## Sizes and sharpness
+
+Settled by a size trial on 2026-10-03 (three clips rendered at 1x and 2x, bytes measured per quality):
+
+- **Knob loops** (`rec_scenes.KNOB_SCALE` 1.25): the whole device, 475 x 550, the knob's screen 300 px, shown
+  1:1. A 2x render cost twice the bytes for no visible gain at display size, because the LCD itself is 240 px.
+- **Hero** (`hero_scene.RES` 2): 1440 x 880, shown at 720, so the Navigator card's text is retina-sharp.
+- **16:9 desktop clips** (`desktop_fullscreen.MON_2X`, `FPS_2X`): a 2560 x 1440 monitor (the stage and the
+  carousel lay out on a 1280 x 720 grid and scale, so this is the same layout at 2x), 1760 x 990 at 24 fps,
+  shown at 880. 32:9 clips stay at 1x.
+- **Headlines** (`headlines.py`): Archivo display type, light and dark PNG at 2x the 880 px column; the words
+  live in `HEADLINES`, which also gives the alt text.

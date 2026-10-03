@@ -5,7 +5,8 @@ Every loop here is one recording (`<recordings>/<name>.json`, schema desk-dial-r
 best 6-9 s window with `t_start` / `t_end` on the output clock (the recording's `screens` list and its
 `note` events say where the screens change), rendered by recording.knob_frames: the LCD from the
 firmware's own renderer (knob-anim), the ring and the four button lights from the LED twin, composited on
-knob_scenes.KnobDevice at scale 1.1 (418 x 484 px, or 396 x 396 with crop_ring). The WebP is the README's
+knob_scenes.KnobDevice at KNOB_SCALE 1.25 (475 x 550 px: the knob's screen 300 px, shown 1:1 in the README;
+the 2x trial of 2026-10-03 cost twice the bytes for no visible gain at display size, the LCD being 240 px). The WebP is the README's
 <picture> source, the GIF its fallback, both within gates.py's caps.
 
 Recordings are looked up in, in order: `$DESK_DIAL_RECORDINGS`, `<ctx.work>/recordings`; a missing scene
@@ -20,6 +21,7 @@ import os
 from pathlib import Path
 
 LCD = "firmware LCD renderer"
+KNOB_SCALE = 1.25
 
 # name -> (t_start, t_end, crop_ring, webp_cap)   times in ms on the recording's output clock
 #   music-volume     62 -> 97, three slow detents to 100, the two refused pushes at 3914 / 4164 (lim +1), then
@@ -38,12 +40,12 @@ LCD = "firmware LCD renderer"
 #   windows-knob     2 = Win opens the picker at 142, Snap left 2610, Snap right 4622, Home, Win again 6914,
 #                    4 = Switch at 8923 (docs pages only).
 CUTS = {
-    "music-volume":       (0,    9000,  True,  1_200_000),
+    "music-volume":       (0,    9000,  False, 1_200_000),
     "music-lists":        (600,  9600,  False, 1_200_000),
     "music-tracks-seek":  (600,  9600,  False, 1_200_000),
     "music-playpause":    (0,    6000,  False, 1_200_000),
     "music-hold-queue":   (400,  7600,  False, 1_200_000),
-    "lights-brightness":  (0,    8500,  True,  1_200_000),
+    "lights-brightness":  (0,    8500,  False, 1_200_000),
     "lights-temperature": (0,    8400,  False, 1_200_000),
     "lights-scenes":      (0,    7000,  False, 1_200_000),
     "lights-power":       (0,    9000,  False, 1_200_000),
@@ -76,7 +78,7 @@ def recording_path(work, name: str, log=print) -> Path:
 
 def cut_frames(rec, knob_anim, work, t_start, t_end, crop_ring, tag=""):
     import recording
-    return recording.knob_frames(rec, knob_anim, work, scale=1.1, crop_ring=crop_ring, t_start=t_start,
+    return recording.knob_frames(rec, knob_anim, work, scale=KNOB_SCALE, crop_ring=crop_ring, t_start=t_start,
                                  t_end=t_end, tag=tag)
 
 

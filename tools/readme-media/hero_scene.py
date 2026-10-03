@@ -1,4 +1,4 @@
-"""The README hero: hero.webp / hero.gif, 720 x 440, 8 s at the recording's 30 fps.
+"""The README hero: hero.webp / hero.gif, rendered at RES x 720 x 440 (shown at 720), 8 s at the recording's 30 fps.
 
 Left, the knob: recording.knob_frames on the true-to-app recording ``hero-knob.json`` (the
 firmware's own LCD renderer for the screen, the app's LED engine twin for the ring and the
@@ -30,13 +30,14 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance
 
 LCD = "firmware LCD renderer"
-SIZE = (720, 440)
-KNOB_SCALE = 0.9
+RES = 2                                     # render scale: 2 = retina-sharp at the README's 720 px (trial 2026-10-03)
+SIZE = (720 * RES, 440 * RES)
+KNOB_SCALE = 0.9 * RES
 T_START, T_END = -300, 7700
 MONITOR = (0, 0, 2560, 1440)
 WORK = (720, 0, 2560, 1440)                 # the card's host column starts at x 720
 VIEW = (0, 280, 1440, 1160)                 # what the hero shows of that desktop (2 : 1 down to 720 x 440)
-WEBP_CAP = 1_000_000                        # gates.CAPS["hero"]
+WEBP_CAP = 1_700_000                        # gates.CAPS["hero"]
 GIF_CAP = 2_900_000
 DEFAULT_RECORDING = "hero-knob.json"
 KEEP = ("title", "subtitle", "status", "statusTone", "meta", "metaTone", "layout", "value", "valueUnit",
@@ -140,7 +141,7 @@ class Replay:
 
 
 def navigator_column_frames(rec, times, items):
-    """The desktop (dark) with the Navigator on it, cropped to VIEW and halved, at each output time."""
+    """The desktop (dark) with the Navigator on it, cropped to VIEW and scaled to SIZE, at each output time."""
     import navigator_scene as NS
     desk = dark_desktop((MONITOR[2], MONITOR[3]))
     art = {}
@@ -157,7 +158,7 @@ def navigator_column_frames(rec, times, items):
     warm = [t0 + k * rig.dt for k in range(int(1000.0 / rig.dt))]
     keep = set(range(len(warm), len(warm) + len(times)))
     steps = warm + list(times)
-    size = ((VIEW[2] - VIEW[0]) // 2, (VIEW[3] - VIEW[1]) // 2)
+    size = SIZE
     out = []
     for j, t in enumerate(steps):
         rp.advance(t)
@@ -168,7 +169,8 @@ def navigator_column_frames(rec, times, items):
         rig.now_ms = t - t0
         rig.step(rp.snapshot(t, items), pressed=rp.pressed(t))
         if j in keep:
-            out.append(rig.frame().crop(VIEW).resize(size, Image.Resampling.LANCZOS))
+            view = rig.frame().crop(VIEW)
+            out.append(view if view.size == size else view.resize(size, Image.Resampling.LANCZOS))
         if j + 1 < len(steps):
             rig.nav.advance(steps[j + 1] - t)
     return out
@@ -192,7 +194,7 @@ def hero_frames(rec, knob_anim, work):
     dev = K.KnobDevice(scale=KNOB_SCALE)
     body, shadow = knob_key(dev.base, K.BG)
     kw, kh = dev.size
-    kx, ky = (360 - kw) // 2, (SIZE[1] - kh) // 2
+    kx, ky = (SIZE[0] // 2 - kw) // 2, (SIZE[1] - kh) // 2
     frames = []
     for k in range(n):
         img = nav[k].copy()

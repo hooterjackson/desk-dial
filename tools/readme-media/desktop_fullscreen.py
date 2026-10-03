@@ -43,6 +43,12 @@ CAROUSEL = "app carousel"
 WEBP_CAP = 2_000_000          # gates.CAPS["desktop"]
 GIF_CAP = 2_900_000           # gates.CAPS["gif"]
 SIZE_16x9 = (1120, 630)
+# The README's 16:9 clips: a 2560 x 1440 monitor (the stage and the carousel lay out on a 1280 x 720 design grid
+# and scale to the monitor, so this is the same layout at 2x) down to 1760 x 990, shown at 880; 24 fps keeps
+# them under the desktop cap (size trial of 2026-10-03).
+SIZE_2X = (1760, 990)
+MON_2X = (0, 0, 2560, 1440)
+FPS_2X = 24
 SIZE_32x9 = (1400, 394)
 
 
@@ -77,13 +83,13 @@ def encode(frames, fps, stem, out_dir, webp_budget=WEBP_CAP, gif_budget=GIF_CAP)
 
 
 # ------------------------------------------------------------------ stage (explorer, Up next)
-def run_stage(monitor, plan, end_ms, out_size):
+def run_stage(monitor, plan, end_ms, out_size, fps=FPS):
     """Drive a stage rig on its fake clock: ``plan`` is [(ms, fn(rig))]; one frame every 1000/FPS ms."""
     rig = D.Rig(monitor)
     size = (monitor[2] - monitor[0], monitor[3] - monitor[1])
     desk = fx.desktop(size)
     out, k, pi, now_ms = [], 0, 0, 0.0
-    step = 1000 / FPS
+    step = 1000 / fps
     while now_ms < end_ms:
         while pi < len(plan) and plan[pi][0] <= now_ms:
             plan[pi][1](rig)
@@ -202,6 +208,7 @@ class Picker:
         from control_center import carousel_render as R
         self.G, self.R = G, R
         G.desktop = lambda size: fx.desktop(size)          # what the frost blurs (and capture returns)
+        G.TABLES.setdefault("16x9@2x", (MON_2X, (0, 0, 2560, 1344)))     # the golden 16:9 table at 2x
         monitor, work = G.TABLES[ratio]
         self.monitor, self.work = monitor, work
         self.size = (monitor[2] - monitor[0], monitor[3] - monitor[1])
@@ -229,7 +236,8 @@ class Picker:
     def thumb(self, k, size):
         full = self._thumbs.get(k)
         if full is None:
-            full = self._thumbs[k] = fx.window_thumb(k, (1600, 1000))
+            k2 = max(1.0, self.size[1] / 720)        # 2 on the 2x monitor, so thumbnails are never upscaled
+            full = self._thumbs[k] = fx.window_thumb(k, (round(1600 * k2), round(1000 * k2)))
         return full.resize(size, Image.Resampling.BILINEAR)
 
     def raise_(self, k, rect):
@@ -300,17 +308,17 @@ class Picker:
         return base
 
 
-def picker_frames(ratio, out_size):
+def picker_frames(ratio, out_size, fps=FPS):
     """Open on the window you are in (Ledger), snap Chatter left and Shell right, then switch to
     Canvas: ~9 s."""
     pk = Picker(ratio)
     frames = []
 
     def hold(seconds):
-        for _ in range(round(seconds * FPS)):
+        for _ in range(round(seconds * fps)):
             img = pk.image()
             frames.append(img if img.size == out_size else img.resize(out_size, Image.Resampling.LANCZOS))
-            pk.step(1 / FPS)
+            pk.step(1 / fps)
 
     hold(0.3)
     pk.open(0)                              # opens on the window you are in (Ledger)
@@ -354,11 +362,11 @@ def picker_frames(ratio, out_size):
 
 # ------------------------------------------------------------------ entry
 JOBS = {
-    "explorer-16x9": lambda: run_stage((0, 0, 1280, 720), *explorer_plan(), SIZE_16x9),
-    "explorer-32x9": lambda: run_stage((0, 0, 2560, 720), *explorer_plan(), SIZE_32x9),
-    "upnext-16x9": lambda: run_stage((0, 0, 1280, 720), *upnext_plan(), SIZE_16x9),
-    "picker-16x9": lambda: picker_frames("16x9", SIZE_16x9),
-    "picker-32x9": lambda: picker_frames("32x9", SIZE_32x9),
+    "explorer-16x9": lambda: (run_stage(MON_2X, *explorer_plan(), SIZE_2X, fps=FPS_2X), FPS_2X),
+    "explorer-32x9": lambda: (run_stage((0, 0, 2560, 720), *explorer_plan(), SIZE_32x9), FPS),
+    "upnext-16x9": lambda: (run_stage((0, 0, 1280, 720), *upnext_plan(), SIZE_16x9), FPS),
+    "picker-16x9": lambda: (picker_frames("16x9@2x", SIZE_2X, fps=FPS_2X), FPS_2X),
+    "picker-32x9": lambda: (picker_frames("32x9", SIZE_32x9), FPS),
 }
 
 
@@ -367,18 +375,18 @@ def render(out_dir, work, which):
     out_dir, work = Path(out_dir), Path(work)
     results = []
     for name in which:
-        frames = JOBS[name]()
+        frames, fps = JOBS[name]()
         for k in (len(frames) // 5, len(frames) // 2, 4 * len(frames) // 5):
             frames[k].save(work / f"fs-{name}-{k}.png")
-        results.append((name, len(frames)) + encode(frames, FPS, f"desktop-{name}", out_dir))
+        results.append((name, len(frames), fps) + encode(frames, fps, f"desktop-{name}", out_dir))
     return results
 
 
 def _scene(which, source):
     def run(ctx) -> list[Path]:
         out = []
-        for stem, n, webp, gif in render(ctx.out, ctx.work, [which]):
-            ctx.log(f"{stem}: {n} frames at {FPS} fps ({n / FPS:.1f} s), webp {webp.stat().st_size} B, "
+        for stem, n, fps, webp, gif in render(ctx.out, ctx.work, [which]):
+            ctx.log(f"{stem}: {n} frames at {fps} fps ({n / fps:.1f} s), webp {webp.stat().st_size} B, "
                     f"gif {gif.stat().st_size} B")
             out += [ctx.produced(webp, source), ctx.produced(gif, source)]
         return out
