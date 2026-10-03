@@ -220,7 +220,7 @@ def load(manifest) -> dict:
 # Scenes whose bytes differ from run to run although nothing changed: the app's stage engine and Navigator
 # renderer (hero, Navigator, the full-screen desktop clips) and real Tk windows (Settings screenshots) carry
 # small timing / antialiasing differences (check of 2026-10-03: 75 of 91 files byte-identical, these 16 not).
-# For them --check compares what the reader sees (dimensions and frame count), not bytes.
+# For them --check compares what the reader sees (dimensions, and duration within 5 %), not bytes.
 LOOSE = ("desktop-*", "hero.*", "navigator.*", "navigator-cards.*", "settings-*.png")
 
 
@@ -247,8 +247,10 @@ def check(out_dir: Path, manifest, context: dict | None = None) -> tuple[bool, s
         if nb != o["bytes"] or ns != o["sha256"]:
             if _loose(name):
                 pr = probe(p)
-                if (pr["width"], pr["height"], pr["frames"]) == (o.get("width"), o.get("height"), o.get("frames")):
-                    continue                       # same picture shape; run-to-run byte noise (LOOSE above)
+                d0, d1 = o.get("duration_ms") or 0, pr["duration_ms"] or 0
+                if (pr["width"], pr["height"]) == (o.get("width"), o.get("height")) and abs(d1 - d0) <= 0.05 * max(d0, 1):
+                    continue                       # same size and length; run-to-run noise (LOOSE above). Frame
+                                                   # counts vary too: the encoders merge frames that come out equal
             lines.append(f"changed   {name}  {o['bytes']} -> {nb} bytes, sha256 {o['sha256'][:12]} -> {ns[:12]}")
     if context is not None:
         now = {"firmware": firmware_stamp(Path(context["firmware_dir"])),
