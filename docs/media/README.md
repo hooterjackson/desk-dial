@@ -69,6 +69,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | music-tracks-seek.webp | 729,256 | 475x550 | 203 | 22.78 |
 | music-volume.gif | 2,673,715 | 404x468 | 135 | 16.67 |
 | music-volume.webp | 1,039,898 | 475x550 | 248 | 27.83 |
+| navigator-cards.png | 249,831 | 1080x860 | 1 |  |
+| navigator-cards.webp | 35,828 | 1080x860 | 1 |  |
 | navigator.gif | 1,292,373 | 1120x630 | 107 | 8.13 |
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 196,030 | 475x550 | 55 | 5.8 |

@@ -216,7 +216,25 @@ def scene_hero(ctx) -> list[Path]:
         frames[k].save(Path(ctx.work) / f"hero-peek-{k}.png")
     gif, webp = R.save_loop(frames, rec["fps"], "hero", ctx.out, webp_cap=WEBP_CAP, gif_cap=GIF_CAP)
     ctx.log(f"hero: {len(frames)} frames at {rec['fps']} fps, webp {webp.stat().st_size} B, gif {gif.stat().st_size} B")
-    return [ctx.produced(webp, LCD), ctx.produced(gif, LCD)]
+    cards = navigator_cards(frames, ctx.out)
+    return [ctx.produced(webp, LCD), ctx.produced(gif, LCD)] + [ctx.produced(p, LCD) for p in cards]
+
+
+def navigator_cards(frames, out_dir):
+    """navigator-cards.webp / .png: the hero's Navigator card twice, side by side at the hero's resolution:
+    browsing Recently Added (70 % through the clip) and the song playing (the last frames)."""
+    out_dir = Path(out_dir)
+    n = len(frames)
+    x0, x1 = round(750 * RES / 2), round(1270 * RES / 2)          # the card column of the 2x hero
+    crops = [frames[k].crop((x0, 5 * RES, x1, SIZE[1] - 5 * RES)) for k in (int(n * 0.7), n - 2)]
+    gap = 20 * RES
+    img = Image.new("RGB", (sum(c.width for c in crops) + gap, crops[0].height), (13, 14, 17))
+    for i, c in enumerate(crops):
+        img.paste(c, (i * (c.width + gap), 0))
+    webp, png = out_dir / "navigator-cards.webp", out_dir / "navigator-cards.png"
+    img.save(webp, quality=86, method=6)
+    img.save(png, optimize=True)
+    return [webp, png]
 
 
 SCENES = {"hero": (LCD, scene_hero)}

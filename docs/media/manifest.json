@@ -1054,6 +1054,32 @@
       "fps": null,
       "duration_ms": 0,
       "data": "fictional"
+    },
+    {
+      "name": "navigator-cards.webp",
+      "scene": "hero",
+      "source": "firmware LCD renderer",
+      "bytes": 35828,
+      "sha256": "b082e933e64e0a05d0c5dcaee59199ab3c641970c6aae8f990d917c50b686c90",
+      "width": 1080,
+      "height": 860,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "navigator-cards.png",
+      "scene": "hero",
+      "source": "firmware LCD renderer",
+      "bytes": 249831,
+      "sha256": "a3f23a977adc5ea76e4bbfc284fc43c0e8dcc9f8e7241b2109cdec7a6ce10101",
+      "width": 1080,
+      "height": 860,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
     }
   ]
 }

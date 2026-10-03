@@ -94,7 +94,9 @@
 <p align="center"><b>The Navigator</b></p>
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-navigator-dark.png"><img src="docs/media/head-navigator.png" alt="Always know what each button does." width="880"></picture></p>
 
-<p align="center">A small glass card at the edge of your screen shows where you are and what the four buttons do, then fades. It never takes focus. It's the card beside the knob in the first clip.</p>
+<p align="center">A small glass card at the edge of your screen shows where you are and what the four buttons do, then fades. It never takes focus.</p>
+
+<p align="center"><a href="docs/features/desktop-companions.md"><picture><source srcset="docs/media/navigator-cards.webp" type="image/webp"><img src="docs/media/navigator-cards.png" alt="Two Navigator cards: browsing Recently Added with the album Glass Weather, the four button words and the hold hints; then the song Copper Sun playing, with the volume at 62 percent and Home, Recent, Tracks and Pause on the buttons" width="540"></picture></a></p>
 
 <p align="center"><a href="docs/features/desktop-companions.md">More about the Navigator ›</a></p>
 
