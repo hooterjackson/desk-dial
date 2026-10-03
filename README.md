@@ -120,7 +120,7 @@
 
 <p align="center">Sixty LEDs draw the volume, take on each album's colour and bloom when you press Like. At rest they settle to one steady warm glow.</p>
 
-<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/leds-moments.webp" type="image/webp"><img src="docs/media/leds-moments.gif" alt="The knob's LED ring playing its moments one after another: a pink bloom, a half-ring wash, a scatter of warm sparks, a comet lapping the ring, a warm glow at one end, a red glow at the bottom, and an arc filling while a button is held" width="880"></picture></a></p>
+<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, a comet lap for Play next, and a glow at the end stop" width="880"></picture></a></p>
 
 <p align="center"><a href="docs/features/leds.md">Every moment, and the screen's motion ›</a></p>
 

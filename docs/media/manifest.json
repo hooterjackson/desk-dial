@@ -1106,6 +1106,32 @@
       "fps": 27.18,
       "duration_ms": 6402,
       "data": "fictional"
+    },
+    {
+      "name": "ring-moments.gif",
+      "scene": "ring-moments",
+      "source": "LED twin (alive_lights.py)",
+      "bytes": 2217224,
+      "sha256": "ad2830d475047a6a842bb867890cd478ee444b7044d8f6d690e7089f41a31bb8",
+      "width": 684,
+      "height": 544,
+      "frames": 76,
+      "fps": 10.0,
+      "duration_ms": 7600,
+      "data": "fictional"
+    },
+    {
+      "name": "ring-moments.webp",
+      "scene": "ring-moments",
+      "source": "LED twin (alive_lights.py)",
+      "bytes": 1050896,
+      "sha256": "13ff4e5c2a6c834e3e5dfb41324d3838290c5669fda38245627e9c0d3d75a555",
+      "width": 1036,
+      "height": 824,
+      "frames": 163,
+      "fps": 21.66,
+      "duration_ms": 7524,
+      "data": "fictional"
     }
   ]
 }

@@ -77,6 +77,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 196,030 | 475x550 | 55 | 5.8 |
 | onshape-knob.webp | 232,202 | 475x550 | 75 | 7.73 |
+| ring-moments.gif | 2,217,224 | 684x544 | 76 | 10 |
+| ring-moments.webp | 1,050,896 | 1036x824 | 163 | 21.66 |
 | settings-general.png | 17,229 | 616x890 | 1 |  |
 | settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
 | settings-knob.png | 26,291 | 616x1392 | 1 |  |

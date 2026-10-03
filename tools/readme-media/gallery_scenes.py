@@ -300,6 +300,53 @@ def scene_leds_moments(ctx) -> list[Path]:
     return [ctx.produced(webp, LED), ctx.produced(gif, LED)]
 
 
+# The README's ring picture: six of the moments, bigger, with short captions (the full twelve stay on leds.md).
+RING_PICKS = (("86 % amber, 95 % red embers", "Volume"), ("Cover colours in a list", "Album colours"),
+              ("Like: pink bloom", "Like"), ("Snap: half wash", "Snap"), ("Queued: comet lap", "Play next"),
+              ("Wall: the push glows", "End stop"))
+RING_SCALE = 0.9                   # 324 px rings (the full grid uses LED_SCALE 0.6)
+RING_CAPTION_H, RING_CAPTION_PX = 64, 30
+
+
+def scene_ring_moments(ctx) -> list[Path]:
+    import knob_scenes as K
+    import headlines as T
+    from PIL import Image, ImageDraw
+    tiles, home0 = led_tiles(ctx)
+    by_caption = {t.caption: t for t in tiles}
+    tuning = (int(home0.get("ledPink", 0) or 0), bool(home0.get("ledVolFull", False)), home0.get("progress"))
+    dev = K.KnobDevice(scale=RING_SCALE, crop_ring=True)
+    dark = Image.new("RGB", (240, 240), (0, 0, 0))
+    per_tile = []
+    for old, _new in RING_PICKS:
+        leds = run_led_tile(by_caption[old], tuning)
+        per_tile.append([dev.compose(dark, ring, buttons) for ring, buttons in leds])
+    cols, gap, pad = 3, 16, 16
+    tw, th = per_tile[0][0].size
+    rows = (len(per_tile) + cols - 1) // cols
+    W = pad * 2 + cols * tw + (cols - 1) * gap
+    H = pad * 2 + rows * (th + RING_CAPTION_H) + (rows - 1) * gap
+    base = Image.new("RGB", (W, H), BG)
+    d = ImageDraw.Draw(base)
+    tw_dir = Path(ctx.work) / "ring-type"
+    tw_dir.mkdir(parents=True, exist_ok=True)
+    for j, (_old, cap) in enumerate(RING_PICKS):
+        x = pad + (j % cols) * (tw + gap)
+        y = pad + (j // cols) * (th + RING_CAPTION_H + gap)
+        probe = Image.new("RGBA", (tw, RING_CAPTION_H))
+        width = T.typeset(ImageDraw.Draw(probe), ctx.app, tw_dir, cap, RING_CAPTION_PX, 600, (0, 0), (0, 0, 0, 0))
+        T.typeset(d, ctx.app, tw_dir, cap, RING_CAPTION_PX, 600, (x + (tw - width) / 2, y + th + 40), (245, 245, 247))
+    n = min(len(t) for t in per_tile)
+    frames = []
+    for k in range(n):
+        img = base.copy()
+        for j, tf in enumerate(per_tile):
+            img.paste(tf[k], (pad + (j % cols) * (tw + gap), pad + (j // cols) * (th + RING_CAPTION_H + gap)))
+        frames.append(img)
+    gif, webp = _save(frames, "ring-moments", ctx)
+    return [ctx.produced(webp, LED), ctx.produced(gif, LED)]
+
+
 # ------------------------------------------------------------------ LCD motion moments
 MOTION_MS = 6000
 MOTION_PRE = 1500                  # knob-anim settles (covers decode) before the first output frame
@@ -465,6 +512,7 @@ def scene_onshape_knob(ctx) -> list[Path]:
 
 SCENES = {
     "leds-moments": (LED, scene_leds_moments),
+    "ring-moments": (LED, scene_ring_moments),
     "motion-gallery": (LCD, scene_motion_gallery),
     "onshape-knob": (APP_CANVAS, scene_onshape_knob),
 }
