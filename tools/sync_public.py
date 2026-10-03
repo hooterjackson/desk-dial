@@ -153,6 +153,7 @@ SPECS = [
             "tests/test_tl_bug_004_recovery_doc.py", "tests/test_tl_bug_006_recovery_doc.py",
             "tests/test_tl_bug_013_ledger_note.py", "tests/test_hn_res_001_sampler_ctx_rate.py",
             "tests/test_fw_pub_003_release_strings.py", "tests/test_fw_perf_010_lcd_bench_window.py",
+            "tests/test_tl_res_001_baseline_awake.py",   # tests work/audit/tools/knob_baseline.py (never published)
             # compare renders that show real covers or titles
             "tests/test_dd_des_009_navigator_goldens.py", "tests/test_render_music.py",
             "tests/test_r3_navigator_scene.py",
