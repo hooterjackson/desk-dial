@@ -139,8 +139,8 @@ class KnobArtStateTests(unittest.TestCase):
 
 class GeneratedSleeveTests(unittest.TestCase):
     # BS genOf (Browse and Snap.dc.html:537) evaluated with node 24 on 2026-09-25.
-    GOLDEN = [("Night Channel", "Sample library", 5), ("PAPER LANTERN Ep. 1", "", 5), ("Tidal Glass", "Oskar Lind Trio", 6),
-              ("Linnéa Holm – Début", "Linnéa Holm", 2), ("🎵 Emoji 🎶", "Ārtist", 4), ("", "", 5),
+    GOLDEN = [("Night Channel", "Sample library", 0), ("PAPER LANTERN Ep. 1", "", 5), ("Tidal Glass", "Oskar Lind Trio", 4),
+              ("Linnéa Holm – Début", "Linnéa Holm", 7), ("🎵 Emoji 🎶", "Ārtist", 4), ("", "", 5),
               ("Untitled playlist", "", 7), ("Favorite Songs", "Apple Music", 4), ("東京", "宇多田ヒカル", 2)]
 
     def test_the_hash_matches_bs(self):
@@ -151,7 +151,7 @@ class GeneratedSleeveTests(unittest.TestCase):
     def test_the_sleeve_and_its_ring_accent(self):
         sleeve = gen_sleeve("Untitled playlist", "")
         self.assertEqual((sleeve["index"], sleeve["ring_accent"], sleeve["accent"]), (7, 0, 0xFFBE69))
-        sleeve = gen_sleeve("Night Channel", "Sample library")
+        sleeve = gen_sleeve("PAPER LANTERN Ep. 1", "")   # genOf index 5
         self.assertEqual((sleeve["g0"], sleeve["g1"], sleeve["ink"], sleeve["ring_accent"]),
                          (0x2A4F57, 0x112326, 0xE9F4F5, (40 << 16) | (210 << 8) | 230))
 

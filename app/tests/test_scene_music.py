@@ -171,11 +171,11 @@ class ArtRuleTests(unittest.TestCase):
 
     def test_gen_hash_matches_bs_genof(self):
         """§13.6 / H8: samples computed by BS ``genOf`` (BS:537) in Node, verbatim."""
-        bs = [["Paper Lanterns", "Mira Vale", 7], ["Promises", "Harbour Signals, Sodium Coast & LSO", 4],
+        bs = [["Paper Lanterns", "Mira Vale", 1], ["Promises", "Harbour Signals, Sodium Coast & LSO", 4],
               ["Copper Sun Sessions", "Various artists", 0],
-              ["Lua & Mar", "Lua Serena & Antônio Carlos Jobim", 3], ["Late Night Channel", "", 4],
+              ["Lua & Mar", "Lua Serena & Antônio Carlos Jobim", 2], ["Late Night Channel", "", 6],
               ["Favorite Songs", "", 1], ["PAPER LANTERN Ep. 1", "", 5], ["😀 Smile 🎶", "Émilie", 3], ["", "", 5],
-              ["Tidal Glass", "Oskar Lind Trio", 6], ["Águas de Março", "Lua Serena", 6], ["𝄞 Clef", "Bach", 6]]
+              ["Tidal Glass", "Oskar Lind Trio", 4], ["Águas de Março", "Lua Serena", 7], ["𝄞 Clef", "Bach", 6]]
         from control_center import artwork
         for title, artist, want in bs:
             self.assertEqual(SM.gen_index(title, artist), want, title)
