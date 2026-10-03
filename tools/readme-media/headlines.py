@@ -42,6 +42,7 @@ HEADLINES = {
     "lights": dict(lines=[("Dim, warm or set a scene.", 72, WEIGHT, "ink")]),
     "windows": dict(lines=[("Every open window, one turn away.", 72, WEIGHT, "ink")]),
     "onshape": dict(lines=[("Zoom, orbit and pan in Onshape.", 72, WEIGHT, "ink")]),
+    "apps": dict(lines=[("Figma, Plasticity, Blender and AutoCAD.", 72, WEIGHT, "ink")]),
     "navigator": dict(lines=[("Always know what each button does.", 72, WEIGHT, "ink")]),
     "feel": dict(lines=[("A different feel for each control.", 72, WEIGHT, "ink")]),
     "ring": dict(lines=[("The ring shows what the knob is doing.", 72, WEIGHT, "ink")]),

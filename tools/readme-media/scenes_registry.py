@@ -116,7 +116,7 @@ def scene_stills(ctx: Context) -> list[Path]:
 # The scene modules, in render order. Each exposes SCENES = {name: (source, fn)}; fn(ctx) tags its own files.
 # A module that is missing or fails to import is reported and skipped, so one broken scene never blocks the rest.
 SCENE_MODULES = ("hero_scene", "rec_scenes", "desktop_fullscreen", "navigator_scene", "app_screens", "panel_scenes",
-                 "gallery_scenes", "social_preview", "headlines", "feel_wide")
+                 "gallery_scenes", "social_preview", "headlines", "feel_wide", "apps_strip")
 IMPORT_ERRORS: dict[str, str] = {}
 
 

@@ -1,8 +1,8 @@
 # Settings
 
-Desk Dial lives in the Windows tray. Right-click its icon and choose Settings to open the Settings window; it also opens by itself on the first run. The window has five pages listed down the left side: General, Music, Windows, Home Assistant and Knob. Every page is described below with the labels exactly as the window shows them, what each option does and its default.
+Desk Dial lives in the Windows tray. Right-click its icon and choose Settings to open the Settings window; it also opens by itself on the first run. The window has six pages listed down the left side: General, Music, Windows, Home Assistant, Knob and Apps. Every page is described below with the labels exactly as the window shows them, what each option does and its default.
 
-A note at the top of the General page tells you which changes apply straight away: album artwork, LEDs, Motion and the switcher background apply when saved; other changes need the knob to reconnect, or Desk Dial to be quit from the tray and opened again. The Save settings button sits at the bottom of the window and saves every page except Home Assistant, which has its own Save.
+A note at the top of the General page tells you which changes apply straight away: album artwork, LEDs, Motion and the switcher background apply when saved; other changes need the knob to reconnect, or Desk Dial to be quit from the tray and opened again. The Save settings button sits at the bottom of the window and saves every page except Home Assistant, which has its own Save, and Apps, which applies each change at once.
 
 Desk Dial is tested on one knob (the author's). This page describes Desk Dial v2.0.0.
 
@@ -100,11 +100,9 @@ Maps the knob's four buttons to buttons 1 to 4. Press Verify physical button ord
 
 **LEDs** · Colour / Warm only · default Colour
 
-Colour lets the LED ring use cover colours, the amber and red volume warning and the coloured moments (a pink bloom on Like, a warm lap on Queue). Warm only keeps every LED in the warm resting colour. Applies when saved.
+Colour lets the LED ring use cover colours, the amber and red volume warning and the coloured moments (a pink bloom on Like, a half-ring wash on Snap). Warm only keeps every LED in the warm resting colour. Applies when saved.
 
-**Onshape mode** · Off / Manual / Auto · default Off
-
-Off never enters Onshape mode. Manual adds an "Onshape mode" item to the tray menu that turns it on and off. Auto turns it on while an Onshape tab is in front in Chrome or Edge, and off half a second after it is not. In Onshape mode the knob is Onshape's mouse; see [Onshape](onshape.md). Hold all four knob buttons for 1 second for Home.
+**Onshape** · a note only: "Onshape and other apps: Settings › Apps." Onshape mode moved to the [Apps](#apps) page in v2.0.0; your earlier choice carries over.
 
 **Knob sounds** · On / Off · default On, with **Volume** · a slider 0 to 100 % in steps of 5 · default 100 %
 
@@ -117,6 +115,11 @@ On makes the steps softer and the clicks silent, and replaces a thump or buzz wi
 **Recalibrate motor** · a button
 
 Aligns the knob's motor again; takes about 10 seconds, during which you keep your hands off the knob and its screens come back when done. If the previous run reported that the motor's direction changed, pressing it again accepts the new direction. Not yet tested on real hardware.
+
+
+## Apps
+
+One row per app (Onshape, Figma, Plasticity, Blender, AutoCAD), each **Off / Manual / Auto**, with its status, where its profile came from and a **Rules…** button; plus **Import profile…**, **Open profiles folder**, **Check for updates** and the box **Fetch updated profiles from the Desk Dial repo (once a day)** (off by default). Every change applies at once. Everything on this page is described on [Apps](apps.md).
 
 ## Where settings are stored
 

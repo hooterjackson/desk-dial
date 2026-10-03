@@ -31,6 +31,9 @@ repo-relative posix path to the terms that file may legitimately contain:
   docs/setup/home-assistant.md          the same default hostname, as the address field's example
   tools/readme-media/fiction.py         the fixtures module's own copy of the blocklist (code)
   docs/media/README.md                  nothing (generated table; must stay clean)
+  docs/features/apps.md, apps_strip.py, the FAQ, Settings and Onshape setup pages
+                                        "Figma": a supported app since v2.0.0 (app profiles), named in
+                                        prose and as a label under Karl's icon; never a logo or fixture
 A new legitimate mention (for example a FAQ about another product) is added here, in ALLOWLIST,
 with the file and the exact term; the gate still fails for the same term in any other file.
 """
@@ -68,11 +71,14 @@ BLOCKLIST = (
 ALLOWLIST = {
     "tools/readme-media/gates.py": set(BLOCKLIST),
     "tools/readme-media/README.md": set(BLOCKLIST),
-    "README.md": {"Spotify"},
-    "docs/setup/onshape.md": {"Google Chrome"},
-    "docs/faq.md": {"Spotify", "homeassistant.local"},
+    "docs/setup/onshape.md": {"Google Chrome", "Figma"},
+    "docs/faq.md": {"Spotify", "homeassistant.local", "Figma"},
+    "docs/features/apps.md": {"Figma"},               # a supported app (app profiles, v2.0.0)
+    "tools/readme-media/apps_strip.py": {"Figma"},     # the label under Karl's Figma icon
+    "tools/readme-media/headlines.py": {"Figma"},      # the Apps chapter headline
+    "README.md": {"Spotify", "Figma"},
     "docs/setup/home-assistant.md": {"homeassistant.local"},
-    "docs/features/settings.md": {"homeassistant.local"},   # the Address field's real hint text
+    "docs/features/settings.md": {"homeassistant.local", "Figma"},   # the Address field's hint; the Apps list
     "tools/readme-media/app_screens.py": {"homeassistant.local"},   # its own allow rule for that hint
     "tools/readme-media/fiction.py": set(BLOCKLIST),   # the fixtures' own self-check copy of the blocklist
 }

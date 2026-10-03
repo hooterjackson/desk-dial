@@ -4,7 +4,7 @@ The knob has a ring of 60 LEDs under its rim and two LEDs under each of the four
 
 Everything here is from the current firmware (v2.0.0) and is tested on one knob (the author's).
 
-<picture><source srcset="../media/leds-moments.webp" type="image/webp"><img src="../media/leds-moments.gif" alt="The knob's LED ring playing its moments one after another: a pink bloom, a half-ring wash, a scatter of warm sparks, a comet lapping the ring, a warm glow at one end, a red glow at the bottom, and an arc filling while a button is held" width="480"></picture>
+<picture><source srcset="../media/leds-moments.webp" type="image/webp"><img src="../media/leds-moments.gif" alt="The knob's LED ring playing its moments one after another: a pink bloom, a half-ring wash, a scatter of warm sparks, the whole ring flashing green as Play next lands, a warm glow at one end, a red glow at the bottom, and an arc filling while a button is held" width="480"></picture>
 
 ## The steady warm rest
 
@@ -37,7 +37,7 @@ A moment is a short effect played once, on top of what the ring is showing. The 
 | Bloom | Like in Up next | a pink bloom spreads from the selected item and fades (always pink, never the cover's colour) |
 | Half wash | Snap left or right in the Windows picker | the half of the ring on that side washes in the window's colour (Colour) or warm white |
 | Scatter | Shuffle in Up next | warm sparks land one after another at scattered positions around the ring |
-| Comet lap | Queue or Play next landed | a warm comet laps the whole ring once from 12 o'clock |
+| Queue landing | Queue or Play next landed (hold 4) | the ring fills while you hold, then the whole ring lights up as the hold lands; a green flash when the queue answer arrives in time |
 | Wash | Play from a list | the ring washes outward from the selected item in its cover colour; green when there is no colour |
 | Green wash | a button press on Lights or Scenes succeeded (Turn on, All off, the temperature toggle, a scene ran) | the whole ring green for 0.7 s |
 | Sweep | Skip in Tracks | a comet runs the direction you skipped |

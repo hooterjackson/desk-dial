@@ -1,4 +1,4 @@
-# Setting up Onshape mode
+# Setting up Onshape
 
 Onshape mode turns the knob into a 3D mouse for Onshape, the browser-based CAD tool. Turn the knob to zoom, hold a button and turn to orbit, tilt or pan, tap a button to undo, and hold one to open a wheel of modelling commands. What the knob does once the mode is on is described in [the Onshape feature page](../features/onshape.md). This page covers turning it on and how it decides when to act.
 
@@ -7,31 +7,31 @@ Onshape mode is tested on one knob (the author's) and one PC. It is the newest p
 ## What you need
 
 - Desk Dial v2.0.0 running on the PC, with the knob connected and showing its Home screen.
-- Onshape open in **Google Chrome or Microsoft Edge**. Other browsers are not recognised (see Limits).
+- Onshape open in **Google Chrome or Microsoft Edge**. Brave, Vivaldi and Opera are recognised too; Firefox is not (see Limits).
 - The knob's own screen running the current firmware (v2.0.0). The command wheel and the 3D cube only appear on a knob running it; an older knob can still zoom, orbit, tilt, pan and undo, but shows a plain text screen instead.
 
 ## Turn it on
 
-<p><img src="../media/settings-knob.png" alt="The Knob page of Desk Dial Settings, with Onshape mode Off, Manual or Auto" width="420"></p>
-
 1. Open Desk Dial's Settings from the tray icon.
-2. Go to **Knob** and find **Onshape mode**. It has three choices: **Off**, **Manual** and **Auto**. Off is the default.
-3. Pick one and save. The choice applies at once.
+2. Go to **Apps** and find the **Onshape** row. It has three choices: **Off**, **Manual** and **Auto**. If you used Onshape mode in an earlier version, your choice has carried over; otherwise it is Off.
+3. Pick one. The Apps page applies it at once, with no Save.
+
+The other apps on that page (Figma, Plasticity, Blender, AutoCAD) work the same way; see [Apps](../features/apps.md).
 
 | Setting | What it does |
 |---|---|
-| **Off** | The knob never enters Onshape mode. The tray's "Onshape mode" item only tells you to turn it on in Settings › Knob first. Choosing Off while the mode is on leaves it. |
-| **Manual** | You switch the mode on and off yourself from the tray icon's menu: the item reads **Onshape mode** when it is off and **Leave Onshape mode** when it is on. Nothing changes until you use it. |
+| **Off** | The knob never enters Onshape mode. Choosing Off while the mode is on leaves it. |
+| **Manual** | You switch the mode on and off yourself from the tray icon's **App mode** menu, where Onshape has a toggle that is ticked while it is on. Nothing changes until you use it. |
 | **Auto** | The knob enters Onshape mode by itself when an Onshape tab is the front window, and leaves half a second after Onshape is no longer in front, back to Home. |
 
 In both Manual and Auto, the knob only sends input to Onshape while an Onshape window is in front and your mouse pointer is over the model (see below).
 
 ### The tray item
 
-The tray menu has one Onshape entry whatever the setting. If it does nothing, it tells you why in a short message:
+The tray's **App mode** menu lists the apps you set to Manual; with none, it shows "Set an app to Manual in Settings › Apps". If a toggle does nothing, it tells you why in a short message:
 
-- "Turn Onshape mode on in Settings › Knob first." (the setting is Off);
-- "Onshape mode needs the knob connected (firmware with the r3 screens)." (no knob, or an older knob);
+- "Turn Onshape on in Settings › Apps first." (the setting is Off);
+- "Onshape needs the knob connected (firmware with the r3 screens)." (no knob, or an older knob);
 - "Close the open screen on the knob first." (a list, the window picker or the seek screen is open on the knob; close it and try again).
 
 Leaving the mode from the tray, or by holding all four buttons on the knob, is a deliberate exit. In Auto, Desk Dial then waits until Onshape has gone to the background and come to the front again before it enters by itself again, so the knob does not fight you.
@@ -40,12 +40,12 @@ Leaving the mode from the tray, or by holding all four buttons on the knob, is a
 
 Auto looks at the window in front, several times a second, and asks two questions:
 
-1. **Is it Chrome or Edge?** The program must be `chrome.exe` or `msedge.exe`.
+1. **Is it a supported browser?** The program must be `chrome.exe`, `msedge.exe`, `brave.exe`, `vivaldi.exe` or `opera.exe`.
 2. **Is it showing Onshape?** Either the window title's last segment is exactly "Onshape", or the browser's address bar shows an Onshape address. Desk Dial reads the address bar through Windows' accessibility interface (UI Automation) and keeps only the host part: `cad.onshape.com`, or a company workspace such as `yourcompany.onshape.com`. Onshape's marketing, learning, forum and status pages (`www.onshape.com`, `learn.onshape.com`, `forum.onshape.com` and similar) do not count.
 
 Switching tabs inside one browser window is noticed too. Window titles and addresses are compared and dropped; they are never written to a log or a file.
 
-This check runs whenever Desk Dial is open, even with Onshape mode Off, because the same code also reports whether Onshape is in front in `logs\status.json` (true or false, never the title).
+The check runs only while some app is set to Auto or one is on. With every app Off or on Manual (and none on), Desk Dial reads nothing about the window in front.
 
 ## The pointer must be over the model
 

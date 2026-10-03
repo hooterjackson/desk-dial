@@ -7,12 +7,12 @@ Desk Dial runs on your PC and talks to things on your own network plus, if you s
 | What | When | Why | Kept? |
 |---|---|---|---|
 | The titles of your open windows | When you open the Windows picker (button 2 on Home) | To show the window list on the knob and the live previews on the PC | No. Titles are shown on the knob over USB and never written to a log. |
-| The title and the address-bar host of the front Chrome or Edge window | On every tick of the app, whether or not Onshape mode is on | To recognise Onshape (`cad.onshape.com` or a `*.onshape.com` host). Only the host part is compared; the full address never leaves the function that reads it | No. Neither the title nor the address is logged or stored. |
+| The program name of the front window and, for Chrome, Edge, Brave, Vivaldi or Opera, the host in its address bar; the window title only to notice a change (and, for Onshape, when the address bar cannot be read) | Only while some app in Settings › Apps is on Auto or one is on; with every app Off or on Manual (and none on), nothing is read | To recognise the app you are working in (see [Apps](features/apps.md)). Only the host is compared; the full address never leaves the function that reads it | No. Logs and `status.json` keep only which app matched and whether by program or by website. |
 | The knob's own profiles and settings (including its serial number) | Once each time the knob connects | To back them up before the app takes control | Yes, in `backups\` (see below). |
 | Your taskbar theme (dark or light) | At start, when Windows signals a theme change, and every 30 s as a backstop | To pick the matching tray icon | No. |
 | The Windows "animation effects" setting | While Settings › General › Motion is "Match Windows" | To follow your preference for reduced motion | No. |
 
-Window titles are read with the ordinary Windows function for the caption of a top-level window. The Onshape check reads the address bar through UI Automation, the same interface screen readers use; it reads only the one text field and turns the result into a host name before anything else sees it. Nothing else on your screen is read.
+Window titles are read with the ordinary Windows function for the caption of a top-level window. The app check reads a browser's address bar through UI Automation, the same interface screen readers use; it reads only the one text field and turns the result into a host name before anything else sees it. Nothing else on your screen is read.
 
 ## What it sends, and where
 
@@ -23,6 +23,7 @@ Window titles are read with the ordinary Windows function for the caption of a t
 | `api.music.apple.com` | Your developer token (signed on the PC from your MusicKit key) and your Apple Music user token, with requests for Recently Added, Playlists, song details and queue covers; one write only: Like (adding a favourite) | When you use the music screens with Apple Music set up |
 | `*.mzstatic.com` (Apple's artwork servers) | Requests for cover images, with no credentials | When a cover is needed |
 | `js-cdn.music.apple.com` | Your browser loads Apple's MusicKit script from here during "Authorize Apple Music" | Only during authorisation |
+| `raw.githubusercontent.com` (this repository's `profiles/index.json`, then any changed profile files) | A plain HTTPS request, with nothing about you | Only when you click Check for updates in Settings › Apps, or once a day if you tick Fetch updated profiles (off by default) |
 
 That is the whole list. There is no telemetry, no crash reporting to anyone, and no update check. The author checked this by searching the whole `control_center` package for every address literal and every network call: the only hosts named in the code are the ones above, plus `127.0.0.1` for the local authorisation page and Microsoft documentation links in code comments.
 
@@ -64,7 +65,7 @@ Everything is under `%LOCALAPPDATA%\DeskDial\` (normally `C:\Users\<you>\AppData
 |---|---|---|
 | `data\credentials.bin` | MusicKit key text, Apple Music user token, Home Assistant token | DPAPI-encrypted |
 | `queue-recovery.bin`, `shuffle-restore.bin` | What Desk Dial needs to restore the Sonos queue and shuffle state | DPAPI-encrypted |
-| `data\settings.json` | Speaker IP address, Home Assistant address and area, button order, every Settings choice (sounds, haptics, LEDs, motion, navigator, Onshape mode). Never a token | Plain JSON |
+| `data\settings.json` | Speaker IP address, Home Assistant address and area, button order, every Settings choice (sounds, haptics, LEDs, motion, navigator, app modes and your app rules). Never a token | Plain JSON |
 | `data\queue-ledger.json` | A record of the songs Desk Dial itself queued on the speaker | Plain JSON |
 | `logs\app.log` (+ `.1` to `.3`) | The app's diary: connections, errors, state changes. 1 MB each, rotated | Plain text |
 | `logs\crash.log` (+ `.1`) | Written only if the app dies: time, process id, and the Python stack of every thread | Plain text |
@@ -89,7 +90,7 @@ The `backups\` folder gains one file per connection and is never pruned; after m
 - whether Apple Music is authorised (yes or no, never the token)
 - the speaker's online state and volume
 - the Home Assistant area id and the light ids in it (never the address or the token)
-- the Onshape mode and refusal counts (never a window title)
+- the active app and how it matched (program or website), and refusal counts (never a window title or address)
 - counters for the stage, the picker, artwork and frame timing
 
 ### How to share logs safely
@@ -114,7 +115,6 @@ The knob keeps whatever firmware is on it. To return to Karl's firmware see the 
 
 - Home Assistant over `http://` is allowed (with a warning in Settings), so the token can travel unencrypted on your LAN.
 - Self-signed Home Assistant certificates are likely to be refused; not yet tested on real hardware.
-- The Onshape title and address-bar check runs on every tick even with Onshape mode Off. It keeps nothing, but it is work the app does whether you use Onshape or not.
 - `status.json` and `app.log` contain your Windows user name in file paths.
 - The `backups\` folder is never pruned.
 - Window titles are shown on the knob's screen while the picker is open; anyone who can see the knob can read them.

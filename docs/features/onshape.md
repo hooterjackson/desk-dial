@@ -2,7 +2,7 @@
 
 In Onshape mode the knob is a 3D mouse for Onshape, the browser-based CAD tool: the knob alone zooms, each of three buttons turns it into orbit, tilt or pan, one tap undoes, and one hold opens a wheel of modelling commands drawn on the knob's own screen. Desk Dial sends ordinary mouse and keyboard input to the browser; Onshape itself is not changed and needs no plug-in.
 
-Turning it on, and the rules for when the knob acts, are in [the setup page](../setup/onshape.md). In short: Chrome or Edge, Onshape in front, and the mouse pointer over the model.
+Onshape is one of the apps on [Apps](apps.md): set it to Manual or Auto in Settings › Apps. Turning it on, and the rules for when the knob acts, are in [the setup page](../setup/onshape.md). In short: Chrome or Edge, Onshape in front, and the mouse pointer over the model.
 
 <picture><source srcset="../media/onshape-knob.webp" type="image/webp"><img src="../media/onshape-knob.gif" alt="The knob's screen in Onshape mode: a wireframe cube turns as the knob turns, with the labels TILT, ORBIT, WHEEL and PAN under the four buttons; holding button 3 brings up a ring of commands" width="480"></picture>
 
@@ -81,11 +81,11 @@ The Onshape screen on the knob is Karl Malota's design, adapted with his permiss
 
 ## Limits and known issues
 
-- **Chrome and Edge only.** Firefox is deliberately not supported: its page and tab strip share one window class, so a middle-button drag could land on a tab and close it.
+- **Chromium browsers only** (Chrome and Edge; Brave, Vivaldi and Opera are recognised too). Firefox is deliberately not supported: its page and tab strip share one window class, so a middle-button drag could land on a tab and close it.
 - **Drags end on their own after 800 ms without a turn**, and the pointer cannot be dragged past the edge of the screen: a long orbit may stop at the screen edge and start again from where the pointer was.
 - **Hold 3 and release repeats a command.** Once the wheel has shown (after about a quarter of a second), letting go runs whatever is highlighted, which is the command you last ran in that ring. If you only wanted Undo, tap 3 quickly instead.
-- **Elevated browser untested.** If Chrome or Edge runs as administrator and Desk Dial does not, Windows blocks the input.
-- **Non-US keyboard layouts unverified.** Shortcut letters are sent as US-layout key positions.
+- **Elevated browser untested.** If the browser runs as administrator and Desk Dial does not, Windows blocks the input.
+- **Keyboard layouts.** Shortcuts are typed for the keyboard layout of the window in front; a shortcut whose key that layout lacks is not sent, and the knob says "Not on this keyboard". Not yet tried on a non-US layout on real hardware.
 - **Not yet checked on real hardware:** the direction of tilt, whether each tool-search phrase lands on the right tool, and whether the browser's Ctrl+wheel page zoom ever wins over the number field in parameter mode A.
 - **Numbers are metric.** Parameter mode B's starting values (depth 25, radius 1) assume a document in millimetres.
 - **The wheel and the cube need the current firmware.** On an older knob Onshape mode still zooms, drags and undoes, but button 3 is Undo only and the screen is plain text.

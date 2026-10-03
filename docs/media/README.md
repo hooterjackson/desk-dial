@@ -6,6 +6,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | file | bytes | dimensions | frames | fps |
 |---|---:|---|---:|---:|
 | app-icons.png | 53,728 | 1240x420 | 1 |  |
+| apps-strip.png | 10,792 | 1760x520 | 1 |  |
+| apps-strip.webp | 25,534 | 1760x520 | 1 |  |
 | cheat-sheet-dark.png | 179,163 | 1240x1754 | 1 |  |
 | cheat-sheet.png | 177,191 | 1240x1754 | 1 |  |
 | desktop-explorer-16x9.gif | 2,838,546 | 800x450 | 72 | 9.96 |
@@ -24,6 +26,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | feel-gallery.png | 63,750 | 760x942 | 1 |  |
 | feel-wide.gif | 1,923,635 | 844x476 | 59 | 9.08 |
 | feel-wide.webp | 1,137,828 | 1280x720 | 174 | 27.18 |
+| head-apps-dark.png | 18,737 | 1760x422 | 1 |  |
+| head-apps.png | 18,012 | 1760x422 | 1 |  |
 | head-feel-dark.png | 14,292 | 1760x422 | 1 |  |
 | head-feel.png | 14,050 | 1760x422 | 1 |  |
 | head-hero-dark.png | 22,435 | 1760x443 | 1 |  |
@@ -49,8 +53,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | hero.gif | 2,833,055 | 864x528 | 71 | 8.88 |
 | hero.webp | 1,613,266 | 1440x880 | 157 | 19.82 |
 | knob-screens.png | 207,493 | 928x814 | 1 |  |
-| leds-moments.gif | 2,811,148 | 596x508 | 76 | 10 |
-| leds-moments.webp | 1,156,734 | 902x770 | 173 | 22.99 |
+| leds-moments.gif | 2,789,672 | 596x508 | 76 | 10 |
+| leds-moments.webp | 1,195,436 | 902x770 | 174 | 23.13 |
 | lights-brightness.gif | 1,228,482 | 475x550 | 80 | 9.98 |
 | lights-brightness.webp | 507,350 | 475x550 | 143 | 16.99 |
 | lights-power.gif | 1,873,643 | 475x550 | 97 | 11.58 |
@@ -77,8 +81,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 196,030 | 475x550 | 55 | 5.8 |
 | onshape-knob.webp | 232,202 | 475x550 | 75 | 7.73 |
-| ring-moments.gif | 2,217,224 | 684x544 | 76 | 10 |
-| ring-moments.webp | 1,050,896 | 1036x824 | 163 | 21.66 |
+| ring-moments.gif | 2,286,445 | 684x544 | 76 | 10 |
+| ring-moments.webp | 1,156,426 | 1036x824 | 167 | 22.2 |
 | settings-general.png | 17,229 | 616x890 | 1 |  |
 | settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
 | settings-knob.png | 26,291 | 616x1392 | 1 |  |

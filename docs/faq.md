@@ -14,6 +14,10 @@ No. Music comes from two places only: a Sonos speaker on your network, and Apple
 
 Without any music service set up, the knob still does three things: it switches and snaps your open windows (button 2 on the Home screen), it drives Home Assistant lights once you add an address and an access token (button 3), and it works in Onshape in Chrome or Edge. With a Sonos speaker but no Apple Music, the knob changes the group volume, plays and pauses, skips and seeks within the song, and shows the Sonos queue. Recently Added, Playlists, Play next and Like all need Apple Music.
 
+### Which apps besides Onshape?
+
+Figma and Plasticity (community-tested profiles), and Blender and AutoCAD (basic: the knob scrolls only), from Karl Malota's Nano_D app profiles. Each is Off until you set it to Manual or Auto in Settings › Apps, and you can import more. See [Apps](features/apps.md).
+
 ### Does it run on a Mac or on Linux?
 
 No. Desk Dial is a Windows 10/11 program. It depends on Windows features throughout: the Windows credential encryption (DPAPI), the window-snapping and live-preview interfaces, UI Automation for the Onshape check and the system tray.
@@ -91,8 +95,8 @@ The knob drives every light in the chosen area, including lights you add later.
 
 ### Buttons do nothing in Onshape
 
-- Settings › Knob › **Onshape mode** must be Manual or Auto. The default is Off. With Manual, switch it on from the tray's "Onshape mode" item.
-- Onshape must be open in **Chrome or Edge**. Firefox and other browsers are not recognised.
+- In Settings › Apps, **Onshape** must be Manual or Auto (Off unless you used it before). With Manual, switch it on from the tray's **App mode** menu.
+- Onshape must be open in **Chrome or Edge** (Brave, Vivaldi and Opera are recognised too). Firefox is not.
 - The knob shows **"Point at the model"** when your mouse pointer is not over the Onshape page in the front window. Move the pointer onto the model and try again. The toolbar, the tab strip and the bookmarks bar do not count.
 - A browser running as administrator does not accept input from a normal program. Start the browser normally.
 
@@ -116,11 +120,12 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 
 - Tested on one knob, the author's. Recalibrate motor, which other knobs may need, has not yet been tested on real hardware.
 - A self-signed `https://` certificate on Home Assistant has not yet been tested on real hardware and will likely be rejected.
-- Onshape: the tilt direction and tool-search hits are unverified; the Onshape title and address check runs even with Onshape mode Off (it reads the host only).
+- Onshape: the tilt direction and tool-search hits are unverified.
 - Spotify and other streaming services are not supported; Sonos and Apple Music only.
 - Windows 10/11 only.
 - Exactly one knob per PC.
 - The offline Windows-volume mode of the firmware has not yet been tested on real hardware.
-- Onshape: Chrome and Edge only; keyboard shortcuts are sent as US-layout virtual keys, so other keyboard layouts are unverified.
+- Onshape and the other apps: Chromium browsers only, not Firefox. Shortcuts follow your keyboard layout ("Not on this keyboard" when a key is missing); non-US layouts are not yet tried on real hardware.
+- Figma and Plasticity profiles are community tested; Blender and AutoCAD are basic (the knob scrolls only). See [Apps](features/apps.md).
 - The program is unsigned; SmartScreen warns on the first start and Smart App Control may block it.
 - The Home Assistant token crosses your network unencrypted when the address starts with `http://`; Settings shows a warning under the address when it does.

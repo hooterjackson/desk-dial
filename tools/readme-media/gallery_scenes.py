@@ -227,7 +227,14 @@ def led_tiles(ctx):
     snap = win0.get("buttons", [{}, {}])[1].get("color") or 0x1FB895
     tiles.append(button_moment("Snap: half wash", win0, 1, kind="ok", moment="snap", side=-1, color=snap))
     tiles.append(button_moment("Shuffle: scatter", H(30), 2, kind="ok", moment="shuffle"))   # sparks land on dark LEDs
-    tiles.append(button_moment("Queued: comet lap", _list(lst0, 0), 2, kind="ok", moment="queued"))
+    # Play next as the knob does it: hold 4 on a row for a second (the ring fills, the hold matures at the twin's
+    # HOLD4_MS), the controller answers "queued" inside the landing window, the whole ring flashes green
+    # (CC_FLASH_QUEUE). A quick tap answered "queued" would fall back to the older sweep.
+    t = LedTile("Play next: green flash", _list(lst0, 0))
+    t.at(MOMENT_AT, "kd", 3)
+    t.feedback(MOMENT_AT + 1060, _list(lst0, 0), kind="ok", moment="queued")
+    t.at(MOMENT_AT + 1100, "ku", 3)
+    tiles.append(t)
 
     t = LedTile("Wall: the push glows", H(100))
     t.at(MOMENT_AT, "lim", 1).at(MOMENT_AT + 260, "lim", 1)
@@ -302,7 +309,7 @@ def scene_leds_moments(ctx) -> list[Path]:
 
 # The README's ring picture: six of the moments, bigger, with short captions (the full twelve stay on leds.md).
 RING_PICKS = (("86 % amber, 95 % red embers", "Volume"), ("Cover colours in a list", "Album colours"),
-              ("Like: pink bloom", "Like"), ("Snap: half wash", "Snap"), ("Queued: comet lap", "Play next"),
+              ("Like: pink bloom", "Like"), ("Snap: half wash", "Snap"), ("Play next: green flash", "Play next"),
               ("Wall: the push glows", "End stop"))
 RING_SCALE = 0.9                   # 324 px rings (the full grid uses LED_SCALE 0.6)
 RING_CAPTION_H, RING_CAPTION_PX = 64, 30

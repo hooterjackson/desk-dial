@@ -65,6 +65,7 @@ SOURCES = (
     "firmware sound bank",
     "real footage",
     "typography (Archivo, headlines.py)",
+    "app profiles (Karl Malota's icons)",
 )
 
 # Fallback (scene, source) by file stem for files already in docs/media that no registry entry

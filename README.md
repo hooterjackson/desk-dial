@@ -16,7 +16,7 @@
 - **Optional:** Sonos, Apple Music and Home Assistant. Each one adds a chapter below; without any of them you still get the window picker, Onshape, the Navigator and the knob's own feel, sound and lights.
 - **Apple Music browsing needs your own Apple Developer membership (99 USD a year)** and an Apple Music subscription. Everything else is free.
 
-<p align="center"><sub>Not today: macOS, Linux, Spotify, lights without Home Assistant, Firefox for Onshape, more than one knob.</sub></p>
+<p align="center"><sub>Not today: macOS, Linux, Spotify, lights without Home Assistant, Firefox for Onshape and the other web apps, more than one knob.</sub></p>
 
 <br>
 
@@ -24,7 +24,7 @@
 <p align="center"><b>Music</b></p>
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-music-volume-dark.png"><img src="docs/media/head-music-volume.png" alt="Every percent, a click." width="880"></picture></p>
 
-<p align="center">Turn for your Sonos speakers, with a firm wall at each end. The ring follows the level and warms to amber past 80 % and red past 90 %.</p>
+<p align="center">Each click moves your Sonos volume 1 %, with a firm wall at each end. The top of the ring's arc glows amber past 80 % and red past 90 %.</p>
 
 <p align="center"><a href="docs/features/music.md"><picture><source srcset="docs/media/music-volume.webp" type="image/webp"><img src="docs/media/music-volume.gif" alt="Turning the knob raises the volume from 66 to 97 percent; the warm arc of light turns amber past 80 percent and red past 90 percent" width="475"></picture></a></p>
 
@@ -56,7 +56,7 @@
 <p align="center"><b>Lights</b></p>
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-lights-dark.png"><img src="docs/media/head-lights.png" alt="Dim, warm or set a scene." width="880"></picture></p>
 
-<p align="center">For your Home Assistant lights: brightness, warmth from 2200 K to 6500 K and scenes, with a heavier click than volume. All off remembers how things were, so Turn on brings them back.</p>
+<p align="center">For your Home Assistant lights: brightness, warmth from 2200 K to 6500 K and scenes, with a little heavier click than volume. All off remembers how the lights were, so Turn on brings them back.</p>
 
 <p align="center"><a href="docs/features/lights.md"><picture><source srcset="docs/media/lights-brightness.webp" type="image/webp"><img src="docs/media/lights-brightness.gif" alt="The Lights screen: turning the knob dims the room from 80 to 30 percent with a heavier click; a bar and a big number follow" width="475"></picture></a></p>
 
@@ -84,9 +84,17 @@
 
 <p align="center"><a href="docs/features/onshape.md"><picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="475"></picture></a></p>
 
-<p align="center"><sub>Chrome or Edge · turn on Onshape mode in Settings</sub> &nbsp;·&nbsp; <a href="docs/features/onshape.md">Everything Onshape mode does ›</a></p>
+<p align="center"><sub>Chrome or Edge · turn it on in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/onshape.md">Everything Onshape does ›</a></p>
 
-<!-- slot: app profiles -->
+<a name="apps"></a>
+<p align="center"><b>More apps</b></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-apps-dark.png"><img src="docs/media/head-apps.png" alt="Figma, Plasticity, Blender and AutoCAD." width="880"></picture></p>
+
+<p align="center">Karl Malota's app profiles give each program its own knob: what turning does, what the buttons do, and its own screen. Set an app to Auto and Desk Dial switches to it whenever the app is in front.</p>
+
+<p align="center"><a href="docs/features/apps.md"><picture><source srcset="docs/media/apps-strip.webp" type="image/webp"><img src="docs/media/apps-strip.png" alt="Karl Malota's pixel-art app icons: Onshape, tested; Figma and Plasticity, community tested; Blender and AutoCAD, basic" width="880"></picture></a></p>
+
+<p align="center"><sub>Figma and Plasticity community tested · Blender and AutoCAD scroll only · each Off until you choose Manual or Auto in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/apps.md">Every app, and how to add one ›</a></p>
 
 <br>
 
@@ -120,7 +128,7 @@
 
 <p align="center">Sixty LEDs draw the volume, take on each album's colour and bloom when you press Like. At rest they settle to one steady warm glow.</p>
 
-<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, a comet lap for Play next, and a glow at the end stop" width="880"></picture></a></p>
+<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, the ring lighting up as Play next lands, and a glow at the end stop" width="880"></picture></a></p>
 
 <p align="center"><a href="docs/features/leds.md">Every moment, and the screen's motion ›</a></p>
 
@@ -159,9 +167,9 @@
 
 1. **Flash the knob.** Follow the [flashing guide](docs/flashing.md); it backs up Karl's firmware first. *You should see* the knob restart.
 2. **Run the app.** Unzip the [latest release](../../releases/latest) anywhere and open `DeskDial.exe`; at the SmartScreen warning choose **More info**, then **Run anyway**. *You should see* the Settings window, and Desk Dial's icon in the tray.
-3. **Plug in the knob.** *You should see* the tray icon read "Desk Dial · Knob connected" and the knob show Home, with four words along the bottom: Music · Win · Lights · Play.
+3. **Plug in the knob.** *You should see* the tray icon read "Desk Dial · Knob connected" and the knob show Home, with four words along the bottom: Music · Win · Lights · Play (Play reads Pause while music plays).
 4. **Connect what you use** in Settings: [Sonos](docs/setup/sonos.md) · [Apple Music](docs/setup/apple-music.md) · [Home Assistant](docs/setup/home-assistant.md) · [Onshape](docs/setup/onshape.md). *You should see* the matching knob screen stop saying "Not connected" or "Sonos unavailable".
-5. **Turn it.** The speaker volume moves and you feel each click. Press 1 for Music; hold 1 to come back Home. *You should see* the screen name the four buttons on every screen, so there is nothing to memorise.
+5. **Turn it.** The speaker volume moves and you feel each click. Press 1 for Music; hold 1 to come back Home (in Onshape and the other apps, hold all four buttons for a second). *You should see* the screen name the four buttons on every screen, so there is nothing to memorise.
 
 Keep the one-page [cheat sheet](docs/media/cheat-sheet.png) ([PDF](docs/cheat-sheet.pdf)) under the knob for the first week.
 
@@ -212,18 +220,19 @@ flowchart LR
   OVL -- "window previews, snapping" --> WIN["Windows desktop"]
 ```
 
-The app does the thinking and the knob does the drawing: they talk over USB in a line-based JSON protocol, documented in [firmware/CONTROL_CENTER.md](firmware/CONTROL_CENTER.md). Build the [firmware](docs/build-firmware.md) and the [app](docs/build-app.md) yourself; issues and pull requests are welcome, and for a big change please open an issue first, because the knob has only four buttons to share.
+The app does the thinking and the knob does the drawing: they talk over USB in a line-based JSON protocol, documented in [firmware/CONTROL_CENTER.md](firmware/CONTROL_CENTER.md). Build the [firmware](docs/build-firmware.md) and the [app](docs/build-app.md) yourself, or add an app with a profile ([profiles/README.md](profiles/README.md)); issues and pull requests are welcome, and for a big change please open an issue first, because the knob has only four buttons to share.
 
 ## What's new in v2.0.0
 
-Home Assistant lights and scenes, the Navigator, Onshape mode with Karl's knob UI, walls at every end, a silent motor at rest, screen motion and knob sounds. The knob firmware and the app now share one version number. Everything else is in the [CHANGELOG](CHANGELOG.md).
+Home Assistant lights and scenes, the Navigator, Onshape mode with Karl's knob UI, app profiles for Figma, Plasticity, Blender and AutoCAD, walls at every end, a silent motor at rest, screen motion and knob sounds. The knob firmware and the app now share one version number. Everything else is in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits
 
 - **[Karl Malota (katbinaris)](https://github.com/katbinaris)** designed the Nano_D++ and wrote its [firmware](https://github.com/katbinaris/NanoD_RatchetH1) and [hardware](https://github.com/katbinaris/Nano_D_PlusPlus). With his permission Desk Dial adapts, from his `feat/firmware-esp-idf-quadra` branch, the Onshape app UI on the knob (cube, cards, wheel, parameter screen, plasma, Silkscreen pixel font, icons), the click and thump sound synthesis, and the haptic effect player with its table of feels. His firmware credits [@runger](https://github.com/runger1101001) (Richard Unger).
+- **App icons:** pixel art by Karl Malota ([katbinaris](https://github.com/katbinaris)), from his Nano_D app profiles.
 - **Typefaces:** Archivo, Montserrat and Silkscreen, under the SIL Open Font License.
 - Designed with Claude Design and built with Claude Code.
-- Apple, Apple Music and MusicKit are trademarks of Apple Inc.; Sonos is a trademark of Sonos, Inc.; Windows is a trademark of Microsoft; Home Assistant is a trademark of the Open Home Foundation; Onshape is a trademark of PTC. Desk Dial is not affiliated with any of them.
+- Apple, Apple Music and MusicKit are trademarks of Apple Inc.; Sonos is a trademark of Sonos, Inc.; Windows is a trademark of Microsoft; Home Assistant is a trademark of the Open Home Foundation; Onshape is a trademark of PTC. Figma, Plasticity, Blender and AutoCAD are trademarks of their respective owners. Desk Dial is not affiliated with any of them.
 
 <details>
 <summary>Libraries</summary>
