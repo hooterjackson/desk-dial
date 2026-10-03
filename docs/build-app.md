@@ -8,6 +8,7 @@ Desk Dial is a Windows program. Everything here assumes Windows 10 or 11 and Pow
 
 - **Python 3.14** (64-bit) from [python.org](https://www.python.org/downloads/windows/). The release is built with Python 3.14.5. Keep the installer's default options: they include **Tcl/Tk** (Desk Dial's Settings window) and the `py` launcher.
 - **About 1 GB of free disk** for the virtual environment and a bundle build.
+- **A short clone path.** The deepest file in the repository is 130 characters below its root, and Windows stops at 260 by default. Clone to something like `C:\src\desk-dial`, or run `git config --global core.longpaths true` before cloning. A checkout that fails with "Filename too long" is this limit.
 - For the parts that talk to a knob: a Nano_D++ with the Desk Dial firmware ([flashing guide](flashing.md)). Without one, the simulator below and the tests still work.
 
 ## Set up the environment
