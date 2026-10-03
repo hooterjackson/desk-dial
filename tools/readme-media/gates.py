@@ -64,9 +64,8 @@ CAPS = {
 # gate still runs on the generic terms and says so.
 BLOCKLIST = (
     "192.168.", "RINCON",
-    "Kate Bush", "Massive Attack", "Floating Points", "Chromatics", "Miles Davis", "Jobim", "Tropic",
-    "Danny Lewis", "Bambu", "Claude ·", "Slack", "ChatGPT", "Google Chrome", "Figma", "Spotify",
-    "Steam", "homeassistant.local",
+    "Bambu", "Claude ·", "Slack", "ChatGPT", "Google Chrome", "Figma", "Spotify",
+    "Steam", "homeassistant.local",       # generic only; artists and titles are in the private list (PRIVATE_TERMS)
 )
 ALLOWLIST = {
     "tools/readme-media/gates.py": set(BLOCKLIST),

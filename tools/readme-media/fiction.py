@@ -99,10 +99,8 @@ def album_of(url):
 
 
 # ---------------------------------------------------------------- the blocklist
-BLOCKLIST = ("Kate Bush", "Massive Attack", "Air", "Floating Points", "Chromatics",
-             "Miles", "Jobim", "Tropic", "192.168", "RINCON", "Danny", "Bambu", "Claude", "Slack",
-             "ChatGPT", "Chrome", "Figma", "Spotify", "Steam", "Undertow", "Morning Fog", "Night Drive",
-             "Hounds of Love", "Sample track", r"C:\\Users", "mzstatic")
+BLOCKLIST = ("192.168", "RINCON", "Bambu", "Claude", "Slack", "ChatGPT", "Chrome", "Figma", "Spotify", "Steam",
+             r"C:\\Users", "mzstatic")    # generic only; artists and titles live in the private list (gates.PRIVATE_TERMS)
 try:                                   # plus the owner's private terms, kept outside the repo (gates.PRIVATE_TERMS)
     from gates import PRIVATE_TERMS as _PRIVATE
     BLOCKLIST = BLOCKLIST + tuple(_PRIVATE)
