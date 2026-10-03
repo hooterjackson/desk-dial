@@ -5,7 +5,7 @@ full-screen on the user's monitor for about a minute: run it only from the main 
 user's explicit go-ahead, the user at the PC:
 
     cd app
-    .venv\\Scripts\\python.exe -I ..\\tools\\stage_checks\\music_tours.py --run --i-have-go-ahead [--stress] [--no-capture]
+    .venv\\Scripts\\python.exe -I ..\\..\\tools\\stage_checks\\music_tours.py --run --i-have-go-ahead [--stress] [--no-capture]
 
 ``--run`` first runs, in child processes, the two headless checks below on the same source and
 starts the on-screen child only when both passed:

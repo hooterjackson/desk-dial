@@ -122,6 +122,10 @@ artwork2 section, the stress passes and the soak:
     (turnAttempts). The gate is as before on the last attempt: at least 20 claimed position events
     inside the stress-frame window itself and no pause over 3 s in that window; otherwise it is a
     FAIL marked "turning not detected during stress; rerun", never a pass;
+  * both stress gates have a floor, like the soak's (TL-BUG-009): each pass (and the untouched pass's v1 part)
+    must send at least STRESS_GATE_FRAMES (300) frame updates and an unpaced pass must last at least
+    STRESS_GATE_SECONDS (20 s); a shorter run is recorded ("gateFloor") but its gate stays false.
+    --stress-frames must be at least 1, and the effective arguments are recorded ("arguments");
   * soak (UNATTENDED): --soak-minutes (default 20) of companion-like traffic with nobody at the
     knob (it shows YOU CAN LEAVE and the time left): a changed frame every second (the countdown
     and the per-frame tag, LED style every 5 s, layout base every 10 s, a
@@ -212,6 +216,13 @@ STRESS_BASES = ("v4-home-now-playing", "v4-recent-item-colour", "v4-tracks-no-pr
 MEDIA_STRESS_BASES = STRESS_BASES + ("v4-windows-window-rule",)
 MEDIA_BASES = {"recent": "v4-recent-item-colour", "windows": "v4-windows-window-rule"}
 REPLAY_TRANSFERS = 3      # the extra cold transfers of the 1.0.0-cc5 run 1, before its stress
+# The stress gates' floor, like the soak's SOAK_GATE_MINUTES (TL-BUG-009): stressUntouched and stressTurn are true only
+# when each pass sent at least the default --stress-frames and an unpaced artwork2 pass lasted at least the default
+# --stress-seconds. A shorter run (e.g. --stress-frames 10 for a rerun) still runs and is recorded, but never passes.
+STRESS_GATE_FRAMES = 300
+STRESS_GATE_SECONDS = t.STRESS_MIN_SECONDS
+# The failure a Ctrl+C records (TL-BUG-008): the run is written as not completed and not passed, then re-raised.
+INTERRUPTED_CHECK = "run completed: interrupted (Ctrl+C) before the end; not a pass"
 # The current release's gates (its profile's: the cc5.2 ten, then artwork2's of 1.0.0-cc5.3). A run
 # for another profile (--release) reports that profile's gates (1.0.0-cc5.4 adds the ALIVE and
 # presentation-5 gates, tooling.ALIVE_DEVICE_GATES and PRESENTATION5_DEVICE_GATES).
@@ -226,6 +237,7 @@ HOLD_RAW, OTHER_RAW, HID_RAW = 0, 1, 3          # Button 1 holds (buttonOrder[0]
 HOLD_AFTER_KD_S = t.DEFERRED_KH_ESTIMATE_S
 DEFERRED_OFFSETS_S = t.DEFERRED_OFFSETS_S
 DEFERRED_ATTEMPTS = 10                           # --deferred-attempts
+DEFERRED_AGAIN = "Again · attempt {n} of {of}"    # the next deferred attempt (fits the note line at 10 of 10)
 DEFERRED_KH_WAIT_S = 1.5                         # after the new ready line, the kh is awaited this long
 LATE_KH_S = 0.6       # after each key-up the check listens this long; a kh in it counts (11.2: at most one per press)
 HOLD_SHORT_S = 1.2                               # a key-up this soon after the kd, with no kh: "Too short"
@@ -599,7 +611,7 @@ def bridge_media(bridge, events, c, controller, simulation, report, out, cursor)
     return all(ok)
 
 
-def bridge_checks(port, report, watch, profile=None):
+def bridge_checks(port, report, watch, profile=None, binary=None):
     p = profile or report.profile
     controller, device, runtime_mod, simulation = companion()
     bridge = device.DeviceBridge(t.BACKUPS)
@@ -613,8 +625,10 @@ def bridge_checks(port, report, watch, profile=None):
         inventory = t.load_json(inventory_path)
         report.data.update(inventory=str(inventory_path), capabilities=caps)
         settings = inventory.get("settings", {})
-        report.check(f"inventory: firmware {p.version}", settings.get("firmwareVersion") == p.version,
-                     settings.get("firmwareVersion"))
+        # FW-PUB-004: the knob reports "<NANO_FIRMWARE_PUBLIC>+<build id>.<binary>" (1.0.0+cc5.7.F), not p.version.
+        reported = t.reported_firmware_versions(p, binary)
+        report.check(f"inventory: firmware {' or '.join(reported)} ({p.version})",
+                     settings.get("firmwareVersion") in reported, settings.get("firmwareVersion"))
         report.check("capability: controlCenter 1, leaseMs 2000", caps.get("controlCenter") == 1 and caps.get("leaseMs") == 2000)
         report.check(f"capability: presentation {p.presentation}", caps.get("presentation") == p.presentation,
                      caps.get("presentation"))
@@ -655,7 +669,7 @@ def bridge_checks(port, report, watch, profile=None):
         runtime = runtime_mod.Runtime(c, simulation.SimulatedSonos(), simulation.SimulatedAppleMusic(),
                                       simulation.SimulatedWindows())
         c.state.update(simulation.SimulatedSonos().read_state())
-        c.state.update(volume=54, title="Colombina", artist="Mari Froes", playback="PLAYING")
+        c.state.update(volume=54, title="Varanda", artist="Ana Ribeira", playback="PLAYING")
         c.state_known = True
         c.windows_hid_enabled = False
         Screen = controller.Screen
@@ -1517,7 +1531,7 @@ def deferred_hold(p, report, out, attempts_max=DEFERRED_ATTEMPTS):
             break
         if khs:
             planner.observe(khs[0][0] - kd_at)
-        note, tone = f"Once more · attempt {n + 1} of {attempts_max}", None
+        note, tone = DEFERRED_AGAIN.format(n=n + 1, of=attempts_max), None
     p.done()
     out.update(attempts=attempts, planner=planner.record(), tooShort=short, attemptsMax=attempts_max)
     ok = bool(attempts) and attempts[-1].get("deferred") is True and not attempts[-1]["problems"]
@@ -1611,6 +1625,17 @@ def end_stop_push(p, seek, say, note, question, nudges, *, direction=1, hold_s=0
     return start, end, first_at, doubles
 
 
+SEEK_FEEL = "fluid.scrub"           # Desk Dial's Seek feel (controller.Controller.feel)
+
+
+def push_note(n, again=""):
+    """The note of push n of PUSHES on the Seek overlay; the first push of a repeat carries `again` ("Again · ") and
+    drops "then" so the line fits the glass (TL-TST-002: "Again · Push 1 of 5, then let go" was cut)."""
+    if again and n == 1:
+        return f"{again}Push {n} of {PUSHES}, let go"
+    return f"Push {n} of {PUSHES}, then let go"
+
+
 def push_test(p, report, device, live_caps, tracks, out, retries):
     """ALIVE.md ruling Q1 (12.5) and 11.9, steps pushes, pushhold and zero: at the right end of a Seek control, one
     lim +1 per push, one while held, none outside; then 0:00 gives lim -1. Every push is its own prompt ("Push past
@@ -1626,13 +1651,15 @@ def push_test(p, report, device, live_caps, tracks, out, retries):
         p.begin("pushes")
         again = "Again · " if attempt else ""
         seek = SeekScreen(p, base, t_end)
+        # Desk Dial's Seek feel on an r4 knob, so its walls follow the r4 wall law and not the cc5.6 loop; silent
+        # (volume 0) like every hands-on step; nothing is added for an older knob (its control line is unchanged).
         seek.cid = p.enter(seek.frame(), PROFILE["tracks"], t_end, t_end, say="End stop test",
-                           note=f"{again}{PUSHES} pushes")
+                           note=f"{again}{PUSHES} pushes", extra=t.feel_fields(device, live_caps, SEEK_FEEL))
         start = knob.now()
         windows, nudges = t.EndStopWindows(), []
         for n in range(1, PUSHES + 1):
-            a, b, first, doubles = end_stop_push(p, seek, "Push past the end", f"{again if n == 1 else ''}Push {n} of "
-                                                 f"{PUSHES}, then let go", "Did you push?", nudges, key=f"push{n}.")
+            a, b, first, doubles = end_stop_push(p, seek, "Push past the end", push_note(n, again), "Did you push?",
+                                                 nudges, key=f"push{n}.")
             windows.push(a, b, missed=first is None)
             for at in doubles:
                 windows.double(n, at)
@@ -1907,6 +1934,29 @@ def run_stress(knob, cid, prefix, frames, bases, live_caps, state, device, error
                         and all(x["committed"] for x in transfers) and media_stats["haveMisses"] == 0
                         and not stopped["aborted"])
     return result
+
+
+def stress_floor_problems(result, media=None, what="stress"):
+    """Why a stress pass `result` (run_stress) is below the gate's floor: fewer than STRESS_GATE_FRAMES frame updates,
+    or, for an unpaced artwork2 pass (`media` set), a frame window shorter than STRESS_GATE_SECONDS. [] when it is not
+    (TL-BUG-009)."""
+    problems = []
+    if result["framesSent"] < STRESS_GATE_FRAMES:
+        problems.append(f"{what}: {result['framesSent']} frame updates < {STRESS_GATE_FRAMES} (the gate's floor)")
+    if media is not None:
+        seconds = result["window"][1] - result["window"][0]
+        if seconds < STRESS_GATE_SECONDS:
+            problems.append(f"{what}: {seconds:.1f} s of unpaced media stress < {STRESS_GATE_SECONDS:g} s "
+                            "(the gate's floor)")
+    return problems
+
+
+def positive_int(text):
+    """argparse type: an integer >= 1 (--stress-frames 0 would let a stress pass send nothing; TL-BUG-009)."""
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {value}")
+    return value
 
 
 class SoakFailure(RuntimeError):
@@ -2474,7 +2524,13 @@ def raw_checks(port, report, caps, args, watch, profile=None):
                          {k: result[k] for k in ("framesSent", "transfers", "committed")})
             report.check(f"stress (untouched, {label}): no knob events (a touched knob is a rerun, not a pass)",
                          not touched, len(touched))
-            report.gates["stressUntouched"] = result["passed"] and not touched and v1_ok
+            floor = stress_floor_problems(result, media, "untouched") + (
+                stress_floor_problems(v1, None, "untouched, paced v1 art") if v1 is not None else [])
+            out["gateFloor"] = {"frames": STRESS_GATE_FRAMES,
+                                "seconds": STRESS_GATE_SECONDS if media is not None else None, "problems": floor}
+            report.gates["stressUntouched"] = result["passed"] and not touched and v1_ok and not floor
+            if floor:
+                print(f"Note: the stressUntouched gate needs a full-length pass: {'; '.join(floor)}.", flush=True)
         render = {}                                         # 1.0.0-cc5.4: ledRenderUsMax over each stress pass
         stress_diag = knob.diag()                           # (the checkpoint before the pass read and reset it)
         if p.alive:
@@ -2540,7 +2596,12 @@ def raw_checks(port, report, caps, args, watch, profile=None):
                          "while turning, zero error replies, no release", passed,
                          {k: result[k] for k in ("framesSent", "transfers", "committed")})
             report.check(TURN_CHECK, not turning, turning or out["knobEvents"])
-            report.gates["stressTurn"] = passed
+            floor = stress_floor_problems(result, media, "stress+turn")
+            out["gateFloor"] = {"frames": STRESS_GATE_FRAMES,
+                                "seconds": STRESS_GATE_SECONDS if media is not None else None, "problems": floor}
+            report.gates["stressTurn"] = passed and not floor
+            if floor:
+                print(f"Note: the stressTurn gate needs a full-length pass: {'; '.join(floor)}.", flush=True)
             report.gates["turningDetected"] = not turning
             if p.alive:
                 # ALIVE.md 11.9: turning back and forth across the stress control's range reaches both ends.
@@ -2679,7 +2740,9 @@ def main(argv=None):
                         help="safety timeout of each wait for the operator; reaching it stops the run as \"operator did "
                              "not complete step N\" (exit 4) or \"screen not confirmed\" (exit 5), never a firmware "
                              f"failure (default {t.PROMPT_STEP_TIMEOUT_S:g} s)")
-    parser.add_argument("--stress-frames", type=int, default=300, help="frame updates in each stress pass")
+    parser.add_argument("--stress-frames", type=positive_int, default=STRESS_GATE_FRAMES,
+                        help=f"frame updates in each stress pass (at least 1; the stress gates need at least "
+                             f"{STRESS_GATE_FRAMES})")
     parser.add_argument("--stress-seconds", type=float, default=t.STRESS_MIN_SECONDS,
                         help="minimum length of each unpaced media stress pass (default "
                              f"{t.STRESS_MIN_SECONDS:g} s; unpaced transfers are fast)")
@@ -2710,33 +2773,61 @@ def main(argv=None):
     t.require_companion_quit()
     port = t.find_app_port()
     report = Report(port, profile)
+    # The effective arguments that shaped this run (stress length, soak length, ...), so the evidence shows them.
+    report.data["arguments"] = {k: v for k, v in sorted(vars(args).items())
+                                if v is None or isinstance(v, (bool, int, float, str))}
     # After a step-down whose failed binary left a core dump, only that dump (held by this binary's step-down base)
     # may be present at the start; any other dump fails coredumpBlank (tooling.coredump_problems, TB-D9).
     watch = RebootWatch(report, port, inherited_coredump=t.step_down_coredump(profile, args.binary) if args.binary else None)
-    error = stop = None
+    error = stop = interrupted = None
     try:
         watch.start()
-        caps = bridge_checks(port, report, watch, profile)
+        caps = bridge_checks(port, report, watch, profile, args.binary)
         time.sleep(0.5)  # let Windows release the port before the raw session
         raw_checks(port, report, caps, args, watch, profile)
     except t.OperatorStop as exc:
         stop = exc              # recorded by raw_checks ("operatorStop", "prompts"); nothing added to "failures"
         report.data["operatorStop"] = exc.record()
+    except KeyboardInterrupt as exc:
+        # Ctrl+C (TL-BUG-008): an interrupted run is recorded as not completed and not passed, then re-raised below
+        # once the record is written; it never prints PASSED.
+        interrupted = exc
+        report.check(INTERRUPTED_CHECK, False, "KeyboardInterrupt")
     except Exception as exc:
         error = exc
         report.check("run completed", False, f"{type(exc).__name__}: {exc}")
     finally:
         try:
             watch.finish(error)
+        except KeyboardInterrupt as exc:     # a second Ctrl+C while the watch finishes: still write the record
+            if interrupted is None:
+                interrupted = exc
+                report.check(INTERRUPTED_CHECK, False, "KeyboardInterrupt (reboot watch)")
         except Exception as exc:
             report.check("reboot watch finished", False, f"{type(exc).__name__}: {exc}")
-        report.data["completed"] = stop is None
-        report.data["passed"] = not report.data["failures"] and stop is None
+        report.data["completed"] = stop is None and interrupted is None
+        report.data["interrupted"] = interrupted is not None
+        # Every gate is a hard gate (finalize_nanod_cc5.REQUIRED_GATES is the profile's gates): a run with a false
+        # gate is not a pass even with no failed check (TL-BUG-008).
+        gates_false = [name for name, value in report.gates.items() if value is not True]
+        report.data["gatesFalse"] = gates_false
+        report.data["passed"] = (not report.data["failures"] and stop is None and interrupted is None
+                                 and not gates_false)
         report.data["finishedUtc"] = t.utc_stamp()
         t.write_json_evidence(profile.device_checks, report.data)
-        verdict = (f"NOT COMPLETED ({stop.reason}: step {stop.step} of {stop.of}, {stop.name}; not a firmware failure)"
-                   if stop is not None else "PASSED" if report.data["passed"] else "FAILED")
-        print(f"{verdict}; gates {report.gates}; evidence {profile.device_checks}")
+        if stop is not None:
+            verdict = f"NOT COMPLETED ({stop.reason}: step {stop.step} of {stop.of}, {stop.name}; not a firmware failure)"
+        elif interrupted is not None:
+            verdict = "INTERRUPTED (Ctrl+C; not completed, not passed)"
+        elif report.data["passed"]:
+            verdict = "PASSED"
+        elif not report.data["failures"]:
+            verdict = f"FAILED (gates not passed: {', '.join(gates_false)})"
+        else:
+            verdict = "FAILED"
+        print(f"{verdict}; gates {report.gates}; evidence {profile.device_checks}", flush=True)
+    if interrupted is not None:
+        raise interrupted
     if stop is not None:
         return stop.exit_code
     return 0 if report.data["passed"] else 1

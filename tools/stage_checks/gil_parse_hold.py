@@ -2,7 +2,7 @@
 §4.7.3 and §6.6 H5; CONTROL_CENTER_V5 §1.2; [G1] G1-5).
 
     cd app
-    .venv\\Scripts\\python.exe -I ..\\tools\\stage_checks\\gil_parse_hold.py [--reps 20] [--json PATH]
+    .venv\\Scripts\\python.exe -I ..\\..\\tools\\stage_checks\\gil_parse_hold.py [--reps 20] [--json PATH]
                                  [--recorded DIR] [--only TEXT] [--quick] [--no-save]
 
 Headless and offline. Nothing is shown, fetched or sent: no Sonos, no Apple Music, no serial port,
@@ -115,8 +115,8 @@ def block_network():
 WORDS = ("love", "night", "running", "hill", "heart", "light", "river", "summer", "dream", "city", "blue",
          "gold", "fire", "rain", "moon", "ghost", "wild", "time", "dance", "home", "paper", "glass",
          "echo", "silver", "ocean", "stone", "velvet", "signal", "arcade", "neon")
-ACCENTED = ("Tropicália", "Björk", "Sigur Rós", "Café Tacvba", "Motörhead", "Beyoncé", "Mañana", "Coração",
-            "Jóga", "Déjà vu", "Ça plane pour moi")
+ACCENTED = ("Copper Sun", "Linnéa Holm", "North of June", "Café Tacvba", "Motörhead", "Renée Lys", "Mañana", "Coração",
+            "Jóga", "Maré Alta", "Ça plane pour moi")
 CJK = ("夜に駆ける", "紅蓮華", "アイドル", "우리의 밤", "少年時代", "春よ、来い")
 
 
@@ -128,7 +128,7 @@ def _title(rng, words=(2, 5)):
     if kind < 0.20:
         base = rng.choice(ACCENTED) + " " + base
     if kind > 0.85:
-        base += rng.choice((" (Remastered 2011)", " [feat. Kate Bush]", " (Live at Wembley 1986)",
+        base += rng.choice((" (Remastered 2011)", " [feat. Mira Vale]", " (Live at Wembley 1986)",
                             " - Single Version", " (A Deal With God)"))
     return base
 
@@ -371,12 +371,12 @@ def recovery_snapshot(rng, rows):
     items = []
     for row in range(rows):
         item = didl_item(rng, row + 1)
-        items.append({"title": _title(rng), "uri": "x-sonos-http:song%3a1000000001.mp4?sid=204&flags=8224&sn=3",
+        items.append({"title": _title(rng), "uri": "x-sonos-http:song%3a1445981467.mp4?sid=204&flags=8224&sn=3",
                       "metadata": DIDL_OPEN + item + "</DIDL-Lite>"})
     return {"room_uid": "RINCON_000E58BENCH01400", "coordinator_uid": "RINCON_000E58BENCH01400",
             "group_revision": _hex(rng, 24), "queue_revision": "187", "items": items,
             "track": {"title": "x", "artist": "y", "album": "z", "position": "0:01:02", "duration": "0:04:58",
-                      "uri": "x-sonos-http:song%3a1000000001.mp4", "playlist_position": "3", "metadata": ""},
+                      "uri": "x-sonos-http:song%3a1445981467.mp4", "playlist_position": "3", "metadata": ""},
             "transport": {"current_transport_state": "PLAYING", "current_transport_status": "OK",
                           "current_transport_speed": "1"}, "play_mode": "NORMAL"}
 

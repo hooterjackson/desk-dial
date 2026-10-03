@@ -1,8 +1,17 @@
 """Build one binary of the current release's firmware (PlatformIO `run`, never upload) and accept or reject it.
 
-The release is nanod_cc5_tooling.CURRENT (1.0.0-cc5.4). It stages the PRESENTATION_V5 12.6 build
-ladder (lead ruling R-m), one binary per run (--binary, default D). The binaries this script builds are the
-active ones (tooling.ACTIVE_BINARIES):
+The release is nanod_cc5_tooling.CURRENT (1.0.0-cc5.5, plan F1; firmware/BUILD-cc5.5.md). It has its own ladder,
+one binary per run (--binary, default D; tooling.binary_choices()):
+  D  release candidate: PLATFORMIO_BUILD_FLAGS "-DCC_BUILD_BINARY=4" on the source defaults (CC_LCD_DMA 1,
+     CC_LCD_PERIOD_MS 16, CC_ART_ASYNC 1), cc5.4 D's pipeline; built into .pio/build-cc5.5-D;
+  F  speed candidate: "-DCC_LCD_PERIOD_MS=12 -DCC_BUILD_BINARY=6" (D at a 12 ms LCD period; diag build "F");
+     built into .pio/build-cc5.5-F.
+A cc5.5 binary is accepted only when, besides everything below, its image is at most the flash size gate
+(tooling.IMAGE_SIZE_GATE_BYTES, 1,245,184 B = 95 % of app0; recorded as "sizeGate"). Logs:
+work/nanod-cc5.5-D-build.log and -F-build.log; records: diagnostics/cc5.5-D-build.json and -F-build.json.
+
+1.0.0-cc5.4 (history; the text below is that release's, whose profile a test can still pin as CURRENT) staged
+the PRESENTATION_V5 12.6 build ladder (lead ruling R-m); its active binaries were:
   D  release candidate (A + fixes): PLATFORMIO_BUILD_FLAGS "-DCC_BUILD_BINARY=4" on the source defaults
      (CC_LCD_DMA 1, CC_LCD_PERIOD_MS 16, CC_ART_ASYNC 1);
   E  fallback (C + fixes): PLATFORMIO_BUILD_FLAGS "-DCC_LCD_DMA=0 -DCC_LCD_PERIOD_MS=33 -DCC_ART_ASYNC=0
@@ -12,12 +21,25 @@ The first ladder, A (the source defaults, built into the project's own .pio/buil
 retired (tooling.RETIRED_BINARIES: A was rolled back on 2026-09-26 with a dark LCD, B carries the same DMA
 defect, C is superseded by E): --binary A|B|C is refused by argparse (exit 2) and nothing is built or written.
 Every binary but A builds into its own PLATFORMIO_BUILD_DIR (.pio/build-cc5.4-D, .pio/build-cc5.4-E), so no
-binary ever overwrites another; PlatformIO appends PLATFORMIO_BUILD_FLAGS to platformio.ini's build_flags. Any
-PLATFORMIO_BUILD_FLAGS, PLATFORMIO_SRC_BUILD_FLAGS, PLATFORMIO_BUILD_UNFLAGS or PLATFORMIO_BUILD_DIR in
-the caller's environment is dropped first. .pio/libdeps is only read.
+binary ever overwrites another; PlatformIO appends PLATFORMIO_BUILD_FLAGS to platformio.ini's build_flags. Every
+PLATFORMIO_* variable in the caller's environment (PLATFORMIO_BUILD_FLAGS, PLATFORMIO_BUILD_SRC_FLAGS,
+PLATFORMIO_BUILD_SRC_FILTER, PLATFORMIO_EXTRA_SCRIPTS, PLATFORMIO_BUILD_CACHE_DIR, ...) is dropped first, so no stray
+override shapes an accepted build unrecorded; only the pinned PLATFORMIO_CORE_DIR is set. The dropped names (never
+their values) are recorded as "droppedEnvironment" (TL-BUG-003). .pio/libdeps is only read.
+
+Every build is clean (2026-09-30, the cc5.7 failure): the binary's build folder is deleted first
+(tooling.clean_build_folder; recorded as "cleanBuild"). include/lv_conf.h reaches LVGL through -DLV_CONF_PATH, a
+macro include the dependency scan cannot see, so an incremental build linked LVGL objects compiled with
+LV_OBJ_STYLE_CACHE 0 against display code compiled with 1: two lv_obj_t layouts in one image, and a host screen
+that was never drawn.
 
 A binary is accepted only when all hold:
   * the PlatformIO log contains [SUCCESS];
+  * every object file under the build folder was compiled by this run and is newer than include/lv_conf.h and
+    include/nanofoc_d.h (tooling.stale_object_problems, recorded as "objectFreshness");
+  * the host harness (harness) was built with this lv_conf.h: its #defines equal the firmware's apart
+    from the host overrides, and its renderer is newer than its copy (tooling.harness_conf_problems, recorded as
+    "harnessConf"), so its renders are evidence for this build;
   * its firmware.bin is an ESP image smaller than app0 (0x140000) containing the release's version;
   * the compiled pipeline is the binary's (tooling.binary_image_problems / binary_elf_problems): the image
     holds the R5 decode task name "ArtDecode" exactly in A and D, and firmware.elf links the R3 draw buffer
@@ -58,10 +80,25 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nanod_cc5_tooling as t  # noqa: E402  (no side effects on import)
+import package_nanod_cc5 as package  # noqa: E402  (the source listing; no side effects on import)
 
-# Build-shaping variables PlatformIO reads from the environment: never inherited from the caller.
+# Build-shaping variables PlatformIO reads from the environment: never inherited from the caller. PlatformIO 6 reads
+# many more (PLATFORMIO_BUILD_SRC_FLAGS, _BUILD_SRC_FILTER, _EXTRA_SCRIPTS, _BUILD_CACHE_DIR, _LIB_EXTRA_DIRS, the
+# *_DIR overrides, ...), so every PLATFORMIO_* variable is dropped; the core dir is set explicitly (TL-BUG-003).
+PIO_VARIABLE_PREFIX = "PLATFORMIO_"
 PIO_BUILD_VARIABLES = ("PLATFORMIO_BUILD_FLAGS", "PLATFORMIO_SRC_BUILD_FLAGS", "PLATFORMIO_BUILD_UNFLAGS",
-                       "PLATFORMIO_BUILD_DIR")
+                       "PLATFORMIO_BUILD_DIR", "PLATFORMIO_BUILD_SRC_FLAGS", "PLATFORMIO_BUILD_SRC_FILTER",
+                       "PLATFORMIO_EXTRA_SCRIPTS", "PLATFORMIO_BUILD_CACHE_DIR", "PLATFORMIO_LIB_EXTRA_DIRS",
+                       "PLATFORMIO_LIBDEPS_DIR", "PLATFORMIO_SRC_DIR", "PLATFORMIO_INCLUDE_DIR",
+                       "PLATFORMIO_LIB_DIR", "PLATFORMIO_BOARDS_DIR", "PLATFORMIO_WORKSPACE_DIR",
+                       "PLATFORMIO_PLATFORMS_DIR", "PLATFORMIO_PACKAGES_DIR")
+
+
+def dropped_variables(environ=None):
+    """The sorted names (never the values) of the caller's PLATFORMIO_* variables build_environment drops."""
+    environ = os.environ if environ is None else environ
+    return sorted(k for k in environ
+                  if k.upper().startswith(PIO_VARIABLE_PREFIX) and k.upper() != "PLATFORMIO_CORE_DIR")
 
 
 def heap_projection_problems(report, p, symbols=None):
@@ -108,8 +145,8 @@ def read_symbols(elf_path):
 
 def build_environment(p):
     """The environment PlatformIO runs with for binary `p`: the pinned core, UTF-8, and for every binary but A its
-    flags and build folder; the caller's build-shaping variables never leak in."""
-    env = {k: v for k, v in os.environ.items() if k.upper() not in PIO_BUILD_VARIABLES}
+    flags and build folder; no PLATFORMIO_* variable of the caller leaks in (TL-BUG-003)."""
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith(PIO_VARIABLE_PREFIX)}
     env.update(PLATFORMIO_CORE_DIR=str(t.PIO_CORE), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     if p.build_flags:
         env["PLATFORMIO_BUILD_FLAGS"] = " ".join(p.build_flags)
@@ -148,6 +185,23 @@ def mosi_gate(p, names, call_order=None, call_order_error=None):
     return gate
 
 
+def git(*args):
+    """A read-only git command in the firmware tree (the source snapshot)."""
+    safe = t.FIRMWARE_SOURCE.as_posix()
+    return subprocess.check_output(["git", "-c", f"safe.directory={safe}", "-C", str(t.FIRMWARE_SOURCE), *args],
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+def source_snapshot():
+    """(snapshot, problems): package_nanod_cc5.source_snapshot of the tree this build compiles (TL-BUG-005:
+    packaging refuses a tree that changed since), or a problem when git cannot list it."""
+    try:
+        return package.source_snapshot(git), []
+    except (OSError, subprocess.CalledProcessError, ValueError, SystemExit) as exc:
+        return None, [f"the firmware sources could not be recorded ({type(exc).__name__}: {exc}); packaging needs "
+                      "them"]
+
+
 def sibling_problems(p, sha256):
     """The image must differ from every other binary's accepted image (identical bytes would mean the
     flags did not take effect)."""
@@ -171,19 +225,34 @@ def main(argv=None):
     if choices:
         parser.add_argument("--binary", choices=choices, default=choices[0],
                             help=f"the PRESENTATION_V5 12.6 binary to build (default {choices[0]})")
+    # 1.0.0-cc5.6 (A2): the release to build, CURRENT by default; --release cc5.6 builds the tree's newest release
+    # while CURRENT is still the one being installed (1.0.0-cc5.5). Same ladder (D, F).
+    releases = [tag for tag, profile in t.PROFILES.items() if profile.pipeline_binaries() == t.CURRENT.pipeline_binaries()]
+    parser.add_argument("--release", choices=releases, default=t.CURRENT.tag,
+                        help=f"the release profile (default {t.CURRENT.tag}, CURRENT)")
     args = parser.parse_args(argv)
     t.console_utf8()
-    p = t.CURRENT.binary_profile(getattr(args, "binary", None))
+    p = t.PROFILES[args.release].binary_profile(getattr(args, "binary", None))
     python = t.PIO_VENV / "Scripts" / "python.exe"
     command = [str(python), "-m", "platformio", "run", "-d", str(t.FIRMWARE_SOURCE), "-e", t.PIO_ENV]
     assert "upload" not in command and "-t" not in command, "Build only"
     env = build_environment(p)
+    dropped = dropped_variables()
     image_path, elf_path = p.built_image, p.built_elf
+    # Always a clean build (2026-09-30, the cc5.7 failure): lv_conf.h reaches LVGL through a macro include the
+    # dependency scan cannot see, so an incremental build can link objects compiled with two different configs.
+    folder = t.build_folder(p)
+    removed = t.clean_build_folder(folder)
     started = datetime.now(timezone.utc)
+    # The tree this build compiles, recorded before PlatformIO runs (TL-BUG-005): package_nanod_cc5.py archives
+    # only these sources with the image, and refuses when the tree changed since.
+    snapshot, snapshot_problems = source_snapshot()
     # The previous log of this binary is evidence (a packaged manifest pins its SHA-256): keep it, never overwrite.
     previous_log = t.archive_existing(p.build_log)
     with p.build_log.open("x", encoding="utf-8") as output:
         output.write(f"$ {' '.join(command)}\nPLATFORMIO_CORE_DIR={t.PIO_CORE}\n")
+        if dropped:
+            output.write(f"dropped from the caller's environment: {', '.join(dropped)}\n")
         if p.binary:
             output.write(f"binary {p.binary} ({t.BINARY_ROLES[p.binary]}); PLATFORMIO_BUILD_FLAGS="
                          f"{env.get('PLATFORMIO_BUILD_FLAGS', '')}; PLATFORMIO_BUILD_DIR="
@@ -199,6 +268,7 @@ def main(argv=None):
               "platformioCoreDir": str(t.PIO_CORE), "log": str(p.build_log),
               "logSha256": t.sha256_bytes(log_bytes), "logBytes": len(log_bytes),
               "previousLogKeptAs": previous_log.name if previous_log else None, "exitCode": result.returncode,
+              "droppedEnvironment": dropped,
               "success": "[SUCCESS]" in log, "image": str(image_path), "slotBytes": t.APP_SIZE,
               "cc4Bytes": t.CC4_IMAGE_BYTES, "fromVersion": p.from_version, "fromBytes": p.from_image_bytes,
               "problems": []}
@@ -212,6 +282,15 @@ def main(argv=None):
                   flashUsedBytes=int(flash.group(1)) if flash else None)
     if result.returncode or not report["success"]:
         report["problems"].append("PlatformIO did not report [SUCCESS]")
+    report["sourceSnapshot"] = snapshot
+    report["problems"] += snapshot_problems
+    # One config for every object (the cc5.7 failure): all compiled by this run, none older than a config header.
+    report["cleanBuild"] = {"folder": str(folder), "filesRemovedBefore": removed}
+    report["objectFreshness"], freshness_problems = t.stale_object_problems(folder, started.timestamp())
+    report["problems"] += freshness_problems
+    # The host harness's renders count as evidence only when it was built with this lv_conf.h.
+    report["harnessConf"], harness_problems = t.harness_conf_problems()
+    report["problems"] += harness_problems
     symbols, elf_problem = read_symbols(elf_path)
     if elf_problem and (p.binary or getattr(p, "presentation", 4) >= 5):
         report["problems"].append(elf_problem)
@@ -230,6 +309,14 @@ def main(argv=None):
                       imageModifiedUtc=datetime.fromtimestamp(image_path.stat().st_mtime, timezone.utc).isoformat(),
                       containsVersion=p.version.encode("ascii") in image)
         report["problems"] += t.app_image_problems(image, p.version)
+        gate = getattr(p, "image_size_gate", None)
+        if gate is not None:
+            # The flash size gate (1.0.0-cc5.5 on; plan "Cross-cutting rules"), in bytes of the image file.
+            report["sizeGate"] = {"maxBytes": gate, "bytes": len(image), "headroomBytes": gate - len(image),
+                                  "slotBytes": t.APP_SIZE, "passed": len(image) <= gate}
+            if len(image) > gate:
+                report["problems"].append(f"the image is {len(image)} B, above the flash size gate of {gate} B "
+                                          f"(95 % of app0's {t.APP_SIZE} B)")
         if p.binary:
             names = None if symbols is None else {name for name, _, _ in symbols}
             report["pipelineEvidence"] = {
@@ -250,6 +337,10 @@ def main(argv=None):
     which = f" binary {p.binary} ({t.BINARY_ROLES[p.binary]})" if p.binary else ""
     print(f"\nBuild{which} {'ACCEPTED' if report['accepted'] else 'REJECTED'}: "
           f"{report.get('bytes')} B ({p.from_version} {p.from_image_bytes} B), sha256 {report.get('sha256')}")
+    if report.get("sizeGate"):
+        size_gate = report["sizeGate"]
+        print(f"Size gate: {size_gate['bytes']} B of at most {size_gate['maxBytes']} B "
+              f"({size_gate['headroomBytes']:+d} B): {'passed' if size_gate['passed'] else 'FAILED'}")
     if report.get("heapProjection"):
         projection = report["heapProjection"]
         print(f"Heap projection: {projection['heapMinFreeProjected']} B (required {projection['required']} B; "

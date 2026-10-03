@@ -1,8 +1,8 @@
-"""Hands-on LED tour for 1.0.0-cc5.4 ("Warm · alive" LEDs, firmware/ALIVE.md revision 2
-section 11.9; PRESENTATION_V5.md 7.3). For the one hardware window, with the user at the knob.
+"""Hands-on LED tour for the current release (nanod_cc5_tooling.CURRENT; "Warm · alive" LEDs since
+1.0.0-cc5.4, firmware/ALIVE.md revision 2 section 11.9; PRESENTATION_V5.md 7.3). For the one hardware window, with the user at the knob.
 
 Quit the companion first (the tour claims the knob itself over raw serial, like check_nanod_cc5.py);
-the knob must run 1.0.0-cc5.4 (capabilities presentation 5 and alive), or the tour refuses. Run with
+the knob must run the current release (CURRENT's capabilities presentation, and alive), or the tour refuses. Run with
 the companion's interpreter:
   app\\.venv\\Scripts\\python.exe tools\\nanod_alive_tour.py
 
@@ -28,7 +28,7 @@ Type a command and Enter; heartbeats keep the claim while you look. `help` lists
   * settling with the user (recorded in the evidence): pick pink 0|1|2|3, pick volfull on|off,
     confirm paused-green|headshake|wake|liked yes|no, note <text>.
   * quit: restores ledPink 0, ledVolFull off, the default drive, dither off (the default) and reducedMotion off,
-    releases the knob and writes diagnostics/cc5.4-led-tour.json (a new name, never overwriting).
+    releases the knob and writes diagnostics/<CURRENT prefix>-led-tour.json (a new name, never overwriting).
 No audible cues (only the turning test beeps), no Sonos, Apple Music, Windows or HID actions
 (windowsHidEnabled is false in every control). Importing this module opens nothing.
 """
@@ -68,7 +68,7 @@ def _button(label, icon, enabled=True, lit=None, color=None):
 
 
 def _base(layout, mode, title, subtitle="", **fields):
-    frame = {"mode": mode, "target": "Den", "value": "", "detail": "", "status": "", "layout": layout,
+    frame = {"mode": mode, "target": "Hall", "value": "", "detail": "", "status": "", "layout": layout,
              "title": title, "subtitle": subtitle, "ledStyle": "color"}
     frame.update(fields)
     return frame
@@ -354,7 +354,7 @@ class Tour:
             self.knob.pump(0.3)
 
     def record(self):
-        return {"tool": "tools/nanod_alive_tour.py", "firmware": t.PROFILES["cc5.4"].version,
+        return {"tool": "tools/nanod_alive_tour.py", "firmware": t.CURRENT.version,   # checked by open_session
                 "contract": "ALIVE.md revision 2 section 11.9; PRESENTATION_V5.md 7.3",
                 "capabilities": {k: self.capabilities.get(k) for k in ("presentation", t.presentation().ALIVE_CAPABILITY)},
                 "settled": self.settled, "pinkCandidates": {str(k): {"label": v[0], "ledPink": v[1]}
@@ -363,16 +363,16 @@ class Tour:
 
 
 def open_session(knob, out=print):
-    """Release, read the capabilities; the tour needs presentation 5 and alive (1.0.0-cc5.4)."""
+    """Release, read the capabilities; the tour needs the current release's presentation and alive."""
     knob.pump(0.3)
     knob.release()
     caps = knob.request({"capabilities": "?"}, lambda m: isinstance(m.get("capabilities"), dict),
                         what="capabilities")["capabilities"]
-    problems = t.presentation_capability_problems(caps, t.PROFILES["cc5.4"])
+    problems = t.presentation_capability_problems(caps, t.CURRENT)
     if not isinstance(caps.get(t.presentation().ALIVE_CAPABILITY), dict):
         problems.append("no alive capability")
     if problems:
-        raise RuntimeError("the knob does not run 1.0.0-cc5.4: " + "; ".join(problems))
+        raise RuntimeError(f"the knob does not run {t.CURRENT.version}: " + "; ".join(problems))
     return caps
 
 
@@ -436,7 +436,7 @@ def main(argv=None):
         knob.release_quietly()
         knob.close()
         if tour is not None:
-            path = t.write_new_json(t.DIAGNOSTICS / f"{t.PROFILES['cc5.4'].prefix}-{EVIDENCE_NAME}.json", tour.record())
+            path = t.write_new_json(t.DIAGNOSTICS / f"{t.CURRENT.prefix}-{EVIDENCE_NAME}.json", tour.record())
             print(f"evidence {path}", flush=True)
     return 0
 

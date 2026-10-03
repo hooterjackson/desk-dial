@@ -1,6 +1,14 @@
 """Package one accepted binary of the current release without touching the device or manifest.json.
 
-The release is nanod_cc5_tooling.CURRENT (1.0.0-cc5.4, upgrading the installed 1.0.0-cc5.3). It stages the
+The release is nanod_cc5_tooling.CURRENT: 1.0.0-cc5.5 (plan F1; firmware/BUILD-cc5.5.md), upgrading the installed
+1.0.0-cc5.4 binary D, with its own ladder: --binary D (default, 16 ms) or F (12 ms), each from its own accepted build
+record, written as nanod-control-center-1.0.0-cc5.5-D.bin / -F.bin, -source.zip and manifest-1.0.0-cc5.5-D.json /
+-F.json (UNFLASHED). cc5.4 D was installed but never finalized (manifest.json is still the cc5.3 record), so the
+from-release record kept here is cc5.4 D's package manifest: firmware/manifest-cc5.4-D.json, a byte copy of
+manifest-1.0.0-cc5.4-D.json (written once; an identical file is kept, a different one stops packaging). The
+manifest also records the build's flash size gate (image.sizeGate).
+
+1.0.0-cc5.4 (history; the text below is that release's, upgrading the installed 1.0.0-cc5.3). It staged the
 PRESENTATION_V5 12.6 build ladder (lead ruling R-m): --binary D (default, the release candidate: A + fixes) or E
 (the fallback: C + fixes), each from its own accepted build record (build_nanod_cc5.py --binary <name>). The first
 ladder's A, B and C are retired (tooling.RETIRED_BINARIES; A was rolled back with a dark LCD): --binary A|B|C is
@@ -40,6 +48,12 @@ re-checks the image (version, size, the binary's R5 marker and build marker "cc-
 written before these fields existed is refused: build that binary again. The gates the manifest pins include the
 stage9b gate runs (cc5.4-stage*) and the ALIVE floor report (cc5.4-alive-floor-report.json, a cc5.4-*-report).
 Git is only read (ls-files / rev-parse with a safe.directory override).
+
+An installed but never finalized binary (TL-BUG-013): when the records say this binary was written to the knob
+(tooling.binary_write_evidence: a flash-checks record with a write attempt) and no rollback record of it is newer
+than its newest write, a package whose image would differ from the one in firmware/ is refused before anything is
+written: the knob runs that image and its flash and look evidence point at it. --replace-installed packages it
+anyway and records why in the manifest (replacedInstalledImage).
 """
 import argparse
 from copy import deepcopy
@@ -93,6 +107,22 @@ RELEASE_SUMMARIES = {
         "icon, an 8192-byte internal CDC receive queue with a 1-tick COM idle while a line or upload is pending "
         "(unpaced whole-line transport when negotiated), and the diag fields rxQueueBytes, mediaCommits, "
         "mediaErrors, mediaEvictions, jpegDecodes, jpegDecodeErrors, jpegDecodeMsMax and jpegDecodeMsLast."),
+    "1.0.0-cc5.5": (
+        "1.0.0-cc5.5 (plan F1, safety and measurement, no change to feel) on 1.0.0-cc5.4 binary D: HID reports "
+        "marked sent only when TinyUSB accepts them (one per pass, actual key codes compared), the USB interface "
+        "results reported instead of assumed, the motor output capped at 2.2 V before motor.init() with no register "
+        "command able to raise it (phase resistance 5.3 kept), haptic profiles validated (detentCount >= 1, vernier "
+        ">= 1, endPos >= startPos) and the brace-less else in haptic_target made explicit (behaviour unchanged), no "
+        "String or Serial.println on the FOC thread, a clear-only ks on position lines with a 16-event key queue, "
+        "and the diag fields focLoopHz, focLoopUsMax, uqAbsMax, uqCapMs, uqCapMv, pdRead, pdPdo, pdVolts, pdRdo, "
+        "usbMidiOk, usbHidOk and hidRetries; binaries D (16 ms) and F (12 ms, diag build F)."),
+    "1.0.0-cc5.6": (
+        "1.0.0-cc5.6 (plan A2) on 1.0.0-cc5.5 binary D: the app canvas. A frame's optional app object (capability "
+        "appCanvas 1, presentation 6) makes the LCD thread pause LVGL and draw Karl Malota's Onshape UI (adapted with "
+        "permission) into a PSRAM 240x240 RGB565 buffer pushed by DMA through LVGL's idle draw buffers: the "
+        "isometric cube following the knob's own sensor angle (stepped poses, 220 ms settle), the command wheel "
+        "with its animated cards (rings MODEL / MODIFY / SKETCH / VIEW), parameter mode A / B, the echo and the "
+        "idle plasma. LVGL resumes and redraws in full on exit. Everything else is 1.0.0-cc5.5 D."),
     "1.0.0-cc5.4": (
         "1.0.0-cc5.4 (Warm alive) on 1.0.0-cc5.3 (firmware/ALIVE.md, PRESENTATION_V5.md): "
         "presentation 5 with the alive LED renderer (the ring and button LEDs rendered by the knob at its own "
@@ -105,6 +135,16 @@ RELEASE_SUMMARIES = {
 }
 # What each release's manifest says about the companions it works with (compatibility).
 COMPATIBILITY = {
+    "1.0.0-cc5.6": ("presentation 6, every 1.0.0-cc5.5 capability unchanged, plus appCanvas 1. A host that never "
+                    "sends the frame's app object (the installed Desk Dial, anything before 7.2.0.0) sees 1.0.0-cc5.5 D "
+                    "exactly. Desk Dial 7.2.0.0 sends app only to an appCanvas knob; on 1.0.0-cc5.5 / cc5.4 it keeps "
+                    "A0's text frames and tap 3 = Undo (no wheel, no parameter mode)."),
+    "1.0.0-cc5.5": ("presentation 6 and every capability exactly as 1.0.0-cc5.4 D reports them (nothing new is "
+                    "advertised). Position lines of the ready control now carry ks, the last reported key mask AND "
+                    "the live one: it can only clear bits, so the installed Desk Dial v7 (which copies any ks into its "
+                    "pressed mask) never loses a kd or a ku to it, and a newer Desk Dial clears lost key-ups from it. "
+                    "The new diag fields are ignored by v7 and read by the newer device.py; a newer Desk Dial on "
+                    "cc5.4 simply sees no ks on position lines and no F1 diag fields."),
     "1.0.0-cc5.3": ("presentation stays 4. A cc5.2-era companion (desktop v3) gets v1 art, paced, exactly as on "
                     "cc5.2: the v1 art path is byte-identical. The v4 companion uses artwork2 (240 px JPEG covers, "
                     "app icons, prefetch, unpaced whole-line writes) only when the artwork2 capability matches "
@@ -127,13 +167,20 @@ def git(*args):
                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
-def source_files():
-    listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard").decode("utf-8").split("\0")
+def _excluded(name):
+    """Not part of the source listing: .vscode/ and the generated compile_commands.json and *.d in the root."""
+    if not name or name.startswith(EXCLUDED_PREFIXES):
+        return True
+    return "/" not in name and (name in EXCLUDED_ROOT_NAMES or name.endswith(EXCLUDED_ROOT_SUFFIXES))
+
+
+def source_files(git_run=None):
+    """(names, missing) of the firmware tree's sources (git ls-files --cached --others --exclude-standard, minus
+    _excluded). `git_run`: the caller's git (build_nanod_cc5.py passes its own)."""
+    listed = (git_run or git)("ls-files", "-z", "--cached", "--others", "--exclude-standard").decode("utf-8").split("\0")
     names, missing = set(), []
     for name in listed:
-        if not name or name.startswith(EXCLUDED_PREFIXES):
-            continue
-        if "/" not in name and (name in EXCLUDED_ROOT_NAMES or name.endswith(EXCLUDED_ROOT_SUFFIXES)):
+        if _excluded(name):
             continue
         if not (t.FIRMWARE_SOURCE / name).is_file():
             missing.append(name)  # tracked but deleted in the working tree
@@ -144,6 +191,32 @@ def source_files():
         if any(part in (".git", ".pio", "__pycache__") for part in parts) or name.startswith("/") or ".." in parts:
             raise SystemExit(f"Refusing to package {name}")
     return sorted(names), sorted(missing)
+
+
+def source_snapshot(git_run=None):
+    """The firmware tree as a build saw it (TL-BUG-005; build_nanod_cc5.py records it at build start as
+    sourceSnapshot): the digests of every source_files() name (platformio.ini, include/, boards/ and src/ among
+    them), the names tracked but missing, HEAD, and whether git status --porcelain showed changes (dirty)."""
+    run = git_run or git
+    files, missing = source_files(run)
+    status = []
+    for line in run("status", "--porcelain").decode("utf-8", errors="replace").splitlines():
+        path = line[3:].split(" -> ")[-1].strip('"')
+        if line.strip() and not _excluded(path):
+            status.append(line)
+    return {"sourceFiles": {name: t.digest_record(t.FIRMWARE_SOURCE / name) for name in files},
+            "sourceFilesMissingFromWorkTree": missing,
+            "checkoutHead": run("rev-parse", "HEAD").decode("ascii").strip(),
+            "dirty": bool(status), "status": status[:200]}
+
+
+def source_drift(recorded, current):
+    """Names whose digest differs between the build's sourceFiles and the tree now: {added, removed, modified}
+    (empty lists: the tree is the one the image was built from)."""
+    return {"added": sorted(set(current) - set(recorded)),
+            "removed": sorted(set(recorded) - set(current)),
+            "modified": sorted(name for name in set(current) & set(recorded)
+                               if (recorded[name] or {}).get("sha256") != current[name]["sha256"])}
 
 
 def gates(p=None):
@@ -160,10 +233,12 @@ def gates(p=None):
 
 
 def previous_release_changes(sources, p=None):
-    """Source changes against the newest superseded cc5 release that recorded its sources."""
+    """Source changes against the release this one upgrades from (its package manifest: cc5.4 D's for
+    1.0.0-cc5.5), else the newest superseded cc5 release that recorded its sources."""
     p = p or t.CURRENT
-    for version in reversed(p.superseded):
-        path = t.release_manifest(version)
+    candidates = [(p.from_artifact_version, p.from_manifest)]
+    candidates += [(version, t.release_manifest(version)) for version in reversed(p.superseded)]
+    for version, path in candidates:
         if not path.is_file():
             continue
         before = t.load_json(path).get("sourceFiles") or {}
@@ -180,8 +255,31 @@ def previous_release_changes(sources, p=None):
 
 def keep_from_record(p=None):
     """firmware/<from record>: the installed from-release record, kept byte-identical before its
-    release manifest is marked SUPERSEDED. Returns a line for the output; stops on a conflict."""
+    release manifest is marked SUPERSEDED. Returns a line for the output; stops on a conflict.
+
+    A from-release that was installed but never finalized (p.from_finalized False: 1.0.0-cc5.4 D under cc5.5) has
+    no installed record in manifest.json: its record is its package manifest (p.from_manifest), kept as a byte copy
+    (firmware/manifest-cc5.4-D.json) once it names the from image with its SHA-256."""
     p = p or t.CURRENT
+    if not p.from_finalized:
+        source = p.from_manifest
+        if p.from_record.is_file():
+            problems = t.from_record_problems(p)
+            if problems:
+                raise SystemExit(f"{p.from_record.name} exists but is not the {p.from_version} record ({problems[0]})")
+            if source.is_file() and t.sha256_file(source) != t.sha256_file(p.from_record):
+                raise SystemExit(f"{p.from_record.name} differs from {source.name}; decide with the user which record "
+                                 f"describes the installed {p.from_artifact_version}")
+            return f"{p.from_record.name} kept (the installed, never finalized {p.from_artifact_version} record)"
+        problems = t.from_record_problems(p, source)
+        if problems:
+            raise SystemExit(f"{source.name} cannot be kept as {p.from_record.name}: {problems[0]}")
+        t.write_new_bytes(p.from_record, source.read_bytes())
+        if t.sha256_file(p.from_record) != t.sha256_file(source):
+            raise SystemExit(f"{p.from_record.name} copy did not verify")
+        return (f"{p.from_record.name} written: byte copy of {source.name} (the installed {p.from_artifact_version}, "
+                "never finalized; manifest.json stays the record it left in force, "
+                f"{p.restore_record.name})")
     if p.from_record.is_file():
         record = t.load_json(p.from_record)
         if (record.get("firmwareVersion") != p.from_version
@@ -253,9 +351,45 @@ def binary_record(p, build):
             "heapProjection": build.get("heapProjection"), "pipelineEvidence": build.get("pipelineEvidence"),
             "lcdMosiGate": build.get("lcdMosiGate"),
             "ladder": {v.binary: v.manifest.name for v in p.variants()},
-            "active": list(t.binary_choices(p)), "retired": dict(t.RETIRED_BINARIES),
+            "active": list(t.binary_choices(p)),
+            "retired": {k: v for k, v in t.RETIRED_BINARIES.items() if k in p.pipeline_binaries()},
             "contract": ("PRESENTATION_V5.md 12.6 (P5-R23); lead ruling R-m; firmware/BUILD-cc5.4.md"
-                         + (" (Fix binaries D and E)" if p.build_number is not None else ""))}
+                         + (" (Fix binaries D and E)" if p.build_number is not None else "")
+                         if p.tag == "cc5.4" else f"plan stage {'A2' if p.tag == 'cc5.6' else 'F1'}; "
+                         f"firmware/BUILD-{p.tag}.md (binaries D and F)")}
+
+
+ROLLED_BACK_OUTCOMES = ("ROLLED_BACK_VERIFIED_RESET", "ROLLED_BACK_VERIFIED_RESET_UNCONFIRMED", "RECORDS_ONLY")
+
+
+def _record_stamps(paths, keep):
+    """startedUtc (tooling.utc_stamp, sortable) of every readable record in `paths` that `keep` accepts."""
+    stamps = []
+    for path in paths:
+        try:
+            record = t.load_json(path)
+        except (OSError, ValueError):
+            continue
+        if isinstance(record, dict) and keep(record) and isinstance(record.get("startedUtc"), str):
+            stamps.append(record["startedUtc"])
+    return stamps
+
+
+def installed_unfinalized(p, diagnostics=None):
+    """Why p.image must not be replaced (empty: it may): the records say this binary was written to the knob
+    (tooling.binary_write_evidence) and no rollback record of it (current or superseded, a rolled-back outcome)
+    started after its newest write. finalize is not required for that state, so packaging must notice it."""
+    diagnostics = Path(t.DIAGNOSTICS if diagnostics is None else diagnostics)
+    reasons = t.binary_write_evidence(p, diagnostics)
+    if not reasons:
+        return []
+    writes = _record_stamps(sorted(diagnostics.glob(f"{p.prefix}-flash-checks*.json")),
+                            lambda r: r.get("writeAttempted") or r.get("flashWritten"))
+    rollbacks = _record_stamps(sorted(diagnostics.glob(f"{p.prefix}-rollback*.json")),
+                               lambda r: r.get("outcome") in ROLLED_BACK_OUTCOMES)
+    if rollbacks and (not writes or max(rollbacks) > max(writes)):
+        return []
+    return reasons
 
 
 def main(argv=None):
@@ -264,9 +398,16 @@ def main(argv=None):
     if choices:
         parser.add_argument("--binary", choices=choices, default=choices[0],
                             help=f"the PRESENTATION_V5 12.6 binary to package (default {choices[0]})")
+    parser.add_argument("--replace-installed", action="store_true",
+                        help="replace the image of a binary the records show installed and not rolled back "
+                             "(recorded in the manifest as replacedInstalledImage)")
+    # 1.0.0-cc5.6 (A2): as build_nanod_cc5.py --release.
+    releases = [tag for tag, profile in t.PROFILES.items() if profile.pipeline_binaries() == t.CURRENT.pipeline_binaries()]
+    parser.add_argument("--release", choices=releases, default=t.CURRENT.tag,
+                        help=f"the release profile (default {t.CURRENT.tag}, CURRENT)")
     args = parser.parse_args(argv)
     t.console_utf8()
-    p = t.CURRENT.binary_profile(getattr(args, "binary", None))
+    p = t.PROFILES[args.release].binary_profile(getattr(args, "binary", None))
     build = t.load_json(p.build_report)
     if not build.get("accepted") or build.get("version") != p.version:
         raise SystemExit(f"{p.build_report.name} does not record an accepted {p.version} build; run build_nanod_cc5.py"
@@ -277,7 +418,8 @@ def main(argv=None):
     image = p.built_image.read_bytes()
     if t.sha256_bytes(image) != build["sha256"]:
         raise SystemExit("firmware.bin changed since the accepted build; rebuild first")
-    problems = t.app_image_problems(image, p.version) + t.binary_image_problems(image, p.binary)
+    problems = (t.app_image_problems(image, p.version) + t.binary_image_problems(image, p.binary)
+                + t.release_image_problems(image))
     if problems:
         raise SystemExit("; ".join(problems))
     log = p.build_log.read_text(encoding="utf-8-sig", errors="replace")
@@ -303,8 +445,32 @@ def main(argv=None):
             raise SystemExit(f"{p.build_report.name} does not record a passed LCD data-line gate (lcdMosiGate: a DMA "
                              f"build with TFT_MISO == TFT_MOSI must link {t.LCD_MOSI_REATTACH_SYMBOL} and call it right "
                              f"after tft.initDMA(), callOrder); {rebuild}")
+    # TL-BUG-005: the sources archived next to the image must be the ones it was built from. The build records the
+    # tree's digests at its start; any file added, removed or changed since refuses (nothing is written).
+    snapshot = build.get("sourceSnapshot")
+    if not (isinstance(snapshot, dict) and isinstance(snapshot.get("sourceFiles"), dict) and snapshot["sourceFiles"]):
+        raise SystemExit(f"{p.build_report.name} does not record the sources it was built from (sourceSnapshot); "
+                         f"{rebuild}. Nothing was written")
+    files, missing = source_files()
+    sources = {name: t.digest_record(t.FIRMWARE_SOURCE / name) for name in files}
+    drift = source_drift(snapshot["sourceFiles"], sources)
+    if any(drift.values()):
+        names = [f"{name} ({kind})" for kind in ("modified", "added", "removed") for name in drift[kind]]
+        raise SystemExit(f"the firmware tree changed since the accepted build: {', '.join(names[:6])}"
+                         f"{' ...' if len(names) > 6 else ''}; the archive would not hold the sources of this image. "
+                         f"Restore the tree or {rebuild}. Nothing was written")
     if p.manifest.is_file() and t.load_json(p.manifest).get("installationStatus") == "INSTALLED":
         raise SystemExit(f"{p.version} is recorded as INSTALLED; its artifacts are not replaced")
+    replaced_installed = None
+    if p.image.is_file() and t.sha256_file(p.image) != build["sha256"]:
+        installed = installed_unfinalized(p)
+        if installed and not args.replace_installed:
+            raise SystemExit(f"{p.image.name} is the image the records show on the knob ({'; '.join(installed)}) and no "
+                             f"rollback of it is newer; packaging would replace it with an image the knob never ran. "
+                             f"Finalize or roll it back first, or pass --replace-installed. Nothing was written")
+        if installed:
+            replaced_installed = {"reasons": installed, "previousImageSha256": t.sha256_file(p.image),
+                                  "flag": "--replace-installed"}
     active_before = t.sha256_file(t.ACTIVE_MANIFEST) if t.ACTIVE_MANIFEST.is_file() else None
 
     base = t.load_json(t.CC4_MANIFEST)
@@ -314,7 +480,6 @@ def main(argv=None):
         raise SystemExit("manifest-cc4.json does not describe the installed cc4 image")
     from_line = keep_from_record(p)          # before anything else is written
     manifest = deepcopy(base)
-    files, missing = source_files()
 
     # Re-packaging this release (for example after review fixes) keeps the previous package as
     # history, never overwritten: <name>.superseded-<UTC>.<ext> (an identical image is not copied).
@@ -334,10 +499,10 @@ def main(argv=None):
         if bundle.testzip() is not None or len(bundle.namelist()) != len(files):
             raise SystemExit("Source archive failed its integrity check")
         for name in files:
-            if hashlib.sha256(bundle.read(f"NanoD_RatchetH1/{name}")).hexdigest() != t.sha256_file(t.FIRMWARE_SOURCE / name):
-                raise SystemExit(f"Archived {name} differs from the working tree")
+            # Against the build's own digests (sourceSnapshot): the archive holds the sources of this image.
+            if hashlib.sha256(bundle.read(f"NanoD_RatchetH1/{name}")).hexdigest() != snapshot["sourceFiles"][name]["sha256"]:
+                raise SystemExit(f"Archived {name} differs from the sources of the accepted build")
 
-    sources = {name: t.digest_record(t.FIRMWARE_SOURCE / name) for name in files}
     before = base.get("sourceFiles", {})
     changed = {"added": sorted(set(sources) - set(before)),
                "removed": sorted(set(before) - set(sources)),
@@ -352,18 +517,20 @@ def main(argv=None):
                              "protocol" if getattr(p, "alive", False) else "")
                           + f"; version {p.version}.")
     previous = previous_release_changes(sources, p)
-    head = git("rev-parse", "HEAD").decode("ascii").strip()
+    head = snapshot.get("checkoutHead") or git("rev-parse", "HEAD").decode("ascii").strip()
     manifest.update(
         firmwareVersion=p.version, installationStatus="UNFLASHED", upgradesFrom=p.from_version,
         artifacts={p.image.name: t.digest_record(p.image), p.source_zip.name: t.digest_record(p.source_zip)},
         image={"file": p.image.name, "sha256": build["sha256"], "bytes": len(image), "slotBytes": t.APP_SIZE,
                "headroomBytes": t.APP_SIZE - len(image), "cc4Bytes": t.CC4_IMAGE_BYTES,
                "deltaFromCc4Bytes": len(image) - t.CC4_IMAGE_BYTES, "previousBytes": p.from_image_bytes,
-               "deltaFromPreviousBytes": len(image) - p.from_image_bytes, "containsVersion": True},
+               "deltaFromPreviousBytes": len(image) - p.from_image_bytes, "containsVersion": True,
+               **({"sizeGate": build.get("sizeGate")} if build.get("sizeGate") is not None else {})},
         sourceFiles=sources,
         sourceListing=("git ls-files --cached --others --exclude-standard (minus .vscode/, and the generated "
                        "compile_commands.json and *.d in the firmware root)"),
-        sourceFilesMissingFromWorkTree=missing, checkoutHead=head, changedFromCc4=changed,
+        sourceFilesMissingFromWorkTree=missing, checkoutHead=head, dirty=bool(snapshot.get("dirty")),
+        sourcesFromBuild={"record": p.build_report.name, "files": len(files), "matched": True}, changedFromCc4=changed,
         changedFromPreviousCc5=previous, supersedes=list(p.superseded),
         previousPackagingKept=kept, installedRecordBeforeUpgrade=p.from_record.name,
         expectedCapabilities=p.expected_capabilities(),
@@ -374,10 +541,16 @@ def main(argv=None):
                         "update completes."
                         + (f" Binary {p.binary} ({t.BINARY_ROLES[p.binary]}) of the PRESENTATION_V5 12.6 ladder"
                            + ("." if p.binary == (t.binary_choices(p) or (None,))[0] else
-                              ": flashed only when the hardware window steps down to it (firmware/BUILD-cc5.4.md).")
+                              f": flashed only when the hardware window steps down to it (firmware/BUILD-{p.tag}.md)."
+                              if p.tag == "cc5.4" else
+                              f": flashed only when the hardware window moves to it (firmware/BUILD-{p.tag}.md).")
                            if p.binary else "")))
+    # FW-PUB-004: the public version (platformio.ini NANO_FIRMWARE_PUBLIC) and the string this image reports.
+    manifest.update(t.public_version_fields(p, p.binary))
     if p.binary:
         manifest["binary"] = binary_record(p, build)
+    if replaced_installed:
+        manifest["replacedInstalledImage"] = replaced_installed
     manifest["build"].update(flashUsedBytes=build.get("flashUsedBytes"), ramUsedBytes=build.get("ramUsedBytes"),
                              buildRecord=f"diagnostics/{p.build_report.name}")
     for key in ("installation", "hardwareValidation", "changedFromCc3"):

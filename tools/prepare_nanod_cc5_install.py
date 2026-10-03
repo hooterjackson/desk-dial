@@ -1,7 +1,16 @@
-"""Prepare the current release's app-only install of one binary (nanod_cc5_tooling.CURRENT: 1.0.0-cc5.3 ->
-1.0.0-cc5.4; --binary D (default) or E, the active fix binaries of the PRESENTATION_V5 12.6 ladder; the retired
-A, B and C are refused by argparse, exit 2, nothing written) from the fresh pre-install 4 MB backup or, after a
-failed binary's rollback, from the step-down base; host-side only (no device).
+"""Prepare the current release's app-only install of one binary (nanod_cc5_tooling.CURRENT: 1.0.0-cc5.4 D ->
+1.0.0-cc5.5; --binary D (default) or F, its own ladder; anything else is refused by argparse, exit 2, nothing
+written) from the fresh pre-install 4 MB backup or, after a failed binary's rollback, from the step-down base;
+host-side only (no device).
+
+1.0.0-cc5.5 upgrades cc5.4 binary D, which was installed but never finalized (tooling Release.from_finalized False):
+the backup is backups/nanod-cc5.4-before-cc5.5-full.bin (diagnostics/cc5.5-backup.json); app0 must hold the cc5.4 D
+image (nanod-control-center-1.0.0-cc5.4-D.bin, SHA-256 dcff9c95...) and equal the app0 its install verified
+(backups/nanod-cc5.4-D-expected-full.bin, diagnostics/cc5.4-D-preparation.json); the from-release record is
+firmware/manifest-cc5.4-D.json (package_nanod_cc5.py keeps it); manifest.json must still be the record that
+install left in force (firmware/manifest-cc5.3.json) and diagnostics/cc5.4-D-flash-checks.json the newest cc5.4
+write, with no cc5.4 rollback after it (tooling.active_record_problems); the before-inventory must report firmware
+1.0.0-cc5.4 and presentation 6. The checks below are the 1.0.0-cc5.4 text (history), with those names.
 
 Checks (any failure stops before anything is written):
   * the backup (backups/nanod-cc5.3-before-cc5.4-full.bin, one backup for every binary) is 4,194,304 B
@@ -84,6 +93,31 @@ def from_app0_record(p, before, offset, size):
     return f"app0 byte-identical to {p.from_expected_full.name}"
 
 
+def before_version_ok(value, p, ini_text=None, record=None):
+    """True when the before-inventory's settings "firmwareVersion" `value` names the from-release (FW-PUB-004): its
+    internal id, the composed "<public>+<build>.<letter>" form of its profile (tooling.reports_version), or the
+    reportedVersion a release.json entry (`record`, None reads tooling.RELEASE_RECORD) records for the from image.
+    The same rule finalize_nanod_cc5.settings_version_ok applies to the before-inventory."""
+    if not isinstance(value, str) or not value:
+        return False
+    if value == p.from_version:
+        return True
+    fp = t.from_profile(p)
+    if fp is not None and t.reports_version(value, fp, binary=p.from_binary, ini_text=ini_text):
+        return True
+    if record is None:
+        try:
+            record = t.load_json(t.RELEASE_RECORD) if t.RELEASE_RECORD.is_file() else {}
+        except (OSError, ValueError):
+            record = {}
+    for entry in (record or {}).get("releases") or []:
+        fw = (entry.get("firmware") or {}) if isinstance(entry, dict) else {}
+        if (fw.get("internalVersion") == p.from_version and fw.get("reportedVersion") == value
+                and (not p.from_binary or fw.get("binary") in (None, p.from_binary))):
+            return True
+    return False
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--before-inventory", required=True,
@@ -105,7 +139,7 @@ def main(argv=None):
     if not inventory_path.is_file():
         fail(f"{inventory_path.name} is not in backups/")
     inventory = t.load_json(inventory_path)
-    if inventory.get("settings", {}).get("firmwareVersion") != p.from_version:
+    if not before_version_ok(inventory.get("settings", {}).get("firmwareVersion"), p):
         fail(f"the before-inventory does not report firmware {p.from_version}")
     if inventory.get("capabilities", {}).get("presentation") != p.from_presentation:
         fail(f"the before-inventory does not report presentation {p.from_presentation}")
@@ -154,13 +188,23 @@ def main(argv=None):
     from_image = p.from_image.read_bytes()
     if t.sha256_bytes(from_image) != p.from_image_sha256 or len(from_image) != p.from_image_bytes:
         fail(f"{p.from_image.name} does not have the installed SHA-256 {p.from_image_sha256}")
-    from_record = t.load_json(p.from_record)
-    if (from_record.get("firmwareVersion") != p.from_version
-            or from_record.get("artifacts", {}).get(p.from_image.name, {}).get("sha256") != p.from_image_sha256):
-        fail(f"{p.from_record.name} is not the {p.from_version} record")
-    if not t.ACTIVE_MANIFEST.is_file() or t.sha256_file(t.ACTIVE_MANIFEST) != t.sha256_file(p.from_record):
-        fail(f"manifest.json is not the installed {p.from_version} record ({p.from_record.name}); run "
-             "package_nanod_cc5.py while manifest.json is that record")
+    if p.from_finalized:
+        from_record = t.load_json(p.from_record)
+        if (from_record.get("firmwareVersion") != p.from_version
+                or from_record.get("artifacts", {}).get(p.from_image.name, {}).get("sha256") != p.from_image_sha256):
+            fail(f"{p.from_record.name} is not the {p.from_version} record")
+        if not t.ACTIVE_MANIFEST.is_file() or t.sha256_file(t.ACTIVE_MANIFEST) != t.sha256_file(p.from_record):
+            fail(f"manifest.json is not the installed {p.from_version} record ({p.from_record.name}); run "
+                 "package_nanod_cc5.py while manifest.json is that record")
+    else:
+        # The from-release was installed but never finalized: its kept package record, the record manifest.json
+        # still holds, and its install record as the newest write of that release (tooling.active_record_problems).
+        problems = t.from_record_problems(p)
+        if problems:
+            fail(f"{problems[0]}; run package_nanod_cc5.py --binary {p.binary} first (it keeps {p.from_record.name})")
+        problems = t.active_record_problems(p)
+        if problems:
+            fail("; ".join(problems))
     if before[offset:offset + len(from_image)] != from_image:
         fail(f"app0 does not hold the verified {p.from_version} image")
     from_app0 = from_app0_record(p, before, offset, size)
@@ -203,6 +247,11 @@ def main(argv=None):
         rollbackFile=p.rollback_app.name, rollbackSha256=t.sha256_bytes(rollback), rollbackBytes=len(rollback),
         rollbackStartsWithFromImage=True, fromImageFile=p.from_image.name, fromImageSha256=p.from_image_sha256,
         fromApp0Check=from_app0, fromRecord=p.from_record.name, fromRecordSha256=t.sha256_file(p.from_record),
+        **({} if p.from_finalized else {
+            "fromFinalized": False, "activeRecord": p.restore_record.name,
+            "activeRecordSha256": t.sha256_file(p.restore_record),
+            "fromInstallRecord": p.from_install_record_name,
+            "fromInstallRecordSha256": t.sha256_file(p.from_install_record)}),
         applicationOffset=offset, applicationSize=size, candidateFile=p.image.name,
         candidateSha256=t.sha256_bytes(candidate), candidateBytes=len(candidate),
         binary=p.binary, buildFlags=list(p.build_flags) if p.binary else None, manifestFile=p.manifest.name,

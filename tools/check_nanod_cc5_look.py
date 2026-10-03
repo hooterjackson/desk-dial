@@ -14,7 +14,18 @@ no release, no frame), at least 1.5 s apart (--gap, default 2 s), and applies to
   * the coredump partition blank (after a step-down, only the dump this binary's step-down base holds,
     tooling.step_down_coredump) and a reset reason that is not a crash (panic, int_wdt, task_wdt, wdt,
     brownout);
-  * no reboot between the reads (bootCount unchanged, uptime advanced).
+  * no reboot between the reads (bootCount unchanged, uptime advanced);
+  * the redraw check (added 2026-09-30 after cc5.7 passed every diag check but never drew a claimed frame):
+    tooling.redraw_check claims the knob with work/lcd_bench_frames.json, alternates two frames for about 3 s,
+    reads diag once a second, then releases it (the knob goes back to its native screen). At least two one-second
+    windows must show flushed pixels (lcdFps >= 1, lcdFlushUs > 0); recorded as "redraw". This is the one step
+    that claims: the diag reads stay read-only.
+1.0.0-cc5.5 (plan F1; firmware/BUILD-cc5.5.md): --binary D (default) or F; the record also keeps, per read, the F1
+diag fields and the Step 0 comparison figures (tooling.f1_diag_summary: focLoopHz, focLoopUsMax, uqAbsMax, uqCapMs,
+uqCapMv, pdRead, pdPdo, pdVolts, pdRdo, usbMidiOk, usbHidOk, hidRetries; resetReason, rtcReset, lcdRefrUsAvg/Max,
+lcdFps, ledLateShows, lvglMinFree, core0IdlePct) as "f1", and prints them (tooling.f1_diag_lines); none is gated.
+A NO-GO names the rollback to the release the binary replaced (rollback_nanod_cc5.py --to cc5.4 --binary <X> for
+cc5.5).
 It records, without gating them, ledFps, ledShowGapMsMax, ledMode, lcdFps and lcdFullRefrs of both reads (the LED
 and LCD timings are the later performance task's; the full 8b / 8c checks, check_nanod_cc5.py and
 check_nanod_cc5_lease.py, are not part of the look session). Evidence: diagnostics/cc5.4-<X>-look-checks.json
@@ -127,10 +138,19 @@ def look(p, args, *, sleep, clock):
     else:
         inherited = t.step_down_coredump(t.CURRENT, p.binary)
         record.update(readGapS=gap, reads=[{"read": 1, "diag": first}, {"read": 2, "diag": second}],
-                      recorded={"first": recorded(first), "second": recorded(second)}, inheritedCoredump=inherited)
+                      recorded={"first": recorded(first), "second": recorded(second)}, inheritedCoredump=inherited,
+                      f1={"first": t.f1_diag_summary(first), "second": t.f1_diag_summary(second)})
         problems = t.look_check_problems(first, second, p.binary, inherited)
         if gap < t.LOOK_READ_GAP_MIN_S:
             problems.append(f"the two diag reads were {gap} s apart, less than {t.LOOK_READ_GAP_MIN_S} s")
+        # The redraw check (2026-09-30, the cc5.7 failure: healthy diag, but no claimed frame ever reached the panel).
+        redraw = t.redraw_check(port)
+        if redraw["problems"] and t.running_companions():
+            print(f"NOT RUN: {' and '.join(t.running_companions())} started during the redraw check and owns the port; "
+                  "quit it and run this again", flush=True)
+            return None, EXIT_NOT_RUN
+        record["redraw"] = redraw
+        problems += redraw["problems"]
         record["problems"] = problems
     record["go"] = not record["problems"]
     record["verdict"] = "GO" if record["go"] else "NO-GO"
@@ -202,13 +222,20 @@ def main(argv=None, *, sleep=time.sleep, clock=time.monotonic):
             print(f" - {problem}", flush=True)
         for label, values in (record.get("recorded") or {}).items():
             print(f"   recorded ({label} read): {values}", flush=True)
+        second = next((r.get("diag") for r in record.get("reads") or [] if r.get("read") == 2), None)
+        for line in t.f1_diag_lines(second):
+            print(f"   {line}", flush=True)
+        redraw = record.get("redraw")
+        if redraw:
+            windows = ", ".join(f"{s.get('lcdFps')} fps" for s in redraw["samples"]) or "no diag replies"
+            print(f"   redraw while claimed: {windows} -> {'passed' if redraw['passed'] else 'FAILED'}", flush=True)
         if record["go"]:
             print("GO: ask the user to look (the offline LED marks at rest, the screen with a few detents, then Desk Dial "
                   "on Home for about 5 minutes and the native dial after quitting it), then record the answers: "
                   f"check_nanod_cc5_look.py --binary {p.binary} --record-by-eye {RECORD_HINT}", flush=True)
         else:
-            print(f"NO-GO: do not ask the user to look; roll binary {p.binary} back (rollback_nanod_cc5.py --to cc5.3 "
-                  f"--binary {p.binary}; firmware/BUILD-cc5.4.md).", flush=True)
+            print(f"NO-GO: do not ask the user to look; roll binary {p.binary} back (rollback_nanod_cc5.py --to "
+                  f"{p.from_tag} --binary {p.binary}; firmware/BUILD-{p.tag}.md).", flush=True)
     print(f"Evidence: {p.look_checks}{kept}", flush=True)
     return code
 

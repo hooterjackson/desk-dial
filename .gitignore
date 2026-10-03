@@ -13,10 +13,26 @@ logs/
 *.log
 *.jsonl
 
-# Device evidence and run records: only the helper scripts in app/diagnostics are tracked
-app/diagnostics/*
-!app/diagnostics/*.ps1
-!app/diagnostics/*.py
+# Device evidence and run records (backups, diagnostics, local state) stay with the maintainer
+diagnostics/
+
+# --- Private working files (never publish) ---
+# Session prompts, hand-off notes, assistant memory and plans, audit records, superseded copies, scratch
+DEEP_DIVE_PROMPT.md
+README_PROMPT.md
+APP_PROFILES_PROMPT.md
+CLAUDE_CODE_HANDOFF.md
+*_PROMPT.md
+CLAUDE.md
+MEMORY.md
+.cla[u]de/
+memory/
+plans/
+audit/
+*.superseded-*
+scratch*/
+desktop-build*/
+desktop-dist*/
 
 # --- Python ---
 __pycache__/
