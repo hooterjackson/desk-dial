@@ -7,7 +7,7 @@ The `.png` files are 120 px previews decoded back from the `.rgb565` bytes.
 
 | File | Source |
 |---|---|
-| `art-hall-120.rgb565` | Byte copy of `previews/artwork-transport/hall-now-playing-120.rgb565` (real Hall cover, "Beira-Mar"; SHA-256 prefix `59e756d3d31b21226f1b272d` = its wire key). |
+| `art-hall-120.rgb565` | Synthetic, calm "hall" cover: a dusk gradient with a low sun and two hill bands (`hall_source()` in `harness/make_art_fixtures.py`). Fictional, like the bright cover: no real album art is published. Passed through `artwork.prepare_artwork()` the same way as the bright cover below. |
 | `art-bright-120.rgb565` | Synthetic bright, busy cover: saturated diagonal stripes, a white/colour checker band behind the title area and a white disc. Passed through the companion's own `artwork.prepare_artwork()`, so it has the real 0.8 opacity + black readability scrim, the LANCZOS 240->120 resample and RGB565 LE packing. The scrim was **not** skipped. |
 
 Regenerate with:
