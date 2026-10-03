@@ -118,7 +118,7 @@
 <p align="center"><b>Settings</b></p>
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/head-settings-dark.png"><img src="docs/media/head-settings.png" alt="Set the sound, the feel and the motion. Turn the sounds down, soften the haptics, calm the motion." width="880"></picture></p>
 
-<p align="center"><a href="docs/features/settings.md"><img src="docs/media/settings-knob.png" alt="Desk Dial Settings, Knob page: LEDs Colour, Onshape mode Off, Knob sounds On at 100 percent, Reduced haptics Off, with the status strip for the knob, Sonos, Apple Music and Home Assistant above" width="308"></a></p>
+<p align="center"><a href="docs/features/settings.md"><img src="docs/media/settings-knob.png" alt="Desk Dial Settings, Knob page: LEDs Colour, a note pointing Onshape and other apps to Settings › Apps, Knob sounds On at 100 percent, Reduced haptics Off, with the status strip for the knob, Sonos, Apple Music and Home Assistant above" width="308"></a></p>
 
 <p align="center"><a href="docs/features/settings.md">Every setting ›</a> &nbsp;·&nbsp; <a href="docs/features/day.md">A day with Desk Dial, in eighteen seconds ›</a></p>
 

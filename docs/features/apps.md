@@ -55,6 +55,8 @@ Onshape keeps its own wording for the first two: "Point at the model" / "Put the
 
 ## Settings › Apps
 
+<p><img src="../media/settings-apps.png" alt="Desk Dial Settings, Apps page: Onshape (Tested), Figma and Plasticity (Not yet tested), Blender and AutoCAD (Basic), each with its icon, Off / Manual / Auto, where its profile came from, how it is recognised and a Rules button; below them Import profile, Open profiles folder, Check for updates, and the daily-fetch checkbox, off" width="420"></p>
+
 The page lists one row per app: its icon, its name, its status badge, Off / Manual / Auto, a line saying where the profile came from (Karl, Imported or Updated) and how it is recognised, and a **Rules…** button.
 
 The intro on the page reads: "Each app profile sets what the knob and its buttons do in that app. Manual: turn it on from the tray’s App mode menu. Auto: on while the app is in front. Hold all four knob buttons for 1 s for Home."

@@ -79,7 +79,7 @@ ALLOWLIST = {
     "README.md": {"Spotify", "Figma"},
     "docs/setup/home-assistant.md": {"homeassistant.local"},
     "docs/features/settings.md": {"homeassistant.local", "Figma"},   # the Address field's hint; the Apps list
-    "tools/readme-media/app_screens.py": {"homeassistant.local"},   # its own allow rule for that hint
+    "tools/readme-media/app_screens.py": {"homeassistant.local", "Figma"},   # its own allow rules (HA hint, Apps page)
     "tools/readme-media/fiction.py": set(BLOCKLIST),   # the fixtures' own self-check copy of the blocklist
 }
 TEXT_SUFFIXES = {".md", ".json", ".py"}

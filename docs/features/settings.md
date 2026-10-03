@@ -88,7 +88,7 @@ Over plain `http://` the token crosses your network unencrypted, and a line unde
 
 ## Knob
 
-<p><img src="../media/settings-knob.png" alt="Desk Dial Settings, Knob page: the USB port, button order, LEDs Colour, Onshape mode Off, Knob sounds On at 100 percent, Reduced haptics Off" width="420"></p>
+<p><img src="../media/settings-knob.png" alt="Desk Dial Settings, Knob page: the USB port, button order, LEDs Colour, the note "Onshape and other apps: Settings › Apps.", Knob sounds On at 100 percent, Reduced haptics Off, Recalibrate motor" width="420"></p>
 
 **Knob USB port** · a text field
 
@@ -118,6 +118,8 @@ Aligns the knob's motor again; takes about 10 seconds, during which you keep you
 
 
 ## Apps
+
+<p><img src="../media/settings-apps.png" alt="Desk Dial Settings, Apps page: Onshape (Tested), Figma and Plasticity (Not yet tested), Blender and AutoCAD (Basic), each with its icon, Off / Manual / Auto, where its profile came from, how it is recognised and a Rules button; below them Import profile, Open profiles folder, Check for updates, and the daily-fetch checkbox, off" width="420"></p>
 
 One row per app (Onshape, Figma, Plasticity, Blender, AutoCAD), each **Off / Manual / Auto**, with its status, where its profile came from and a **Rules…** button; plus **Import profile…**, **Open profiles folder**, **Check for updates** and the box **Fetch updated profiles from the Desk Dial repo (once a day)** (off by default). Every change applies at once. Everything on this page is described on [Apps](apps.md).
 

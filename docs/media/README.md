@@ -8,22 +8,22 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | app-icons.png | 53,728 | 1240x420 | 1 |  |
 | apps-strip.png | 11,144 | 1760x520 | 1 |  |
 | apps-strip.webp | 25,692 | 1760x520 | 1 |  |
-| cheat-sheet-dark.png | 179,163 | 1240x1754 | 1 |  |
-| cheat-sheet.png | 177,191 | 1240x1754 | 1 |  |
-| desktop-explorer-16x9.gif | 2,834,647 | 800x450 | 72 | 9.96 |
-| desktop-explorer-16x9.webp | 1,837,400 | 1760x990 | 97 | 12.83 |
-| desktop-explorer-32x9.gif | 2,624,189 | 960x270 | 88 | 12.61 |
-| desktop-explorer-32x9.webp | 1,686,434 | 1400x394 | 142 | 19.12 |
+| cheat-sheet-dark.png | 183,536 | 1240x1754 | 1 |  |
+| cheat-sheet.png | 179,667 | 1240x1754 | 1 |  |
+| desktop-explorer-16x9.gif | 2,606,573 | 800x450 | 71 | 9.82 |
+| desktop-explorer-16x9.webp | 1,906,468 | 1760x990 | 99 | 13.1 |
+| desktop-explorer-32x9.gif | 2,365,922 | 960x270 | 86 | 12.29 |
+| desktop-explorer-32x9.webp | 1,627,030 | 1400x394 | 139 | 18.72 |
 | desktop-picker-16x9.gif | 1,730,957 | 960x540 | 72 | 8.16 |
 | desktop-picker-16x9.webp | 1,762,982 | 1760x990 | 117 | 12.78 |
-| desktop-picker-32x9.gif | 1,142,480 | 960x270 | 86 | 10.07 |
-| desktop-picker-32x9.webp | 925,830 | 1400x394 | 136 | 15.21 |
-| desktop-upnext-16x9.gif | 2,740,059 | 800x450 | 100 | 12.67 |
-| desktop-upnext-16x9.webp | 1,736,318 | 1120x630 | 164 | 19.41 |
-| feel-and-sound.gif | 2,080,773 | 476x438 | 58 | 10 |
-| feel-and-sound.webp | 1,191,814 | 720x664 | 158 | 27.68 |
-| feel-gallery-dark.png | 69,334 | 760x942 | 1 |  |
-| feel-gallery.png | 63,750 | 760x942 | 1 |  |
+| desktop-picker-32x9.gif | 1,136,969 | 960x270 | 86 | 10.07 |
+| desktop-picker-32x9.webp | 926,654 | 1400x394 | 136 | 15.21 |
+| desktop-upnext-16x9.gif | 2,722,009 | 800x450 | 100 | 12.67 |
+| desktop-upnext-16x9.webp | 1,989,816 | 1120x630 | 166 | 19.65 |
+| feel-and-sound.gif | 2,075,715 | 476x438 | 58 | 10 |
+| feel-and-sound.webp | 1,177,364 | 720x664 | 158 | 27.68 |
+| feel-gallery-dark.png | 69,974 | 760x942 | 1 |  |
+| feel-gallery.png | 64,085 | 760x942 | 1 |  |
 | feel-wide.gif | 1,916,522 | 844x476 | 59 | 9.08 |
 | feel-wide.webp | 1,176,188 | 1280x720 | 174 | 27.18 |
 | head-apps-dark.png | 31,880 | 1760x584 | 1 |  |
@@ -50,9 +50,9 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | head-settings.png | 28,185 | 1760x584 | 1 |  |
 | head-windows-dark.png | 31,478 | 1760x584 | 1 |  |
 | head-windows.png | 31,959 | 1760x584 | 1 |  |
-| hero.gif | 2,843,213 | 864x528 | 73 | 9.12 |
-| hero.webp | 1,658,276 | 1440x880 | 157 | 19.82 |
-| knob-screens.png | 207,493 | 928x814 | 1 |  |
+| hero.gif | 2,846,189 | 864x528 | 73 | 9.12 |
+| hero.webp | 1,658,140 | 1440x880 | 157 | 19.82 |
+| knob-screens.png | 210,211 | 928x814 | 1 |  |
 | leds-moments.gif | 2,789,672 | 596x508 | 76 | 10 |
 | leds-moments.webp | 1,195,436 | 902x770 | 174 | 23.13 |
 | lights-brightness.gif | 1,260,507 | 475x550 | 80 | 9.98 |
@@ -63,8 +63,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | lights-scenes.webp | 482,086 | 475x550 | 99 | 14.29 |
 | lights-temperature.gif | 1,110,843 | 475x550 | 74 | 9.31 |
 | lights-temperature.webp | 508,566 | 475x550 | 114 | 13.71 |
-| motion-gallery.gif | 2,188,122 | 838x486 | 60 | 10.66 |
-| motion-gallery.webp | 1,019,264 | 838x486 | 114 | 19.19 |
+| motion-gallery.gif | 2,198,529 | 838x486 | 60 | 10.66 |
+| motion-gallery.webp | 1,006,830 | 838x486 | 114 | 19.19 |
 | music-hold-queue.gif | 2,554,124 | 475x550 | 83 | 12.44 |
 | music-hold-queue.webp | 619,666 | 475x550 | 113 | 15.85 |
 | music-lists.gif | 2,590,059 | 356x412 | 128 | 15.67 |
@@ -75,24 +75,25 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | music-tracks-seek.webp | 869,978 | 475x550 | 203 | 22.78 |
 | music-volume.gif | 2,664,575 | 404x468 | 135 | 16.67 |
 | music-volume.webp | 1,017,054 | 475x550 | 245 | 27.5 |
-| navigator-cards.png | 275,130 | 1080x860 | 1 |  |
-| navigator-cards.webp | 36,864 | 1080x860 | 1 |  |
-| navigator.gif | 1,292,373 | 1120x630 | 107 | 8.13 |
-| navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
+| navigator-cards.png | 274,973 | 1080x860 | 1 |  |
+| navigator-cards.webp | 36,838 | 1080x860 | 1 |  |
+| navigator.gif | 1,304,347 | 1120x630 | 107 | 8.13 |
+| navigator.webp | 1,189,804 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 208,338 | 475x550 | 55 | 5.8 |
 | onshape-knob.webp | 287,628 | 475x550 | 75 | 7.73 |
 | ring-moments.gif | 2,265,085 | 684x544 | 76 | 10 |
 | ring-moments.webp | 1,187,026 | 1036x824 | 167 | 22.2 |
-| settings-general.png | 17,229 | 616x890 | 1 |  |
-| settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
-| settings-knob.png | 26,291 | 616x1392 | 1 |  |
-| settings-music.png | 19,131 | 616x1093 | 1 |  |
-| settings-windows.png | 15,520 | 616x1093 | 1 |  |
+| settings-apps.png | 29,557 | 616x1339 | 1 |  |
+| settings-general.png | 17,338 | 616x890 | 1 |  |
+| settings-home-assistant.png | 26,173 | 616x1317 | 1 |  |
+| settings-knob.png | 24,661 | 616x1339 | 1 |  |
+| settings-music.png | 19,248 | 616x1093 | 1 |  |
+| settings-windows.png | 15,627 | 616x1093 | 1 |  |
 | social-preview.png | 61,320 | 1280x640 | 1 |  |
-| sound-bank-dark.png | 63,263 | 1100x674 | 1 |  |
-| sound-bank.png | 59,148 | 1100x674 | 1 |  |
-| story-day.gif | 2,114,022 | 314x364 | 154 | 8.56 |
-| story-day.webp | 1,451,874 | 475x550 | 338 | 18.97 |
+| sound-bank-dark.png | 62,296 | 1100x674 | 1 |  |
+| sound-bank.png | 57,571 | 1100x674 | 1 |  |
+| story-day.gif | 2,118,096 | 314x364 | 154 | 8.56 |
+| story-day.webp | 1,452,048 | 475x550 | 337 | 18.91 |
 | windows-knob.gif | 1,626,581 | 475x550 | 126 | 15.42 |
 | windows-knob.webp | 895,934 | 475x550 | 209 | 23.46 |
 <!-- /media-table -->

@@ -83,7 +83,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app_canvas_anim.cpp")
   add_library(firmware_app OBJECT
     "${SRC}/cc_frame_parse.cpp" "${SRC}/cc_app_canvas.cpp" "${SRC}/cc_app_gfx.cpp" "${SRC}/cc_app_fonts.cpp"
     "${SRC}/cc_app_shape.cpp" "${SRC}/cc_app_cards.cpp" "${SRC}/cc_app_screens.cpp"
-    "${SRC}/cc_app_onshape.c" "${APP_ICONS}")
+    "${SRC}/cc_app_onshape.c" "${SRC}/cc_app_store.c" "${APP_ICONS}")   # cc_app_store.c: the profile store the canvas leases from (v2.0.0)
   set_target_properties(firmware_app PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON)
   target_include_directories(firmware_app PUBLIC "${SRC}")
   target_include_directories(firmware_app SYSTEM PUBLIC "${ARDUINOJSON}")

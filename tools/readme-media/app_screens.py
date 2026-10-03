@@ -25,7 +25,7 @@ from scenes_registry import STAGE
 # Entry fields whose default comes from the app's code, replaced before capture (label -> fictional value).
 FIELD_OVERRIDES = {"Apple Team ID": "A1B2C3D4E5", "MusicKit Key ID": "K9L8M7N6P5", "Speaker IP": "192.0.2.20"}
 # Blocklist terms allowed in these screenshots: Home Assistant's own default host, shown as the Address hint.
-SCREEN_ALLOW = {"homeassistant.local"}
+SCREEN_ALLOW = {"homeassistant.local", "Figma"}   # the HA hint; Figma, a supported app on the Apps page (v2.0.0)
 FICTIONAL_SETTINGS = {
     "speaker_ip": "192.0.2.20", "room_uid": "", "port": "",
     "ha_base_url": "https://homeassistant.example:8123", "ha_area": "living_room",
