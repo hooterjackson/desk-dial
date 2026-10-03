@@ -40,17 +40,17 @@ def ink_band(text, label=lp.LIST_TITLE, row=0):
 class CrumbClearTests(unittest.TestCase):
     def test_half_matches_the_spec_for_every_token(self):
         for token in crumb_arc.TOKENS:
-            for text in ('Ásæla ljós', 'Stay', 'gypsy'):
+            for text in ('Ásæla ljósbrot', 'Stay', 'gypsy'):
                 _, top, bottom = ink_band(text)
                 with self.subTest(token=token, text=text):
                     self.assertEqual(lp.crumb_clear_half(token, lp.LIST_TITLE.centre, top, bottom),
                                      oracle_half(token, top, bottom))
 
     def test_recent_crumb_wraps_the_title_the_knob_wraps(self):
-        text = 'Ásæla ljós'
+        text = 'Ásæla ljósbrot'
         self.assertEqual(lp.fit_label(lp.LIST_TITLE, text)[0], [text])            # no crumb: one line
         lines, widths = lp.fit_label(lp.LIST_TITLE, text, 'recent')
-        self.assertEqual(lines, ['Ásæla', 'ljós'])
+        self.assertEqual(lines, ['Ásæla', 'ljósbrot'])
         ink, top, bottom = ink_band(text)
         self.assertEqual(widths[0], 2 * oracle_half('recent', top, bottom))
         self.assertLess(widths[0], lp.LIST_TITLE.line_width(ink, 0))
@@ -75,22 +75,22 @@ class CrumbClearTests(unittest.TestCase):
                     self.assertEqual(hits, [], f'{token} row {mask.y + j}')
 
     def test_crumb_without_ink_on_the_rows_and_other_labels_unchanged(self):
-        ink, top, bottom = ink_band('Ásæla ljós')
+        ink, top, bottom = ink_band('Ásæla ljósbrot')
         self.assertEqual(lp.LIST_TITLE.line_width(ink, 0, 'music'), lp.LIST_TITLE.line_width(ink, 0))
         self.assertEqual(lp.LIST_TITLE.line_width(ink, 0, ''), lp.LIST_TITLE.line_width(ink, 0))
         self.assertEqual(lp.LIST_TITLE.line_width(None, 0, 'recent'), 170)
         self.assertFalse(lp.TRACKS_TITLE.crumb_clear)
-        tracks_ink = lp.ink_rows('Ásæla ljós', lp.TRACKS_TITLE.size)
+        tracks_ink = lp.ink_rows('Ásæla ljósbrot', lp.TRACKS_TITLE.size)
         self.assertEqual(lp.TRACKS_TITLE.line_width(tracks_ink, 0, 'recent'), lp.TRACKS_TITLE.line_width(tracks_ink, 0))
 
     def test_scene_label_uses_the_scene_crumb(self):
         scene = lp.Scene('recent')
         scene.crumb = 'recent'
-        lp._label(scene, 'title', lp.LIST_TITLE, 'Ásæla ljós', lp.INK_RGB)
-        self.assertEqual([r.text for r in scene.texts('title')], ['Ásæla', 'ljós'])
+        lp._label(scene, 'title', lp.LIST_TITLE, 'Ásæla ljósbrot', lp.INK_RGB)
+        self.assertEqual([r.text for r in scene.texts('title')], ['Ásæla', 'ljósbrot'])
         plain = lp.Scene('recent')
-        lp._label(plain, 'title', lp.LIST_TITLE, 'Ásæla ljós', lp.INK_RGB)
-        self.assertEqual([r.text for r in plain.texts('title')], ['Ásæla ljós'])
+        lp._label(plain, 'title', lp.LIST_TITLE, 'Ásæla ljósbrot', lp.INK_RGB)
+        self.assertEqual([r.text for r in plain.texts('title')], ['Ásæla ljósbrot'])
 
 
 if __name__ == '__main__':
