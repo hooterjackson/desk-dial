@@ -22,6 +22,28 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | feel-and-sound.webp | 1,191,814 | 720x664 | 158 | 27.68 |
 | feel-gallery-dark.png | 69,334 | 760x942 | 1 |  |
 | feel-gallery.png | 63,750 | 760x942 | 1 |  |
+| head-feel-dark.png | 14,292 | 1760x422 | 1 |  |
+| head-feel.png | 14,050 | 1760x422 | 1 |  |
+| head-hero-dark.png | 22,435 | 1760x443 | 1 |  |
+| head-hero.png | 22,912 | 1760x443 | 1 |  |
+| head-lights-dark.png | 12,193 | 1760x422 | 1 |  |
+| head-lights.png | 11,794 | 1760x422 | 1 |  |
+| head-music-albums-dark.png | 11,052 | 1760x269 | 1 |  |
+| head-music-albums.png | 10,529 | 1760x269 | 1 |  |
+| head-music-explorer-dark.png | 13,108 | 1760x422 | 1 |  |
+| head-music-explorer.png | 12,782 | 1760x422 | 1 |  |
+| head-music-volume-dark.png | 10,104 | 1760x269 | 1 |  |
+| head-music-volume.png | 9,689 | 1760x269 | 1 |  |
+| head-navigator-dark.png | 18,872 | 1760x422 | 1 |  |
+| head-navigator.png | 18,232 | 1760x422 | 1 |  |
+| head-onshape-dark.png | 14,780 | 1760x422 | 1 |  |
+| head-onshape.png | 14,317 | 1760x422 | 1 |  |
+| head-ring-dark.png | 18,255 | 1760x422 | 1 |  |
+| head-ring.png | 17,467 | 1760x422 | 1 |  |
+| head-settings-dark.png | 16,038 | 1760x422 | 1 |  |
+| head-settings.png | 15,821 | 1760x422 | 1 |  |
+| head-windows-dark.png | 16,569 | 1760x422 | 1 |  |
+| head-windows.png | 15,959 | 1760x422 | 1 |  |
 | hero.gif | 2,492,884 | 612x374 | 104 | 14.19 |
 | hero.webp | 995,114 | 720x440 | 161 | 20.33 |
 | knob-screens.png | 207,493 | 928x814 | 1 |  |

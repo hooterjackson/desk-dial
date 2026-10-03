@@ -64,6 +64,7 @@ SOURCES = (
     "firmware feel laws + knob model",
     "firmware sound bank",
     "real footage",
+    "typography (Archivo, headlines.py)",
 )
 
 # Fallback (scene, source) by file stem for files already in docs/media that no registry entry
