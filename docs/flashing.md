@@ -29,6 +29,8 @@ Every command here uses [esptool](https://github.com/espressif/esptool), Espress
   Desk Dial was flashed with esptool 4.12.0. esptool 5 renamed the commands this guide uses, so stay on 4.x.
 - **From the [v2.0.0 release](https://github.com/hooterjackson/desk-dial/releases/tag/v2.0.0):** `desk-dial-firmware-2.0.0-F.bin` and `SHA256SUMS`. Put both in one folder, open PowerShell in that folder, and run every command below from there.
 
+> **Coming from v1.0 or v1.1?** Update Desk Dial to v2.0.0 **before** you flash. See [compatibility](compatibility.md#upgrading-from-v11).
+
 ### Check the download
 
 ```powershell
@@ -155,7 +157,7 @@ If the screen stays dark after about ten seconds, unplug the knob, wait five sec
 
 Now start Desk Dial **v2.0.0**. *You should see* the knob connect. The status line at the top of the Settings window shows a firmware version that starts with `2.0.0`.
 
-If you are coming from v1.0 or v1.1, update Desk Dial **before** you flash. See [compatibility](compatibility.md#upgrading-from-v11).
+If you came from v1.0 or v1.1, you updated Desk Dial before flashing (see [What you need](#what-you-need)); if you did not, update it now.
 
 ## Going back to your old firmware
 
