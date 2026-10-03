@@ -726,7 +726,7 @@ Also: Archivo, radius 0, 2 px rules (`RULE_WIDTH`). **Identical: no delta.**
 |---|---|---|
 | Window | Title `Settings` (34 px bar, 2 px rule) | Title `Nano_D++ · Setup`, heading `Connect your desk` (`:1568`, `:1574`), subtitle `SETUP_SUBTITLE` (`:113`) |
 | Knob | `Knob` · `Ready` (#6ed996); a 4-cell button map with the **old grammar** (`1 Play/Pause · Back`, `2 Browse · Home`, `3 Windows`, `4 Tracks · Action`); note "Left to right, under the knob. Fixed mapping." and a `Proposed` press-to-light test | Raw button indices, `Verify physical button order` probe (`:1583-1606`) |
-| Sonos target | Room radio list with detail (`Hall — Stereo pair + Sub · Victoria`, `Kitchen — One`); `Manual IP, if discovery fails` input (placeholder IP) | `Hall speaker IP` entry; room chosen by config |
+| Sonos target | Room radio list with detail (`Hall — Stereo pair + Sub`, `Kitchen — One`); `Manual IP, if discovery fails` input (placeholder IP) | `Hall speaker IP` entry; room chosen by config |
 | Apple Music | Status `Signed in` / `Sign-in expired` (colour-coded); "Signing keys stay in Windows Credential Manager and are never shown here."; `Renew sign-in…` | `Apple Team ID`, `MusicKit Key ID`, `Choose .p8 key`, `Authorize Apple Music`. Keys are DPAPI-protected (`credentials.bin`), not Credential Manager |
 | LED brightness | `Proposed`: Dim · **Standard** · Bright, "Scales L1–L4 together; ratios stay fixed." | none (ALIVE adds `led_drive` in settings.json with **no UI**, ALIVE §10.2) |
 | Launch at sign-in | Checkbox `Launch at Windows sign-in` | Installer-registered Task Scheduler task; no toggle |
