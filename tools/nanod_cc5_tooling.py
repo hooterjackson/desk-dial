@@ -888,7 +888,66 @@ JPEG_DECODE_MAX_MS = 200            # ARTWORK2.md section 10 / 12.11: diag jpegD
 COVER_TRANSFER_MAX_SECONDS = 1.5    # one unpaced cover, begin to commit ack (a paced 120 px v1 cover took ~5 s)
 MEDIA_DIAG_FIELDS = ("rxQueueBytes", "mediaCommits", "mediaErrors", "mediaEvictions", "jpegDecodes",
                      "jpegDecodeErrors", "jpegDecodeMsMax", "jpegDecodeMsLast")
-DESIGN_ASSETS = APP / "design-reference" / "design_handoff_nano_d_artwork_color" / "assets"
+_DESIGN_HANDOFF_ASSETS = APP / "design-reference" / "design_handoff_nano_d_artwork_color" / "assets"
+SYNTHETIC_MEDIA_VERSION = 1
+
+
+def _synthetic_design_assets(target):
+    """Fictional stand-ins for the design hand-off's covers/ and apps/ folders, which the public
+    repository does not ship (third-party album art and app logos). Nine covers and five app icons,
+    drawn deterministically and asymmetric (so every orientation of cover_pool/icon_pool is a distinct
+    image), written once into `target` (outside the repository). Returns `target`."""
+    from PIL import Image, ImageDraw
+    covers, apps = target / "covers", target / "apps"
+    done = target / f"ready-v{SYNTHETIC_MEDIA_VERSION}"
+    if done.is_file():
+        return target
+    covers.mkdir(parents=True, exist_ok=True)
+    apps.mkdir(parents=True, exist_ok=True)
+    rng = random.Random("desk-dial synthetic media")
+    for n in range(9):
+        size = 300 + 4 * n
+        image = Image.new("RGB", (size, size))
+        draw = ImageDraw.Draw(image)
+        a = [rng.randrange(256) for _ in range(3)]
+        b = [rng.randrange(256) for _ in range(3)]
+        for y in range(size):
+            t = y / (size - 1)
+            draw.line([(0, y), (size - 1, y)], fill=tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3)))
+        for _ in range(6 + n):
+            x0, y0 = rng.randrange(size), rng.randrange(size)
+            w, h = rng.randrange(20, size // 2), rng.randrange(10, size // 3)
+            colour = tuple(rng.randrange(256) for _ in range(3))
+            (draw.ellipse if rng.random() < 0.5 else draw.rectangle)([x0, y0, x0 + w, y0 + h], fill=colour)
+        draw.polygon([(0, 0), (size // 3, 0), (0, size // 4)], fill=(250, 250, 250))   # top-left marker
+        if n % 2:
+            image.save(covers / f"synthetic-cover-{n + 1}.jpg", format="JPEG", quality=92)
+        else:
+            image.save(covers / f"synthetic-cover-{n + 1}.png")
+    for n in range(5):
+        size = 250 + 20 * n
+        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        colour = tuple(rng.randrange(40, 256) for _ in range(3)) + (255,)
+        draw.rounded_rectangle([8, 8, size - 9, size - 9], radius=size // 5, fill=colour)
+        draw.polygon([(size // 4, size // 4), (3 * size // 4, size // 3), (size // 3, 3 * size // 4)],
+                     fill=(255, 255, 255, 255))
+        draw.ellipse([size - size // 3, 12, size - 16, size // 3], fill=(20, 20, 20, 160))
+        image.save(apps / f"synthetic-app-{n + 1}.png")
+    done.write_text("synthetic design media\n", encoding="utf-8")
+    return target
+
+
+def _design_assets():
+    """The design hand-off's assets when a private checkout has them, else fictional stand-ins."""
+    if (_DESIGN_HANDOFF_ASSETS / "covers").is_dir() and any((_DESIGN_HANDOFF_ASSETS / "covers").iterdir()) \
+            and (_DESIGN_HANDOFF_ASSETS / "apps").is_dir():
+        return _DESIGN_HANDOFF_ASSETS
+    import tempfile
+    return _synthetic_design_assets(Path(tempfile.gettempdir()) / "desk-dial-synthetic-media")
+
+
+DESIGN_ASSETS = _design_assets()
 _presentation_module = None
 
 
