@@ -1,0 +1,5433 @@
+{
+ "about": "Write r3-handoff/r3_screens.json: the Desk Dial r3 release-1 knob screens (presentation 6) for the harness.",
+ "screens": [
+  {
+   "id": "cap-home",
+   "name": "Home: launcher, knob = volume, 1 Music · 2 Win · 3 Lights · 4 Play/Pause",
+   "ring": "awake",
+   "frame": {
+    "id": 3,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "28%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 28,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 28,
+    "playing": true,
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-turn",
+   "name": "Home · turn: volume reveal",
+   "ring": "awake",
+   "frame": {
+    "id": 3,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "Setting…",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "pending",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "volume",
+    "restLayout": "nowPlaying",
+    "volumeVisible": true,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 28,
+    "playing": true,
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-4",
+   "name": "Home · 4: pause (button 4 = Play)",
+   "ring": "awake",
+   "frame": {
+    "id": 3,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "Paused",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "statusTone": "secondary",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Paused · Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": false,
+    "ledStyle": "color",
+    "artKey": "k-hall",
+    "progress": {
+     "pos": 74000,
+     "dur": 334000
+    }
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-4-again",
+   "name": "Home · 4 again: playing",
+   "ring": "awake",
+   "frame": {
+    "id": 3,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "ledStyle": "color",
+    "artKey": "k-hall",
+    "progress": {
+     "pos": 74000,
+     "dur": 334000
+    }
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-hold-4",
+   "name": "Home · hold 4: knob = Hall brightness: LIGHTS, `Hall · bri% · K`, `Knob sets brightness`",
+   "ring": "awake",
+   "frame": {
+    "id": 4,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "Hall · 62% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "Hall · 62% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 62,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Knob sets brightness",
+    "metaTone": "warm",
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-home-lights-turn",
+   "name": "Home (lights) · turn: Brightness big reveal",
+   "ring": "awake",
+   "frame": {
+    "id": 4,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "66",
+    "detail": "Hall · 66% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "Hall · 66% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 66,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lightsbig",
+    "heading": "LIGHTS",
+    "meta": "Knob sets brightness",
+    "metaTone": "warm",
+    "volumeCaption": "Hall",
+    "valueUnit": "%",
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-home-lights-4",
+   "name": "Home (lights) · 4: All off → Lights off / Tap 4 to turn on",
+   "ring": "awake",
+   "frame": {
+    "id": 5,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "Lights off",
+    "detail": "Tap 4 to turn on",
+    "status": "",
+    "title": "Lights off",
+    "subtitle": "Tap 4 to turn on",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Turn on",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "off",
+     "value": 0,
+     "index": 0,
+     "count": 0
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Lights off",
+    "metaTone": "secondary",
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-home-lights-4-again",
+   "name": "Home (lights) · 4 again: Turn on",
+   "ring": "awake",
+   "frame": {
+    "id": 6,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "Hall · 66% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "Hall · 66% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 66,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Lights on",
+    "metaTone": "secondary",
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-home-hold-4-again",
+   "name": "Home · hold 4 again: knob = volume, `Knob sets volume`",
+   "ring": "awake",
+   "frame": {
+    "id": 7,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "Knob sets volume",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "statusTone": "warm",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-2",
+   "name": "Home · 2: picker opens on screen; knob Windows list",
+   "ring": "awake",
+   "frame": {
+    "id": 8,
+    "mode": "WINDOWS",
+    "target": "DESKTOP",
+    "value": "Model training review",
+    "detail": "Claude",
+    "status": "",
+    "title": "Model training review",
+    "subtitle": "Claude",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Snap left",
+      "enabled": true,
+      "icon": "snapleft"
+     },
+     {
+      "label": "Snap right",
+      "enabled": true,
+      "icon": "snapright"
+     },
+     {
+      "label": "Switch",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "marker",
+     "value": 0,
+     "index": 1,
+     "count": 24,
+     "first": 0
+    },
+    "layout": "windows",
+    "meta": "2 / 24",
+    "crumb": "windows",
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-windows-turn",
+   "name": "Windows · turn: highlight moves",
+   "ring": "awake",
+   "frame": {
+    "id": 8,
+    "mode": "WINDOWS",
+    "target": "DESKTOP",
+    "value": "Engineering · #firmware",
+    "detail": "Slack",
+    "status": "",
+    "title": "Engineering · #firmware",
+    "subtitle": "Slack",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Snap left",
+      "enabled": false,
+      "icon": "snapleft"
+     },
+     {
+      "label": "Snap right",
+      "enabled": false,
+      "icon": "snapright"
+     },
+     {
+      "label": "Switch",
+      "enabled": false,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "marker",
+     "value": 0,
+     "index": 3,
+     "count": 24,
+     "first": 0
+    },
+    "layout": "windows",
+    "meta": "Closed · can’t switch",
+    "titleTone": "muted",
+    "crumb": "windows",
+    "ledStyle": "color",
+    "iconKey": "26bed1ece7b2db4f"
+   }
+  },
+  {
+   "id": "cap-windows-1",
+   "name": "Windows · 1: Home (restores focus)",
+   "ring": "awake",
+   "frame": {
+    "id": 9,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-windows-2",
+   "name": "Windows · 2: snap left",
+   "ring": "awake",
+   "frame": {
+    "id": 11,
+    "mode": "WINDOWS",
+    "target": "DESKTOP",
+    "value": "Apple Music documentation — Google Chrome",
+    "detail": "Chrome",
+    "status": "",
+    "title": "Apple Music documentation — Google Chrome",
+    "subtitle": "Chrome",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Snap left",
+      "enabled": true,
+      "icon": "snapleft",
+      "lit": "on",
+      "color": 7903711
+     },
+     {
+      "label": "Snap right",
+      "enabled": true,
+      "icon": "snapright"
+     },
+     {
+      "label": "Switch",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "marker",
+     "value": 0,
+     "index": 2,
+     "count": 24,
+     "first": 0
+    },
+    "layout": "windows",
+    "meta": "Snapped left",
+    "metaTone": "success",
+    "crumb": "windows",
+    "feedback": {
+     "kind": "ok",
+     "seq": 1,
+     "moment": "snap",
+     "side": -1,
+     "color": 7903711
+    },
+    "ledStyle": "color",
+    "iconKey": "dabff695dc3abe42"
+   }
+  },
+  {
+   "id": "cap-windows-3",
+   "name": "Windows · 3: snap right, the pair closes → Home",
+   "ring": "awake",
+   "frame": {
+    "id": 12,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 2,
+     "moment": "snap",
+     "side": 1,
+     "color": 14221206
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-windows-4",
+   "name": "Windows · 4: Switch → Home",
+   "ring": "awake",
+   "frame": {
+    "id": 14,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "Switched to Microsoft Edge",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-windows-hold-1",
+   "name": "Windows · hold 1: Home",
+   "ring": "awake",
+   "frame": {
+    "id": 16,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-home-1",
+   "name": "Home · 1: Music: 1 Home · 2 Recent · 3 Tracks · 4 Play/Pause, knob = volume",
+   "ring": "awake",
+   "frame": {
+    "id": 17,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "31%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 31,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 31,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-music-turn",
+   "name": "Music · turn: volume",
+   "ring": "awake",
+   "frame": {
+    "id": 17,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "volume",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": true,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 29,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-music-4",
+   "name": "Music · 4: Play/Pause",
+   "ring": "awake",
+   "frame": {
+    "id": 17,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Straße ? Mix for Night",
+    "status": "Paused",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "statusTone": "secondary",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Paused · Straße ? Mix for Night",
+    "confirmedVolume": 29,
+    "playing": false,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall",
+    "progress": {
+     "pos": 74000,
+     "dur": 334000
+    }
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-music-2-loading",
+   "name": "Music · 2 (loading): Recently Added list, Loading…",
+   "ring": "awake",
+   "frame": {
+    "id": 18,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "title": "",
+    "subtitle": "",
+    "activity": "loading",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "off",
+     "value": 0,
+     "index": 0,
+     "count": 0
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "Loading…",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-music-2",
+   "name": "Music · 2: Recently Added list: title / artist / n of N",
+   "ring": "awake",
+   "frame": {
+    "id": 19,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Varanda",
+    "detail": "Ana Ribeira",
+    "status": "",
+    "title": "Varanda",
+    "subtitle": "Ana Ribeira",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "1 / 44 · Ana Ribeira",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-recent-turn",
+   "name": "Recent · turn: list scrolls",
+   "ring": "awake",
+   "frame": {
+    "id": 19,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "North of June · Ásæla ljós",
+    "detail": "North of June",
+    "status": "",
+    "title": "North of June · Ásæla ljós",
+    "subtitle": "North of June",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "4 / 44 · North of June",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-recent-1",
+   "name": "Recent · 1: Back → Music",
+   "ring": "awake",
+   "frame": {
+    "id": 20,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Straße ? Mix for Night",
+    "status": "",
+    "title": "Straße ? Mix for Night",
+    "subtitle": "DJ Ørsted",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Straße ? Mix for Night",
+    "confirmedVolume": 29,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-recent-2",
+   "name": "Recent · 2: explorer opens full screen (same album)",
+   "ring": "awake",
+   "frame": {
+    "id": 23,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Ænima",
+    "detail": "Tool",
+    "status": "",
+    "title": "Ænima",
+    "subtitle": "Tool",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album",
+      "lit": "on"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "off"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "explorer",
+    "heading": "RECENT",
+    "meta": "3 / 44",
+    "crumb": "onScreenRecent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-turn",
+   "name": "Explorer · turn: covers scroll",
+   "ring": "awake",
+   "frame": {
+    "id": 23,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "North of June · Ásæla ljós",
+    "detail": "North of June",
+    "status": "",
+    "title": "North of June · Ásæla ljós",
+    "subtitle": "North of June",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album",
+      "lit": "on"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "off"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "explorer",
+    "heading": "RECENT",
+    "meta": "4 / 44",
+    "crumb": "onScreenRecent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-3",
+   "name": "Explorer · 3: Favourite playlists tab",
+   "ring": "awake",
+   "frame": {
+    "id": 24,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Favorite Songs",
+    "detail": "12 songs",
+    "status": "",
+    "title": "Favorite Songs",
+    "subtitle": "12 songs",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album",
+      "lit": "off"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "explorer",
+    "heading": "FAVOURITES",
+    "meta": "1 / 2",
+    "page": 1,
+    "crumb": "onScreenPlaylists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-2",
+   "name": "Explorer · 2: Recently Added tab",
+   "ring": "awake",
+   "frame": {
+    "id": 25,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "North of June · Ásæla ljós",
+    "detail": "North of June",
+    "status": "",
+    "title": "North of June · Ásæla ljós",
+    "subtitle": "North of June",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album",
+      "lit": "on"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "off"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "explorer",
+    "heading": "RECENT",
+    "meta": "4 / 44",
+    "crumb": "onScreenRecent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-1",
+   "name": "Explorer · 1: Back → knob list, same album",
+   "ring": "awake",
+   "frame": {
+    "id": 26,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "North of June · Ásæla ljós",
+    "detail": "North of June",
+    "status": "",
+    "title": "North of June · Ásæla ljós",
+    "subtitle": "North of June",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "4 / 44 · North of June",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 3
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-4",
+   "name": "Explorer · 4: Play → Music now playing",
+   "ring": "awake",
+   "frame": {
+    "id": 28,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 1",
+    "status": "",
+    "title": "Movement 1",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 1",
+    "confirmedVolume": 29,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 4,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-recent-3",
+   "name": "Recent · 3: Favourite playlists: MUSIC › PLAYLISTS, n songs, 3 = Recent",
+   "ring": "awake",
+   "frame": {
+    "id": 31,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Favorite Songs",
+    "detail": "Favourite playlist",
+    "status": "",
+    "title": "Favorite Songs",
+    "subtitle": "Favourite playlist",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "recent",
+    "heading": "PLAYLISTS",
+    "meta": "1 / 2 · 12 songs",
+    "crumb": "playlists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 4,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-playlists-turn",
+   "name": "Playlists · turn: next playlist",
+   "ring": "awake",
+   "frame": {
+    "id": 31,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "PAPER LANTERN Ep. 1",
+    "detail": "Favourite playlist",
+    "status": "",
+    "title": "PAPER LANTERN Ep. 1",
+    "subtitle": "Favourite playlist",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 1,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "recent",
+    "heading": "PLAYLISTS",
+    "meta": "2 / 2 · 34 songs",
+    "crumb": "playlists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 4,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-playlists-hold-4",
+   "name": "Playlists · hold 4: Play next (the playlist queued after the playing song)",
+   "ring": "awake",
+   "frame": {
+    "id": 31,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "PAPER LANTERN Ep. 1",
+    "detail": "Favourite playlist",
+    "status": "",
+    "title": "PAPER LANTERN Ep. 1",
+    "subtitle": "Favourite playlist",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 1,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "recent",
+    "heading": "PLAYLISTS",
+    "meta": "Queued · PAPER LANTERN E…",
+    "metaTone": "success",
+    "crumb": "playlists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 5,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-playlists-2",
+   "name": "Playlists · 2: the explorer opens on the Favourites tab, same playlist",
+   "ring": "awake",
+   "frame": {
+    "id": 32,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "PAPER LANTERN Ep. 1",
+    "detail": "34 songs",
+    "status": "",
+    "title": "PAPER LANTERN Ep. 1",
+    "subtitle": "34 songs",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album",
+      "lit": "off"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 1,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "explorer",
+    "heading": "FAVOURITES",
+    "meta": "2 / 2",
+    "page": 1,
+    "crumb": "onScreenPlaylists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 5,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-explorer-1-playlists",
+   "name": "Explorer · 1 (Playlists): Back → the knob list on Playlists",
+   "ring": "awake",
+   "frame": {
+    "id": 33,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "PAPER LANTERN Ep. 1",
+    "detail": "Favourite playlist",
+    "status": "",
+    "title": "PAPER LANTERN Ep. 1",
+    "subtitle": "Favourite playlist",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 1,
+     "count": 2,
+     "colors": [
+      16729670,
+      9858815
+     ]
+    },
+    "layout": "recent",
+    "heading": "PLAYLISTS",
+    "meta": "2 / 2 · 34 songs",
+    "crumb": "playlists",
+    "feedback": {
+     "kind": "ok",
+     "seq": 5,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-playlists-3",
+   "name": "Playlists · 3: back to Recently Added, same album",
+   "ring": "awake",
+   "frame": {
+    "id": 34,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Varanda",
+    "detail": "Ana Ribeira",
+    "status": "",
+    "title": "Varanda",
+    "subtitle": "Ana Ribeira",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "Recently Added",
+    "metaTone": "warm",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 5,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-recent-hold-4",
+   "name": "Recent · hold 4: Play next (queued)",
+   "ring": "awake",
+   "frame": {
+    "id": 34,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall + 1 room",
+    "value": "Varanda",
+    "detail": "Ana Ribeira",
+    "status": "",
+    "title": "Varanda",
+    "subtitle": "Ana Ribeira",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 44,
+     "first": 0,
+     "colors": [
+      9856255,
+      0,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      16737340,
+      16760360,
+      0,
+      7785331,
+      0,
+      16737340,
+      16760360,
+      9856255,
+      16727180,
+      12415559,
+      16727180,
+      16760360,
+      16727180,
+      3988600
+     ],
+     "unavailable": 8224
+    },
+    "layout": "recent",
+    "heading": "RECENTLY ADDED",
+    "meta": "Queued · Varanda",
+    "metaTone": "success",
+    "crumb": "recent",
+    "feedback": {
+     "kind": "ok",
+     "seq": 6,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-recent-4",
+   "name": "Recent · 4: Play (replaces queue) → Music",
+   "ring": "awake",
+   "frame": {
+    "id": 35,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 1",
+    "status": "",
+    "title": "Movement 1",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 1",
+    "confirmedVolume": 29,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 7,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-music-3",
+   "name": "Music · 3: Tracks on the playing row: `Turn to browse the queue`",
+   "ring": "awake",
+   "frame": {
+    "id": 36,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 1",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 1",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 0,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      2675430,
+      3988600,
+      0,
+      16760360,
+      16737340
+     ]
+    },
+    "layout": "tracks",
+    "heading": "TRACKS",
+    "meta": "Turn to browse the queue",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 7,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-tracks-turn",
+   "name": "Tracks · turn: the whole queue: `Skip to · n / T`, `Press 4 to play`",
+   "ring": "awake",
+   "frame": {
+    "id": 36,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 3",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      2675430,
+      3988600,
+      0,
+      16760360,
+      16737340
+     ]
+    },
+    "layout": "tracks",
+    "heading": "TRACKS",
+    "meta": "Skip to 3 / 9 · 4 plays",
+    "metaTone": "success",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 7,
+     "moment": "started",
+     "color": 459624
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-tracks-4",
+   "name": "Tracks · 4: jumps there; Tracks re-centres on the new playing row",
+   "ring": "awake",
+   "frame": {
+    "id": 36,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 3",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      2675430,
+      3988600,
+      0,
+      16760360,
+      16737340
+     ]
+    },
+    "layout": "tracks",
+    "heading": "TRACKS",
+    "meta": "Turn to browse the queue",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-tracks-3",
+   "name": "Tracks · 3: Seek",
+   "ring": "awake",
+   "frame": {
+    "id": 37,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "0:03",
+    "detail": "",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Cancel",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Set",
+      "enabled": true,
+      "icon": "seek",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "lap",
+     "value": 0,
+     "index": 3,
+     "count": 226,
+     "first": 0
+    },
+    "layout": "seek",
+    "heading": "TRACKS",
+    "meta": "of 3:46 · 3 sets · 1 cancels",
+    "metaTone": "warm",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-seek-turn",
+   "name": "Seek · turn: scrub",
+   "ring": "awake",
+   "frame": {
+    "id": 37,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "0:23",
+    "detail": "",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Cancel",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Set",
+      "enabled": true,
+      "icon": "seek",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "lap",
+     "value": 0,
+     "index": 23,
+     "count": 226,
+     "first": 13
+    },
+    "layout": "seek",
+    "heading": "TRACKS",
+    "meta": "of 3:46 · 3 sets · 1 cancels",
+    "metaTone": "warm",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-seek-1",
+   "name": "Seek · 1: Back → Tracks",
+   "ring": "awake",
+   "frame": {
+    "id": 38,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 3",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      2675430,
+      3988600,
+      0,
+      16760360,
+      16737340
+     ]
+    },
+    "layout": "tracks",
+    "heading": "TRACKS",
+    "meta": "Seek cancelled",
+    "metaTone": "secondary",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-tracks-2",
+   "name": "Tracks · 2: Up next opens full screen",
+   "ring": "awake",
+   "frame": {
+    "id": 39,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 3",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 3",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "off"
+     },
+     {
+      "label": "Like",
+      "enabled": true,
+      "icon": "heart"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 9,
+     "colors": [
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910
+     ],
+     "now": 2
+    },
+    "layout": "upnext",
+    "heading": "UP NEXT",
+    "meta": "3 / 9 · playing",
+    "crumb": "upnext",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-up-next-turn",
+   "name": "Up next · turn: rows scroll",
+   "ring": "awake",
+   "frame": {
+    "id": 39,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 4",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 4",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "off"
+     },
+     {
+      "label": "Like",
+      "enabled": true,
+      "icon": "heart"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 9,
+     "colors": [
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910
+     ],
+     "now": 2
+    },
+    "layout": "upnext",
+    "heading": "UP NEXT",
+    "meta": "4 / 9",
+    "crumb": "upnext",
+    "feedback": {
+     "kind": "ok",
+     "seq": 8,
+     "moment": "started",
+     "color": 9856255
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-up-next-3",
+   "name": "Up next · 3: Like",
+   "ring": "awake",
+   "frame": {
+    "id": 39,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 4",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 4",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "off"
+     },
+     {
+      "label": "Liked",
+      "enabled": true,
+      "icon": "heart",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 9,
+     "colors": [
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910,
+      7902910
+     ],
+     "now": 2
+    },
+    "layout": "upnext",
+    "heading": "UP NEXT",
+    "meta": "Liked",
+    "crumb": "upnext",
+    "feedback": {
+     "kind": "ok",
+     "seq": 9,
+     "moment": "like"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-up-next-hold-4",
+   "name": "Up next · hold 4: Play next: the focused row moves after the playing one",
+   "ring": "awake",
+   "frame": {
+    "id": 39,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 4",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 4",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "off"
+     },
+     {
+      "label": "Like",
+      "enabled": false,
+      "icon": "heart"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      2675430,
+      3988600,
+      0,
+      16760360,
+      16737340
+     ],
+     "now": 2
+    },
+    "layout": "upnext",
+    "heading": "UP NEXT",
+    "meta": "Plays next · Movement 4",
+    "metaTone": "success",
+    "crumb": "upnext",
+    "feedback": {
+     "kind": "ok",
+     "seq": 10,
+     "moment": "queued"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-up-next-2",
+   "name": "Up next · 2: Shuffle",
+   "ring": "awake",
+   "frame": {
+    "id": 40,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 4",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 4",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "on"
+     },
+     {
+      "label": "Like",
+      "enabled": false,
+      "icon": "heart"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      16760360,
+      16737340,
+      3988600,
+      0,
+      2675430
+     ],
+     "now": 2
+    },
+    "layout": "upnext",
+    "heading": "UP NEXT",
+    "meta": "Shuffle on",
+    "metaTone": "warm",
+    "crumb": "upnext",
+    "feedback": {
+     "kind": "ok",
+     "seq": 11,
+     "moment": "shuffle"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-up-next-1",
+   "name": "Up next · 1: Back → Tracks",
+   "ring": "awake",
+   "frame": {
+    "id": 41,
+    "mode": "TRACKS",
+    "target": "Hall + 1 room",
+    "value": "Movement 4",
+    "detail": "Harbour Signals, Sodium Coast & LSO",
+    "status": "",
+    "title": "Movement 4",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 9,
+     "colors": [
+      16737340,
+      16727180,
+      9856255,
+      4618495,
+      16760360,
+      16737340,
+      3988600,
+      0,
+      2675430
+     ]
+    },
+    "layout": "tracks",
+    "heading": "TRACKS",
+    "meta": "Skip to 4 / 9 · 4 plays",
+    "metaTone": "success",
+    "crumb": "tracks",
+    "feedback": {
+     "kind": "ok",
+     "seq": 11,
+     "moment": "shuffle"
+    },
+    "ledStyle": "color",
+    "artKey": "k-hall"
+   },
+   "art": "art-hall-120"
+  },
+  {
+   "id": "cap-up-next-4",
+   "name": "Up next · 4: Play this track → Music",
+   "ring": "awake",
+   "frame": {
+    "id": 43,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 8",
+    "status": "",
+    "title": "Movement 8",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "heading": "MUSIC",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 8",
+    "confirmedVolume": 29,
+    "playing": true,
+    "crumb": "music",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-hold-1-from-music",
+   "name": "hold 1 (from Music): Home",
+   "ring": "awake",
+   "frame": {
+    "id": 44,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 8",
+    "status": "",
+    "title": "Movement 8",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 8",
+    "confirmedVolume": 29,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-home-3",
+   "name": "Home · 3: Lights: scene / bri% · K, knob = brightness",
+   "ring": "awake",
+   "frame": {
+    "id": 45,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "66% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "66% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 66,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Hall · 3 lights",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-turn",
+   "name": "Lights · turn: Brightness big reveal",
+   "ring": "awake",
+   "frame": {
+    "id": 45,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "71",
+    "detail": "71% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "71% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 71,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lightsbig",
+    "heading": "LIGHTS",
+    "volumeCaption": "Brightness",
+    "valueUnit": "%",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-settle",
+   "name": "Lights · settle: text screen, `· adjusted`",
+   "ring": "awake",
+   "frame": {
+    "id": 45,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "71% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "71% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 71,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Hall · 3 lights",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-3",
+   "name": "Lights · 3: temperature mode, 3 lit, meta Knob: temperature",
+   "ring": "awake",
+   "frame": {
+    "id": 46,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "71% · 3200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "71% · 3200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo",
+      "lit": "on"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "ctemp",
+     "value": 23,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Knob: temperature",
+    "metaTone": "warm",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-turn-temp",
+   "name": "Lights · turn (temp): Colour temperature big reveal (K)",
+   "ring": "awake",
+   "frame": {
+    "id": 46,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "3500",
+    "detail": "71% · 3500 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "71% · 3500 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo",
+      "lit": "on"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "ctemp",
+     "value": 30,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3500
+    },
+    "layout": "lightsbig",
+    "heading": "LIGHTS",
+    "meta": "Knob: temperature",
+    "metaTone": "warm",
+    "volumeCaption": "Colour temperature",
+    "valueUnit": "K",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-3-again",
+   "name": "Lights · 3 again: back to brightness",
+   "ring": "awake",
+   "frame": {
+    "id": 47,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "71% · 3500 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "71% · 3500 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 71,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3500
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Knob: brightness",
+    "metaTone": "warm",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-4",
+   "name": "Lights · 4: All off → Lights off / Tap 4 to turn on",
+   "ring": "awake",
+   "frame": {
+    "id": 48,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Lights off",
+    "detail": "Tap 4 to turn on",
+    "status": "",
+    "title": "Lights off",
+    "subtitle": "Tap 4 to turn on",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "Turn on",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "off",
+     "value": 0,
+     "index": 0,
+     "count": 0
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Lights off",
+    "metaTone": "secondary",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-turn-while-off",
+   "name": "Lights · turn while off: turns on at 1 %",
+   "ring": "awake",
+   "frame": {
+    "id": 48,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "1",
+    "detail": "1% · 3500 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "1% · 3500 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 1,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3500
+    },
+    "layout": "lightsbig",
+    "heading": "LIGHTS",
+    "volumeCaption": "Brightness",
+    "valueUnit": "%",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-4-turn-on",
+   "name": "Lights · 4 (Turn on): restores the snapshot",
+   "ring": "awake",
+   "frame": {
+    "id": 50,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "1% · 3500 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "1% · 3500 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 1,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3500
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Lights on",
+    "metaTone": "secondary",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-2",
+   "name": "Lights · 2: Scenes list: prev / current / next, n / N · bri · K",
+   "ring": "awake",
+   "frame": {
+    "id": 51,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Focus",
+    "detail": "",
+    "status": "",
+    "title": "Focus",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 0,
+     "count": 5
+    },
+    "layout": "scenes",
+    "heading": "SCENES",
+    "meta": "1 / 5 · 62% · 3200 K",
+    "prevTitle": "",
+    "nextTitle": "Evening",
+    "crumb": "scenes",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-turn",
+   "name": "Scenes · turn: next scene",
+   "ring": "awake",
+   "frame": {
+    "id": 51,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 2,
+     "count": 5
+    },
+    "layout": "scenes",
+    "heading": "SCENES",
+    "meta": "3 / 5",
+    "prevTitle": "Evening",
+    "nextTitle": "Reading",
+    "crumb": "scenes",
+    "feedback": {
+     "kind": "ok",
+     "seq": 12,
+     "moment": "started",
+     "color": 7902910
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-2",
+   "name": "Scenes · 2: refused: Turn to choose · 4 runs it",
+   "ring": "awake",
+   "frame": {
+    "id": 51,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 2,
+     "count": 5
+    },
+    "layout": "scenes",
+    "heading": "SCENES",
+    "meta": "Turn to choose · 4 runs it",
+    "metaTone": "error",
+    "prevTitle": "Evening",
+    "nextTitle": "Reading",
+    "crumb": "scenes",
+    "feedback": {
+     "kind": "err",
+     "seq": 13,
+     "moment": "refused"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-3",
+   "name": "Scenes · 3: refused: Turn to choose · 4 runs it",
+   "ring": "awake",
+   "frame": {
+    "id": 51,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 2,
+     "count": 5
+    },
+    "layout": "scenes",
+    "heading": "SCENES",
+    "meta": "Turn to choose · 4 runs it",
+    "metaTone": "error",
+    "prevTitle": "Evening",
+    "nextTitle": "Reading",
+    "crumb": "scenes",
+    "feedback": {
+     "kind": "err",
+     "seq": 14,
+     "moment": "refused"
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-4",
+   "name": "Scenes · 4: Run → Lights, `Scene running`",
+   "ring": "awake",
+   "frame": {
+    "id": 53,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "12% · 2200 K",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "12% · 2200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 12,
+     "index": 0,
+     "count": 0,
+     "kelvin": 2200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Scene running",
+    "metaTone": "success",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-2-after-a-run",
+   "name": "Lights · 2 (after a run): Scenes list, `n / N · running now`",
+   "ring": "awake",
+   "frame": {
+    "id": 54,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 2,
+     "count": 5
+    },
+    "layout": "scenes",
+    "heading": "SCENES",
+    "meta": "3 / 5 · running now",
+    "prevTitle": "Evening",
+    "nextTitle": "Reading",
+    "crumb": "scenes",
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-1",
+   "name": "Scenes · 1: Back → Lights",
+   "ring": "awake",
+   "frame": {
+    "id": 55,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Movie",
+    "detail": "12% · 2200 K",
+    "status": "",
+    "title": "Movie",
+    "subtitle": "12% · 2200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 12,
+     "index": 0,
+     "count": 0,
+     "kelvin": 2200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Hall · 3 lights",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-turn-after-a-scene",
+   "name": "Lights · turn after a scene: title `{Scene} · adjusted`",
+   "ring": "awake",
+   "frame": {
+    "id": 55,
+    "mode": "LIGHTS",
+    "target": "Hall + 1 room",
+    "value": "Hall",
+    "detail": "14% · 2200 K",
+    "status": "",
+    "title": "Hall",
+    "subtitle": "14% · 2200 K",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 14,
+     "index": 0,
+     "count": 0,
+     "kelvin": 2200
+    },
+    "layout": "lights",
+    "heading": "LIGHTS",
+    "meta": "Hall · 3 lights",
+    "crumb": "lights",
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-lights-1",
+   "name": "Lights · 1: Home",
+   "ring": "awake",
+   "frame": {
+    "id": 56,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 8",
+    "status": "",
+    "title": "Movement 8",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 8",
+    "confirmedVolume": 29,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "cap-scenes-hold-1",
+   "name": "Scenes · hold 1: Home",
+   "ring": "awake",
+   "frame": {
+    "id": 59,
+    "mode": "VOLUME",
+    "target": "Hall + 1 room",
+    "value": "29%",
+    "detail": "Movement 8",
+    "status": "",
+    "title": "Movement 8",
+    "subtitle": "Harbour Signals, Sodium Coast & LSO",
+    "activity": "idle",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 29,
+     "index": 0,
+     "count": 101,
+     "first": 0
+    },
+    "layout": "nowPlaying",
+    "restLayout": "nowPlaying",
+    "volumeVisible": false,
+    "volumeCaption": "Movement 8",
+    "confirmedVolume": 29,
+    "playing": true,
+    "feedback": {
+     "kind": "ok",
+     "seq": 15
+    },
+    "ledStyle": "color"
+   }
+  },
+  {
+   "id": "r31-music-playing",
+   "name": "r3.1 Music space playing: art at 0.8, MUSIC crumb, Home / Recent / Tracks / Pause",
+   "ring": "awake",
+   "art": "art-hall-120",
+   "frame": {
+    "id": 630,
+    "mode": "VOLUME",
+    "target": "Hall",
+    "value": "41%",
+    "detail": "",
+    "status": "",
+    "layout": "nowPlaying",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 41,
+     "index": 0,
+     "count": 101
+    },
+    "playing": true,
+    "heading": "MUSIC",
+    "title": "Hoppípolla",
+    "subtitle": "North of June",
+    "volumeCaption": "Hoppípolla",
+    "confirmedVolume": 41,
+    "restLayout": "nowPlaying",
+    "crumb": "music",
+    "artKey": "k-hall"
+   }
+  },
+  {
+   "id": "r31-music-paused",
+   "name": "r3.1 Music space paused: keeps the art, dimmed to 0.45 (image_opa 143), status Paused, green Play icon and LED",
+   "ring": "awake",
+   "art": "art-hall-120",
+   "frame": {
+    "id": 631,
+    "mode": "VOLUME",
+    "target": "Hall",
+    "value": "41%",
+    "detail": "",
+    "status": "Paused",
+    "layout": "nowPlaying",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": true,
+      "icon": "tracks"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 41,
+     "index": 0,
+     "count": 101
+    },
+    "playing": false,
+    "statusTone": "secondary",
+    "heading": "MUSIC",
+    "title": "Hoppípolla",
+    "subtitle": "North of June",
+    "volumeCaption": "Hoppípolla",
+    "confirmedVolume": 41,
+    "restLayout": "nowPlaying",
+    "crumb": "music",
+    "artKey": "k-hall"
+   }
+  },
+  {
+   "id": "r31-music-idle",
+   "name": "r3.1 Music idle row (nothing loaded): Home (house) and Recent (album) at 26 px; Tracks and Play dimmed",
+   "ring": "rest",
+   "frame": {
+    "id": 632,
+    "mode": "VOLUME",
+    "target": "Hall",
+    "value": "41%",
+    "detail": "",
+    "status": "",
+    "layout": "idle",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "album"
+     },
+     {
+      "label": "Tracks",
+      "enabled": false,
+      "icon": "tracks"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 41,
+     "index": 0,
+     "count": 101
+    },
+    "heading": "MUSIC",
+    "title": "Nothing playing",
+    "subtitle": "",
+    "restLayout": "idle",
+    "crumb": "music"
+   }
+  },
+  {
+   "id": "r31-recent",
+   "name": "r3.1 Recently Added: button 3 = Playlists (list-music icon), status with the artist, hold tick under button 4 (hold 4 = queue)",
+   "ring": "awake",
+   "local": [
+    3,
+    11
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 641,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "recent",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 12,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360
+     ]
+    },
+    "heading": "RECENTLY ADDED",
+    "title": "Ásæla ljós",
+    "subtitle": "North of June",
+    "meta": "4 / 12 · North of June",
+    "crumb": "recent",
+    "artKey": "k-hall",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-playlists",
+   "name": "r3.1 Favourite playlists: MUSIC › PLAYLISTS crumb, button 3 lit amber (warm LED 0.9), songs instead of a year, hold tick",
+   "ring": "awake",
+   "local": [
+    2,
+    11
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 633,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "recent",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Recent",
+      "enabled": true,
+      "icon": "playlists",
+      "lit": "on"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 2,
+     "count": 12,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360
+     ]
+    },
+    "heading": "PLAYLISTS",
+    "title": "Late Night Jazz",
+    "subtitle": "Favourite playlist",
+    "meta": "3 / 12 · 42 songs",
+    "crumb": "playlists",
+    "artKey": "k-hall",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-tracks-queue",
+   "name": "r3.1 Tracks = the whole queue: the queue ring (focus +-1 in its album colour, the playing row warm white 0.6, the rest off), no prev / dot / next row, green Play",
+   "ring": "awake",
+   "local": [
+    8,
+    23
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 634,
+    "mode": "TRACKS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "tracks",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "queue",
+     "value": 0,
+     "index": 8,
+     "count": 24,
+     "first": 0,
+     "now": 6,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360,
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559
+     ]
+    },
+    "heading": "TRACKS",
+    "crumb": "tracks",
+    "artKey": "k-hall",
+    "title": "Stjarn-a-fold",
+    "subtitle": "North of June",
+    "meta": "Skip to 9 / 24 · 4 plays",
+    "metaTone": "success"
+   }
+  },
+  {
+   "id": "r31-tracks-playing",
+   "name": "r3.1 Tracks at the playing row: Turn to browse the queue; Play dimmed",
+   "ring": "awake",
+   "local": [
+    6,
+    23
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 635,
+    "mode": "TRACKS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "tracks",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Up next",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Seek",
+      "enabled": true,
+      "icon": "seek"
+     },
+     {
+      "label": "Play",
+      "enabled": false,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "queue",
+     "value": 0,
+     "index": 6,
+     "count": 24,
+     "first": 0,
+     "now": 6,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360,
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559
+     ]
+    },
+    "heading": "TRACKS",
+    "crumb": "tracks",
+    "artKey": "k-hall",
+    "title": "Hoppípolla",
+    "subtitle": "North of June",
+    "meta": "Turn to browse the queue"
+   }
+  },
+  {
+   "id": "r31-upnext-queue",
+   "name": "r3.1 Up next on the queue ring (was selection), hold tick (hold 4 = play next)",
+   "ring": "awake",
+   "local": [
+    9,
+    23
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 636,
+    "mode": "UP NEXT",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "upnext",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Shuffle",
+      "enabled": true,
+      "icon": "shuffle",
+      "lit": "off"
+     },
+     {
+      "label": "Like",
+      "enabled": true,
+      "icon": "heart"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "queue",
+     "value": 0,
+     "index": 9,
+     "count": 24,
+     "first": 0,
+     "now": 6,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360,
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559
+     ]
+    },
+    "heading": "UP NEXT",
+    "crumb": "upnext",
+    "holdMarker": true,
+    "artKey": "k-hall",
+    "title": "Ný batterí",
+    "subtitle": "North of June",
+    "meta": "10 / 24 · Up next"
+   }
+  },
+  {
+   "id": "r31-home-hold4",
+   "name": "r3.1 hold 4 on Home (launcher, holdMarker tick): the warm arc from 15 %, here 60 % of 1.0 s; the tap stays instant (on release)",
+   "ring": "hold4",
+   "art": "art-hall-120",
+   "frame": {
+    "id": 640,
+    "mode": "VOLUME",
+    "target": "Hall",
+    "value": "41%",
+    "detail": "",
+    "status": "",
+    "layout": "nowPlaying",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 41,
+     "index": 0,
+     "count": 101
+    },
+    "title": "Hoppípolla",
+    "subtitle": "North of June",
+    "volumeCaption": "Hoppípolla",
+    "confirmedVolume": 41,
+    "restLayout": "nowPlaying",
+    "playing": true,
+    "artKey": "k-hall",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-home-land-lights",
+   "name": "r3.1 hold 4 landed on Home: knob to brightness, the ring flashes the Kelvin colour 0.68 for 450 ms (host: plain ok feedback)",
+   "ring": "land",
+   "frame": {
+    "id": 642,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "lights",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Lights off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 62,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "heading": "LIGHTS",
+    "title": "Hall",
+    "subtitle": "Hall · 62% · 3200 K",
+    "meta": "3 lights",
+    "metaTone": "meta",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-home-land-music",
+   "name": "r3.1 hold 4 back to volume: the ring flashes warm 0.68 for 450 ms",
+   "ring": "land",
+   "art": "art-hall-120",
+   "frame": {
+    "id": 640,
+    "mode": "VOLUME",
+    "target": "Hall",
+    "value": "41%",
+    "detail": "",
+    "status": "",
+    "layout": "nowPlaying",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Pause",
+      "enabled": true,
+      "icon": "pause"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 41,
+     "index": 0,
+     "count": 101
+    },
+    "title": "Hoppípolla",
+    "subtitle": "North of June",
+    "volumeCaption": "Hoppípolla",
+    "confirmedVolume": 41,
+    "restLayout": "nowPlaying",
+    "playing": true,
+    "artKey": "k-hall",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-recent-land-queue",
+   "name": "r3.1 hold 4 on Recently Added: queued, the ring flashes green 0.68 for 600 ms (host: ok + moment queued)",
+   "ring": "queue",
+   "local": [
+    3,
+    11
+   ],
+   "art": "art-hall-120",
+   "frame": {
+    "id": 641,
+    "mode": "RECENTLY ADDED",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "recent",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "Full screen",
+      "enabled": true,
+      "icon": "expand"
+     },
+     {
+      "label": "Playlists",
+      "enabled": true,
+      "icon": "playlists"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "selection",
+     "value": 0,
+     "index": 3,
+     "count": 12,
+     "colors": [
+      9856255,
+      16737340,
+      459624,
+      16760360,
+      4618495,
+      7785331,
+      16727180,
+      12415559,
+      3988600,
+      16737340,
+      9856255,
+      16760360
+     ]
+    },
+    "heading": "RECENTLY ADDED",
+    "title": "Ásæla ljós",
+    "subtitle": "North of June",
+    "meta": "4 / 12 · North of June",
+    "crumb": "recent",
+    "artKey": "k-hall",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-home-lights-off",
+   "name": "r3.1 Home lights domain, all off: Lights off / Tap 4 to turn on, ring off",
+   "ring": "awake",
+   "frame": {
+    "id": 643,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "lights",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Turn on",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "off",
+     "value": 0,
+     "index": 0,
+     "count": 0
+    },
+    "heading": "LIGHTS",
+    "title": "Lights off",
+    "subtitle": "Tap 4 to turn on",
+    "meta": "Hall · 3 lights",
+    "holdMarker": true
+   }
+  },
+  {
+   "id": "r31-lights-blocked",
+   "name": "r3.1 Lights blocked: Not connected / Home Assistant / Open Settings on your PC (red), ring off, buttons 2-4 dimmed",
+   "ring": "awake",
+   "frame": {
+    "id": 644,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "lights",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": false,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": false,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": false,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "off",
+     "value": 0,
+     "index": 0,
+     "count": 0
+    },
+    "heading": "LIGHTS",
+    "title": "Not connected",
+    "subtitle": "Home Assistant",
+    "meta": "Open Settings on your PC",
+    "metaTone": "error",
+    "crumb": "lights"
+   }
+  },
+  {
+   "id": "home-idle",
+   "name": "Home idle icon row: Music, Win, Lights (bulb 26 px), Play; no crumb",
+   "ring": "rest",
+   "frame": {
+    "id": 602,
+    "mode": "HOME",
+    "target": "Hall",
+    "value": "54%",
+    "detail": "",
+    "status": "Paused",
+    "layout": "idle",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Music",
+      "enabled": true,
+      "icon": "list"
+     },
+     {
+      "label": "Win",
+      "enabled": true,
+      "icon": "win"
+     },
+     {
+      "label": "Lights",
+      "enabled": true,
+      "icon": "bulb"
+     },
+     {
+      "label": "Play",
+      "enabled": true,
+      "icon": "play"
+     }
+    ],
+    "ring": {
+     "style": "level",
+     "value": 54,
+     "index": 0,
+     "count": 101
+    },
+    "restLayout": "idle",
+    "title": "Pressure Front",
+    "subtitle": "Mira Vale"
+   }
+  },
+  {
+   "id": "lightsbig-2200",
+   "name": "Warm end: Colour temperature 2200 K",
+   "ring": "awake",
+   "frame": {
+    "id": 616,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "2200",
+    "detail": "",
+    "status": "",
+    "layout": "lightsbig",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo",
+      "lit": "on"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "ctemp",
+     "value": 0,
+     "index": 0,
+     "count": 0,
+     "kelvin": 2200
+    },
+    "heading": "LIGHTS",
+    "title": "Focus",
+    "volumeCaption": "Colour temperature",
+    "valueUnit": "K"
+   }
+  },
+  {
+   "id": "lightsbig-6500",
+   "name": "Cool end: Brightness 100 % at 6500 K",
+   "ring": "awake",
+   "local": [
+    100,
+    100
+   ],
+   "frame": {
+    "id": 617,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "100",
+    "detail": "",
+    "status": "",
+    "layout": "lightsbig",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 100,
+     "index": 0,
+     "count": 0,
+     "kelvin": 6500
+    },
+    "heading": "LIGHTS",
+    "title": "Focus",
+    "volumeCaption": "Brightness",
+    "valueUnit": "%"
+   }
+  },
+  {
+   "id": "lights-rest",
+   "name": "Lights resting (5 s without input): steady warm 0.34 on the filled arc",
+   "ring": "rest",
+   "frame": {
+    "id": 618,
+    "mode": "LIGHTS",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "lights",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Home",
+      "enabled": true,
+      "icon": "house"
+     },
+     {
+      "label": "Scenes",
+      "enabled": true,
+      "icon": "wand"
+     },
+     {
+      "label": "Temp",
+      "enabled": true,
+      "icon": "thermo"
+     },
+     {
+      "label": "All off",
+      "enabled": true,
+      "icon": "power"
+     }
+    ],
+    "ring": {
+     "style": "bri",
+     "value": 62,
+     "index": 0,
+     "count": 0,
+     "kelvin": 3200
+    },
+    "heading": "LIGHTS",
+    "title": "Focus",
+    "subtitle": "62% · 3200 K",
+    "meta": "",
+    "metaTone": "meta",
+    "crumb": "lights"
+   }
+  },
+  {
+   "id": "scenes-ran",
+   "name": "Scene ran: the green wash (0.68, 700 ms) over the whole ring",
+   "ring": "wash",
+   "local": [
+    2,
+    4
+   ],
+   "frame": {
+    "id": 624,
+    "mode": "SCENES",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "scenes",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 2,
+     "count": 5
+    },
+    "heading": "SCENES",
+    "title": "Movie",
+    "prevTitle": "Evening",
+    "nextTitle": "Reading",
+    "meta": "Scene running",
+    "metaTone": "success",
+    "crumb": "scenes"
+   }
+  },
+  {
+   "id": "scenes-twenty",
+   "name": "20 scenes: 20 clusters of 3 fill the ring",
+   "ring": "awake",
+   "local": [
+    13,
+    19
+   ],
+   "frame": {
+    "id": 625,
+    "mode": "SCENES",
+    "target": "Hall",
+    "value": "",
+    "detail": "",
+    "status": "",
+    "layout": "scenes",
+    "ledStyle": "color",
+    "buttons": [
+     {
+      "label": "Back",
+      "enabled": true,
+      "icon": "back"
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "",
+      "enabled": false,
+      "icon": ""
+     },
+     {
+      "label": "Run",
+      "enabled": true,
+      "icon": "switch"
+     }
+    ],
+    "ring": {
+     "style": "clusters",
+     "value": 0,
+     "index": 13,
+     "count": 20
+    },
+    "heading": "SCENES",
+    "title": "Scene 14",
+    "prevTitle": "Scene 13",
+    "nextTitle": "Scene 15",
+    "meta": "14 / 20 · 80% · 3500 K",
+    "metaTone": "meta",
+    "crumb": "scenes"
+   }
+  }
+ ]
+}
