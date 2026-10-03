@@ -32,7 +32,7 @@ hold fill ({"keys": 8} for 1000 ms on a holdMarker frame, landed by a new ok fee
 knob-anim's own stats line (pops, morphs, glides, holdFills, walls, presses) is logged per tile as a check.
 
 onshape-knob.webp / .gif (9.8 s): onshape_scenes.frames(onshape_scenes.SCENES["onshape-knob"](), app-canvas-anim,
-work) on knob_scenes.KnobDevice(scale=1.1) with the ring and the button lights all dark (the knob turns its LEDs
+work) on knob_scenes.KnobDevice(scale=ONSHAPE_SCALE) with the ring and the button lights all dark (the knob turns its LEDs
 off in Onshape mode). The public media show the knob's real Onshape screen, logo included (the owner's
 decision, 2026-10-03); a --no-logo build swaps the logo for a plain badge.
 
@@ -447,7 +447,7 @@ def scene_motion_gallery(ctx) -> list[Path]:
 
 
 # ------------------------------------------------------------------ Onshape
-ONSHAPE_SCALE = 1.1
+ONSHAPE_SCALE = 1.25          # the same device size as the other knob loops (rec_scenes.KNOB_SCALE)
 
 
 def scene_onshape_knob(ctx) -> list[Path]:

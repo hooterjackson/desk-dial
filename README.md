@@ -82,7 +82,7 @@
 
 <p align="center">Point at your model in Chrome or Edge. Turn to zoom; hold a button and turn to tilt, orbit or pan. Tap 3 to undo, hold 3 for Karl's command wheel.</p>
 
-<p align="center"><a href="docs/features/onshape.md"><picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="418"></picture></a></p>
+<p align="center"><a href="docs/features/onshape.md"><picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="475"></picture></a></p>
 
 <p align="center"><sub>Chrome or Edge · turn on Onshape mode in Settings</sub> &nbsp;·&nbsp; <a href="docs/features/onshape.md">Everything Onshape mode does ›</a></p>
 
