@@ -33,6 +33,17 @@ from control_center import presentation as P  # noqa: E402
 
 ORACLE = ROOT / "tests" / "fixtures" / "alive_oracle.json"
 BS_ORACLE = ROOT / "tests" / "fixtures" / "alive_oracle_bs.json"
+
+
+def need_oracle(test, *paths):
+    """Skip `test` unless every generated oracle fixture is present. tests/fixtures/alive_oracle.json is
+    generated (node tests/js/alive_oracle.cjs design-reference/design_handoff_led_choreography
+    tests/fixtures/alive_oracle.json) and git-ignored, so a fresh clone does not have it."""
+    missing = [p.name for p in (paths or (ORACLE, BS_ORACLE)) if not p.is_file()]
+    if missing:
+        test.skipTest(f"generated oracle fixture missing: {', '.join(missing)} (see tests/js/alive_oracle*.cjs)")
+
+
 Cell = al.Cell
 WARM, AMBER, RED, GREEN, BLUE = al.WARM, al.AMBER, al.RED, al.GREEN, al.BLUE
 S = al.CLASS_S
@@ -525,6 +536,7 @@ class OutputFloorTests(unittest.TestCase):
         """Both oracles' expect.bytes (tests/js referenceOutput(), float64) equal reference_output() on
         the same rounded e with the masks of the persistent view, byte for byte; the floor changes
         only dark target-lit LEDs, and only to one count per channel."""
+        need_oracle(self)
         for path in (ORACLE, BS_ORACLE):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["output"]["drive"], al.DEFAULT_DRIVE)
@@ -564,6 +576,7 @@ class OutputFloorTests(unittest.TestCase):
         F-T marks, and the chosen dominant-only channel rule is the one continuous with plain rounding
         (no floored byte brighter than its neighbours in time, no channel against its value) with the
         lowest mean hue error against the cells' full-level colours."""
+        need_oracle(self)
         sys.path.insert(0, str(ROOT / "tests" / "tools"))
         try:
             import alive_floor_report as report_tool
@@ -593,6 +606,7 @@ class OutputFloorTests(unittest.TestCase):
         node = shutil.which("node")
         if not node:
             self.skipTest("node is not installed")
+        need_oracle(self)
         design = ROOT / "design-reference"
         runs = ((JS_ORACLES[0], design / "design_handoff_led_choreography", ORACLE),
                 (JS_ORACLES[1], design / "design_handoff_nano_d_master_r2.1" / "prototypes", BS_ORACLE))
@@ -2214,6 +2228,7 @@ class OracleTests(unittest.TestCase):
         every step up to its first eviction. Only ``designUncapped`` cases may evict, exactly
         at the first step whose design queue exceeds 8; their ``live`` counts (the design's
         queue after draw) must equal the uncapped animator's."""
+        need_oracle(self, ORACLE)
         self.assertTrue(ORACLE.exists(), "tests/fixtures/alive_oracle.json is missing: "
                         "node tests/js/alive_oracle.cjs design-reference/design_handoff_led_choreography "
                         "tests/fixtures/alive_oracle.json")
@@ -2276,6 +2291,7 @@ class OracleTests(unittest.TestCase):
         """[r2] 11.2 (gate A2): the r2.1 Browse and Snap draw() (tests/js/alive_oracle_bs.cjs), with BS's
         palette, its reduced motion (play()'s drop list and the stationary fail) and its half, scatter
         and colour bloom; every step within the tolerance, the production cap never evicting."""
+        need_oracle(self)
         self.assertTrue(BS_ORACLE.exists(), "tests/fixtures/alive_oracle_bs.json is missing: node "
                         "tests/js/alive_oracle_bs.cjs design-reference/design_handoff_nano_d_master_r2.1/prototypes "
                         "tests/fixtures/alive_oracle_bs.json")
