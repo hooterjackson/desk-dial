@@ -81,7 +81,7 @@ The Onshape screen on the knob is Karl Malota's design, adapted with his permiss
 
 ## Limits and known issues
 
-- **Chromium browsers only** (Chrome and Edge; Brave, Vivaldi and Opera are recognised too). Firefox is deliberately not supported: its page and tab strip share one window class, so a middle-button drag could land on a tab and close it.
+- **Chromium browsers only.** Tested in Chrome; Edge, Brave, Vivaldi and Opera are recognised, not yet tried. Firefox is deliberately not supported: its page and tab strip share one window class, so a middle-button drag could land on a tab and close it.
 - **Drags end on their own after 800 ms without a turn**, and the pointer cannot be dragged past the edge of the screen: a long orbit may stop at the screen edge and start again from where the pointer was.
 - **Hold 3 and release repeats a command.** Once the wheel has shown (after about a quarter of a second), letting go runs whatever is highlighted, which is the command you last ran in that ring. If you only wanted Undo, tap 3 quickly instead.
 - **Elevated browser untested.** If the browser runs as administrator and Desk Dial does not, Windows blocks the input.

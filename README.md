@@ -84,7 +84,7 @@
 
 <p align="center"><a href="docs/features/onshape.md"><picture><source srcset="docs/media/onshape-knob.webp" type="image/webp"><img src="docs/media/onshape-knob.gif" alt="The knob shows a wireframe cube that turns with the shaft; holding a button and turning orbits the model; a long press on button 3 opens a ring of command cards" width="475"></picture></a></p>
 
-<p align="center"><sub>Chrome or Edge · turn it on in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/onshape.md">Everything Onshape does ›</a></p>
+<p align="center"><sub>Tested in Chrome · turn it on in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/onshape.md">Everything Onshape does ›</a></p>
 
 <a name="apps"></a>
 <p align="center"><b>More apps</b></p>
@@ -92,9 +92,9 @@
 
 <p align="center">Karl Malota's app profiles give each program its own knob: what turning does, what the buttons do, and its own screen. Set an app to Auto and Desk Dial switches to it whenever the app is in front.</p>
 
-<p align="center"><a href="docs/features/apps.md"><picture><source srcset="docs/media/apps-strip.webp" type="image/webp"><img src="docs/media/apps-strip.png" alt="Karl Malota's pixel-art app icons: Onshape, tested; Figma and Plasticity, community tested; Blender and AutoCAD, basic" width="880"></picture></a></p>
+<p align="center"><a href="docs/features/apps.md"><picture><source srcset="docs/media/apps-strip.webp" type="image/webp"><img src="docs/media/apps-strip.png" alt="Karl Malota's pixel-art app icons: Onshape, tested; Figma and Plasticity, not yet tested; Blender and AutoCAD, basic" width="880"></picture></a></p>
 
-<p align="center"><sub>Figma and Plasticity community tested · Blender and AutoCAD scroll only · each Off until you choose Manual or Auto in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/apps.md">Every app, and how to add one ›</a></p>
+<p align="center"><sub>Figma and Plasticity not yet tested · Blender and AutoCAD scroll only · each Off until you choose Manual or Auto in Settings › Apps</sub> &nbsp;·&nbsp; <a href="docs/features/apps.md">Every app, and how to add one ›</a></p>
 
 <br>
 
@@ -128,7 +128,7 @@
 
 <p align="center">Sixty LEDs draw the volume, take on each album's colour and bloom when you press Like. At rest they settle to one steady warm glow.</p>
 
-<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, the ring lighting up as Play next lands, and a glow at the end stop" width="880"></picture></a></p>
+<p align="center"><a href="docs/features/leds.md"><picture><source srcset="docs/media/ring-moments.webp" type="image/webp"><img src="docs/media/ring-moments.gif" alt="Six of the knob's LED rings, each playing one moment: the volume arc warming to amber and red, album colours in a list, a pink bloom for Like, a half-ring wash for Snap, a scatter for Shuffle, and a glow at the end stop" width="880"></picture></a></p>
 
 <p align="center"><a href="docs/features/leds.md">Every moment, and the screen's motion ›</a></p>
 

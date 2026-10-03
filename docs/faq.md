@@ -16,7 +16,7 @@ Without any music service set up, the knob still does three things: it switches 
 
 ### Which apps besides Onshape?
 
-Figma and Plasticity (community-tested profiles), and Blender and AutoCAD (basic: the knob scrolls only), from Karl Malota's Nano_D app profiles. Each is Off until you set it to Manual or Auto in Settings › Apps, and you can import more. See [Apps](features/apps.md).
+Figma and Plasticity (not yet tested: their shortcuts come from Karl's profiles, mapped to Windows), and Blender and AutoCAD (basic: the knob scrolls only), from Karl Malota's Nano_D app profiles. Each is Off until you set it to Manual or Auto in Settings › Apps, and you can import more. See [Apps](features/apps.md).
 
 ### Does it run on a Mac or on Linux?
 
@@ -96,7 +96,7 @@ The knob drives every light in the chosen area, including lights you add later.
 ### Buttons do nothing in Onshape
 
 - In Settings › Apps, **Onshape** must be Manual or Auto (Off unless you used it before). With Manual, switch it on from the tray's **App mode** menu.
-- Onshape must be open in **Chrome or Edge** (Brave, Vivaldi and Opera are recognised too). Firefox is not.
+- Onshape must be open in a Chromium browser: tested in **Chrome**; Edge, Brave, Vivaldi and Opera are recognised, not yet tried. Firefox is not supported.
 - The knob shows **"Point at the model"** when your mouse pointer is not over the Onshape page in the front window. Move the pointer onto the model and try again. The toolbar, the tab strip and the bookmarks bar do not count.
 - A browser running as administrator does not accept input from a normal program. Start the browser normally.
 
@@ -126,6 +126,6 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 - Exactly one knob per PC.
 - The offline Windows-volume mode of the firmware has not yet been tested on real hardware.
 - Onshape and the other apps: Chromium browsers only, not Firefox. Shortcuts follow your keyboard layout ("Not on this keyboard" when a key is missing); non-US layouts are not yet tried on real hardware.
-- Figma and Plasticity profiles are community tested; Blender and AutoCAD are basic (the knob scrolls only). See [Apps](features/apps.md).
+- Figma and Plasticity are not yet tested; Blender and AutoCAD are basic (the knob scrolls only). See [Apps](features/apps.md).
 - The program is unsigned; SmartScreen warns on the first start and Smart App Control may block it.
 - The Home Assistant token crosses your network unencrypted when the address starts with `http://`; Settings shows a warning under the address when it does.

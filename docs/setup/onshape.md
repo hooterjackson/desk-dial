@@ -7,7 +7,7 @@ Onshape mode is tested on one knob (the author's) and one PC. It is the newest p
 ## What you need
 
 - Desk Dial v2.0.0 running on the PC, with the knob connected and showing its Home screen.
-- Onshape open in **Google Chrome or Microsoft Edge**. Brave, Vivaldi and Opera are recognised too; Firefox is not (see Limits).
+- Onshape open in **Google Chrome** (tested). Microsoft Edge, Brave, Vivaldi and Opera are recognised, not yet tried; Firefox is not supported (see Limits).
 - The knob's own screen running the current firmware (v2.0.0). The command wheel and the 3D cube only appear on a knob running it; an older knob can still zoom, orbit, tilt, pan and undo, but shows a plain text screen instead.
 
 ## Turn it on

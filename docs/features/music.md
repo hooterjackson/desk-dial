@@ -103,9 +103,9 @@ Button 4 on Home and in Music is Play when the speaker is paused and Pause when 
 
 ## Play next by holding 4
 
-Holding button 4 for a second is the queue action throughout Music: in Recently Added and Playlists, in the full-screen list on the PC, and in Up next. The ring fills while you hold; the landing thumps, the ring lights up, and the knob confirms "Queued · Name" or "Plays next · Song".
+Holding button 4 for a second is the queue action throughout Music: in Recently Added and Playlists, in the full-screen list on the PC, and in Up next. The ring fills while you hold; the landing thumps, and the knob shows "Finding songs…", then confirms "Queued · Name" or "Plays next · Song".
 
-<picture><source srcset="../media/music-hold-queue.webp" type="image/webp"><img src="../media/music-hold-queue.gif" alt="Button 4 held on an album cover; the ring fills as a progress arc, then the whole ring lights up and the screen reads Queued with the album name." width="480"></picture>
+<picture><source srcset="../media/music-hold-queue.webp" type="image/webp"><img src="../media/music-hold-queue.gif" alt="Button 4 held on an album cover; the ring fills as a progress arc, then the screen reads Queued with the album name." width="480"></picture>
 
 Play next needs the queue to be the thing playing. When it is not, the knob says why: "AirPlay · use Play", "Radio · use Play", "Line-in · use Play", "Nothing playing · Play", or "Shuffle on · turn it off" when Sonos's own shuffle is on (Sonos would scatter the new songs).
 

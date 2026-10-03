@@ -10,17 +10,17 @@ Desk Dial is tested on one knob (the author's). This page describes Desk Dial v2
 
 | App | Status | Picked when this is in front |
 |---|---|---|
-| Onshape | Tested | cad.onshape.com or a company workspace (`*.onshape.com`) in a browser |
-| Figma | Community tested | Figma.exe, or figma.com in a browser |
-| Plasticity | Community tested | Plasticity.exe |
+| Onshape | Tested (in Chrome) | cad.onshape.com or a company workspace (`*.onshape.com`) in a browser |
+| Figma | Not yet tested | Figma.exe, or figma.com in a browser |
+| Plasticity | Not yet tested | Plasticity.exe |
 | Blender | Basic | blender.exe |
 | AutoCAD | Basic | acad.exe |
 
 - **Tested** means checked on the author's knob.
-- **Community tested** means the profile comes from Karl's community and has not been checked on the author's knob.
+- **Not yet tested** means nobody has tried it on Windows yet: the shortcuts come from Karl's profile (made on a Mac), mapped Cmd to Ctrl and Option to Alt and checked against the app's own Windows shortcut documentation. When an owner confirms an app works, its badge becomes **Community tested**. If a command is wrong, [open an issue](https://github.com/hooterjackson/desk-dial/issues).
 - **Basic** means the knob scrolls and nothing more: Karl's profile has no commands for that app yet.
 
-Websites are recognised in Chrome, Edge, Brave, Vivaldi and Opera. Firefox is not supported.
+Websites are recognised in Chrome, Edge, Brave, Vivaldi and Opera; only Chrome has been tried. Firefox is not supported.
 
 ## Off, Manual or Auto
 
@@ -36,7 +36,7 @@ In any app, hold all four knob buttons for 1 second to go back to Home.
 
 ## The knob in an app
 
-On a knob with the current firmware, each app gets its own screen: Onshape its cube and command wheel, Figma its name and icon, Plasticity a pyramid. "LOADING..." shows for a moment while a profile is sent to the knob. A knob with older firmware shows a text screen instead.
+On a knob with the current firmware, each app gets its own screen: Onshape its cube and command wheel, Figma its name and icon, Plasticity a pyramid. "LOADING..." shows for a moment while a profile is sent to the knob; if the knob has dropped a profile from its memory, a text screen shows until it has been sent again. A knob with older firmware shows a text screen instead.
 
 When a button cannot do its job, the knob tells you why:
 
@@ -55,7 +55,7 @@ The page lists one row per app: its icon, its name, its status badge, Off / Manu
 
 The intro on the page reads: "Each app profile sets what the knob and its buttons do in that app. Manual: turn it on from the tray’s App mode menu. Auto: on while the app is in front. Hold all four knob buttons for 1 s for Home."
 
-**Rules…** opens "Rules · {app}", with two lists, **Programs** and **Websites**, and the built-in rules underneath. Add a program by its file name (such as `Figma.exe`) or a website by its host (such as `figma.com` or `*.figma.com`). If you paste a whole web address, Desk Dial keeps only the host and says "Kept the host only: {host}. Desk Dial never stores a web address."
+**Rules…** opens "Rules · {app}", with two lists, **Programs** and **Websites**, and the built-in rules underneath. Add a program by its file name (such as `Figma.exe`) or a website by its host (such as `figma.com` or `*.figma.com`). If you paste a whole web address, Desk Dial keeps only the host and says "Kept the host only: {host}. Desk Dial never stores a web address." A rule can never point at a command shell, a terminal or Windows' own shell; those are refused.
 
 The Knob page now only points here: "Onshape and other apps: Settings › Apps."
 
@@ -80,6 +80,6 @@ To write or change a profile, see the author guide in [profiles/README.md](../..
 
 ## Known limits
 
-- Figma and Plasticity are community tested, and Blender and AutoCAD are basic (scroll only), as above.
+- Figma and Plasticity are not yet tested, and Blender and AutoCAD are basic (scroll only), as above.
 
 App icons: pixel art by Karl Malota ([katbinaris](https://github.com/katbinaris)), from his Nano_D app profiles.

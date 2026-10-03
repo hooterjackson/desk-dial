@@ -15,7 +15,7 @@ from pathlib import Path
 SOURCE = "app profiles (Karl Malota's icons)"
 ORDER = ("onshape", "figma", "plasticity", "blender", "autocad")
 NAMES = {"onshape": "Onshape", "figma": "Figma", "plasticity": "Plasticity", "blender": "Blender", "autocad": "AutoCAD"}
-STATUS = {"tested": "TESTED", "community": "COMMUNITY TESTED", "basic": "BASIC"}
+STATUS = {"tested": "TESTED", "community": "NOT YET TESTED", "basic": "BASIC"}   # the Settings badges (user ruling 2026-10-03)
 W, H = 1760, 520
 BG = (13, 14, 17)
 INK, QUIET = (245, 245, 247), (134, 134, 139)
