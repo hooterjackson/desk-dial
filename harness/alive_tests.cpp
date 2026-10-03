@@ -1028,6 +1028,7 @@ CCAliveTargetState stateOf(bool asleep, uint8_t flash = CC_FLASH_NONE, uint32_t 
     s.localValue = -1;
     s.localIndex = localIndex;
     s.volFull = volFull;
+    s.holdFill = 0;       // [r3] 15.7: no hold-1 progress ring
     return s;
 }
 
@@ -1214,6 +1215,24 @@ void targetChecks() {
             "a grey accent and colour 0 are WARM (landmark 0.30); no tint [R2]");
     cc_alive_targets(&win, stateOf(false, CC_FLASH_OK), t);
     require(t.ring[t.cursor].role == CC_ALIVE_ROLE_GREEN && !t.tintOn, "a flash cursor is not an ACCENT: no tint [R2]");
+    // FW-BUG-024: the deny glow (flash REFUSED) paints 26..34 ACCENT; it never tints the ring, whatever the cursor.
+    {
+        int denyCursors = 0;
+        for (int index = 0; index < 19; ++index) {
+            for (int bare = 0; bare < 2; ++bare) {
+                CCFrame deny = list(19, index);
+                if (bare) for (int k = 0; k < 20; ++k) deny.ringColors[k] = 0u;   // an uncoloured cursor
+                cc_alive_targets(&deny, stateOf(false, CC_FLASH_REFUSED), t);
+                if (t.cursor >= 26 && t.cursor <= 34) ++denyCursors;
+                require(!t.tintOn, "FW-BUG-024: no tint under the deny glow (index " + num(index) + ", cursor " +
+                                       num(t.cursor) + ")");
+            }
+        }
+        require(denyCursors > 0, "FW-BUG-024: some cursor lands inside the deny glow (26..34)");
+        CCFrame landed = list(9, 4);
+        cc_alive_targets(&landed, stateOf(false, CC_FLASH_LAND), t);
+        require(t.tintOn, "FW-BUG-024: the M12 landing (no ring override) keeps the cursor tint");
+    }
     CCFrame more = list(9, 8, false, 8);
     cc_alive_targets(&more, awake, t);
     require(cellIs(t.ring[slotOf(8, 4)], W, C3, 1.0f) && t.ring[slotOf(8, 4) + 1].cls == CC_ALIVE_CLASS_NONE &&
@@ -1278,6 +1297,20 @@ void targetChecks() {
     require(!cc_alive_apply_local(l9, 6, 9, out), "selection needs local_max == count - 1");
     require(!cc_alive_apply_local(pend, 6, 8, out) && !cc_alive_apply_local(loading, 6, 10, out),
             "selection: not while pending/loading");
+    // DD-DES-003: the brightness local cursor has two frames. Off: max 100, value = pos (0 = off).
+    // On: max 99, value = pos + 1 (positions 0..99 = 1..100 %).
+    CCFrame bri = volume(40);
+    bri.ringStyle = CC_RING_BRI;
+    const int32_t briCases[][3] = {{0, 100, 0}, {1, 100, 1}, {50, 100, 50}, {100, 100, 100}, {120, 100, 100},
+                                   {0, 99, 1}, {49, 99, 50}, {99, 99, 100}, {120, 99, 100}, {-3, 99, 1}};
+    for (const auto& c : briCases) {
+        localValue = localIndex = 0;
+        require(cc_alive_local(bri, c[0], c[1], localValue, localIndex) && localValue == c[2] && localIndex == -1 &&
+                    cc_alive_apply_local(bri, c[0], c[1], out) && out.ringValue == c[2],
+                "DD-DES-003 bri local pos " + num(c[0]) + " max " + num(c[1]) + " -> " + num(c[2]));
+    }
+    require(!cc_alive_apply_local(bri, 5, 98, out) && !cc_alive_apply_local(bri, 5, 101, out),
+            "DD-DES-003 bri: only the 99 (on) and 100 (off) frames take the local cursor");
 
     // 5.1.4 Up next [M14].
     CCFrame q = upnext(12, 0, 4);
@@ -1507,6 +1540,169 @@ void tieChecks() {
     require(tieLength(tie, 1) == 1, "exact tie x = 0.5 (vel 5): len 1, half up as Math.round in exact arithmetic");
     require(tieLength(window, 2) == 1, "x = 0.4999325 (inside the 1e-4 window below the tie): len 1 (Math.round: 0)");
     require(tieLength(below, 2) == 2, "x = 2.4998238 (1.8e-4 below the tie): len 2, as Math.round");
+}
+
+// r4 (design_handoff_nano_d_r4 README 3.3 / 3.4; ALIVE.md 16): the output easer (no LED steps in one frame), the
+// wall glow on the end LEDs, the 480 ms deny glow and the M12 domain-swap sweep.
+float maxAbs(const float (&a)[3], const float (&b)[3]) {
+    float m = 0.0f;
+    for (int q = 0; q < 3; ++q) m = std::fmax(m, std::fabs(a[q] - b[q]));
+    return m;
+}
+
+void r4Checks() {
+    static CCAlive engine;
+    // 1. Easing: a claim's first frames and a jump of the volume never move an LED by more than the 16 ms share of
+    //    the 50 ms easer (1 - e^-16/50 = 0.274 of the remaining gap) in one frame.
+    engine.reset(0);
+    engine.claim(0);
+    CCFrame v30 = volume(30), v80 = volume(80);
+    for (uint32_t t = 0; t <= 2000; t += 16) engine.render(t, &v30, -1, -1, extraOf(1));
+    float before[CC_RING_LEDS][3];
+    std::memcpy(before, engine.ringE(), sizeof(before));
+    float worst = 0.0f;
+    int worstLed = -1;
+    for (uint32_t t = 2016; t <= 2400; t += 16) {
+        engine.render(t, &v80, -1, -1, extraOf(1));
+        for (int i = 0; i < CC_RING_LEDS; ++i) {
+            const float d = maxAbs(engine.ringE()[i], before[i]);
+            if (d > worst) { worst = d; worstLed = i; }
+            std::memcpy(before[i], engine.ringE()[i], sizeof(before[i]));
+        }
+    }
+    // The easer moves an LED by at most 1 - e^(-16/50) = 0.274 of its gap (e <= 1 after the tone map) per 16 ms frame.
+    require(worst <= 0.275f, "r4 3.4: no LED moves more than the 50 ms easer's 16 ms share in one frame (worst " +
+                                 num(static_cast<double>(worst)) + " at LED " + num(worstLed) + ")");
+    for (uint32_t t = 2416; t <= 4500; t += 16) engine.render(t, &v80, -1, -1, extraOf(1));
+    require(!engine.asleep() && engine.easeResidue() < 1.0f / 1024.0f, "r4 3.4: the easer settles on the animator's e");
+    // 2. Wall: a limit at 100 % glows the cursor +-2 warm white (255,232,205 at 0.9), rise 90 ms, fall 420 ms.
+    CCFrame v100 = volume(100);
+    for (uint32_t t = 6016; t <= 9000; t += 16) engine.render(t, &v100, -1, -1, extraOf(1));
+    const uint8_t cursor = engine.cursor();
+    float rest[3];
+    std::memcpy(rest, engine.ringE()[(cursor + 2) % CC_RING_LEDS], sizeof(rest));
+    engine.limit(9010, 1);
+    engine.render(9016, &v100, -1, -1, extraOf(1));
+    require(engine.wallGlow() && engine.animating(), "r4 3.3: a wall starts the end glow");
+    float peak[3] = {0, 0, 0};
+    for (uint32_t t = 9032; t <= 9160; t += 16) {
+        engine.render(t, &v100, -1, -1, extraOf(1));
+        const float* e = engine.ringE()[(cursor + 2) % CC_RING_LEDS];
+        if (e[1] > peak[1]) std::memcpy(peak, e, sizeof(peak));
+    }
+    require(peak[1] > rest[1] + 0.2f && peak[1] / peak[0] > 0.8f,
+            "r4 3.3: the end LED (cursor + 2) brightens towards warm white (g/r " +
+                num(static_cast<double>(peak[1] / peak[0])) + ")");
+    for (uint32_t t = 9176; t <= 10200; t += 16) engine.render(t, &v100, -1, -1, extraOf(1));
+    require(!engine.wallGlow() && maxAbs(engine.ringE()[(cursor + 2) % CC_RING_LEDS], rest) < 0.01f,
+            "r4 3.3: the glow is over within 90 + 420 ms and the LED eases back");
+    // 3. Deny glow: 480 ms (flash REFUSED), LEDs 26..34 red-dominant 255,60,40.
+    CCFrame refused = withFeedback(v100, CC_FEEDBACK_ERR, 5);
+    refused.feedbackMoment = CC_MOMENT_REFUSED;
+    engine.render(10216, &refused, -1, -1, extraOf(1));
+    require(engine.flash() == CC_FLASH_REFUSED, "r4 3.4: an unavailable press is the deny glow");
+    for (uint32_t t = 10232; t <= 10600; t += 16) engine.render(t, &refused, -1, -1, extraOf(1));
+    const float* deny = engine.ringE()[30];
+    require(engine.flash() == CC_FLASH_REFUSED && deny[0] > 0.5f && deny[1] < deny[0] * 0.5f,
+            "r4 3.4: LED 30 glows red while the 480 ms window runs");
+    engine.render(10712, &refused, -1, -1, extraOf(1));
+    require(engine.flash() == CC_FLASH_NONE, "r4 3.4: the deny window is 480 ms");
+    // 4. M12: a plain-ok landing after a matured hold 4 sweeps from 12 o'clock: LED 0 moves before LED 50.
+    CCFrame held = volume(40);
+    held.holdMarker = true;
+    for (uint32_t t = 11000; t <= 13000; t += 16) engine.render(t, &held, -1, -1, extraOf(1));
+    engine.press(13010, 3);
+    for (uint32_t t = 13016; t <= 14100; t += 16) engine.render(t, &held, -1, -1, extraOf(1));
+    CCFrame landed = withFeedback(volume(40), CC_FEEDBACK_OK, 9);
+    landed.holdMarker = true;
+    float at0[CC_RING_LEDS][3];
+    std::memcpy(at0, engine.ringE(), sizeof(at0));
+    engine.render(14116, &landed, -1, -1, extraOf(1));
+    require(engine.flash() == CC_FLASH_LAND && engine.sweeping(), "r4 M12: the landing is the domain sweep");
+    engine.render(14132, &landed, -1, -1, extraOf(1));
+    require(maxAbs(engine.ringE()[50], at0[50]) == 0.0f,
+            "r4 M12: LED 50 still holds (its turn is 50 x 8.7 = 435 ms after the landing)");
+    for (uint32_t t = 14148; t <= 15000; t += 16) engine.render(t, &landed, -1, -1, extraOf(1));
+    require(!engine.sweeping(), "r4 M12: the sweep window ends (800 ms)");
+    // 5. FW-DES-002: under reduced motion (r4 7, MOTION.md M12) the landing is a blend: no sweep, every LED moves in
+    //    the first frame after the landing.
+    engine.keyUp(15010, 3);
+    engine.setReducedMotion(15020, true);
+    for (uint32_t t = 15032; t <= 17000; t += 16) engine.render(t, &held, -1, -1, extraOf(1));
+    engine.press(17010, 3);
+    for (uint32_t t = 17016; t <= 18100; t += 16) engine.render(t, &held, -1, -1, extraOf(1));
+    CCFrame blended = withFeedback(volume(40), CC_FEEDBACK_OK, 11);
+    blended.holdMarker = true;
+    std::memcpy(at0, engine.ringE(), sizeof(at0));
+    engine.render(18116, &blended, -1, -1, extraOf(1));
+    require(engine.flash() == CC_FLASH_LAND && !engine.sweeping(), "FW-DES-002: a reduced-motion landing never sweeps");
+    float at1[CC_RING_LEDS][3];
+    std::memcpy(at1, engine.ringE(), sizeof(at1));
+    for (uint32_t t = 18132; t <= 18616; t += 16) engine.render(t, &blended, -1, -1, extraOf(1));
+    int held4 = 0, moved = 0;                         // an LED still in the landing frame that moves later was held
+    for (int i = 0; i < CC_RING_LEDS; ++i) {
+        if (maxAbs(engine.ringE()[i], at0[i]) == 0.0f) continue;
+        ++moved;
+        if (maxAbs(at1[i], at0[i]) == 0.0f) ++held4;
+    }
+    require(moved > 0 && held4 == 0, "FW-DES-002: no LED holds for its sweep turn under reduced motion (" +
+                                         num(held4) + " of " + num(moved) + " held)");
+    for (uint32_t t = 18632; t <= 19000; t += 16) engine.render(t, &blended, -1, -1, extraOf(1));
+    engine.keyUp(19010, 3);
+    engine.setReducedMotion(19020, false);
+}
+
+// DD-BUG-053 [r3.1] 15.8: the button-4 hold (Play next) lands on the first new seq after its 1000 ms maturity, also
+// when that frame arrives on the very render of the 1000 ms mark (the landing window opens before the frame's
+// feedback is read). Renders every 16 ms from 0; the hold frame is Recently Added with holdMarker (seq 1, seeded);
+// button 4 goes down at pressAt, the landing frame (seq 2) is rendered at landAt.
+CCFrame withMoment(CCFrame f, uint32_t seq, uint8_t moment, uint32_t color, int8_t side);
+
+uint8_t playNextLanding(uint32_t pressAt, uint32_t landAt, uint8_t moment, bool marker, bool hold1,
+                        uint16_t* holdMs = nullptr) {
+    static CCAlive engine;
+    engine.reset(0);
+    engine.claim(0);
+    CCFrame held = withFeedback(list(30, 0), CC_FEEDBACK_OK, 1);
+    held.crumb = CC_CRUMB_RECENT;
+    held.holdMarker = marker;
+    CCFrame landed = withMoment(held, 2, moment, 0, 0);
+    bool pressed = false;
+    for (uint32_t t = 0; t < landAt; t += 16) {
+        if (!pressed && t >= pressAt) {
+            if (hold1) engine.press(pressAt, 0);
+            engine.press(pressAt, 3);
+            pressed = true;
+        }
+        engine.render(t, &held, -1, -1, extraOf(1));
+    }
+    engine.render(landAt, &landed, -1, -1, extraOf(1));
+    if (holdMs) *holdMs = engine.holdMs();
+    return engine.flash();
+}
+
+void playNextChecks() {
+    // The recording order: the host's ok + queued lands on the render of exactly press + 1000.
+    require(playNextLanding(2000, 3000, CC_MOMENT_QUEUED, true, false) == CC_FLASH_QUEUE,
+            "DD-BUG-053: ok + queued on the render of the 1000 ms mark is the queue flash (green)");
+    // Unaligned press (2005): the 1000 ms mark falls between renders; the frame arrives on the first render after it.
+    require(playNextLanding(2005, 3008, CC_MOMENT_QUEUED, true, false) == CC_FLASH_QUEUE,
+            "DD-BUG-053: ok + queued on the first render after the mark is the queue flash");
+    // The frame one host round trip (20 ms) after the engine's own maturity render (3008) still lands.
+    require(playNextLanding(2000, 3020, CC_MOMENT_QUEUED, true, false) == CC_FLASH_QUEUE,
+            "DD-BUG-053: ok + queued 20 ms after maturity is the queue flash");
+    // A plain ok at the mark is the domain landing.
+    require(playNextLanding(2000, 3000, CC_MOMENT_NONE, true, false) == CC_FLASH_LAND,
+            "DD-BUG-053: a plain ok on the render of the mark is the landing");
+    // No holdMarker: no hold ring, no landing: ok + queued is the ordinary moment (no flash, the 640 ms hold).
+    uint16_t holdMs = 0;
+    const uint8_t plain = playNextLanding(2000, 3000, CC_MOMENT_QUEUED, false, false, &holdMs);
+    require(plain == CC_FLASH_NONE && holdMs == 640,
+            "DD-BUG-053: without holdMarker ok + queued stays the queued moment (no queue / land flash)");
+    // Hold 1 wins on a crumb screen: the button-4 hold never matures, so no landing.
+    const uint8_t both = playNextLanding(2000, 3000, CC_MOMENT_QUEUED, true, true);
+    require(both != CC_FLASH_QUEUE && both != CC_FLASH_LAND,
+            "DD-BUG-053: while the hold-1 ring runs the button-4 hold opens no landing");
 }
 
 // Song hand (8.4) and the animating() flag.
@@ -2491,8 +2687,13 @@ bool sequenceFloor(JsonObjectConst expect, const CCAlive& engine, const uint32_t
         if (!(m > 0.0) || m >= 0.5 - kSeqFloorBand) continue;
         ++s.floored;
         const int top = v[0] >= v[1] && v[0] >= v[2] ? 0 : (v[1] >= v[2] ? 1 : 2);
-        const int shift = 16 - 8 * top;
-        bool ok = chan(py, shift) == 1 && chan(cpp, shift) == 1;
+        // The dominant channel: Python's, estimated from its e, which the fixture rounds to 1 / eScale; r4's eased
+        // tails (ALIVE.md 16) make channels a few 1e-5 apart common, so any channel within the band of the top
+        // one counts as dominant when both ports light that same channel.
+        bool dominant = false;
+        for (int c = 0, q = 16; c < 3; ++c, q -= 8)
+            if (v[c] >= m - kSeqFloorBand && chan(py, q) == 1 && chan(cpp, q) == 1) dominant = true;
+        bool ok = dominant;
         for (int c = 0, q = 16; c < 3; ++c, q -= 8) {
             ok = ok && chan(py, q) <= 1 && chan(cpp, q) <= 1;
             if (v[c] < m - kSeqFloorBand) ok = ok && chan(py, q) == 0 && chan(cpp, q) == 0;
@@ -2663,6 +2864,7 @@ bool runSequences(const char* path, bool perCase, SequenceStats& s) {
                 else if (!std::strcmp(kind, "detent")) engine.detent(t, op["delta"].as<int32_t>());
                 else if (!std::strcmp(kind, "limit")) engine.limit(t, static_cast<int8_t>(op["dir"].as<int>()));
                 else if (!std::strcmp(kind, "press")) engine.press(t, static_cast<uint8_t>(op["slot"].as<int>()));
+                else if (!std::strcmp(kind, "keyup")) engine.keyUp(t, static_cast<uint8_t>(op["slot"].as<int>()));   // [r3]
                 else if (!std::strcmp(kind, "clock")) engine.setClock(t, static_cast<uint16_t>(op["minute"].as<int>()));
                 else if (!std::strcmp(kind, "progress")) engine.setProgress(t, op["pos"].as<uint32_t>(), op["dur"].as<uint32_t>());
                 else if (!std::strcmp(kind, "rm")) engine.setReducedMotion(t, op["on"].as<bool>());
@@ -2861,6 +3063,8 @@ int main(int argc, char** argv) {
     eventChecks();
     tieChecks();
     songChecks();
+    r4Checks();
+    playNextChecks();
     noticeRestChecks();
     momentChecks();
     knobChecks();

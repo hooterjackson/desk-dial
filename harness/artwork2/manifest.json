@@ -2,8 +2,8 @@
   "about": "artwork2 harness fixtures (ARTWORK2.md section 5), written by make_art_fixtures.py",
   "covers": [
     {
-      "name": "a2-den",
-      "file": "cover-den-240.jpg",
+      "name": "a2-hall",
+      "file": "cover-hall-240.jpg",
       "bytes": 4167,
       "quality": 85,
       "sha_key": "6ed0810f373608e22cd53d99"

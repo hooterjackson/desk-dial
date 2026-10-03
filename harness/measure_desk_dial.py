@@ -1,6 +1,6 @@
 """Width check of the Desk Dial knob copy (rename-desk-dial.md 5.2 and 14.4 item 3). Read only.
 
-Moved here from the rename session's scratchpad so it survives it. Two methods, as PRESENTATION_V5.md:
+Moved here from the rename session's a scratch folder so it survives it. Two methods, as PRESENTATION_V5.md:
 
 - design: the contract's Notation (Montserrat.ttf instanced at wght 500, advance widths, no kerning);
 - LVGL: font_tests.resolved_run_width over cc_font_<N> -> the kerned built-in lv_font_montserrat_<N>

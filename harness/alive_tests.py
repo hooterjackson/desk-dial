@@ -154,8 +154,9 @@ def dither_default_wiring() -> int:
 
 def hmi_input_wiring() -> int:
     """PRESENTATION_V5 11.2 / 11.4 (VOC 2.5): the kh hold and the hid tag, as source pins. The HMI
-    turns AceButton's long press on (600 ms, no suppression, no repeat); the claimed branch queues a
-    hold only for the raw at physical slot 0 and tags a key down that fired F24; the native branch
+    turns AceButton's long press on (no suppression, no repeat); [r3.1] each press sets its raw's delay from
+    its physical slot (600 ms at slot 0, 1000 ms elsewhere) and the claimed branch queues a hold for every
+    raw, and tags a key down that fired F24; the native branch
     ignores the long press entirely; the COM task sends kh / hid and routes an entering hold to the
     deferred slot. These pins hold the wiring only: the control_center.cpp behaviour (the deferred
     slot, ks in ready, the F24 icon gate) needs a host run of that unit (media_tests.py's wiring
@@ -167,8 +168,12 @@ def hmi_input_wiring() -> int:
         (hmi, r'->setFeature\(ButtonConfig::kFeatureLongPress\);', 'long press on'),
         (hmi, r'->setLongPressDelay\(kHoldMs\);', 'long-press delay kHoldMs'),
         (hmi, r'constexpr uint16_t kHoldMs = 600;', 'hold_ms 600'),
-        (hmi, r'if \(eventType == AceButton::kEventLongPressed\) \{ if \(cc_physical_button\(index\) != 0\) return;',
-         'a claimed long press is a hold only on physical slot 0'),
+        (hmi, r'constexpr uint16_t kHoldOtherMs = 1000;', '[r3.1] hold_ms 1000 off slot 0'),
+        (hmi, r'if \(eventType == AceButton::kEventPressed\) \{ button->getButtonConfig\(\)->setLongPressDelay\('
+              r'cc_physical_button\(index\) == 0 \? kHoldMs : kHoldOtherMs\);',
+         '[r3.1] a claimed press sets its hold delay by physical slot'),
+        (hmi, r'if \(eventType == AceButton::kEventLongPressed\) \{ KeyEvt evt = \{kKeyEvtHold,',
+         '[r3.1] a claimed long press is a hold on every raw'),
         (hmi, r'KeyEvt evt = \{kKeyEvtHold, index, hmi_thread\.keyState, cc_input_id\(\)\};', 'the hold KeyEvt'),
         (hmi, r'if \(eventType == AceButton::kEventLongPressed\) return;', 'the native branch ignores the long press'),
         (hmi, r'static_cast<uint8_t>\(eventType \| \(hid \? kKeyEvtHid : 0\)\)', 'a key down that fired F24 is tagged'),
@@ -194,7 +199,7 @@ def lcd_diag_fields() -> tuple:
     because the companion's device.DIAG_LCD_FIELDS mirrors LCD_DIAG_FIELDS), read without importing
     the tooling."""
     import ast
-    tree = ast.parse((root.parent / 'nanod_cc5_tooling.py').read_text(encoding='utf-8'))
+    tree = ast.parse((root.parent / 'tools' / 'nanod_cc5_tooling.py').read_text(encoding='utf-8'))
     found = {}
     for node in tree.body:
         if isinstance(node, ast.Assign):
@@ -268,6 +273,45 @@ def diag_and_native_wiring() -> int:
     return 10
 
 
+def marker_rest_off() -> int:
+    """[user 2026-10-03] FW-BUG-026: the r3 Windows marker ring draws only the white marker +-1; the rest of the
+    arc is off (no sub-floor dim segments, like the Lights arcs and the queue ring; ALIVE.md 15.7). Pins that
+    neither draw_marker (cc_alive.cpp) nor the twin's _draw_marker puts class M, that CC_ALIVE_CLASS_M stays in
+    the enum, and the twin's targets for the r3-refused-marker frames; byte parity of the two engines is the
+    sequences' (step 4). Returns the number of checks."""
+    al = make_alive_sequences.al
+    cpp = (firmware / 'src' / 'cc_alive.cpp').read_text(encoding='utf-8', errors='replace').replace('\r\n', '\n')
+    body = re.search(r'int draw_marker\(.*?\n}\n', cpp, re.S)
+    if not body or 'CC_ALIVE_CLASS_M' in body.group(0) or 'CC_ALIVE_CLASS_3, markerRgb' not in body.group(0):
+        raise SystemExit('FAIL: cc_alive.cpp draw_marker must draw the marker +-1 only (no class M rest)')
+    header = (firmware / 'src' / 'cc_alive.h').read_text(encoding='utf-8', errors='replace')
+    if not re.search(r'\bCC_ALIVE_CLASS_M,', header):
+        raise SystemExit('FAIL: cc_alive.h must keep CC_ALIVE_CLASS_M in the enum (append-only)')
+    import ast
+    import inspect
+    import textwrap
+    fn = ast.parse(textwrap.dedent(inspect.getsource(al._draw_marker))).body[0]
+    names = {n.id for stmt in fn.body[1:] for n in ast.walk(stmt) if isinstance(n, ast.Name)}   # body[0]: docstring
+    if 'CLASS_M' in names or 'MARKER_RGB' not in names:
+        raise SystemExit('FAIL: alive_lights._draw_marker must draw the marker +-1 only (no class M rest)')
+    arc = [(38 + k) % 60 for k in range(45)]
+    checks = 3
+    for count, index in ((8, 0), (8, 3), (8, 7), (1, 0), (24, 11)):
+        span = max(1, count - 1)
+        pos = (2 * index * 44 + span) // (2 * span)
+        for asleep in (False, True):
+            t = al.alive_targets(make_alive_sequences.windows_r3(count, index).frame, state_asleep=asleep)
+            for k, seg in enumerate(arc):
+                cell = t.ring[seg]
+                if (cell is None) != (abs(k - pos) > 1) or (cell is not None and cell.cls != 3):
+                    raise SystemExit(f'FAIL: marker ring count {count} index {index} asleep {asleep}: arc {k} '
+                                     f'is {cell!r} (marker +-1 class 3 only)')
+            checks += 1
+    print('alive_tests: [user 2026-10-03] the marker ring rest is off (draw_marker, _draw_marker, 10 twin frames)',
+          flush=True)
+    return checks
+
+
 def compile_runner() -> Path:
     cl, env = msvc_env()
     exe = out_dir / 'alive_tests.exe'
@@ -291,6 +335,7 @@ def main() -> int:
     print(f'alive_tests: section 9 dither default: {dither_default_wiring()} pin(s)', flush=True)
     print(f'alive_tests: kh / hid input wiring: {hmi_input_wiring()} pin(s)', flush=True)
     print(f'alive_tests: 12.3 diag / 8.10 native button wiring: {diag_and_native_wiring()} pin(s)', flush=True)
+    print(f'alive_tests: marker ring rest off (FW-BUG-026): {marker_rest_off()} check(s)', flush=True)
     # 2. Twin sequences from the Python engine.
     data = make_alive_sequences.build()
     text = make_alive_sequences.dumps(data)

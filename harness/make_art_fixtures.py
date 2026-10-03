@@ -1,8 +1,8 @@
 """Create the artwork fixtures used by the LVGL harness.
 
 v1 (120 px RGB565), written to app/assets/fixtures/ (data only):
-- art-den-120.rgb565: byte copy of the real Den cover transfer captured by the
-  artwork agent (previews/artwork-transport/den-now-playing-120.rgb565).
+- art-hall-120.rgb565: byte copy of the real Hall cover transfer captured by the
+  artwork agent (previews/artwork-transport/hall-now-playing-120.rgb565).
 - art-bright-120.rgb565: a synthetic bright, busy cover (saturated diagonal
   stripes plus a high-contrast checker band behind the title area). It is
   passed through the companion's own artwork.prepare_artwork() (imported
@@ -12,8 +12,8 @@ v1 (120 px RGB565), written to app/assets/fixtures/ (data only):
 - *.png: 120 px previews decoded back from each .rgb565 file, for eyeballing.
 
 artwork2 (1.0.0-cc5.3, ARTWORK2.md section 5), written to harness/artwork2/:
-- cover-den-240.jpg: the real Den cover's 240 px composite
-  (previews/artwork-transport/den-now-playing-240.png, already 0.8 opacity +
+- cover-hall-240.jpg: the real Hall cover's 240 px composite
+  (previews/artwork-transport/hall-now-playing-240.png, already 0.8 opacity +
   scrim) encoded like the host: Pillow JPEG, quality ladder, 4:2:0, optimize,
   baseline, first result <= COVER_MAX_BYTES.
 - cover-bright-240.jpg: the synthetic bright cover's 240 px composite from
@@ -50,8 +50,8 @@ ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
 COMPANION = WORKSPACE / 'app'
 FIXTURES = COMPANION / 'assets' / 'fixtures'
-DEN_SOURCE = COMPANION / 'previews' / 'artwork-transport' / 'den-now-playing-120.rgb565'
-DEN_240 = COMPANION / 'previews' / 'artwork-transport' / 'den-now-playing-240.png'
+DEN_SOURCE = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-120.rgb565'
+DEN_240 = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-240.png'
 ARTWORK2 = ROOT / 'artwork2'
 SIZE, TRANSFER = 240, 120
 BYTES = TRANSFER * TRANSFER * 2
@@ -112,7 +112,7 @@ def preview(raw: bytes, target: Path) -> None:
 
 def make_v1(prepare_artwork) -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
-    den = FIXTURES / 'art-den-120.rgb565'
+    den = FIXTURES / 'art-hall-120.rgb565'
     if DEN_SOURCE.stat().st_size != BYTES:
         raise SystemExit(f'{DEN_SOURCE} is not {BYTES} bytes')
     shutil.copyfile(DEN_SOURCE, den)
@@ -192,7 +192,7 @@ def make_artwork2(prepare_artwork, p, companion_icon_payload) -> None:
     den = Image.open(DEN_240).convert('RGB')
     bright = prepare_artwork(bright_source())[0].convert('RGB')
     detail = prepare_artwork(detail_source())[0].convert('RGB')
-    for name, file, composite in (('a2-den', 'cover-den-240.jpg', den), ('a2-bright', 'cover-bright-240.jpg', bright),
+    for name, file, composite in (('a2-hall', 'cover-hall-240.jpg', den), ('a2-bright', 'cover-bright-240.jpg', bright),
                                   ('a2-detail', 'cover-detail-240.jpg', detail)):
         data, quality = cover_jpeg(composite, p)
         (ARTWORK2 / file).write_bytes(data)

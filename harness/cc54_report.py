@@ -9,10 +9,15 @@ Checks:
   parse             every frames_v5.json input a cc5.4 parser accepts (v5.accept) and every
                     cc5_frames.json case was rendered; nothing rejected
   safe_circle       text/icon ink of the art-less renders inside r104; heading ink inside r112
+  crumb_clear_of_labels  [FW-DES-001] in every art-less render with a settled crumb, every crumb mask pixel
+                    (alpha >= 64, src/cc_crumbs.cpp) is the crumb ink x alpha within 40 levels: no label
+                    overdraws the crumb (the list title's first line clears it)
   heading_fit       the six v5 headings verbatim at 1 px tracking; legacy headings follow the chain
                     (drop tracking, "RECENTLY ADDED · P{n}" -> "RECENT · P{n}", then U+2026)
   verbatim_text     every drawn line is the wire text or its prefix + U+2026 (no invented copy)
   ellipsis_honest   U+2026 only where the full wire text cannot fit its lines (chord oracle)
+  nonlatin_title    [DD-DES-002] 5 Hangul syllables + an emoji + " Mix" through Desk Dial's _device_text
+                    (latin-ext-a) is '????? ? Mix' and case syn-nonlatin's list title draws exactly that
   label_bounds      no drawn line wider than its label box
   css_baselines     every 8.5.1 box on its CSS baseline +-1 px (derived from the design's CSS tops
                     and line heights with Montserrat's hhea metrics, not from the renderer)
@@ -28,10 +33,19 @@ Checks:
   art_rules         art only on the 8.4 layouts, artDim 112, never translates; 240 ms show/hide;
                     instant swaps over a visible cover; late arrival fades 240 ms without delay
   slides            the 8.7 flip table; no slide on detents, Seek on/off, id or Home layout changes
-  motion            key times of 8.8: content 220/380, reveal, idle stagger, footer 160/280+140,
+  motion            r4 key times (MOTION.md; design_handoff_nano_d_r4 README 3.2): M1 content 28 px SPRING.snap / 240,
+                    M2 / M3 reveal, M11 idle stagger 140 + 40 i, M6 lines 240 + 10 px SPRING.soft, footer 160/280+140,
                     meta/status fades 160, at the harness's 1 ms fake tick
-  reduced_motion    reducedMotion true: no translate in any capture; content fade 220 ms
-  twins             exactly the twelve twins: black, text_opa 204, +1 px, same text/visibility
+  reduced_motion    reducedMotion true: no translate in any capture; content fade 160 ms (r4 section 7);
+                    [FW-DES-003] every lv_anim a reduced render starts (v5-reduced, r4-reduced) lasts <= 160 ms
+                    with no delay, except M10 (the hold fill), M11 (the idle stagger delays) and the 8.4 cover
+                    fade; the idle -> loaded step fades footer and status in 160 ms
+  r4_moments        r4-moments / r4-reduced timelines: M1, M15, M2, M4, M5, M6, M7, M8, M9, M10, M13 key frames;
+                    [HN-DES-002] one 9 px wall bounce on Volume 100 % / 0 %, Windows last, Scenes first, Seek
+                    0:00 and Up next last; r4-tour's wall past 100 % bounces a settled 100 % frame;
+                    [FW-DES-004] r4-source-toggle: recent -> playlists -> recent is no screen change, slide or
+                    glide; the crumb slots crossfade and the content never translates
+  twins             exactly the thirteen twins (presentation 6: + scenes.title): black, text_opa 204, +1 px, same text/visibility
   twin_fade         content/track/volume fades vs a group-composited reference: differences only
                     inside label ink boxes (none outside), identical at opacity 0/255; in-box
                     differences are classed by what lies under the ink: the cover, <= 28 levels
@@ -43,6 +57,12 @@ Checks:
                     cancel stops the decode at the next of 15 MCU bands, 12.5.4 step 2, R-f) and
                     completes through cc_art_decode_result(); (h) one decode time plus at most one
                     band at 46 / 120 / 154 ms decodes; the result mapping over its domain
+  native_pc_volume  [FW-DES-007] the native value screen in offline PC volume mode (main.cpp kind "native",
+                    a stand-in value screen with the firmware's cc_native_pc_volume_attach view): "PC volume", no
+                    number, no half arc (no ink beyond r100), a + / - tick per step gone after 300 ms, number and
+                    arc back on exit; the flex column's profile name / "MIDI CC 7" labels muted (HIDDEN
+                    flags left to lcd_thread) and back on exit, the box centred out of the flex flow;
+                    ui_valueScreen.c / hmi_thread.cpp wiring pinned
   offline           the offline layer: copy and line counts (8.10), geometry, entry/native/exit
                     timelines (native input through cc_offline_input_update), pins, no
                     native-screen frame
@@ -90,13 +110,31 @@ FRAMES_V5 = COMPANION / 'tests' / 'fixtures' / 'frames_v5.json'
 sys.path.insert(0, str(COMPANION))
 from control_center import presentation  # noqa: E402
 
-LAYOUTS = ['nowPlaying', 'volume', 'idle', 'recent', 'tracks', 'windows', 'notice', 'seek', 'explorer', 'upnext']
+LAYOUTS = ['nowPlaying', 'volume', 'idle', 'recent', 'tracks', 'windows', 'notice', 'seek', 'explorer', 'upnext',
+           'lights', 'lightsbig', 'scenes']   # presentation 6 (PRESENTATION_V5.md section 19)
 ART_LAYOUTS = {'nowPlaying', 'volume', 'recent', 'tracks', 'seek', 'explorer', 'upnext'}
 SAFE_R, HEADING_R, INK = 104, 112, 12
+ART_PAUSED_OPA = 255   # [r3.1] PRESENTATION_V5 19.10: a paused Home / Music cover (playing false) at full (user ruling 2026-09-29)
+
+
+def art_opa(case):
+    """The cover's image_opa: artDim 112, else [r3.1] a paused Home cover (the parser keeps playing on Home
+    layouts only) 143, else 255."""
+    if case['art_dim']:
+        return base.ART_DIM_OPA
+    return ART_PAUSED_OPA if case.get('playing') == 0 else 255
 FOOTER_CX = [56, 99, 141, 184]
 IDLE_CX = [51, 97, 143, 189]
 ELLIPSIS = '…'
-HEAP_LIMIT = 34 * 1024
+# Section 12.2's harness bound (x64 pointers: an upper bound of the knob) was 34 KB used; r4 (MOTION.md) adds the crumb
+# crossfade's second slot, the hold fill (clip box + image), the line / icon transform styles and the stepper anim:
+# +2.1 KB on x64 at the peak (about +1.2 KB with the knob's 4-byte pointers). The device gate is unchanged
+# (lvglMinFree >= 30 KB, 12.3), to be re-read on the knob with the r4 build.
+HEAP_LIMIT = 37 * 1024
+# FW-DES-003 (r4 section 7): under reduced motion every animation is a 160 ms opacity crossfade. Exempt: M10 the hold
+# fill (a 1000 ms progress, not a transition) and the 8.4 cover show/hide (240 ms, opacity only).
+REDUCED_FADE_MS = 160
+REDUCED_ANIM_EXEMPT = ('footer.holdfill', 'art')
 # PRESENTATION_V5 15.3 twin_fade after the K1 errata of lead rulings R-b (2026-09-25, 16.7 E-b) and
 # R-g (2026-09-26, 16.8 E-g). R-b: <= 28 levels per 8-bit channel inside label ink boxes (P5-13's float
 # model gives <= 15; LVGL blends the twin and then the label into the RGB565 framebuffer, each blend
@@ -108,7 +146,8 @@ HEAP_LIMIT = 34 * 1024
 TWIN_FADE_LIMIT = 28
 TWIN_FADE_OVERLAP_LIMIT = 36
 TWIN_ROLES = ('heading', 'home.title', 'home.artist', 'volume.caption', 'volume.digits', 'volume.percent',
-              'list.title', 'list.subtitle', 'tracks.title', 'tracks.subtitle', 'seek.caption', 'seek.time')
+              'list.title', 'list.subtitle', 'tracks.title', 'tracks.subtitle', 'seek.caption', 'seek.time',
+              'scenes.title')   # presentation 6: the scenes list's current scene (section 19.4)
 V5_HEADINGS = ('RECENTLY ADDED', 'RECENT', 'FAVOURITES', 'UP NEXT', 'TRACKS', 'SEEK')
 HOME_LABELS = ('Play', 'Pause', 'Browse', 'Tracks', 'Win')
 # K1 8.10 offline sub after the Desk Dial rename (rename-desk-dial.md C1, 5.2 and 11.5): the firmware's
@@ -127,7 +166,79 @@ CSS = {
     'seek.caption': (52, 14, 18), 'seek.time': (76, 48, 46), 'seek.line': (128, 14, 18),
     'windows.app': (80, 14, 18), 'windows.title': (98, 16, 20), 'windows.meta': (140, 12, 14),
     'offline.title': (70, 22, 26), 'offline.subtitle': (104, 14, 18), 'idle.word': (134, 12, 14),
+    # presentation 6 scenes list (README r3 section 2.2)
+    'scenes.prev': (56, 14, 18), 'scenes.title': (78, 22, 26), 'scenes.next': (108, 14, 18), 'scenes.meta': (134, 12, 14),
 }
+
+
+CRUMB_ALPHA_MIN, CRUMB_TOLERANCE = 64, 40   # FW-DES-001 crumb_clear_of_labels
+
+
+def crumb_masks():
+    """src/cc_crumbs.cpp (generated): {(x, y, w, h): alpha bytes} of every crumb mask."""
+    text = (ROOT.parent / 'firmware' / 'src' / 'cc_crumbs.cpp').read_text(encoding='utf-8')
+    masks = {}
+    for m in re.finditer(r'// \w+ (?:cur|anc): (\d+) x (\d+) at \((\d+), (\d+)\)\s*const uint8_t \w+\[(\d+)\] = \{(.*?)\};',
+                         text, re.S):
+        w, h, x, y, n = (int(m.group(i)) for i in range(1, 6))
+        data = bytes(int(v, 16) for v in re.findall(r'0x([0-9A-Fa-f]{2})', m.group(6)))
+        if len(data) != n or n != w * h:
+            raise SystemExit(f'cc_crumbs.cpp: mask at ({x}, {y}) has {len(data)} bytes, want {w} x {h}')
+        masks[(x, y, w, h)] = data
+    return masks
+
+
+def crumb_overdraw(data, layout, masks):
+    """Crumb mask pixels (alpha >= CRUMB_ALPHA_MIN) of the settled crumbs in `layout` whose rendered colour is not
+    the crumb ink x alpha within CRUMB_TOLERANCE (an art-less render: black under the crumb). Returns (checked
+    crumbs, [(x, y, rendered, expected)])."""
+    checked, bad = 0, []
+    for o in layout:
+        if not o['role'].startswith('crumb.') or not visible(o) or o['opa_eff'] < 255 or o['tx'] or o['ty']:
+            continue
+        key = (o['x1'], o['y1'], o['x2'] - o['x1'] + 1, o['y2'] - o['y1'] + 1)
+        mask = masks.get(key)
+        if mask is None:
+            bad.append((o['x1'], o['y1'], None, f'no cc_crumbs.cpp mask at {key}'))
+            continue
+        checked += 1
+        ink = int(o['recolor'][1:], 16)
+        ink = ((ink >> 16) & 255, (ink >> 8) & 255, ink & 255)
+        x0, y0, w, h = key
+        for j in range(h):
+            for i in range(w):
+                a = mask[j * w + i]
+                if a < CRUMB_ALPHA_MIN:
+                    continue
+                x, y = x0 + i, y0 + j
+                k = (y * 240 + x) * 3
+                got = tuple(data[k:k + 3])
+                want = tuple(c * a // 255 for c in ink)
+                if max(abs(g - e) for g, e in zip(got, want)) > CRUMB_TOLERANCE:
+                    bad.append((x, y, got, want))
+    return checked, bad
+
+
+def crumb_overdraw_self_test(masks):
+    """The check must catch ink over a crumb: a synthetic render with the RECENT current crumb drawn exactly passes,
+    the same with a white bar across its lowest rows fails."""
+    key = next(k for k in masks if k[1] < 30 and k[3] > 40)
+    x0, y0, w, h = key
+    ink = (0xE6, 0xE6, 0xE6)
+    buf = bytearray(240 * 240 * 3)
+    for j in range(h):
+        for i in range(w):
+            a = masks[key][j * w + i]
+            k = ((y0 + j) * 240 + x0 + i) * 3
+            buf[k:k + 3] = bytes(c * a // 255 for c in ink)
+    obj = {'role': 'crumb.current', 'hidden': False, 'opa_eff': 255, 'tx': 0, 'ty': 0, 'recolor': '#E6E6E6',
+           'x1': x0, 'y1': y0, 'x2': x0 + w - 1, 'y2': y0 + h - 1}
+    clean = crumb_overdraw(bytes(buf), [obj], masks)
+    for y in range(y0 + h - 8, y0 + h):
+        for x in range(x0, x0 + w):
+            buf[(y * 240 + x) * 3:(y * 240 + x) * 3 + 3] = b'\xf2\xf2\xf2'
+    dirty = crumb_overdraw(bytes(buf), [obj], masks)
+    return clean[0] == 1 and not clean[1] and len(dirty[1]) > 0
 
 
 def css_baseline(role):
@@ -135,10 +246,23 @@ def css_baseline(role):
     return round(top + (lh - 1.219 * size) / 2 + 0.968 * size)
 
 
-LABEL_SOURCES = dict(base.LABEL_SOURCES, **{'seek.caption': 'title', 'seek.line': 'meta'})
+LABEL_SOURCES = dict(base.LABEL_SOURCES, **{'seek.caption': 'title', 'seek.line': 'meta',
+                                            # presentation 6 (section 19.4)
+                                            'scenes.prev': 'prevTitle', 'scenes.title': 'title',
+                                            'scenes.next': 'nextTitle', 'scenes.meta': 'meta'})
+LIGHTS_LAYOUTS = ('lights', 'lightsbig')   # presentation 6: their 12 px `status` label draws `meta`
 visible = base.visible
 objects = base.objects
 load_rgb = base.load_rgb
+
+
+M1_PX = 28   # r4 M1: the content enters from 28 px (presentation 5: 20)
+
+
+def art_drawn(layout):
+    """The cover is on screen in this capture (visible, opacity above 0)."""
+    arts = [o for o in layout if o.get('role') == 'art']
+    return any(not o.get('hidden') and eff(o) > 0 for o in arts)
 
 
 def labels_of(layout, include_twins=False):
@@ -341,13 +465,13 @@ def exact_covers_v5(base_dir: Path, idx):
         if raw is None:
             failures.append(f'{name}: no recorded decoder output for {key!r}')
             continue
-        opa = base.ART_DIM_OPA if case['art_dim'] else 255
+        opa = art_opa(case)
         twin = load_rgb(base_dir / case['noart']['file'])
         mask = label_box_mask(layout)
         pixels = [p for p in range(240 * 240) if not (twin[3 * p] or twin[3 * p + 1] or twin[3 * p + 2]) and not mask[p]]
         bad, worst = base.mismatches(load_rgb(base_dir / file), base.decoded_rgb(raw, opa), pixels)
         compared += 1
-        rows.append(f'{name}: {key} {"x image_opa 112 " if opa < 255 else ""}{bad} of {len(pixels)} art-only px '
+        rows.append(f'{name}: {key} {f"x image_opa {opa} " if opa < 255 else ""}{bad} of {len(pixels)} art-only px '
                     f'differ (max |d| {worst})')
         if bad or len(pixels) < 20000:
             failures.append(rows[-1])
@@ -358,8 +482,8 @@ base.exact_covers = exact_covers_v5
 # v5: a cover hidden by a failed decode shows again over 240 ms (section 8.4), so its exact pixels
 # are compared once the fade is over.
 base.EXACT_CAPTURES = (
-    ('a2-swap', 'back-to-a', 0, 'a2-swap-a', 'a2-recent-den-dim'),           # back-buffer reuse (dim)
-    ('a2-decode-fail', 'other-key', 300, 'a2-den', 'a2-np-den'),             # after a failed decode
+    ('a2-swap', 'back-to-a', 0, 'a2-swap-a', 'a2-recent-hall-dim'),           # back-buffer reuse (dim)
+    ('a2-decode-fail', 'other-key', 300, 'a2-hall', 'a2-np-hall'),             # after a failed decode
     ('a2-slide-decode', 'slide-decode', 380, 'a2-slide', 'a2-recent-bright'),  # decoded during a slide
 )
 
@@ -404,7 +528,7 @@ def artwork2_checks(checks, out, index, frames, timelines):
         render, twin = load_rgb(out / c['render']['file']), load_rgb(out / c['noart']['file'])
         mask = label_box_mask(c['render']['layout'])
         art_only = [p for p in range(240 * 240) if not (twin[3 * p] or twin[3 * p + 1] or twin[3 * p + 2]) and not mask[p]]
-        opa = base.ART_DIM_OPA if c['art_dim'] else 255
+        opa = art_opa(c)
         reference = base.reference_565(covers[name].tobytes(), opa)
         db, db_luma, worst, count = base.psnr(render, reference, art_only)
         small = covers[name].resize((120, 120), Image.Resampling.LANCZOS).resize((240, 240), Image.Resampling.BILINEAR)
@@ -569,21 +693,21 @@ def artwork2_checks(checks, out, index, frames, timelines):
                f'decode fail: the previous cover (still in the front buffer) shows again over 240 ms: {other}')
         expect(again['art_decodes'] == 1 and again['art_decode_errors'] == 1, f'decode fail: retried after a key change: {again}')
         slide = step('a2-heartbeat', 'windows')['render']
-        expect(slide['last_slide'] == 20 and slide.get('media') == {'cover': None, 'icon': 'ic-code'},
-               f'Home -> Windows slides +20 and releases the cover pin: {slide}')
-        for label, want in (('unrelated-commit-home', {'cover': 'a2-den', 'icon': None}),
+        expect(slide['last_slide'] == M1_PX and slide.get('media') == {'cover': None, 'icon': 'ic-code'},
+               f'Home -> Windows slides +{M1_PX} (r4 M1) and releases the cover pin: {slide}')
+        for label, want in (('unrelated-commit-home', {'cover': 'a2-hall', 'icon': None}),
                             ('unrelated-commit-windows', {'cover': None, 'icon': 'ic-code'})):
             s = step('a2-heartbeat', label)
             expect(s['expect'].get('identical') and s['render'].get('media') == want, f'{label}: {s["render"].get("media")}')
         sim = index['sim_decode_ms']
         sd, sb = step('a2-slide-decode', 'slide-decode')['render'], step('a2-slide-decode', 'slide-back')['render']
-        at = {o: cap('a2-slide-decode', 'slide-decode', o)[0] for o in (0, 60, 110, 220, 380)}
-        expect(sd['render_ms'] == sim and sd['art_decodes'] == 1 and sd['last_slide'] == 20, f'decode + slide: {sd}')
-        expect(at[0]['content']['tx'] == 20 and at[0]['content']['opa'] == 0 and at[220]['content']['opa'] == 255
-               and at[380]['content']['tx'] == 0 and 0 < at[60]['content']['tx'] < 20,
+        at = {o: cap('a2-slide-decode', 'slide-decode', o)[0] for o in (0, 60, 110, 240, 420)}
+        expect(sd['render_ms'] == sim and sd['art_decodes'] == 1 and sd['last_slide'] == M1_PX, f'decode + slide: {sd}')
+        expect(at[0]['content']['tx'] == M1_PX and at[0]['content']['opa'] == 0 and at[240]['content']['opa'] == 255
+               and at[420]['content']['tx'] == 0 and 0 < at[60]['content']['tx'] < M1_PX,
                'decode + slide: the content slide and fade start at their beginning after a 150 ms decode')
         expect(at[0]['art']['opa'] == 255 and at[0]['art']['tx'] == 0, 'decode + slide: the new cover is swapped in at once')
-        expect(sb['art_reuses'] == 1 and sb['art_decodes'] == 0 and sb['last_slide'] == -20, f'slide back: {sb}')
+        expect(sb['art_reuses'] == 1 and sb['art_decodes'] == 0 and sb['last_slide'] == -M1_PX, f'slide back: {sb}')
     except (KeyError, StopIteration, ValueError) as error:
         failures.append(f'missing artwork2 timeline data: {error!r}')
     checks.add('a2_timelines', not failures, 'late icon instant; late JPEG cover 240 ms fade; swap/reuse; decode '
@@ -593,6 +717,52 @@ def artwork2_checks(checks, out, index, frames, timelines):
     checks.add('a2_handback', not failures and len(rows) == len(base.HANDBACK_EXPECT),
                'cc_display_release_media() releases the pins; the return re-pins and decodes nothing', failures, steps=rows)
     one_buffer_checks(checks, out)
+
+
+NONLATIN_SOURCE = '한국어노래 \U0001F525 Mix'   # 5 Hangul syllables, an emoji, " Mix"
+NONLATIN_DRAWN = '????? ? Mix'                                        # 5 + 1 question marks
+NONLATIN_CAPABILITIES = {'presentation': 5, 'glyphs': 'latin-ext-a'}
+
+
+def nonlatin_title_check(checks, by_id):
+    """[DD-DES-002] A non-Latin title goes through Desk Dial's control_center.device._device_text with latin-ext-a
+    capabilities and is drawn: case syn-nonlatin (main.cpp) carries that title, and the list title draws it on one
+    line as '????? ? Mix' -- one '?' per unsupported source character, no longer run of '?'."""
+    failures = []
+    try:
+        from control_center.device import _device_text
+        device = _device_text(NONLATIN_SOURCE, NONLATIN_CAPABILITIES, presentation.TEXT_CAPACITY['title'])
+    except Exception as error:   # noqa: BLE001 -- reported as a failed check
+        device = None
+        failures.append(f'_device_text failed: {error!r}')
+    if device is not None and device != NONLATIN_DRAWN:
+        failures.append(f'_device_text gives {device!r}, expected {NONLATIN_DRAWN!r}')
+    case = by_id.get('syn-nonlatin')
+    drawn = None
+    if not case or case.get('kind') != 'frame':
+        failures.append('case syn-nonlatin not rendered as a frame')
+    else:
+        if (case.get('wire') or {}).get('title') != (device or NONLATIN_DRAWN):
+            failures.append(f'syn-nonlatin wire title {(case.get("wire") or {}).get("title")!r} is not the Desk Dial text')
+        for capture in ('noart', 'render'):
+            title = first(case[capture]['layout'], 'list.title')
+            if not title or not visible(title):
+                failures.append(f'syn-nonlatin {capture}: list.title not drawn')
+                continue
+            lines = [l for l in title['lines'] if l['text']]
+            drawn = [l['text'] for l in lines]
+            if drawn != [NONLATIN_DRAWN]:
+                failures.append(f'syn-nonlatin {capture}: list.title draws {drawn!r}, expected [{NONLATIN_DRAWN!r}]')
+                continue
+            runs = [len(r) for r in re.findall(r'\?+', drawn[0])]
+            if runs != [5, 1]:
+                failures.append(f'syn-nonlatin {capture}: runs of ? {runs}, expected [5, 1]')
+            pens = lines[0]['pens']
+            if len(pens) != len(NONLATIN_DRAWN) or any(b <= a for a, b in zip(pens, pens[1:])) or not lines[0]['width']:
+                failures.append(f'syn-nonlatin {capture}: a glyph without an advance (pens {pens})')
+    checks.add('nonlatin_title', not failures,
+               f'[DD-DES-002] 5 Hangul + emoji + " Mix" -> _device_text (latin-ext-a) {device!r} -> list.title draws '
+               f'{drawn!r}', failures)
 
 
 def one_buffer_checks(checks, out: Path):
@@ -716,11 +886,33 @@ def main(argv) -> int:
                f'{len(drawn_cases)} art-less renders: text and icon ink inside r{SAFE_R}, heading ink inside r{HEADING_R} '
                f'({heading_uses} heading px between r104 and r112; worst radius {worst:.1f})', failures)
 
+    # crumb_clear_of_labels (FW-DES-001) ---------------------------------------------------------------------
+    masks = crumb_masks()
+    failures, crumb_renders = [], 0
+    if not crumb_overdraw_self_test(masks):
+        failures.append('self-test: the overdraw probe does not tell a clean crumb from one under a label')
+    for c in drawn_cases:
+        layout = c['noart']['layout']
+        if not any(o['role'].startswith('crumb.') and visible(o) for o in layout):
+            continue
+        checked, bad = crumb_overdraw(load_rgb(out / c['noart']['file']), layout, masks)
+        crumb_renders += checked > 0
+        if bad:
+            failures.append(f'{c["id"]}: {len(bad)} crumb px overdrawn, e.g. {bad[:3]}')
+    checks.add('crumb_clear_of_labels', not failures and crumb_renders >= 20,
+               f'{crumb_renders} art-less renders with a settled crumb: every crumb mask px (alpha >= {CRUMB_ALPHA_MIN}) '
+               f'is the crumb ink x alpha within {CRUMB_TOLERANCE} levels (no label overdraws the crumb)', failures)
+
     # heading fit --------------------------------------------------------------------
     failures, seen = [], {}
     for c in frame_cases:
         w = wire(c).get('heading', '')
         h = first(c['render']['layout'], 'heading')
+        if wire(c).get('crumb'):
+            # Presentation 6 (section 19.9): a crumb replaces the flat heading (the arc bitmaps, cc_crumbs.cpp).
+            if h and visible(h):
+                failures.append(f'{c["id"]}: heading {h["text"]!r} drawn next to crumb {wire(c)["crumb"]!r}')
+            continue
         if not w:
             if h and visible(h):
                 failures.append(f'{c["id"]}: heading {h["text"]!r} without a wire heading')
@@ -749,6 +941,8 @@ def main(argv) -> int:
         frame = wire(c)
         layout = c['render']['layout']
         for role, field in LABEL_SOURCES.items():
+            if role == 'status' and frame.get('layout') in LIGHTS_LAYOUTS:
+                field = 'meta'
             for o in objects(layout, role):
                 lines = [l['text'] for l in o['lines']]
                 counted += 1
@@ -764,6 +958,7 @@ def main(argv) -> int:
                         bounds_fail.append(f'{c["id"]} {o["role"]}: line {l["text"]!r} {l["x1"]}..{l["x2"]} '
                                            f'outside box {o["x1"]}..{o["x2"]}')
     checks.add('verbatim_text', not failures, f'{counted} drawn labels equal the wire text or its prefix + U+2026', failures)
+    nonlatin_title_check(checks, by_id)
     checks.add('label_bounds', not bounds_fail, 'every drawn line fits its label box', bounds_fail)
 
     failures, labels_n, ellipsized, fit_cases = [], 0, [], []
@@ -924,7 +1119,9 @@ def main(argv) -> int:
             continue
         line = o['lines'][0]
         samples.append(o['text'])
-        if o['font_name'] != 'cc_font_48t' or o['letter_space'] != -1 or line['baseline'] - o['ty'] != 116:
+        # HN-DES-002: an M13 wall moves the whole content layer (content ty) with the digits in it.
+        lift = (first(layout, 'content') or {}).get('ty', 0)
+        if o['font_name'] != 'cc_font_48t' or o['letter_space'] != -1 or line['baseline'] - o['ty'] - lift != 116:
             failures.append(f'{source}: {o["text"]!r} font {o["font_name"]}, tracking {o["letter_space"]}, '
                             f'baseline {line["baseline"]}')
         groups.setdefault(len(o['text']), {}).setdefault((line['x1'], tuple(line['pens'])), set()).add(o['text'])
@@ -982,7 +1179,7 @@ def main(argv) -> int:
             failures.append(f'{c["id"]} ({name}, key {c["art_key"]!r}): art {"shown" if eff(art) else "hidden"}')
         if want:
             shown_n += 1
-            if art['image_opa'] != (112 if c['art_dim'] else 255) or art['opa_eff'] != 255:
+            if art['image_opa'] != art_opa(c) or art['opa_eff'] != 255:
                 failures.append(f'{c["id"]}: image_opa {art["image_opa"]}, opa {art["opa_eff"]}')
         if eff(first(c['noart']['layout'], 'art')) > 0:
             failures.append(f'{c["id"]}: the art-less twin shows art')
@@ -1025,6 +1222,8 @@ def main(argv) -> int:
             if 'slide' not in s['expect']:
                 continue
             want, got = s['expect']['slide'], s['render']['last_slide']
+            # The fixtures carry the direction (+-20 since presentation 5); r4 M1 enters from 28 px.
+            want = (M1_PX if want > 0 else -M1_PX) if want else 0
             rows_.append(f'{tid} {s["label"]}: {got:+d}')
             if want != got:
                 failures.append(f'{tid} t={s["t"]} {s["label"]}: slide {got:+d}, expected {want:+d}')
@@ -1054,30 +1253,43 @@ def main(argv) -> int:
             d = s['expect'].get('slide', 0)
             if not d:
                 continue
+            d = M1_PX if d > 0 else -M1_PX
             c0, c110 = at('v5-flips', None, 0, 'content', 'tx', step_index=k), at('v5-flips', None, 110, 'content', 'opa', step_index=k)
-            o0, o220 = at('v5-flips', None, 0, 'content', 'opa', step_index=k), at('v5-flips', None, 220, 'content', 'opa', step_index=k)
-            t380 = at('v5-flips', None, 380, 'content', 'tx', step_index=k)
-            expect(c0 == d and o0 == 0 and 0 < c110 < 255 and o220 == 255 and t380 == 0,
-                   f'v5-flips {s["label"]}: tx {c0}->{t380} (380 ms), opa {o0}->{c110}->{o220} (220 ms)')
+            o0, o240 = at('v5-flips', None, 0, 'content', 'opa', step_index=k), at('v5-flips', None, 240, 'content', 'opa', step_index=k)
+            t420 = at('v5-flips', None, 420, 'content', 'tx', step_index=k)
+            expect(c0 == d and o0 == 0 and 0 < c110 < 255 and o240 == 255 and t420 == 0,
+                   f'v5-flips {s["label"]}: tx {c0}->{t420} (SPRING.snap 416 ms), opa {o0}->{c110}->{o240} (240 ms)')
+        # r4 M2: text out 130 ms E.in (12 px up by 160); the big value from 14 px below, 40 ms + 180 ms OUT,
+        # SPRING.snap from 40 ms (416 ms).
         r = lambda off, role, key='opa': at('volume-reveal-hide', 'rot', off, role, key)  # noqa: E731
-        expect(r(0, 'volume') == 0 and r(0, 'track') == 255 and r(150, 'track') == 0 and r(190, 'track', 'ty') == -8
-               and r(230, 'volume') == 255 and r(390, 'volume', 'ty') == 0, 'reveal key times (150/190 IN, 50+180 OUT, 50+340 SPR)')
+        expect(r(0, 'volume') == 0 and r(0, 'track') == 255 and r(130, 'track') == 0 and r(160, 'track', 'ty') == -12
+               and r(220, 'volume') == 255 and r(460, 'volume', 'ty') == 0,
+               f'M2 reveal key times (130/160 IN, 40+180 OUT, 40+416 SPRING.snap): track {r(130, "track")} '
+               f'ty {r(160, "track", "ty")}, volume {r(220, "volume")} ty {r(460, "volume", "ty")}')
+        # r4 M3: the big value out 130 ms E.in (14 px by 160); the text back after 90 ms: 260 ms OUT, SPRING.soft 544.
         h = lambda off, role, key='opa': at('volume-reveal-hide', 'volHide', off, role, key)  # noqa: E731
-        expect(h(170, 'volume') == 0 and h(190, 'volume', 'ty') == 6, 'reveal out: 170 / 190 IN')
+        expect(h(130, 'volume') == 0 and h(160, 'volume', 'ty') == 14 and h(350, 'track') == 255
+               and h(640, 'track', 'ty') == 0,
+               f'M3 reveal out: 130 / 160 IN, text 90 + 260 / 90 + 544: volume {h(130, "volume")} ty {h(160, "volume", "ty")}, '
+               f'track {h(350, "track")} ty {h(640, "track", "ty")}')
         i = lambda off, role, key='opa', o=0: at('idle-entry-exit', 'pIdle', off, role, key, o)  # noqa: E731
         expect(i(160, 'footer') == 0, 'idle in: footer out by +160 (IN)')
-        expect(i(245, 'idle.item', o=0) > 0 and i(245, 'idle.item', o=1) == 0 and i(335, 'idle.item', o=2) > 0
-               and i(335, 'idle.item', o=3) == 0, 'idle stagger 200 + 45 i')
+        expect(i(160, 'idle.item', o=0) > 0 and i(160, 'idle.item', o=1) == 0 and i(240, 'idle.item', o=2) > 0
+               and i(240, 'idle.item', o=3) == 0, 'M11 idle stagger 140 + 40 i')
+        expect(i(0, 'idle.item', 'ty', o=3) == 16 and all(abs(i(560, 'idle.item', 'ty', o=k)) <= 2 for k in range(4)),
+               'M11: the row rises from 16 px and springs to 0 (SPRING.pop: +-2 px of overshoot at +560)')
         expect(0 < i(160, 'art') < 255 and i(245, 'art') == 0, f'idle in: art out over 240 ms OUT ({i(160, "art")} at +160)')
         b = lambda off, role, key='opa': at('idle-entry-exit', None, off, role, key, step_index=7)  # noqa: E731
-        expect(b(90, 'track') == 0 and b(510, 'track') == 255 and b(510, 'track', 'ty') == 0, 'idle out: track 90 + 320/420')
+        expect(b(90, 'track') == 0 and b(350, 'track') == 255 and b(640, 'track', 'ty') == 0, 'idle out: track 90 + 260 / 90 + 544')
         expect(b(140, 'footer') == 0 and 0 < b(280, 'footer') < 255 and b(420, 'footer') == 255, 'idle out: footer 140 + 280')
         expect(0 < b(90, 'art') < 255 and b(280, 'art') == 255, 'idle out: art back over 240 ms')
         for label, role in (('meta-change', 'list.meta'), ('status-change', 'status'), ('tracks-meta', 'tracks.meta'),
                             ('windows-meta', 'windows.meta')):
-            vals = [at('v5-rest', label, off, role) for off in (0, 80, 160)]
-            notes.append(f'{label} {role} opacity +0/+80/+160: {vals}')
-            expect(vals[0] == 0 and 0 < vals[1] < 255 and vals[2] == 255, f'{label}: {role} fades in over 160 ms: {vals}')
+            vals = [at('v5-rest', label, off, role) for off in (0, 120, 240)]
+            rise = [at('v5-rest', label, off, role, 'ty') for off in (0, 560)]
+            notes.append(f'{label} {role} opacity +0/+120/+240: {vals}, ty +0/+560: {rise}')
+            expect(vals[0] == 0 and 0 < vals[1] < 255 and vals[2] == 255 and rise == [10, 0],
+                   f'M6 {label}: {role} fades in over 240 ms and rises 10 px (SPRING.soft): {vals} {rise}')
         for label, role in (('title-change', 'list.title'), ('home-title', 'home.title'), ('seek-line', 'seek.line'),
                             ('seek-time', 'seek.time')):
             step_ = next(s for s in timelines['v5-rest']['steps'] if s['label'] == label)
@@ -1088,8 +1300,9 @@ def main(argv) -> int:
                'a meta change in a screen-change render does not fade on its own')
     except (KeyError, ValueError, StopIteration, TypeError, IndexError) as error:
         failures.append(f'motion data: {error!r}')
-    checks.add('motion', not failures, 'content 220/380, reveal, idle stagger and fades, footer 160/280+140, '
-                                       'meta/status 160 at rest, instant titles and Seek lines', failures, notes=notes)
+    checks.add('motion', not failures, 'r4: M1 content 28 px SPRING.snap / 240 ms, M2 / M3 reveal, M11 idle stagger '
+                                       '140 + 40 i, footer 160/280+140, M6 meta/status 240 ms + 10 px at rest, instant '
+                                       'titles and Seek lines', failures, notes=notes)
 
     # reduced motion ----------------------------------------------------------------------------------
     failures, notes = [], []
@@ -1104,21 +1317,215 @@ def main(argv) -> int:
                     if o['role'] in ('content', 'track', 'volume', 'idle.item') and eff(o) > 0 and (o['tx'] or o['ty']):
                         failures.append(f'{s["label"]} +{cpt["offset"]}: {o["role"]} translated {o["tx"]},{o["ty"]}')
             if s['expect'].get('screenFade'):
-                vals = [at('v5-reduced', None, off, 'content', step_index=k) for off in (0, 110, 220)]
-                notes.append(f'{s["label"]} content opacity +0/+110/+220: {vals}')
+                vals = [at('v5-reduced', None, off, 'content', step_index=k) for off in (0, 60, 160)]
+                notes.append(f'{s["label"]} content opacity +0/+60/+160: {vals}')
                 if not (vals[0] == 0 and 0 < vals[1] < 255 and vals[2] == 255) or not s['render']['screen_change'] \
                         or s['render']['last_slide'] != 0:
                     failures.append(f'{s["label"]}: fade only ({vals}, {s["render"]})')
-        vals = [at('v5-reduced', 'idle-in', off, 'idle.item', ordinal=idx) for idx, off in ((0, 245), (1, 245), (2, 335), (3, 335))]
+        vals = [at('v5-reduced', 'idle-in', off, 'idle.item', ordinal=idx) for idx, off in ((0, 160), (1, 160), (2, 240), (3, 240))]
         if not (vals[0] > 0 and vals[1] == 0 and vals[2] > 0 and vals[3] == 0):
-            failures.append(f'reduced idle keeps the 200 + 45 i stagger: {vals}')
+            failures.append(f'reduced idle keeps the 140 + 40 i stagger: {vals}')
         full = next(s for s in tl['steps'] if s['label'] == 'full-motion-again')
-        if full['render']['last_slide'] != 20:
+        if full['render']['last_slide'] != M1_PX:
             failures.append(f'reducedMotion false restores the slide: {full["render"]}')
+        # FW-DES-003: the animations every reduced render starts (main.cpp anims_started).
+        anim_steps = [(f'v5-reduced/{s["label"]}', s) for s in tl['steps'] if s['expect'].get('reduced')]
+        anim_steps += [(f'r4-reduced/{s["label"]}', s) for s in timelines['r4-reduced']['steps'][1:]]
+        counted = 0
+        for name, s in anim_steps:
+            for a in s['render']['anims_started']:
+                counted += 1
+                if a['role'] in REDUCED_ANIM_EXEMPT:
+                    continue
+                delay_ok = a['delay'] == 0 or a['role'] == 'idle.item'          # M11: the 140 + 40 i stagger
+                if a['duration'] > REDUCED_FADE_MS or not delay_ok:
+                    failures.append(f'{name}: {a["role"] or "(struct)"} {a["duration"]} ms after {a["delay"]} ms under '
+                                    f'reduced motion (r4 section 7: {REDUCED_FADE_MS} ms, no delay)')
+        idle_out = next(s for s in tl['steps'] if s['label'] == 'idle-out')
+        seen = {a['role'] for a in idle_out['render']['anims_started']}
+        if not {'footer', 'status'} <= seen:
+            failures.append(f'idle-out (idle -> loaded) did not fade footer and status: {sorted(seen)}')
+        notes.append(f'{counted} animations started by {len(anim_steps)} reduced renders')
     except (KeyError, ValueError, StopIteration, TypeError, IndexError) as error:
         failures.append(f'reduced-motion data: {error!r}')
     checks.add('reduced_motion', not failures, 'reducedMotion true: no translate in any capture (content, track, '
-                                               'volume, idle row); content fade 220 ms; stagger kept', failures, notes=notes)
+                                               'volume, idle row); content fade 160 ms (r4 section 7); stagger kept; '
+                                               'every started animation <= 160 ms without delay (M10, M11, cover '
+                                               'fade exempt)',
+               failures, notes=notes)
+
+    # r4 moments (design_handoff_nano_d_r4 README 3.2, MOTION.md) ------------------------------------------
+    failures, notes = [], []
+
+    def r4_checks(tid, reduced):
+        tl = timelines[tid]
+        steps = {s['label']: (k, s) for k, s in enumerate(tl['steps'], start=1)}
+
+        def cap(label, off):
+            k = steps[label][0]
+            return next(c for c in tl['captures'] if c['step'] == k and c['offset'] == off)['layout']
+
+        def objs(label, off, role):
+            return [o for o in cap(label, off) if o['role'] == role]
+
+        def val(label, off, role, key='opa', ordinal=0):
+            o = objs(label, off, role)
+            return o[ordinal][key] if len(o) > ordinal else None
+
+        def rend(label):
+            return steps[label][1]['render']
+
+        def expect(cond, message):
+            if not cond:
+                failures.append(f'{tid}: {message}')
+
+        if reduced:
+            # Section 7: every moment a 160 ms opacity crossfade; nothing translates or scales.
+            for label, (k, st) in steps.items():
+                r = st['render']
+                expect(r['glides'] == 0 and r['pops'] == 0 and r['morphs'] == 0 and r['wall_bounces'] == 0 and r['presses'] == 0,
+                       f'{label}: no glide / pop / morph / bounce / squash under reduced motion: {r}')
+                for c in [c for c in tl['captures'] if c['step'] == k]:
+                    for o in c['layout']:
+                        if o['hidden'] or eff(o) == 0:
+                            continue
+                        if o['role'] in ('content', 'track', 'volume', 'list', 'idle.item', 'status', 'list.meta') and (o['tx'] or o['ty']):
+                            failures.append(f'{tid} {label} +{c["offset"]}: {o["role"]} translated {o["tx"]},{o["ty"]}')
+                        if o.get('type') == 'image' and o['role'] in ('footer.icon', 'idle.icon') and \
+                                (o.get('scale_x', 256) != 256 or o.get('scale_y', 256) != 256):
+                            failures.append(f'{tid} {label} +{c["offset"]}: {o["role"]} scaled {o["scale_x"]}x{o["scale_y"]}')
+            vals = [val('M1-M15-push-recent', off, 'content') for off in (0, 60, 160)]
+            expect(vals[0] == 0 and 0 < vals[1] < 255 and vals[2] == 255, f'M1 reduced: a 160 ms fade {vals}')
+            fill = [val('M7-M10-hold-4-down', off, 'footer.holdfill') for off in (0, 500, 1000)]
+            expect(fill[0] == 0 and 0 < fill[1] < 255 and fill[2] == 255, f'M10 reduced: the fill fades in over the hold {fill}')
+            notes.append(f'{tid}: M1 content opacity +0/+60/+160 {vals}; M10 fill opacity +0/+500/+1000 {fill}')
+            return
+        # M1 + M15: 28 px, SPRING.snap (settled by +420), fade 240 ms; the crumb crossfades with it.
+        r = rend('M1-M15-push-recent')
+        tx = [val('M1-M15-push-recent', off, 'content', 'tx') for off in (0, 60, 420)]
+        op = [val('M1-M15-push-recent', off, 'content') for off in (0, 110, 240)]
+        expect(r['last_slide'] == M1_PX and tx[0] == M1_PX and 0 < tx[1] < M1_PX and tx[2] == 0
+               and op[0] == 0 and 0 < op[1] < 255 and op[2] == 255, f'M1 push: tx {tx}, opa {op}, {r["last_slide"]}')
+        crumbs = [[o['opa'] for o in objs('M1-M15-push-recent', off, 'crumb.current')] for off in (0, 110, 240)]
+        expect(sorted(crumbs[0]) == [0, 255] and all(0 < v < 255 for v in crumbs[1]) and sorted(crumbs[2]) == [0, 255],
+               f'M15 crumb crossfade (outgoing, incoming) +0/+110/+240: {crumbs}')
+        notes.append(f'M1 tx +0/+60/+420 {tx}, opa +0/+110/+240 {op}; M15 crumb {crumbs}')
+        expect(rend('M1-M15-back-to-music')['last_slide'] == -M1_PX, 'M1 back: -28')
+        # M2 / M3 on the r4 frames: the big value from 14 px below.
+        expect(val('M2-reveal', 0, 'volume', 'ty') == 14 and val('M2-reveal', 460, 'volume', 'ty') == 0,
+               f'M2: volume ty +0 {val("M2-reveal", 0, "volume", "ty")} +460 {val("M2-reveal", 460, "volume", "ty")}')
+        # M4: each detent jumps the rows 14 px in the turn direction and springs back; a fast spin re-jumps.
+        for label, d in (('M4-detent', 14), ('M4-fast-1', 14), ('M4-fast-2', 14), ('M4-back', -14)):
+            g = [val(label, off, 'list', 'ty') for off in (0, 60)]
+            expect(rend(label)['glides'] == 1 and g[0] == d and abs(g[1]) < abs(d), f'M4 {label}: ty +0/+60 {g}')
+        expect(val('M4-back', 420, 'list', 'ty') == 0, 'M4: settled by +420')
+        expect(val('M4-detent', 0, 'list.title', 'text') == 'Kill for Love', 'M4: the labels already show the new item')
+        # M5: the song's text rises 14 px into place.
+        g = [val('M5-track-change', off, 'track', 'ty') for off in (0, 60, 420)]
+        expect(rend('M5-track-change')['track_changes'] == 1 and g[0] == 14 and 0 <= g[1] < 14 and g[2] == 0, f'M5: ty {g}')
+        # M6 + M8 + M9 on Pause: the status rises 10 px and fades in (240 ms); the Play / Pause icon pops and morphs.
+        r = rend('M8-M9-M6-pause')
+        st = [val('M8-M9-M6-pause', off, 'status', key) for off, key in ((0, 'ty'), (0, 'opa'), (240, 'opa'), (640, 'ty'))]
+        expect(st[0] == 10 and st[1] == 0 and st[2] == 255 and st[3] == 0, f'M6 status: ty +0 {st[0]}, opa +0/+240 {st[1:3]}, ty +640 {st[3]}')
+        sc = [val('M8-M9-M6-pause', off, 'footer.icon', 'scale_x') for off in (0, 640)]
+        expect(r['pops'] >= 1 and sc[0] == 328 and sc[1] == 256, f'M8 pop on Pause: {r["pops"]}, scale +0/+640 {sc}')
+        icons = [val('M8-M9-M6-pause', off, 'footer.icon', 'icon') for off in (0, 100, 640)]
+        expect(r['morphs'] == 1 and str(icons[1]).startswith('morph') and icons[2] == 'play@20',
+               f'M9 morph: {r["morphs"]}, icons +0/+100/+640 {icons}')
+        leave = [val('M8-M9-play', off, 'status') for off in (0, 100, 300)]
+        expect(rend('M8-M9-play')['morphs'] == 1 and leave[0] > leave[1] > leave[2] == 0,
+               f'M6 leave: the status fades out with its words {leave}')
+        # M7 + M10: squash on the press; the fill grows bottom-up over 1 s on the dimmed icon; the landing pops.
+        r = rend('M7-M10-hold-4-down')
+        sq = [val('M7-M10-hold-4-down', 70, 'footer.icon', key, ordinal=3) for key in ('scale_x', 'scale_y', 'ty')]
+        h = [(lambda o: o['y2'] - o['y1'] + 1 if o and not o['hidden'] else 0)(
+            (objs('M7-M10-hold-4-down', off, 'footer.holdfill') or [None])[0]) for off in (0, 500, 1000)]
+        base_ink = val('M7-M10-hold-4-down', 500, 'footer.icon', 'recolor', ordinal=3)
+        expect(r['presses'] == 1 and r['hold_fills'] == 1 and sq == [205, 220, 2], f'M7 squash {sq}, {r}')
+        expect(h[0] <= 1 and 8 <= h[1] <= 12 and h[2] == 20 and base_ink == '#6A6A6A', f'M10 fill heights {h}, base ink {base_ink}')
+        r = rend('M8-landing-queued')
+        pop = [val('M8-landing-queued', off, 'footer.icon', 'scale_x', ordinal=3) for off in (0, 640)]
+        expect(r['landings'] == 1 and pop == [328, 256], f'M8 landing: {r["landings"]}, scale +0/+640 {pop}')
+        sq = [val('M7-press-2', 70, 'footer.icon', key, ordinal=1) for key in ('scale_x', 'scale_y', 'ty')]
+        back = [val('M7-release-2', 640, 'footer.icon', key, ordinal=1) for key in ('scale_x', 'scale_y', 'ty')]
+        expect(sq == [205, 220, 2] and back == [256, 256, 0], f'M7 press {sq}, release +640 {back}')
+        drain = [(lambda o: o['y2'] - o['y1'] + 1 if o and not o['hidden'] else 0)(
+            (objs('M10-early-release-up', off, 'footer.holdfill') or [None])[0]) for off in (0, 300)]
+        expect(drain[0] > 0 and drain[1] == 0, f'M10 early release drains in 180 ms: {drain}')
+        # M13: 9 px towards the wall in 90 ms E.out, SPRING.wall back (overshoot), a new push retargets.
+        w = [val('M13-wall-start', off, 'content', 'ty') for off in (0, 90, 250, 650)]
+        expect(rend('M13-wall-start')['wall_bounces'] == 1 and w[1] == 9 and w[2] < 0 and w[3] == 0,
+               f'M13 past the start: ty +0/+90/+250/+650 {w}')
+        w2 = [val('M13-wall-end', off, 'content', 'ty') for off in (0, 90)]
+        w3 = [val('M13-wall-again', off, 'content', 'ty') for off in (0, 90)]
+        expect(w2[1] == -9 and w3[1] == -9, f'M13 past the end {w2}, again (retarget) {w3}')
+        notes.append(f'M13 ty +0/+90/+250/+650 {w}; M10 fill {h}; M4 back {val("M4-back", 0, "list", "ty")}')
+        # HN-DES-002: one wall bounce on every other bounded layout, 9 px towards the wall, settled by +650.
+        bounded = []
+        for label, d in (('M13-wall-volume-100', -9), ('M13-wall-volume-0', 9), ('M13-wall-windows-last', -9),
+                         ('M13-wall-scenes-first', 9), ('M13-wall-seek-0', 9), ('M13-wall-up-next-last', -9)):
+            b = [val(label, off, 'content', 'ty') for off in (0, 90, 650)]
+            bounded.append(f'{label[9:]} {b}')
+            expect(rend(label)['wall_bounces'] == 1 and b[0] == 0 and b[1] == d and b[2] == 0,
+                   f'M13 {label}: {rend(label)["wall_bounces"]} bounce(s), ty +0/+90/+650 {b} (want 0/{d}/0)')
+        notes.append('M13 bounded layouts ty +0/+90/+650: ' + '; '.join(bounded))
+
+    try:
+        r4_checks('r4-moments', False)
+        r4_checks('r4-reduced', True)
+        tour = timelines['r4-tour']
+        notes.append(f'r4-tour: {len(tour["steps"])} steps, {len(tour["captures"])} captures')
+        # HN-DES-002: the tour's wall past 100 % bounces a settled 100 % frame (not the 66 % turn before it).
+        tsteps = {s_['label'].split(' ')[0]: k for k, s_ in enumerate(tour['steps'], start=1)}
+
+        def tour_val(key, off, role, field):
+            c = next(c for c in tour['captures'] if c['step'] == tsteps[key] and c['offset'] == off)
+            return next((o[field] for o in c['layout'] if o['role'] == role and not o['hidden']), None)
+        wall_row = tour['steps'][tsteps['21.8'] - 1]
+        before = [tour_val('21.3', off, key_role, field) for off, key_role, field in
+                  ((420, 'volume.digits', 'text'), (420, 'content', 'ty'))]
+        past = [tour_val('21.8', off, key_role, field) for off, key_role, field in
+                ((0, 'volume.digits', 'text'), (60, 'content', 'ty'), (420, 'content', 'ty'))]
+        if not (tsteps['21.3'] < tsteps['21.8'] and before == ['100', 0] and wall_row['render']['wall_bounces'] == 1
+                and past == ['100', -9, 0]):
+            failures.append(f'r4-tour 21.8 Past 100 %: 21.3 digits / ty +420 {before}, 21.8 bounces '
+                            f'{wall_row["render"]["wall_bounces"]}, digits +0 / ty +60 / ty +420 {past} '
+                            f'(want 100 / 0, 1, 100 / -9 / 0)')
+        notes.append(f'r4-tour 21.8: 100 % frame {before}, wall {past}')
+    except (KeyError, ValueError, StopIteration, TypeError, IndexError) as error:
+        failures.append(f'r4 data: {error!r}')
+    # FW-DES-004: Recently Added's source toggle (button 3) keeps the screen; only the crumb crossfades.
+    try:
+        tl = timelines['r4-source-toggle']
+        for k, s_ in enumerate(tl['steps'], start=1):
+            if not s_['expect'].get('sourceToggle'):
+                continue
+            r = s_['render']
+            if r['screen_change'] or r['last_slide'] != 0 or r['slides'] or r['glides']:
+                failures.append(f'r4-source-toggle {s_["label"]}: screen change {r["screen_change"]}, slide '
+                                f'{r["last_slide"]}, slides {r["slides"]}, glides {r["glides"]} (want none)')
+            caps = [c for c in tl['captures'] if c['step'] == k]
+            crossfade = False
+            for c in caps:
+                for o in c['layout']:
+                    if o['role'] == 'content' and (o['tx'] or o['ty']):
+                        failures.append(f'r4-source-toggle {s_["label"]} +{c["offset"]}: content translated '
+                                        f'{o["tx"]},{o["ty"]}')
+                cur = [o for o in c['layout'] if o['role'] == 'crumb.current' and visible(o)]
+                if len(cur) == 2 and all(0 < o['opa_eff'] < 255 for o in cur):
+                    crossfade = True
+            last = max(caps, key=lambda c: c['offset'])
+            settled = [o for o in last['layout'] if o['role'] == 'crumb.current' and visible(o)]
+            if not crossfade or len(settled) != 1 or settled[0]['opa_eff'] != 255:
+                failures.append(f'r4-source-toggle {s_["label"]}: crumb crossfade {crossfade}, settled '
+                                f'{[(o["x1"], o["opa_eff"]) for o in settled]}')
+        notes.append('r4-source-toggle: recent -> playlists -> recent without a screen change; crumb crossfade')
+    except (KeyError, ValueError, TypeError, IndexError) as error:
+        failures.append(f'r4-source-toggle data: {error!r}')
+    checks.add('r4_moments', not failures, 'r4 moments (README 3.2): M1 28 px SPRING.snap + fade 240, M15 crumb crossfade, '
+                                           'M2, M4 list glide (retargets), M5, M6 rise / leave, M7 squash, M8 pops, M9 '
+                                           'morph, M10 hold fill + landing / drain, M13 wall stretch; reduced motion: '
+                                           'opacity only', failures, notes=notes)
 
     # twins ---------------------------------------------------------------------------------------------
     failures, twinned = [], set()
@@ -1134,18 +1541,22 @@ def main(argv) -> int:
                 failures.append(f'{c["id"]}: unexpected twin {role}')
                 continue
             for tw, lb in zip(objs, by.get(label_role, [])):
+                # Render speed (r4): a twin may be hidden while no cover is drawn (black over black draws nothing);
+                # it is never shown without its label.
+                vis_ok = tw['hidden'] == lb['hidden'] or (tw['hidden'] and not art_drawn(layout))
                 if tw['color'] != '#000000' or tw['text_opa'] != 204 or tw['x1'] != lb['x1'] or tw['y1'] != lb['y1'] + 1 \
-                        or tw['text'] != lb['text'] or tw['hidden'] != lb['hidden'] or tw['letter_space'] != lb['letter_space']:
+                        or tw['text'] != lb['text'] or not vis_ok or tw['letter_space'] != lb['letter_space']:
                     failures.append(f'{c["id"]} {role}: {tw["color"]} opa {tw["text_opa"]} at {tw["x1"]},{tw["y1"]} '
                                     f'{tw["text"]!r} vs label {lb["x1"]},{lb["y1"]} {lb["text"]!r}')
         for role in TWIN_ROLES:
             for lb in by.get(role, []):
-                if visible(lb) and lb['text'] and not any(visible(t) for t in by.get(role + '.twin', [])):
+                if visible(lb) and lb['text'] and art_drawn(layout) and not any(visible(t) for t in by.get(role + '.twin', [])):
                     failures.append(f'{c["id"]}: {role} {lb["text"]!r} has no visible twin')
     missing_twins = sorted(set(TWIN_ROLES) - twinned)
     checks.add('twins', not failures and not missing_twins and index.get('text_twins') == 1,
-               f'exactly the twelve twins ({", ".join(TWIN_ROLES)}): black, text_opa 204, +1 px, same text and '
-               f'visibility; none elsewhere', failures + [f'twin {m} never drawn' for m in missing_twins])
+               f'exactly the thirteen twins (presentation 6: + scenes.title) ({", ".join(TWIN_ROLES)}): black, text_opa 204, +1 px, same text and '
+               f'visibility while a cover is drawn (hidden over black: r4 render speed); none elsewhere',
+               failures + [f'twin {m} never drawn' for m in missing_twins])
 
     # twin fade --------------------------------------------------------------------------------------------
     # Every in-box pixel is classified: the fading layer's label ink over the cover (through the
@@ -1351,7 +1762,7 @@ def main(argv) -> int:
         cap0 = base.find_capture(tl, 'lease-expired', 0)
         cap300 = base.find_capture(tl, 'lease-expired', 300)
         notes.append(f'pins at +0 {cap0["media"]}, at +300 {cap300["media"]}')
-        expect(cap0['media'].get('cover') == 'a2-den' and cap300['media'] == {'cover': None, 'icon': None},
+        expect(cap0['media'].get('cover') == 'a2-hall' and cap300['media'] == {'cover': None, 'icon': None},
                f'offline: the display pins are released after the cover fade ({cap0["media"]} -> {cap300["media"]})')
         subs = [(v('native-input', off, 'offline.subtitle'), first(base.find_capture(tl, 'native-input', off)['layout'],
                                                                      'offline.subtitle')['text']) for off in (0, 80, 160)]
@@ -1376,6 +1787,93 @@ def main(argv) -> int:
                f'lines, Open Desk Dial / on your PC, the name never split) / Knob controls still work (1 line at -1 px tracking, K1 8.10 and R-c), no heading, footer or cover; entry 220/160/240, '
                f'native swap 160 (a native tap between two passes, through cc_offline_input_update), next claim '
                f'220/240/280+140, no slide, no native frame', failures, notes=notes)
+
+    # native_pc_volume (FW-DES-007) -------------------------------------------------------------------------------
+    failures, notes = [], []
+    native = {c['id']: c for c in cases if c['kind'] == 'native'}
+    want_ticks = {'native-pc-volume': '', 'native-pc-volume-up': '+', 'native-pc-volume-down': '-'}
+    for cid, tick in want_ticks.items():
+        c = native.get(cid)
+        if not c:
+            failures.append(f'{cid}: not rendered')
+            continue
+        layout = c['render']['layout']
+        title, tick_o = first(layout, 'pcvol.title'), first(layout, 'pcvol.tick')
+        for role in ('native.number', 'native.arc', 'native.profile.name', 'native.profile.desc'):
+            if not first(layout, role):
+                failures.append(f'{cid}: {role} missing from the stand-in (the real flex column holds it)')
+        for role in ('native.number', 'native.arc'):
+            if visible(first(layout, role) or {'hidden': False, 'opa_eff': 255}):
+                failures.append(f'{cid}: {role} drawn in offline PC volume mode')
+        if not title or not visible(title) or [l['text'] for l in title['lines']] != ['PC volume']:
+            failures.append(f'{cid}: title {title and title["text"]!r} (want a visible "PC volume")')
+        # The tick is two bars (no glyph, so no font is linked in for it): the horizontal bar alone is '-', with
+        # the vertical bar it is '+'.
+        bar_h, bar_v = first(layout, 'pcvol.tick.h'), first(layout, 'pcvol.tick.v')
+        drawn_tick = ''
+        if tick_o and visible(tick_o) and bar_h and visible(bar_h):
+            drawn_tick = '+' if bar_v and visible(bar_v) else '-'
+        if drawn_tick != tick:
+            failures.append(f'{cid}: tick {drawn_tick!r} (want {tick!r})')
+        data = load_rgb(out / c['render']['file'])
+        if tick:
+            # The bars are drawn: '+' and '-' both ink the centre of their box.
+            box = [(x, y) for y in range(tick_o['y1'], tick_o['y2'] + 1) for x in range(tick_o['x1'], tick_o['x2'] + 1)
+                   if 0 <= x < 240 and 0 <= y < 240 and base.ink_at(data, x, y) > INK]
+            cx = (min(x for x, _ in box) + max(x for x, _ in box)) // 2 if box else 0
+            cy = (min(y for _, y in box) + max(y for _, y in box)) // 2 if box else 0
+            if not box or base.ink_at(data, cx, cy) <= INK:
+                failures.append(f'{cid}: tick {tick!r} has no ink at the centre of its ink box (a missing glyph)')
+        digits = [o['text'] for o in labels_of(layout) if visible(o) and re.search(r'[0-9]', o['text'])]
+        if digits:
+            failures.append(f'{cid}: a number is drawn: {digits}')
+        ring = [(x, y) for y in range(240) for x in range(240) if math.hypot(x + 0.5 - 120, y + 0.5 - 120) > 100
+                and base.ink_at(data, x, y) > INK]
+        if ring:
+            failures.append(f'{cid}: {len(ring)} ink px beyond r100 (the half arc is drawn), e.g. {ring[:3]}')
+        ink = [(x, y) for y in range(240) for x in range(240) if base.ink_at(data, x, y) > INK]
+        if ink:
+            notes.append(f'{cid}: ink rows {min(y for _, y in ink)}..{max(y for _, y in ink)}, '
+                         f'x {min(x for x, _ in ink)}..{max(x for x, _ in ink)}')
+    t = (native.get('native-pc-volume') or {}).get('transitions', {})
+    want = {'before_number_drawn': True, 'before_arc_drawn': True, 'before_shown': False, 'entry_ticked': False,
+            'tick_up_at_140_ms': True, 'tick_up_at_440_ms': False, 'tick_down_at_440_ms': False,
+            'exit_number_drawn': True, 'exit_arc_drawn': True, 'exit_view_drawn': False, 'exit_shown': False,
+            'released_on_delete': True, 'before_profile_drawn': True, 'mode_profile_drawn': False,
+            'mode_profile_hidden_flag': False, 'exit_profile_drawn': True}
+    for key, value in want.items():
+        if t.get(key) is not value:
+            failures.append(f'transition {key} = {t.get(key)!r} (want {value!r})')
+    # The stand-in screen is held out of the CC display heap peak; the firmware view's own share is bounded here,
+    # and deleting the screen gives the heap back (the view leaks nothing).
+    if not isinstance(t.get('heap_view_bytes'), int) or t['heap_view_bytes'] > 2048:
+        failures.append(f'PC volume view heap {t.get("heap_view_bytes")!r} B (want <= 2048)')
+    if isinstance(t.get('heap_after_delete'), int) and isinstance(t.get('heap_entry'), int)             and t['heap_after_delete'] > t['heap_entry'] + 64:
+        # 64 B slack: the host screen's own timers run during the 1.1 s of fake time (a view leak is ~900 B).
+        failures.append(f'heap after delete {t["heap_after_delete"]} B > at entry {t["heap_entry"]} B + 64 (a leak)')
+    notes.append(f'stand-in heap: entry {t.get("heap_entry")} B, peak {t.get("heap_peak")} B, '
+                 f'view {t.get("heap_view_bytes")} B, after delete {t.get("heap_after_delete")} B')
+    # The box floats out of the flex column: 200x80, centred on the 240x240 screen (not stacked under the labels).
+    box = tuple(t.get(k) for k in ('box_x1', 'box_y1', 'box_x2', 'box_y2'))
+    if box != (20, 80, 219, 159):
+        failures.append(f'PC volume box at {box} (want (20, 80, 219, 159): 200x80 centred, out of the flex flow)')
+    fw = ROOT.parent / 'firmware' / 'src'
+    ui_value = source_code((fw / 'screens' / 'ui_valueScreen.c').read_text(encoding='utf-8', errors='replace'))
+    hmi = source_code((fw / 'hmi_thread.cpp').read_text(encoding='utf-8', errors='replace'))
+    if 'cc_native_pc_volume_attach(ui_dataScreen, ui_posIndicator, ui_Arc1, hmi_pc_volume_source);' not in ui_value:
+        failures.append('ui_valueScreen.c does not bind the PC volume view to ui_dataScreen / ui_posIndicator / ui_Arc1')
+    if not re.search(r'extern "C" bool hmi_pc_volume_source\(int32_t\* steps\) \{ \*steps = cc_offline_steps\(\); '
+                     r'return cc_offline_wanted\(\); \}', hmi):
+        failures.append('hmi_thread.cpp hmi_pc_volume_source() is not the offline mode word and the FOC step count')
+    display = source_code((fw / 'cc_display.cpp').read_text(encoding='utf-8', errors='replace'))
+    if re.search(r'lv_font_montserrat_\d+', display):
+        # A built-in LVGL font referenced here is linked in whole (~46 KB for Montserrat 32): the tick is drawn bars.
+        failures.append('cc_display.cpp references a built-in lv_font_montserrat_* font (draw the tick, do not link a font)')
+    checks.add('native_pc_volume', not failures,
+               f'[FW-DES-007] {len(native)} native value-screen renders in offline PC volume mode: a fixed "PC volume", '
+               f'no number, no half arc (no ink beyond r100); a + / - tick on each step, gone 300 ms after it; '
+               f'number and arc back when the mode ends; ui_valueScreen.c binds the view to hmi_pc_volume_source',
+               failures, notes=notes)
 
     # copy ------------------------------------------------------------------------------------------------------
     failures, reported, rows_ = [], [], []
@@ -1482,6 +1980,14 @@ def main(argv) -> int:
                             f'{perfect["anim_timer_runs"]} animation-timer runs ({len(animated)} animated steps)')
         if stall['late'] < 1 or stall['max_gap_ms'] < stall['stall_ms']:
             failures.append(f'a {stall["stall_ms"]} ms stall was not counted: {stall}')
+        app, control = cad['app_session'], cad['app_session_control']
+        if not app['listed_at_entry'] or app['late'] != app['late_before']                 or app['max_gap_ms'] > 2 * perfect['period_ms']:
+            failures.append(f'FW-BUG-044: {app["passes"]} paused passes (app canvas) counted as late: {app}')
+        if not control['listed_at_entry'] or control['late'] <= control['late_before']                 or control['max_gap_ms'] < control['passes']:
+            failures.append(f'FW-BUG-044 control: the unpaused poll did not show the session-long gap: {control}')
+        notes.append(f'FW-BUG-044 app session ({app["passes"]} paused passes): late {app["late_before"]} -> '
+                     f'{app["late"]}, worst {app["max_gap_ms"]} ms (control without the pause: late '
+                     f'{control["late_before"]} -> {control["late"]}, worst {control["max_gap_ms"]} ms)')
         for o in cad['offline_input']:
             if o['native'] != o['want']:
                 failures.append(f'cc_offline_input_update "{o["name"]}": native {o["native"]} (want {o["want"]})')
@@ -1722,6 +2228,11 @@ def art_decode_wiring_failures(source):
     return failures
 
 
+def source_code(text):
+    """C/C++ source without comments, whitespace collapsed (FW-DES-007 wiring pins)."""
+    return re.sub(r'\s+', ' ', re.sub(r'//[^\n]*|/\*.*?\*/', ' ', text, flags=re.S))
+
+
 def art_decode_wiring():
     """art_decode_wiring_failures over the real src/cc_art_decode.cpp, after a self-test on the phase-2a
     (run-to-end) form, which must be refused."""
@@ -1772,6 +2283,7 @@ MIRROR_ROLES = {
     'volume.caption': 'caption', 'volume.digits': 'digits', 'volume.percent': 'percent', 'idle.word': 'idle-word',
     'list.meta': 'meta', 'tracks.meta': 'meta', 'windows.meta': 'meta', 'windows.letter': 'tile-initial',
     'seek.caption': 'caption', 'seek.time': 'seek-time', 'seek.line': 'line',
+    'scenes.prev': 'prev', 'scenes.title': 'title', 'scenes.next': 'next', 'scenes.meta': 'meta',   # presentation 6
 }
 
 
@@ -1824,7 +2336,7 @@ def mirror_parity(checks, index, wire):
 
 def contact_sheet(out: Path, index):
     font = ImageFont.load_default()
-    cases = [c for c in index['cases'] if c['kind'] in ('frame', 'offline')]
+    cases = [c for c in index['cases'] if c['kind'] in ('frame', 'offline', 'native')]   # native: FW-DES-007
     size, gap, label, columns = 240, 10, 16, 12
     rows = (len(cases) + columns - 1) // columns
     image = Image.new('RGB', (columns * (size + gap) + gap, 30 + rows * (size + label + gap) + gap), (28, 30, 32))

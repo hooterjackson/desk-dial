@@ -26,7 +26,7 @@ Checks (contract v4 section 6, Knob Face.dc.html, plan "Decided defaults"):
   windows_meta     Windows title line 2 ink ends above the meta ink
   status_home_only list/tracks/windows layouts draw meta, never the status line
   art_rules        art shown only where the contract allows it; artDim -> image_opa 112
-  heap             peak LVGL heap <= 50 % of 64 KB (fragmentation reported)
+  heap             peak LVGL heap <= 50 % of LV_MEM_SIZE (80 KB) (fragmentation reported)
   heartbeat        an identical frame starts no animation, sets no text, needs no redraw
   slides           slide direction per step: none on external volume / Tracks re-centre,
                    deeper screens from the right (+20), back from the left (-20)
@@ -782,8 +782,8 @@ TJPGD_SHIM = ROOT / 'tjpgd_shim'
 # Timeline captures whose cover pixels must be exact: (timeline, step label, offset, cover key,
 # the artwork2 case with the same text, whose art-less twin gives the art-only pixels).
 EXACT_CAPTURES = (
-    ('a2-swap', 'back-to-a', 0, 'a2-swap-a', 'a2-recent-den-dim'),           # back-buffer reuse (dim)
-    ('a2-decode-fail', 'other-key', 0, 'a2-den', 'a2-np-den'),               # after a failed decode
+    ('a2-swap', 'back-to-a', 0, 'a2-swap-a', 'a2-recent-hall-dim'),           # back-buffer reuse (dim)
+    ('a2-decode-fail', 'other-key', 0, 'a2-hall', 'a2-np-hall'),               # after a failed decode
     ('a2-slide-decode', 'slide-decode', 380, 'a2-slide', 'a2-recent-bright'),  # decoded during a slide
 )
 
@@ -1131,7 +1131,7 @@ def artwork2_checks(checks, out, index, frames, timelines):
                f'heartbeat timeline: on Windows the cover pin is released and the icon pinned: {media}')
         # Prefetch commits of other keys re-render the same frame (lcd_thread follows cc_media_version()):
         # inert (a2_heartbeat's rules, expect "identical") and the pins stay on the frame's keys.
-        for label, want in (('unrelated-commit-home', {'cover': 'a2-den', 'icon': None}),
+        for label, want in (('unrelated-commit-home', {'cover': 'a2-hall', 'icon': None}),
                             ('unrelated-commit-windows', {'cover': None, 'icon': 'ic-code'})):
             s = step('a2-heartbeat', label)
             expect(bool(s.get('commits')) and s['expect'].get('identical') and s['render'].get('media') == want,
@@ -1176,9 +1176,9 @@ def artwork2_checks(checks, out, index, frames, timelines):
 
 # Native handback steps (main.cpp): label -> (cover pin, icon pin, art drawn, icon drawn).
 HANDBACK_EXPECT = {
-    'host-cover': ('a2-den', None, True, False),
+    'host-cover': ('a2-hall', None, True, False),
     'handback-cover': (None, None, None, None),
-    'return-cover': ('a2-den', None, True, False),
+    'return-cover': ('a2-hall', None, True, False),
     'host-icon': (None, 'ic-code', False, True),
     'handback-icon': (None, None, None, None),
     'return-evicted': (None, None, True, False),

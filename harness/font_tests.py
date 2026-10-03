@@ -134,7 +134,7 @@ WARN_FLAGS = ['-Wall', '-Wextra', '-Wpedantic']
 SAMPLE_RUNS = ['Living Room', 'Volume', 'AVATAR', 'Tokyo Drift', "It's All Right", 'Recently Added',
                '0123456789', '100%']
 # Mixed ASCII + Latin-Ext-A runs for the hybrid fonts (fixture copy included).
-MIXED_RUNS = ['Tropicália ou Panis et Circencis', 'Björk — Homogénic', 'Łódź · Kraków', 'Doesn’t play…',
+MIXED_RUNS = ['Copper Sun Sessions', 'Linnéa Holm — Homogénic', 'Łódź · Kraków', 'Doesn’t play…',
               'RECENTLY ADDED · P2', 'Zoë Café', 'Dvořák: Symphony 9']
 # cc_font_48t: the Seek time (PRESENTATION_V5 sections 8.5.1, 8.6.8, 10).
 SEEK_TRACKING = -1             # label letter space, px
@@ -143,11 +143,14 @@ SEEK_SAMPLES = {3: ['0:00', '1:14', '4:47', '9:59'], 4: ['10:00', '47:11', '59:5
 
 # Icons: PRESENTATION_V5 section 9.1 (token -> firmware mask sizes), CCIcon order, mask bytes.
 ICON_ENUM = ('play', 'pause', 'list', 'win', 'tracks', 'back', 'home', 'more', 'prev', 'next', 'switch', 'cancel',
-             'expand', 'clock', 'playlists', 'playnext', 'seek', 'shuffle', 'heart', 'snapleft', 'snapright')
-ICON_SIZES = {**{token: (20,) for token in ICON_ENUM}, 'play': (20, 26), 'pause': (20, 26), 'list': (20, 26),
+             'expand', 'clock', 'playlists', 'playnext', 'seek', 'shuffle', 'heart', 'snapleft', 'snapright',
+             # presentation 6 (PRESENTATION_V5.md section 19.5): the r3 prototype icons, bulb also at 26 px
+             'bulb', 'thermo', 'power', 'wand', 'house', 'album')
+ICON_SIZES = {**{token: (20,) for token in ICON_ENUM}, 'bulb': (20, 26), 'house': (20, 26), 'album': (20, 26), 'play': (20, 26), 'pause': (20, 26), 'list': (20, 26),
               'win': (20, 26), 'tracks': (20, 26), 'prev': (16, 20), 'next': (16, 20), 'dotfill': (16,),
               'heartfill': (20,)}                # [r2.2] internal: tone `liked` (P5-R29), the heart filled
-ICON_MASK_BYTES = 12948                          # 12,548 B (r2.1) + heartfill 20 x 20
+ICON_MASK_BYTES = 17376                          # 12,548 B (r2.1) + heartfill 400 + presentation 6 (6 x 400 + 676)
+#                                                  + r3.1 house / album 26 px (2 x 676)
 ICON_DESKTOP = ICON_ENUM + ('heartfill',)        # desktop copies at 16/20/26 and @2x/@3x (dotfill: 16 px only)
 ICON_ASSETS = gen.WORKSPACE / 'app' / 'assets'
 ICON_EXPORTER = ROOT / 'export_handoff_icons.cjs'
@@ -1186,6 +1189,11 @@ def test_msvc(report: Report, specs) -> dict:
 
 
 def main(argv=None) -> int:
+    # The report prints Latin Extended samples; a cp1252 console or a redirected stdout must not turn that into a
+    # UnicodeEncodeError that looks like a font failure.
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(encoding='utf-8', errors='backslashreplace')
     parser = argparse.ArgumentParser(description='Validate the generated cc_font_*.c files and cc_icons.cpp.')
     parser.add_argument('--json', type=Path, help='also write the full report as JSON')
     parser.add_argument('--no-toolchain', action='store_true', help='skip the ESP32-S3 compile checks')

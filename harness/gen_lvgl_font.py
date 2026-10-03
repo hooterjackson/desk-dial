@@ -7,7 +7,7 @@ FreeType binding and writes LVGL 9.0 ``lv_font_fmt_txt`` C sources:
     firmware/src/fonts/cc_font_14.c   hybrid text font, 4 bpp
     firmware/src/fonts/cc_font_16.c   hybrid text font, 4 bpp
     firmware/src/fonts/cc_font_22.c   hybrid text font, 4 bpp
-    firmware/src/fonts/cc_font_48.c   '0123456789%-' only, 4 bpp
+    firmware/src/fonts/cc_font_48.c   '0123456789%-K' only, 4 bpp (K: presentation 6)
     firmware/src/fonts/cc_font_48t.c  '0123456789:' tabular (Seek time), 4 bpp
     firmware/src/fonts/cc_fonts.h     extern "C" declarations
 
@@ -30,7 +30,7 @@ built-in is disabled in lv_conf.h. ``--with-ascii`` restores the previous
 standalone layout (ASCII baked in as well, fallback optional); it exists only
 for comparison and is not what the firmware ships.
 
-cc_font_48 stays digits-only ('0123456789%-'); its fallback is optional and is
+cc_font_48 stays digits-only ('0123456789%-', plus 'K' since presentation 6); its fallback is optional and is
 NULL while LV_FONT_MONTSERRAT_48 is 0 (the firmware setting).
 
 Format, matched to LVGL 9.0.0 ``src/font/lv_font_fmt_txt.c``:
@@ -123,7 +123,10 @@ ASCII_SET = tuple(range(0x20, 0x7F))
 NON_ASCII_SET = tuple(sorted(set(range(0xA0, 0x180)) | set(PUNCTUATION)))
 # The full advertised set (--with-ascii, the pre-hybrid standalone layout).
 TEXT_SET = tuple(sorted(set(ASCII_SET) | set(NON_ASCII_SET)))
-DIGIT_SET = tuple(sorted(ord(c) for c in '0123456789%-'))
+# Presentation 6 (PRESENTATION_V5.md section 19.2): 'K' joins the 48 px set for the lightsbig unit "K" (Colour
+# temperature 3200 K). The renderer draws the unit with the 22 px face like '%' (README r3 section 2.2), so this
+# glyph is the 48 px fallback of the unit, never mixed into the digits.
+DIGIT_SET = tuple(sorted(ord(c) for c in '0123456789%-K'))
 # cc_font_48t: the Seek time m:ss (PRESENTATION_V5 section 10). Digits from the .tf outlines.
 TABULAR_SET = tuple(range(0x30, 0x3B))                  # '0'..'9' and ':'
 TABULAR_GLYPHS = {0x30 + i: f'{name}.tf' for i, name in enumerate(

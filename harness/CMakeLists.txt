@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(nanod_lcd_preview LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 get_filename_component(FIRMWARE "${CMAKE_CURRENT_SOURCE_DIR}/../firmware" ABSOLUTE)
-get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 # Firmware sources compiled into the harness. Always the real src/ for evidence
 # (build.py passes -DNANOD_FIRMWARE_SRC and -DNANOD_TJPGD_SHIM explicitly, so an
 # earlier override cached in build/ cannot survive); overridable (in a separate
@@ -16,6 +16,9 @@ set(FRAMES "${COMPANION}/tests/fixtures/cc5_frames.json")
 # cc5.4 (PRESENTATION_V5.md section 15.3): the v5 fixture and the knob copy table.
 set(FRAMES_V5 "${COMPANION}/tests/fixtures/frames_v5.json")
 set(COPY_TABLE "${CMAKE_CURRENT_SOURCE_DIR}/cc54_copy.json")
+# Presentation 6 (Desk Dial r3 release 1): the parser fixture and the r3 knob screens (r3-handoff).
+set(FRAMES_V6 "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/frames_v6.json")
+set(R3_SCREENS "${CMAKE_CURRENT_SOURCE_DIR}/r3-handoff/r3_screens.json")
 # artwork2 fixtures (240 px JPEG covers, 32x32 RGB565 icons; make_art_fixtures.py --artwork2).
 set(ARTWORK2_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/artwork2")
 
@@ -24,7 +27,15 @@ set(ARTWORK2_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/artwork2")
 # Third-party headers are SYSTEM (MSVC /external:I) so /W4 applies to our code only.
 file(GLOB_RECURSE LVGL_SOURCES "${LVGL}/src/*.c")
 add_library(lvgl STATIC ${LVGL_SOURCES})
-target_include_directories(lvgl SYSTEM PUBLIC "${LVGL}" "${CMAKE_CURRENT_SOURCE_DIR}")
+# NANOD_LV_CONF_DIR: where lv_conf.h comes from (this directory: build.py's generated copy of the firmware
+# file). perf.py --conf points a separate build directory at an experimental copy (a candidate lv_conf.h change
+# measured before it is proposed for the firmware); evidence builds never set it.
+set(NANOD_LV_CONF_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Directory holding the lv_conf.h the harness compiles")
+target_include_directories(lvgl SYSTEM PUBLIC "${LVGL}" "${NANOD_LV_CONF_DIR}")
+if(NOT NANOD_LV_CONF_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  # Every unit must see the same file (MSVC finds a quoted "lv_conf.h" next to an includer first).
+  target_compile_definitions(lvgl PUBLIC "LV_CONF_PATH=${NANOD_LV_CONF_DIR}/lv_conf.h")
+endif()
 target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE _CRT_SECURE_NO_WARNINGS)
 if(MSVC)
   target_compile_options(lvgl PRIVATE /W0)
@@ -36,6 +47,8 @@ endif()
 add_library(firmware_shared OBJECT
   "${NANOD_FIRMWARE_SRC}/cc_display.cpp"
   "${NANOD_FIRMWARE_SRC}/cc_icons.cpp"
+  "${NANOD_FIRMWARE_SRC}/cc_icon_morph.cpp"
+  "${NANOD_FIRMWARE_SRC}/cc_crumbs.cpp"
   "${NANOD_FIRMWARE_SRC}/cc_frame_parse.cpp")
 set_target_properties(firmware_shared PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 target_include_directories(firmware_shared PUBLIC "${NANOD_FIRMWARE_SRC}")
@@ -60,6 +73,8 @@ target_sources(firmware_shared PRIVATE ${CC_FONTS})
 add_library(firmware_shared_full OBJECT
   "${NANOD_FIRMWARE_SRC}/cc_display.cpp"
   "${NANOD_FIRMWARE_SRC}/cc_icons.cpp"
+  "${NANOD_FIRMWARE_SRC}/cc_icon_morph.cpp"
+  "${NANOD_FIRMWARE_SRC}/cc_crumbs.cpp"
   "${NANOD_FIRMWARE_SRC}/cc_frame_parse.cpp" ${CC_FONTS})
 set_target_properties(firmware_shared_full PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 target_include_directories(firmware_shared_full PUBLIC "${NANOD_FIRMWARE_SRC}")
@@ -112,6 +127,7 @@ target_link_libraries(lcd-preview-full PRIVATE firmware_shared_full jpeg_glue lv
 foreach(target lcd-preview lcd-preview-full)
   target_compile_definitions(${target} PRIVATE NANOD_FIXTURE_DIR="${FIXTURES}" NANOD_FRAMES_JSON="${FRAMES}"
     NANOD_FRAMES_V5_JSON="${FRAMES_V5}" NANOD_COPY_JSON="${COPY_TABLE}"
+    NANOD_FRAMES_V6_JSON="${FRAMES_V6}" NANOD_R3_SCREENS_JSON="${R3_SCREENS}"
     NANOD_ARTWORK2_DIR="${ARTWORK2_FIXTURES}" NANOD_JPEG_GLUE="${NANOD_JPEG_GLUE}"
     NANOD_JPEG_FIRMWARE=${NANOD_JPEG_FIRMWARE}
     NANOD_FIRMWARE_SRC_DIR="${NANOD_FIRMWARE_SRC}" NANOD_TJPGD_SHIM_DIR="${TJPGD_SHIM}")
@@ -121,3 +137,25 @@ foreach(target lcd-preview lcd-preview-full)
   endif()
 endforeach()
 target_compile_definitions(lcd-preview-full PRIVATE CC_DISPLAY_FULL_LAYERS=1)
+
+# r4 render-speed profile (perf.cpp, run by perf.py): the same firmware units, no fixtures but the v1 covers.
+add_executable(lcd-perf perf.cpp)
+set_target_properties(lcd-perf PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+target_link_libraries(lcd-perf PRIVATE firmware_shared lvgl)
+target_compile_definitions(lcd-perf PRIVATE NANOD_FIXTURE_DIR="${FIXTURES}")
+if(MSVC)
+  target_compile_options(lcd-perf PRIVATE /EHsc /utf-8)
+endif()
+
+# Optimisation pinned on the profiled code (HN-PERF-001). build/'s CMakeCache was configured long ago with empty
+# CMAKE_<LANG>_FLAGS_RELEASE, so its "Release" compiled at MSVC's default /Od while a fresh build-perf-conf got
+# CMake's /O2 /Ob2 /DNDEBUG: a compiler gain was credited to an lv_conf.h change. Pinned per target, an empty
+# cache can no longer strip them; perf.py records the flags each target was built with and refuses /Od.
+if(MSVC)
+  foreach(target lvgl firmware_shared lcd-perf)
+    target_compile_options(${target} PRIVATE "$<$<CONFIG:Release>:/O2;/Ob2>")
+    target_compile_definitions(${target} PRIVATE "$<$<CONFIG:Release>:NDEBUG>")
+  endforeach()
+  # build/'s empty cache also links Release incrementally (jump thunks); a fresh cache does not.
+  target_link_options(lcd-perf PRIVATE "$<$<CONFIG:Release>:/INCREMENTAL:NO>")
+endif()

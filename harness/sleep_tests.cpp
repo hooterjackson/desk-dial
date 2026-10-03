@@ -6,7 +6,9 @@
 //      the cogging quiet window, the wake turn, the settle before enable, the settle cap, a button
 //      wake (no motion) enabling at once, and a sleep racing a turn;
 //   3. the button swallow bookkeeping (press + long press + release of the waking press only);
-//   4. the backlight clamp.
+//   4. the backlight clamp;
+//   5. the LCD gate while asleep (FW-BUG-016): pause once on sleep, nothing refreshed while dark, the
+//      backlight held at 0 through the wake pass until the wake refresh has run.
 #include "cc_sleep.h"
 
 #include <cstdio>
@@ -278,6 +280,43 @@ void backlight_tests() {
     EXPECT(std::strcmp(cc_sleep_state_name(CC_SLEEP_DIM), "dim") == 0);
     EXPECT(std::strcmp(cc_sleep_state_name(CC_SLEEP_ASLEEP), "asleep") == 0);
 }
+void lcd_gate_tests() {
+    CCSleepLcdGate g;
+    EXPECT(!g.dark());
+    EXPECT(g.step(CC_SLEEP_AWAKE) == CC_SLEEP_LCD_KEEP);
+    EXPECT(g.step(CC_SLEEP_DIM) == CC_SLEEP_LCD_KEEP);            // dim still draws (backlight clamped)
+    EXPECT(!g.dark());
+    EXPECT(g.backlightState(CC_SLEEP_DIM) == CC_SLEEP_DIM);
+    // Falling asleep: one PAUSE, then dark for every pass (host frames animating: no refresh at all).
+    EXPECT(g.step(CC_SLEEP_ASLEEP) == CC_SLEEP_LCD_PAUSE);
+    EXPECT(g.dark());
+    int refreshes = 0;
+    for (int pass = 0; pass < 10000; ++pass) {               // ~10 s of 1 ms passes
+        EXPECT(g.step(CC_SLEEP_ASLEEP) == CC_SLEEP_LCD_KEEP);
+        if (!g.dark()) ++refreshes;                          // lcd_refr_now() would draw
+    }
+    EXPECT(refreshes == 0);
+    EXPECT(cc_sleep_duty(g.backlightState(CC_SLEEP_ASLEEP), 3200) == 0);
+    // The wake: RESUME, still dark (render the latest frame, no partial refresh, backlight 0) ...
+    EXPECT(g.step(CC_SLEEP_AWAKE) == CC_SLEEP_LCD_RESUME);
+    EXPECT(g.dark());
+    EXPECT(cc_sleep_duty(g.backlightState(CC_SLEEP_AWAKE), 3200) == 0);
+    // ... a pass that misses the refresh asks again (never lit on a stale frame) ...
+    EXPECT(g.step(CC_SLEEP_AWAKE) == CC_SLEEP_LCD_RESUME);
+    // ... and after the full refresh the backlight follows the live state again.
+    g.refreshed();
+    EXPECT(!g.dark());
+    EXPECT(cc_sleep_duty(g.backlightState(CC_SLEEP_AWAKE), 3200) == 3200);
+    EXPECT(g.step(CC_SLEEP_AWAKE) == CC_SLEEP_LCD_KEEP);
+    // Asleep again right after: a live asleep state darkens the backlight at once, the next pass pauses.
+    EXPECT(cc_sleep_duty(g.backlightState(CC_SLEEP_ASLEEP), 3200) == 0);
+    EXPECT(g.step(CC_SLEEP_ASLEEP) == CC_SLEEP_LCD_PAUSE);
+    // A wake straight into dim (an input that only restores the clamp is not possible from asleep, but the
+    // gate must not care): the refresh runs and the backlight comes back clamped.
+    EXPECT(g.step(CC_SLEEP_DIM) == CC_SLEEP_LCD_RESUME);
+    g.refreshed();
+    EXPECT(cc_sleep_duty(g.backlightState(CC_SLEEP_DIM), 3200) == 640);
+}
 }  // namespace
 
 int main() {
@@ -285,6 +324,7 @@ int main() {
     foc_tests();
     button_tests();
     backlight_tests();
+    lcd_gate_tests();
     std::printf("sleep_tests: %d check(s), %d failure(s)\n", checks, failures);
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

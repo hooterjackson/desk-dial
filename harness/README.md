@@ -7,7 +7,7 @@ without a window, USB access, device actions, network access, or Python packages
 Run from the workspace:
 
 ```powershell
-& './app/.venv/Scripts/python.exe' './harness/build.py'
+& 'app/.venv/Scripts/python.exe' './harness/build.py'
 ```
 
 An optional argument sets the output directory. The default is `rendered/` next
@@ -48,10 +48,15 @@ shipped size is48.
   |---|---|---|---|
   | `LV_USE_TFT_ESPI` | 1 | 0 | ESP-only SPI display driver; the host flushes into a framebuffer. |
 
-  Everything else is the knob's: `LV_MEM_SIZE` 64 KB, the Montserrat set
+- Re-run `build.py` after every change to the firmware's `lv_conf.h`. Until then the renders are evidence for the
+  old config only. `build_nanod_cc5.py` rejects a firmware build whose harness copy differs from the firmware's
+  (`tooling.harness_conf_problems`). This check was added on 2026-09-30: cc5.7 changed `LV_OBJ_STYLE_CACHE` to 1
+  after the last harness build, so the harness had passed with 0.
+
+  Everything else is the knob's: `LV_MEM_SIZE` 80 KB, the Montserrat set
   (12/14/16/22/32/48), draw, widget and theme settings, and the assert handler
-  (`while(1)`; `build.py` runs the renderer under a 300 s timeout so a hang
-  fails the build). Do not edit `lv_conf.h` here; edit the firmware file.
+  (`abort()`, so a failed assert ends the renderer at once; `build.py` still runs
+  it under a 900 s timeout so any hang fails the build). Do not edit `lv_conf.h` here; edit the firmware file.
 - The display uses `LV_DISPLAY_RENDER_MODE_PARTIAL` with an 11,520-byte draw
   buffer, exactly like `lv_tft_espi_create()` in `lcd_thread.cpp`. The flush
   callback copies each strip into a static 240x240 RGB565 framebuffer outside
@@ -78,11 +83,11 @@ shipped size is48.
   only the driver `main.cpp` uses C++17 (`std::filesystem`). The ArduinoJson
   include path is available for later parser units; generated fonts
   `src/fonts/cc_font_*.c` are picked up automatically once they exist.
-- Artwork fixtures: `app/assets/fixtures/art-den-120.rgb565`
+- Artwork fixtures: `app/assets/fixtures/art-hall-120.rgb565`
   and `art-bright-120.rgb565` (see the README there; create them with
   `make_art_fixtures.py`). The fixture directory is compiled in and can be
   overridden with a second argument: `build.py <out> <fixture-dir>`.
-  `art-den-volume` and `art-bright-recent` exercise the two-argument API with
+  `art-hall-volume` and `art-bright-recent` exercise the two-argument API with
   real covers; the Stage 1 renderer ignores artwork, so they match `volume` and
   `recent` until the Stage 6 renderer draws it.
 
@@ -100,11 +105,14 @@ truncation, and colors. The four representative frames use the current
 controller's field conventions and button colors. Their titles/values are fixed
 sample content, not a capture of current Sonos/desktop activity.
 
-`before-*.png` are the untouched240x240 LCD rasters. Run `contact_sheet.py` to
-produce `current-four-controls.png`: a552x552 contact sheet containing Volume,
-Recently Added, Tracks, and Windows, in reading order. Each240px rendering is
-masked to the physical circular LCD aperture; no content is moved, scaled, or
-retouched. `before-*-round.png` are the separate circular references.
+`before-*.png` were the untouched 240x240 LCD rasters of that reference, with
+`current-four-controls.png` (a 552x552 contact sheet of Volume, Recently Added,
+Tracks and Windows, masked to the circular aperture) and the `before-*-round.png`
+circular references. The harness no longer renders them (`old_display.cpp` is not
+compiled since Stage 6, and `build.py` clears its output's rasters), so the script
+that drew that sheet was retired; any copies left in an old output folder are
+historical. The current contact sheet is `contact-sheet-cc54.png`, written by
+`cc54_report.py` from `render-index.json`.
 
 ## Selected Quiet Listening design
 
@@ -123,7 +131,7 @@ raster geometry, not real viewing-angle or brightness acceptance.
 
 The shipped Montserrat font subset lacks accented Latin, typographic
 punctuation, CJK, and emoji. Two samples demonstrate the companion's device-only
-ASCII normalization (`Beyonce - Deja Vu` and `It's All Right - Live`). Full
+ASCII normalization (`Renee Lys - Mare Alta` and `It's All Right - Live`). Full
 original text remains a companion/provider concern. The native counter uses an
 ASCII vertical separator because the font lacks a middle-dot glyph.
 
@@ -148,9 +156,9 @@ the content and volume value keeps the larger footer separate from metadata.
 Regenerate the current evidence without overwriting the cc2 renders:
 
 ```powershell
-& './app/.venv/Scripts/python.exe' './harness/build.py' './harness/cc3'
-& './app/.venv/Scripts/python.exe' './harness/quiet_sheet.py' './harness/cc3'
-& './app/.venv/Scripts/python.exe' './harness/cc3_report.py'
+& 'app/.venv/Scripts/python.exe' './harness/build.py' './harness/cc3'
+& 'app/.venv/Scripts/python.exe' './harness/quiet_sheet.py' './harness/cc3'
+& 'app/.venv/Scripts/python.exe' './harness/cc3_report.py'
 powershell -NoProfile -ExecutionPolicy Bypass -File './harness/cc3_comparison.ps1'
 ```
 
@@ -182,8 +190,8 @@ file header). The harness (`main.cpp`) no longer renders the cc3/cc4 reference
 frames; `old_display.cpp` stays for reference only and is not compiled.
 
 ```powershell
-& './app/.venv/Scripts/python.exe' './harness/build.py' './harness/cc5-handoff'
-& './app/.venv/Scripts/python.exe' './harness/cc5_report.py' './harness/cc5-handoff'
+& 'app/.venv/Scripts/python.exe' './harness/build.py' './harness/cc5-handoff'
+& 'app/.venv/Scripts/python.exe' './harness/cc5_report.py' './harness/cc5-handoff'
 ```
 
 - Every case of `app/tests/fixtures/cc5_frames.json` goes
@@ -249,7 +257,7 @@ here), and its artwork2 lookups through `cc_display_set_media(CCDisplayMedia)`:
   group at opa 89 either way.
 
 Fixtures: `make_art_fixtures.py --artwork2` writes `artwork2/` (deterministic):
-`cover-den-240.jpg` (the real Den composite), `cover-bright-240.jpg` and
+`cover-hall-240.jpg` (the real Hall composite), `cover-bright-240.jpg` and
 `cover-detail-240.jpg` (synthetic, through `prepare_artwork()`), all encoded like
 the host (section 5 quality ladder, 4:2:0, baseline); `cover-progressive-240.jpg`
 (forces a decode failure); three 2048-byte icon payloads (section 5 composite
@@ -304,3 +312,29 @@ TJpgDec replicates chroma instead of libjpeg's "fancy" upsampling, and a 5-bit
 channel turns +-1 decoder differences into 8-unit steps, so RGB PSNR is 33-44 dB
 on these fixtures while luma is 45-49 dB. The detail cover's 120 px round trip
 stays near 23 dB, so it proves full resolution.
+
+## r4 motion, LEDs and render speed (plan stage F4; MOTION.md in the firmware tree)
+
+- `make_motion.py [--check]`: the four r4 springs baked into `cc_display.cpp` `kSpringLut` (the r3.1 prototype's
+  `cssSpring()`); `--check` fails when the table is stale.
+- `export_morph_strip.cjs [--check]`: the M9 Play <-> Pause morph, 12 A8 frames of the 20 px glyph
+  (`src/cc_icon_morph.cpp/.h`), drawn with the icon exporter's renderer and stroke.
+- `make_crumbs.py` now lays the crumb out by `crumb_arc.display()` (README 3.6: at most two named levels, 190 px of
+  arc, else `‹ CURRENT`).
+- Harness timelines `r4-moments`, `r4-reduced` (M1-M15, the input moments through `cc_display_input()` /
+  `cc_display_wall()` like lcd_thread) and `r4-tour` (README 8 on the r3 screens); `cc54_report.py` `r4_moments`.
+  `r4_tour_sheet.py <render-dir> [out.png]` draws the review sheet (default
+  `app/design-reference/r4-motion-tour-sheet.png`), with the LED moments from the twin.
+- `perf.py <label> [--rows 24,48] [--cycles N] [--period 12] [--repeat 5] [--out DIR] [--conf DIR]` builds `lcd-perf` (`perf.cpp`) and profiles M1 / M4 /
+  M13 refreshes at the knob's LVGL period (`--period`, default 12 ms = binary F; 16 = binary D and the older files) (host µs, pixels, chunks, layered objects, A8 copies, per-task time, a content-redraw breakdown)
+  into `perf/<label>.json`. `--conf DIR` compiles LVGL with `DIR/lv_conf.h` in `build-perf-conf/` (a candidate
+  lv_conf.h change measured before it is proposed; CMake `NANOD_LV_CONF_DIR`, never set by `build.py`).
+  `CMakeLists.txt` pins Release `/O2 /Ob2 /DNDEBUG` on `lvgl`, `firmware_shared` and `lcd-perf` (and a non-incremental
+  link): `build/`'s old cache had empty Release flags, so its runs were `/Od` while `build-perf-conf/` was `/O2`.
+  Every run records `release_flags` and `lv_conf_sha256`; perf.py refuses a build without `/O2`, and
+  `perf.py --compare A.json B.json` refuses files built at different or unrecorded levels. Files made before
+  this (`before`, `after-r4`, `baseline-cc5.7`: `/Od`; `stylecache`, `after-r4-stylecache`: `/O2`) are not
+  comparable with each other; `baseline-cc5.7-o2` is the re-taken cc5.7 baseline (12 ms, `/O2`).
+  `--repeat N` (default 5) runs N interleaved rounds of every rows variant (one run's median moves 15-40 % on a PC,
+  more than the effects being ranked) and records per scenario `us_medians`, `us_median_min` and
+  `us_median_of_runs`; `--compare` uses the median over runs. `--out DIR` writes outside the tracked `perf/` (audits).
