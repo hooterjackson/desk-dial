@@ -350,8 +350,10 @@ LAYOUT_RULES: list[Rule] = [
     R("tooling:firmware", r'^FIRMWARE_SOURCE = ROOT / "firmware"$', 'FIRMWARE_SOURCE = ROOT / "firmware"',
       only=["tools/nanod_cc5_tooling.py"], flags=re.M),
     R("tooling:pio-core", r'^PIO_CORE = .*$',
-      "# PlatformIO core dir (toolchains, packages). NANOD_PIO_CORE overrides the in-repo default (git-ignored).\n"
-      'PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or ROOT / ".pio-core")',
+      "# PlatformIO core dir (toolchains, packages): NANOD_PIO_CORE, else PLATFORMIO_CORE_DIR, else PlatformIO's\n"
+      "# default ~/.platformio (same order as harness/cpp11_gate.py).\n"
+      'PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or os.environ.get("PLATFORMIO_CORE_DIR")\n'
+      '                or Path.home() / ".platformio")',
       only=["tools/nanod_cc5_tooling.py"], flags=re.M),
     R("tooling:chip-mac", r'^CHIP_MAC = "[^"]*".*$',
       "# The ROM port reports the chip MAC as its USB serial number. Set NANOD_CHIP_MAC to your knob's MAC\n"

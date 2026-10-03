@@ -97,7 +97,9 @@ import gen_lvgl_font as gen
 ROOT = Path(__file__).resolve().parent
 FONT_DIR = gen.OUT_DIR
 LVGL = gen.LVGL
-TOOLCHAIN = gen.WORK / 'platformio-core' / 'packages' / 'toolchain-xtensa-esp32s3' / 'bin'
+PIO_CORE = Path(os.environ.get('NANOD_PIO_CORE') or os.environ.get('PLATFORMIO_CORE_DIR')
+                or Path.home() / '.platformio')   # same order as cpp11_gate.py
+TOOLCHAIN = PIO_CORE / 'packages' / 'toolchain-xtensa-esp32s3' / 'bin'
 FIRMWARE_MAP = gen.FIRMWARE / '.pio' / 'build' / 'nanofoc_d' / 'firmware.map'
 
 OPA4 = [0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255]

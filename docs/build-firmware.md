@@ -126,7 +126,9 @@ From the repository root:
 .\app\.venv\Scripts\python.exe .\harness\build.py
 ```
 
-`build.py` first checks that the shared sources compile as C++11 (the device's language level). It then copies `firmware/include/lv_conf.h` into the harness with one host-only change (no TFT_eSPI display driver), builds with CMake and renders. The PNGs land in `harness\rendered\` (ignored by git).
+`build.py` first checks that the shared sources compile as C++11 (the device's language level), with the ESP32-S3 compiler from your PlatformIO core folder. It looks in `NANOD_PIO_CORE`, then `PLATFORMIO_CORE_DIR`, then PlatformIO's default `%USERPROFILE%\.platformio`. The xtensa toolchain only arrives there after one firmware build (`pio run`, above). If your PlatformIO uses another core folder, point the variable at it first, for example `$env:NANOD_PIO_CORE = "D:\pio-core"`. `FAIL: toolchain not found` means the folder is wrong or no firmware build has run yet.
+
+`build.py` then copies `firmware/include/lv_conf.h` into the harness with one host-only change (no TFT_eSPI display driver), builds with CMake and renders. The PNGs land in `harness\rendered\` (ignored by git).
 
 The other checks are scripts named `*_tests.py` in the same folder, for example:
 

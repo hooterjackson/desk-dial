@@ -47,9 +47,11 @@ ROOT = Path(__file__).resolve().parent
 WORK = ROOT.parent
 FIRMWARE = WORK / 'firmware'
 LIBDEPS = FIRMWARE / '.pio' / 'libdeps' / 'nanofoc_d'
-# NANOD_PIO_CORE: a PlatformIO core folder elsewhere (a git worktree's longer path pushes gcc's
-# ..-joined include paths past MAX_PATH; the public tree reads the same variable).
-PIO_CORE = Path(os.environ['NANOD_PIO_CORE']) if os.environ.get('NANOD_PIO_CORE') else WORK / 'platformio-core'
+# The PlatformIO core folder that holds the xtensa toolchain (it arrives with the first 'pio run'):
+# NANOD_PIO_CORE, else PLATFORMIO_CORE_DIR, else PlatformIO's default ~/.platformio. Same order as
+# tools/nanod_cc5_tooling.py.
+PIO_CORE = Path(os.environ.get('NANOD_PIO_CORE') or os.environ.get('PLATFORMIO_CORE_DIR')
+                or Path.home() / '.platformio')
 TOOLCHAIN = PIO_CORE / 'packages' / 'toolchain-xtensa-esp32s3' / 'bin'
 GXX = TOOLCHAIN / 'xtensa-esp32s3-elf-g++.exe'
 GCC = TOOLCHAIN / 'xtensa-esp32s3-elf-gcc.exe'

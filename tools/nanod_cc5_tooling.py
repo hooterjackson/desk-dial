@@ -148,8 +148,10 @@ FIXTURES = APP / "tests" / "fixtures"
 FIRMWARE_SOURCE = ROOT / "firmware"
 FLASH_VENV = WORK / "nanod-flash-venv"
 PIO_VENV = WORK / "nanod-pio-venv"
-# PlatformIO core dir (toolchains, packages). NANOD_PIO_CORE overrides the in-repo default (git-ignored).
-PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or ROOT / ".pio-core")
+# PlatformIO core dir (toolchains, packages): NANOD_PIO_CORE, else PLATFORMIO_CORE_DIR, else PlatformIO's
+# default ~/.platformio (same order as harness/cpp11_gate.py).
+PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or os.environ.get("PLATFORMIO_CORE_DIR")
+                or Path.home() / ".platformio")
 PIO_ENV = "nanofoc_d"
 BUILT_IMAGE = FIRMWARE_SOURCE / ".pio" / "build" / PIO_ENV / "firmware.bin"
 
