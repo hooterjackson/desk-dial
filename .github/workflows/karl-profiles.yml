@@ -8,7 +8,7 @@
 # still resolve, regenerates profiles/index.json, and writes a change summary for the PR body.
 #
 # Two jobs (S3 review DD-4): `build` runs Karl's code with a read-only token and hands over only the
-# JSON files and the summary; `propose` holds the write token, never runs his code, checks the file
+# JSON files and the summary (as an artifact); `propose` holds the write token, never runs his code, checks the file
 # names, validates them with this repository's own tools and opens the pull request. Run in one job,
 # his exporter could have rewritten a later action's files and pushed with its token.
 #
@@ -43,9 +43,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    outputs:
-      files: ${{ steps.pack.outputs.files }}
-      summary: ${{ steps.pack.outputs.summary }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,19 +66,22 @@ jobs:
         working-directory: ${{ env.APP }}
         run: python tools/profiles/validate.py profiles
 
+      # Handed over as an artifact, not job outputs: the JSON is well over Linux's 128 KB limit for one
+      # environment value ("Argument list too long" on the first run).
       - name: Hand over the JSON files and the summary (data only)
-        id: pack
         working-directory: ${{ env.APP }}
         run: |
           set -euo pipefail
-          python - >> "$GITHUB_OUTPUT" <<'PY'
-          import base64, json, os, pathlib
-          files = {p.name: base64.b64encode(p.read_bytes()).decode("ascii")
-                   for p in sorted(pathlib.Path("profiles/karl").glob("*.json"))}
-          summary = pathlib.Path(os.environ["RUNNER_TEMP"], "summary.md").read_bytes()
-          print("files=" + base64.b64encode(json.dumps(files).encode("ascii")).decode("ascii"))
-          print("summary=" + base64.b64encode(summary).decode("ascii"))
-          PY
+          mkdir -p "$RUNNER_TEMP/handover/files"
+          cp profiles/karl/*.json "$RUNNER_TEMP/handover/files/"
+          cp "$RUNNER_TEMP/summary.md" "$RUNNER_TEMP/handover/summary.md"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: karl-profiles
+          path: ${{ runner.temp }}/handover
+          if-no-files-found: error
+          retention-days: 1
 
   propose:
     needs: build
@@ -99,33 +99,38 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: karl-profiles
+          path: ${{ runner.temp }}/handover
+
       - name: Unpack the imported files (names and sizes checked)
         working-directory: ${{ env.APP }}
-        env:
-          KARL_FILES: ${{ needs.build.outputs.files }}
-          KARL_SUMMARY: ${{ needs.build.outputs.summary }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import base64, json, os, pathlib, re
+          import os, pathlib, re
+          src = pathlib.Path(os.environ["RUNNER_TEMP"], "handover")
           out = pathlib.Path("profiles/karl")
-          files = json.loads(base64.b64decode(os.environ["KARL_FILES"], validate=True))
-          if not isinstance(files, dict) or not files or len(files) > 64:
+          entries = list((src / "files").iterdir())
+          if not entries or len(entries) > 64:
               raise SystemExit("unexpected file list")
           data = {}
-          for name, b64 in files.items():
-              if not re.fullmatch(r"(?:[a-z0-9_-]{1,11}|SOURCE)\.json", name):
-                  raise SystemExit(f"refused file name {name!r}")
-              raw = base64.b64decode(b64, validate=True)
+          for p in entries:
+              if p.is_symlink() or not p.is_file():
+                  raise SystemExit(f"refused entry {p.name!r}")
+              if not re.fullmatch(r"(?:[a-z0-9_-]{1,11}|SOURCE)\.json", p.name):
+                  raise SystemExit(f"refused file name {p.name!r}")
+              raw = p.read_bytes()
               if len(raw) > 128 * 1024:
-                  raise SystemExit(f"{name}: too big")
-              data[name] = raw
+                  raise SystemExit(f"{p.name}: too big")
+              data[p.name] = raw
           for stale in out.glob("*.json"):
               if stale.name not in data:
                   stale.unlink()
           for name, raw in data.items():
               (out / name).write_bytes(raw)
-          summary = base64.b64decode(os.environ["KARL_SUMMARY"], validate=True)
+          summary = (src / "summary.md").read_bytes()
           pathlib.Path(os.environ["RUNNER_TEMP"], "summary.md").write_bytes(summary[:60000])
           PY
 

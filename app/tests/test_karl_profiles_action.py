@@ -24,7 +24,8 @@ def _code_lines():
 class KarlProfilesActionTests(unittest.TestCase):
     def test_every_action_is_pinned_to_a_full_commit(self):
         uses = [line.split("uses:", 1)[1].strip() for line in _code_lines() if "uses:" in line]
-        self.assertEqual(len(uses), 5)              # checkout and setup-python in each job, create-pull-request
+        self.assertEqual(len(uses), 7)              # checkout and setup-python in each job, the artifact hand-over
+        #                                             (upload, download) and create-pull-request
         for ref in uses:
             self.assertRegex(ref, r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$", ref)
 
