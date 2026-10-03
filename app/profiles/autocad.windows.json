@@ -1,0 +1,7 @@
+{
+  "overlay": 1,
+  "status": "basic",
+  "legend": ["", "", "", ""],
+  "detect": {"exe": ["acad.exe"]},
+  "notes": ["Karl's AutoCAD profile is still his empty template: the knob scrolls, nothing else (plan section 9.1)."]
+}

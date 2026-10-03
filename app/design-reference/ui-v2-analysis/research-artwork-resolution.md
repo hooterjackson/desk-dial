@@ -5,7 +5,7 @@ Question: what is the highest-resolution album, playlist and track artwork the W
 Scope: read-only research on 2026-09-25.
 - **Not touched:** no request to the Sonos speakers, no Apple Music API call with the user's tokens, no credential or settings file opened, no serial port, and the companion was not run.
 - **Measured:** real artwork was sampled from Apple's **public** endpoints only: the iTunes Search/Lookup API, the public `mzstatic.com` image CDN, and one public `music.apple.com` playlist page. This PC's displays were read with Win32 calls.
-- **Evidence files** (temporary, in the session scratchpad `…/scratchpad/artwork-research/`): `results.json` (17 albums × 8 sizes, formats, latency), `results2.json` (80 more albums, maximum size only), `results3.json` (CDN cache state per size, 12 albums), and the scripts `sample.py`, `sample2.py`, `sample3.py`.
+- **Evidence files** (temporary, in a scratch folder `<scratch>/artwork-research/`): `results.json` (17 albums × 8 sizes, formats, latency), `results2.json` (80 more albums, maximum size only), `results3.json` (CDN cache state per size, 12 albums), and the scripts `sample.py`, `sample2.py`, `sample3.py`.
 
 Paths are relative to `app/` unless they start with `soco/`, which means `.venv/Lib/site-packages/soco/` (SoCo 0.31.2). `B&S:Lnnn` is a line in `design-reference/design_handoff_nano_d_master/prototypes/Browse and Snap.dc.html`.
 
@@ -17,7 +17,7 @@ Paths are relative to `app/` unless they start with `soco/`, which means `.venv/
 - **Real maximums vary widely.** Across 97 sampled catalog albums:
   - 62 % are 3000 px or larger;
   - 95 % are at least 1400 px, which is Apple's current delivery minimum;
-  - 5 % stop at **600 px**. These are older back-catalogue albums such as *Kind of Blue*.
+  - 5 % stop at **600 px**. These are older back-catalogue albums such as *Tidal Glass*.
   
   Apple's own editorial playlists are 3840 px. User-made playlists often have **no artwork at all** in the API. The design's 2 × 2 mosaic of album covers avoids that problem (§1.2, §1.3).
 - **On this PC the two biggest covers need 680 px and 760 px.** This PC has one 5120 × 1440 monitor at 100 % scaling, so the design scales by k = 2. The explorer's centre card is 680 px and the Up next cover is 760 px. On a 4K monitor they would be 1020 px and 1140 px.
@@ -106,7 +106,7 @@ Maximum edge, **n = 97**:
 
 - **At least 1200 px: 95 %. At least 3000 px: 62 %. Median: 3000 px.**
 - **The 600 px items are old back-catalogue:**
-  - *Kind of Blue* (1959);
+  - *Tidal Glass* (1959);
   - Robert Johnson, *King of the Delta Blues Singers* (1961);
   - John Williams, *The Great Paraguayan* (1995);
   - *The Indispensible Django Reinhardt* (1983 issue, 600 × 612);
@@ -143,11 +143,11 @@ Pass 1 (17 albums; only rows where the returned size equals the requested one):
 
 Measured on `is1-ssl.mzstatic.com` (pass 1 `formats`, plus direct probes):
 - **Any integer size works, up to 10,000.** 680, 760, 1020 and 683 all returned exactly that size. `10000x10000bb.jpg` returned the original; **`10001` and above return HTTP 400** (`application/json`, 129 bytes).
-- **Apple never upscales.** A request above the original returns the original: *Kind of Blue* returns 600 × 600 for 680, 1020, 1200 and 10000.
+- **Apple never upscales.** A request above the original returns the original: *Tidal Glass* returns 600 × 600 for 680, 1020, 1200 and 10000.
 - **`bb` fits the image inside the box.** `1000x600bb` returned 600 × 600 for a square cover. Non-square boxes behave oddly (`600x1000cc` returned 1000 × 1000), so **always request square sizes**. For square sources, `cc` and `sr` returned the same bytes as `bb`.
 - **Formats** (by changing the extension; undocumented, but it works today). At 600 px:
 
-  | Extension | *Abbey Road* | *Kind of Blue* | *Thriller* | Notes |
+  | Extension | *Abbey Road* | *Tidal Glass* | *Thriller* | Notes |
   |---|---|---|---|---|
   | `.jpg` | 163 KB | 61 KB | 89 KB | |
   | `.webp` | 53 KB | 23 KB | 28 KB | about ⅓ of the JPEG |

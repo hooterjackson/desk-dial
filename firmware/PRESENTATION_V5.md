@@ -781,6 +781,8 @@ Firmware:
 
 The host re-seeds its pressed mask from it (DV today sets `_pressed = 0` at ready, DV:1085), so an edge lost during entering never leaves a stale "pressed" bit, and a held button is known at ready. Absent (presentation 4) = 0.
 
+**[1.0.0-cc5.5, F1] `ks` on position lines (clear-only).** A position line of the ready control becomes `{"id":id,"p":pos,"ks":mask}` with `mask` = the mask last reported on a `kd` / `ku` / `kh` / `ready` line AND the live mask. It can only clear bits: a press is always reported by its own `kd`; a `ku` lost to a full key queue (16 events since cc5.5, 5 before) is cleared by the next turn. While a key event is still queued, the line repeats the last reported mask, so it never pre-empts a `ku` on its way (the HMI queues a `ku` before it publishes the cleared bit; COM reads the live mask, then the queue). The installed Desk Dial v7, which copies any `ks` into its pressed mask, therefore never loses a `kd` or a `ku` to it (a `ks` equal to the live mask would pre-set the bit of a press whose `kd` is still queued and swallow that `kd`; `tests/test_cc_device_f1.py` replays both). A newer host clears the bits and reports each as a release, before the turn the line carries. No capability: a cc5.4 knob sends no `ks` there.
+
 ### 11.4 F24 icon gate (S01:81 "Windows opens only from Home"; A04 §6.2; 00 §3.2)
 
 `cc_is_windows_button(raw)` (CCP:337-342) becomes:
@@ -834,7 +836,7 @@ phase == ready && !readyReply && windowsHidEnabled && raw == windowsButton
 |---|---|
 | `lcdFps` | refreshes that reached the panel in the last full second |
 | `lcdFpsAnimMin` | lowest 1 s `lcdFps` while animations run; reset on read |
-| `lcdRefrUsMax`, `lcdRefrUsAvg` | `LV_EVENT_REFR_START` → `REFR_READY` (+ the final `dmaWait`) |
+| `lcdRefrUsMax`, `lcdRefrUsAvg` | `LV_EVENT_REFR_START` → `REFR_READY` (+ the final `dmaWait`), over the refreshes of the last full second (windowed like `lcdFps`; 0 when none reached the panel) |
 | `lcdRenderUsMax` | time inside `cc_display_render()` (A04 §2.8 "measure first") |
 | `lcdFlushUs`, `lcdPxPerRefr`, `lcdFullRefrs` | flush share; Σ w·h per refresh; refreshes ≥ 57,600 px |
 | `lcdLateRefrs`, `lcdMaxGapMs` | intervals > 1.5 × period while animating; worst gap |
@@ -847,6 +849,8 @@ phase == ready && !readyReply && windowsHidEnabled && raw == windowsButton
 | `build` **[erratum E-lcd]** | the ladder binary compiled into this image: `"A"`…`"E"` for `CC_BUILD_BINARY` 1…5 (a JSON string). **Absent** when the image has no ladder id (`CC_BUILD_BINARY` 0, the source default; A, B and C were built before it existed). The image also holds the marker `cc-build-binary:<n>`. Tells D from A and E from C, whose pipeline fields are equal |
 
 Existing fields stay (`jpegDecodeMsMax/Last`, `lcdAgeMs`, `lvglFree`, `lvglMinFree`, `heapFree`, `heapMinFree` = `heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)` (CCP:175), …; P4 §1).
+
+**[1.0.0-cc5.5, F1]** `build` may also be `"F"` (`CC_BUILD_BINARY` 6: D's pipeline with `CC_LCD_PERIOD_MS` 12, so `lcdPeriodMs` 12). F1 appends the safety and measurement fields `usbMidiOk`, `usbHidOk`, `hidRetries`, `pdRead`, `pdPdo`, `pdVolts`, `pdRdo`, `focLoopHz`, `focLoopUsMax` (µs, reset on read), `uqAbsMax` (mV, reset on read), `uqCapMs` and `uqCapMv` (CONTROL_CENTER.md "Diagnostics" has the definitions). The `diag` capability stays 1; the host's `device.py` reads them as `DIAG_F1_FIELDS` and v7 ignores them.
 
 ### 12.4 Internal-RAM budget (gate `heapMinFree ≥ 40 KB`)
 
@@ -1260,3 +1264,132 @@ Unchanged from P4 §10: no C++14 features; tables at namespace-scope `constexpr`
 | **OQ-5** | ~~The LCD heart ink is the design's candidate PINK `#FF285A`;~~ **[r2.2]** The knob LCD's liked heart ink is the design's `#A3244A`; the LED PINK is tuned by eye on the ring (CH "Still open"). Should a new LED pick change the LCD ink? | **No:** ~~the LCD ink stays `#FF285A`;~~ **[r2.2] superseded:** the knob LCD's liked heart is the fixed filled `#A3244A` (R22 CH §1; tone `liked`, 5.2), not PINK; `#FF285A` is only the desktop row heart (K4), never an LCD ink. The tour changes only K2's LED constant: an `ledPink` pick never changes an LCD ink. Revisit only if the user finds the LCD heart and the ring's PINK visibly mismatched in the hardware window. |
 | **OQ-6** *(adopted)* | K3's Recently Added error sub-line `Home, then Browse to retry` (CC5 §15.2 `knob.sub.library_error`) is 197.1 px at 14 px against the 170 px one-line sub; the knob would ellipsize it. | **Adopted:** **`Home, then Browse`** (141.2 px) in CC5 §15.2 and VOC §9.5: the error title `Library not loaded` already says what failed. Confirmed in K3's copy approval pass together with OQ-2; **[r2.2] approved** (R22 CH §2, 141 px). (The explorer's overlay copy `Go Home, then Browse to retry.` has no knob limit, VOC-K4-04.) |
 | **OQ-7** | F1 (12.4) funds the internal-RAM gate by making the native WAV samples `const`, a change outside the control-center code. Is that acceptable? | **Yes:** it is `const` propagation only, the samples and every sound stay byte-identical, and it frees 53,964 B that nothing else can replace. If the user wants native code untouched, the release needs their decision between binary C and a 35 KB gate for A (12.4). |
+
+
+---
+
+## 19. Presentation 6 (Desk Dial r3 release 1: the Lights space; 2026-09-28)
+
+Source: the r3 handoff `design_handoff_nano_d_r3/README.md` §1–§3, §6, §9 (copy: `harness/r3-handoff/design/`) and the approved plan (release 1 of 3: HA bridge, Lights space, launcher Home). Everything here is **append-only** on presentation 5: no token, field, default, layout or rule above changes, so every presentation-5 frame is accepted and drawn exactly as before. Firmware: `cc_presentation.h`, `cc_frame_parse.cpp`, `cc_display.cpp`, `cc_icons.cpp`, `cc_alive.*` (ALIVE.md section 15), `control_center.cpp`; Python reading: `lcd_preview.v6_parse` (parser), `lcd_preview.compose` (LCD mirror), `alive_lights` (LEDs). The host side (device.py validation, controller, Home Assistant) belongs to the Desk Dial job.
+
+### 19.1 Capabilities and gating
+
+- The knob reports **`presentation: 6`**. Nothing else in the capabilities reply changes (alive, artwork, artwork2, diag as before).
+- A host sends the section 19 content **only when `presentation >= 6`**. A presentation-5 knob (cc5.4) rejects every token below (fatal on the host), so an older knob keeps the r2.2 UI. The host's other gates stay `>= 4` / `>= 5`.
+- New layout tokens (CCLayout, append-only): **10 `lights`**, **11 `lightsbig`**, **12 `scenes`**. New ring styles (CCRingStyle): **5 `bri`**, **6 `ctemp`**, **7 `clusters`**. New icons (CCIcon): **22 `bulb`**, **23 `thermo`**, **24 `power`**, **25 `wand`**, **26 `house`**, **27 `album`**. New enum CCValueUnit: 0 `%`, 1 `K`.
+
+### 19.2 New top-level fields
+
+| Field | Type / bound | Default | Scope (kept on) | Meaning |
+|---|---|---|---|---|
+| `valueUnit` | `"%"` \| `"K"` (length-aware, case-sensitive) | `"%"` | `lightsbig` | the 22 px unit after the 48 px digits |
+| `prevTitle` | text ≤ 64 B (CCFrame `char[65]`) | `""` | `scenes` | the row above the current scene (14 px `#7C7C7C`) |
+| `nextTitle` | text ≤ 64 B | `""` | `scenes` | the row below the current scene (14 px `#7C7C7C`) |
+
+Strictness is section 3.3's: a present value is validated on **every** layout (invalid → reject), then stripped silently outside its scope. Text follows 3.2 (control characters reject, longer text is cut at the last whole code point within 64 B). `volume` keeps drawing `%` whatever `valueUnit` says.
+
+### 19.3 Ring additions
+
+| Field | Rule |
+|---|---|
+| `style:"bri"` | `value` 0..100 = brightness %; **`kelvin` required**; `index` / `count` free (send 0) |
+| `style:"ctemp"` | `value` 0..100 = the position of the selected K between the group's min and max (host: `round((K − 2200) · 100 / 4300)` for the design range); **`kelvin` required** = the selected K |
+| `style:"clusters"` | `1 ≤ count ≤ 20` scenes, `index < count` the selected one; else reject; `value` 0 |
+| `kelvin` | int **2200..6500** (never a bool or float); present on another style → validated, then stripped (stored 0) |
+
+`first`, `colors`, `unavailable`, `moreIndex`, `external`, `now`, `card` keep their section 4 rules on every style (they mean nothing on the new ones; send none).
+
+### 19.4 LCD (`cc_display.cpp`; mirror `lcd_preview.compose`)
+
+| Layout | Draws | Group / depth | Art |
+|---|---|---|---|
+| `lights` | the Home text drawing on the home layer: `heading` (e.g. `LIGHTS`), `title` 22/26 two lines at y 61, `subtitle` 14 at y 115, and the 12 px line at y 133 = **`meta` in `metaTone`** (never `status`) | Lights, 1 | none |
+| `lightsbig` | the Home reveal on the home layer: caption = `volumeCaption` (else `title`), 48 px digits of `value` (digits and `-` before any `%`), the 22 px `#A6A6A6` unit = `valueUnit`; the 12 px line = `meta` | Lights, 1 | none |
+| `scenes` | own layer: `prevTitle` 14 px `#7C7C7C` y 57, `title` 22 px one line y 79 (box x 30..210, titleTone, text-shadow twin), `nextTitle` 14 px `#7C7C7C` y 109, `meta` 12 px y 133 (x 30..210, metaTone, 160 ms fade at rest) | Scenes, 2 | none |
+
+- `lights` ↔ `lightsbig` is one group: the change is the Home reveal (track layer out, volume layer in; no slide). Home (0) → Lights (1) → Scenes (2) slide in from the right, back from the left (section 8.7). The idle row never shows on the Lights layouts.
+- `cc_font_48` gains `K` (13 glyphs); the unit itself is drawn with the 22 px face like `%` (README r3 §2.2).
+- The footer, tones and inks are section 5.2's: `power` on slot 3 is **nav** `#E6E6E6` (never red), a lit-on `thermo` is tone `on` `#FFFFFF`.
+
+### 19.5 Icons
+
+The six r3 prototype paths (`Knob IA Prototype.dc.html` `I.bulb`, `I.temp`, `I.power`, `I.wand`, `I.home`, `I.album`; README §2.2), 24-unit viewBox, round caps and joins, drift-checked verbatim by `export_handoff_icons.cjs` (src `r3`): 20 px at stroke 2.3 (footer) each, `bulb` also 26 px at 2.1 (Home idle row `Music · Win · Lights · Play`). Firmware masks: 37, **16,024 B** (12,948 + 6 × 400 + 676). The r2.1 masks are byte-identical.
+
+### 19.6 Kelvin colour
+
+`cc_kelvin_rgb(K)` (cc_presentation.h) = README r3 §3 (Tanner Helland), clamped 0..255, rounded half up in double; K clamped to 2200..6500. 2200 K = 255,146,39; 2700 K = 255,167,87; 3200 K = 255,184,123; 6500 K = 255,254,250. The nearest channel to a .5 tie over 2200..6500 is 3.1e-5 away, so newlib, MSVC and CPython agree (checked for every K). **Calibration hook:** `CC_KELVIN_GAIN` (= `alive_lights.KELVIN_GAIN`) scales each channel afterwards, `(c · gain + 127) / 255`; `{255, 255, 255}` today. Matching the ring's real white point to the bulbs is a by-eye step on hardware.
+
+### 19.7 Fixtures and gates
+
+- `harness/fixtures/frames_v6.json` (`make_frames_v6.py`): 42 hand-judged cases + the Kelvin vector; `parse_tests.py` holds `lcd_preview.v6_parse` and the firmware parser (MSVC /W4 /WX) to it, with every v4 / ALIVE / v5 default of an accepted frame; the existing v4 / alive / v5 fixtures and the cc5.3 downgrade pass unchanged.
+- LCD harness: every accepted `frames_v6` case (group `v6`) and the 17 r3 screens of `r3-handoff/r3_screens.json` (group `r3`); `cc54_report.py` (all 39 checks, incl. `mirror_parity` of `lcd_preview`) extended for the new roles (the scenes title is a thirteenth twin). Contact sheet: `r3-handoff/contact-sheet-r3.png` (`r3_sheet.py`).
+- CCFrame grows 136 B (1,124 → 1,260 B on x64 MSVC); the build gates (size, heap projection) apply as before.
+
+### 19.8 Open for the next releases (not in presentation 6)
+
+- The design's amber `#FFBE69` for `Knob: temperature` / `Runs in 1 s` has no line tone; release 1 sends `secondary` (`#A6A6A6`). A `warm` line tone would be one more append-only token.
+- The design's active-mode footer ink (`act` `#FFBE69` in the prototype) differs from 5.2's lit-on `#FFFFFF`; release 1 keeps 5.2.
+- Arc breadcrumbs, the hold-1 progress ring, the unavailable-press bottom flash: release 2.
+
+### 19.10 [r3.1] Desk Dial r3.1 (user feedback round + the r3.1 design delta; 2026-09-29; append-only)
+
+Sources: the approved r3.1 plan (Job B) and `design-reference/r3.1-design-delta.md` (Job B rows; `Knob IA Prototype
+r3.1.dc.html`, copied to `harness/r3-handoff/design-r3.1/`). Nothing above changes; every r3 frame parses and
+draws as before.
+
+- **Holds (`kh`, 11.2):** every physical button now sends `{"id","ks","kh":raw}` once per press when held: the raw at
+  physical slot 0 (`buttonOrder[0]`) after **600 ms** (`kHoldMs`, unchanged, incl. the deferred-hold rules of step 5),
+  every other raw after **1000 ms** (`kHoldOtherMs`). Each claimed press sets its raw's AceButton long-press delay from
+  its physical slot (the buttonOrder in force at the press). `kd` / `ku` are unchanged; the host decides tap vs hold
+  (button 4 acts on release; a `kh` cancels the tap).
+- **`holdMarker`** (top-level bool, absent = false, any other type rejects; kept on every layout): button 4 has a hold
+  action on this screen (Home in both domains, Recently Added / Playlists, the explorer, Up next). The LCD draws the
+  **hold tick**, a 16 x 2 px bar, radius 1, `#A6A6A6`, at (176, 180) under the button-4 footer icon (x 184), with the
+  footer (not in the idle icon view), fading 200 ms (`footer.tick`; the footer layer grows to rows 152..181). The LEDs
+  draw the button-4 hold ring only on such a frame (ALIVE.md 15.8).
+- **Ring style `queue`** (9, `CC_RING_QUEUE`; count >= 1, index < count, else reject): the whole-queue Tracks and Up
+  next. `index` = the focused row, `ring.now` (-1..count-1, validated as in 4.4) = the playing row, **kept on the queue
+  ring on every layout**; `first` / `colors` follow the window rule; `kelvin` is validated and stripped. The Tracks
+  prev / dot / next position row is drawn only with the `transport` ring (any other ring hides it). LEDs: ALIVE.md 15.9.
+- **Crumb `playlists`** (appended after `scenes`, `CC_CRUMB_PLAYLISTS` = 10): the arc `MUSIC › PLAYLISTS` (ancestor
+  #7C7C7C, current #E6E6E6), depth 2; `cc_crumbs.cpp` regenerated by `make_crumbs.py` from `crumb_arc.py`.
+- **Paused cover:** a Home-layout frame with `playing:false` (the parser keeps `playing` on Home layouts only) draws its
+  cover at `image_opa` **143** (0.45 / 0.8 of the pre-composited cover; `cc_art_image_opa`); `artDim` (112) wins; else
+  255. Paused therefore keeps the Now Playing layout with its art (the host no longer idles after 4 s paused).
+- **Icons:** `house` and `album` also have 26 px masks (stroke 2.1), so the Music space idle row draws Home and Recent:
+  firmware masks 17,376 B (16,024 + 2 x 676). The design's `listMusic` glyph is the existing `playlists` token (the same
+  path), so button 3 of Recently Added / Playlists sends `icon:"playlists"` (lit `on` in Playlists: the r3 active ink
+  `#FFBE69` and the warm 0.90 LED); no new icon token.
+- **Wire compatibility:** `playlists`, `queue` and `holdMarker` are rejected by an r3 (release 1) knob; the host sends
+  them only to this firmware (knob and Desk Dial are installed together).
+
+## 20. r4 motion (design_handoff_nano_d_r4, 2026-09-30; plan stage F4)
+
+Supersedes the section 8.8 motion rows where they differ; screens, copy and button maps stay r3.1. Summary and
+measurements: `MOTION.md`. Normative for `cc_display.cpp` and the harness (`cc54_report.py` `r4_moments`):
+
+- **Tokens.** `SPRING.snap / soft / pop / wall` = (0.36, 0.72) / (0.46, 0.82) / (0.42, 0.52) / (0.34, 0.42)
+  (response s, damping), baked as `kSpringLut` (`make_motion.py`), settling in 416 / 544 / 624 / 648 ms; the knob-
+  following moments (M4, M5, M13) run on a 4 ms semi-implicit Euler stepper that retargets and never queues.
+- **8.7 screen change = M1.** The content enters from **28 px** (was 20) in the depth direction on `SPRING.snap`
+  (was 380 ms OUT); opacity 0 → 1 in **240 ms** OUT (was 220). No scale (a transform is a layer). `lastSlide` = ±28.
+  The crumb crossfades with it (M15: two slots, 240 ms). From the offline layer and on a claim: 220 ms as 8.10.
+- **Reveal.** M2: text out 130 ms IN (−12 px, 160 ms); big layer from +14 px, 180 ms OUT after 40 ms, `SPRING.snap`
+  after 40 ms. M3: big out 130 ms IN (+14 px, 160 ms); text back after 90 ms: 260 ms OUT, `SPRING.soft`.
+- **Idle row (M11).** Stagger 140 + 40 i ms (was 200 + 45 i), fade 260 ms OUT, from +16 px (was 14) at 85 % icon
+  scale, `SPRING.pop`; exit 120 ms opacity / 140 ms offset IN.
+- **Text at rest (8.5.4 + M6).** A meta / status line whose text changed at rest fades in over **240 ms** (was 160)
+  and rises 10 px (`SPRING.soft`); not on a detent that glides the rows (M4). The Home status leaves with a plain
+  fade (its words kept until the next text).
+- **New moments.** M4 list glide, M5 track change, M7 press squash (`cc_display_input`), M8 landing pop, M9 Play ⇄
+  Pause morph (12 frames, same screen only), M10 hold-4 fill (the icon's own mask in a growing clip box), M13 wall
+  stretch (`cc_display_wall`, driven by `cc_wall.h`). Table in `MOTION.md` section 2.
+- **Reduced motion (7.1 latch).** Every moment is a **160 ms** opacity crossfade (8.9's 220 ms content fade → 160):
+  no translate, scale or morph; M10 fades its warm copy in instead of filling.
+- **Layout (README 3.6).** Crumb: at most two named levels, ≤ 190 px of arc, else `‹ CURRENT`; scenes rows 104 /
+  160 / 150 / 176 px, Tracks meta 176 px; big value `number | 4 px | unit` (`DIGIT_GAP` 4).
+- **Layer boxes (8.2 R2).** content rows 28..164 (M11's +16), list-like layers +10 px below their meta (M6), footer
+  42..197 × 150..181 (M8's 1.28×); `v5_bounded` holds.
+- **Render speed (12.x).** Twins are hidden while no cover shows (identical pixels); A8 masks draw from flash; the
+  LVGL heap bound of the harness is 37 KB (r4: +2.1 KB x64); the device gate `lvglMinFree >= 30 KB` stands.
+

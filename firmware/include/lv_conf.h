@@ -42,7 +42,11 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /*Size of the memory available for `lv_malloc()` in bytes (>= 2kB)*/
-    #define LV_MEM_SIZE (64 * 1024U)          /*[bytes]*/
+    /* FW-RES-001 (2026-10-02): 80 KB (was 64). cc5.7 F read lvglMinFree 28,476 B after 42 h, under the
+     * 30,720 B gate (PRESENTATION_V5.md 12.2); the harness soak (harness display_soak_tests.py)
+     * shows no growth across repeated tours, so the steady state needs the room. +16 KB of .bss against
+     * heapMinFree 89,396 B measured (gate 40 KB). Needs a CLEAN build (lv_obj_t layouts, lv_conf change). */
+    #define LV_MEM_SIZE (80 * 1024U)          /*[bytes]*/
 
     /*Size of the memory expand for `lv_malloc()` in bytes*/
     #define LV_MEM_POOL_EXPAND_SIZE 0
@@ -237,8 +241,11 @@
 #define LV_USE_ASSERT_OBJ           0   /*Check the object's type and existence (e.g. not deleted). (Slow)*/
 
 /*Add a custom handler when assert happens e.g. to restart the MCU*/
-#define LV_ASSERT_HANDLER_INCLUDE <stdint.h>
-#define LV_ASSERT_HANDLER while(1);   /*Halt by default*/
+/* FW-RES-001: abort() instead of while(1): a failed LVGL assert (an out-of-memory lv_malloc above all)
+ * panics at once with a backtrace and a reset reason, instead of freezing the LCD task until the task
+ * watchdog. On the host harness abort() ends the renderer with an error (build.py fails fast). */
+#define LV_ASSERT_HANDLER_INCLUDE <stdlib.h>
+#define LV_ASSERT_HANDLER abort();
 
 /*-------------
  * Debug
@@ -284,7 +291,7 @@
 #define LV_COLOR_MIX_ROUND_OFS  0
 
 /* Add 2 x 32 bit variables to each lv_obj_t to speed up getting style properties */
-#define LV_OBJ_STYLE_CACHE      0
+#define LV_OBJ_STYLE_CACHE      1   /* r4 2026-09-30: 2.4-3.1x faster refreshes (style lookups per chunk), pixel-identical */
 
 /* Add `id` field to `lv_obj_t` */
 #define LV_USE_OBJ_ID           0

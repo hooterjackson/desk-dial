@@ -1,0 +1,7 @@
+{
+"batches": [
+ {"events": [["key", 17, false], ["key", 90, false], ["key", 90, true], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"flags": 0, "scan": 44, "type": "key", "vk": 90}, {"flags": 2, "scan": 44, "type": "key", "vk": 90}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.1}
+],
+"feedback": ["undo", "refused"],
+"status": {"action": "zoom", "active": true, "commands": 0, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 1, "idleMs": 800, "moves": 0, "refusals": 1, "releases": {}, "scrolls": 0, "short": 0, "typed": 0, "undo": 1, "undoSkipped": 1, "wheel": 0}
+}

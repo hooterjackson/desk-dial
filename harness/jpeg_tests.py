@@ -37,7 +37,7 @@ Pillow + MSVC; the xtensa toolchain for the firmware syntax check. No device, no
    10 now states it, so it is the default.
    - 'as-written' (the original cc5.3-start wording, superseded): the RGB565 result against Pillow's decode after RGB565
      rounding (both expanded to 8 bits), >= 40 dB for every design cover. NOT met with Pillow
-     12.3: cover-heligoland-album measures 39.40 dB although (a) is exact and (b) is 43.14 dB.
+     12.3: cover-glass weather-album measures 39.40 dB although (a) is exact and (b) is 43.14 dB.
      Rounding both sides to RGB565 turns the decoders' +-1 differences (TJpgDec floors its IDCT
      and replicates chroma, as the ROM's R0.01b does; libjpeg rounds and interpolates) into
      whole RGB565 steps, and section 7 fixes the conversion, so the firmware cannot change it.

@@ -33,6 +33,7 @@ from xml.sax.saxutils import escape
 
 from .credentials import CredentialError, CredentialStore, _dpapi
 from .artwork import sonos_artwork_url
+from .home_assistant import is_lan_host
 
 
 PLAY_NEXT_MAX = 100           # C5-21: the first 100 songs in order
@@ -47,6 +48,15 @@ SEEK_LANDED = ("PLAYING", "PAUSED_PLAYBACK")   # [r2.2] C5-68: landed = playback
 SEEK_OFF_TARGET_S = 2         # [r2.2] a landing further off is logged (diagnostic only, not a condition)
 READBACK_S = 2.0              # transport / play mode read-back window
 READBACK_POLL_S = 0.05
+# DD-BUG-050: a speaker Volume Limit clamps SetGroupVolume. A read-back that moved from the start
+# toward the target, stopped short of it and held for this long is the speaker's limit, not a
+# failed write; a limit learned that way also accepts later steps that read exactly that level.
+VOLUME_CLAMP_STABLE_S = 0.2
+# A knob turned one detent at a time reaches the limit exactly (59 -> 60 confirms), so the next
+# step (60 -> 61) reads back unchanged. An upward write that holds at its start for this long,
+# when the start is the level this group's previous upward step confirmed, is that limit too.
+# Longer than VOLUME_CLAMP_STABLE_S so a slow coordinator is not mistaken for a limit.
+VOLUME_UNMOVED_STABLE_S = 0.6
 # Queue reads and the GIL (K3 section 1.2, K4 section 4.7.3, [G1] G1-5). soco parses a Browse(Q:0)
 # answer twice: the SOAP envelope with ElementTree's expat parser (one GIL-holding C call) and the
 # DIDL-Lite inside it with lxml, which parses with the GIL released. The H5 bench
@@ -236,6 +246,42 @@ def playnext_line(payload) -> str:
 
 
 # ---------------------------------------------------------------------- start counts
+_NO_PROXY_LOCK = threading.Lock()
+
+
+def bypass_proxy_for(*hosts) -> None:
+    """Add LAN speaker addresses to NO_PROXY / no_proxy (DD-RES-004). soco sends its SOAP calls through
+    module-level ``requests``, which honours a system or HTTP(S)_PROXY proxy; that proxy cannot reach a
+    speaker on the owner's network. Existing entries are kept; public hosts are never added."""
+    _merge_no_proxy([str(h).strip() for h in hosts if isinstance(h, str) and is_lan_host(h)])
+
+
+# The IPv4 ranges is_lan_host treats as the owner's network. requests matches a CIDR NO_PROXY entry
+# against an IP-literal URL, so discovery can bypass the proxy before soco learns any speaker address.
+_LAN_CIDRS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10")
+
+
+def bypass_proxy_for_lan_ranges() -> None:
+    """Before discovery (DD-RES-004): soco.discover queries the answering speaker's topology over SOAP
+    inside the call, so its IP cannot be added first; add the private IPv4 ranges instead."""
+    _merge_no_proxy(list(_LAN_CIDRS))
+
+
+def _merge_no_proxy(wanted) -> None:
+    if not wanted:
+        return
+    with _NO_PROXY_LOCK:
+        current = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+        entries = [e.strip() for e in current.replace(";", ",").split(",") if e.strip()]
+        known = {e.lower() for e in entries}
+        added = [h for h in dict.fromkeys(wanted) if h.lower() not in known]
+        if not added:
+            return
+        merged = ",".join(entries + added)
+        os.environ["NO_PROXY"] = merged
+        os.environ["no_proxy"] = merged
+
+
 def start_outcome(start) -> str:
     """VOC section 8.5 for a verified start's ``_start``: ``playlist_partial`` when songs were
     unavailable (a lenient playlist, U6), else ``ok``."""
@@ -421,6 +467,22 @@ def _left_unit(units, song):
     return min(found, key=lambda unit: (unit["played"], unit["start"] is not None, unit["start"] or 0))
 
 
+def _record_attributes(items, record_rows) -> bool:
+    """Whether a companion-shuffle record still describes this queue (DD-BUG-034): every base row
+    it holds is still in the queue (by signature digest, as often as the record holds it). The app
+    only ever inserts rows (Play next) or moves them (the shuffle), so a queue replaced or cleared
+    elsewhere fails this; rows added elsewhere are left to Shuffle off's own attribution."""
+    need = {}
+    for entry in record_rows:
+        if isinstance(entry, (list, tuple)) and entry:
+            need[entry[0]] = need.get(entry[0], 0) + 1
+    have = {}
+    for item in items:
+        digest = row_signature(item)
+        have[digest] = have.get(digest, 0) + 1
+    return all(have.get(digest, 0) >= count for digest, count in need.items())
+
+
 def _attribute_restore(items, position, record_rows, playnext_song_ids):
     """Shuffle off (section 9.5.3 step 2): attribute every upcoming row (after the 1-based playing
     row ``position``) to the restore record (a base row, by its signature digest) or to Play next.
@@ -518,10 +580,15 @@ class SonosAdapter:
         self._last_state = {}
         self._last_source = None
         self._cached_context = None   # (context, monotonic time) for read_state(reuse_context_s)
+        self._volume_ceiling = {}     # group uid -> level a speaker Volume Limit clamped to (DD-BUG-050)
+        self._volume_confirmed = {}   # group uid -> (level, upward): the last level set_volume confirmed
         self.last_recovery = None
         self.recovery_store = recovery_store
         self.shuffle_store = shuffle_store
         self._shuffle_record = None   # None = not loaded; {} = no record
+        self._shuffle_checked = None  # the queue UpdateID the record was last found attributable at (DD-BUG-034)
+        self._shuffle_job = False     # a companion shuffle job is moving rows (its UpdateIDs are its own)
+        self._shuffle_drop_pending = False   # a drop whose store write failed: retried by the next state read
         self._clock = clock
         self._sleeper = sleep
 
@@ -547,12 +614,14 @@ class SonosAdapter:
             self._discover = self._discover or soco.discover
             self._share_link_factory = self._share_link_factory or ShareLinkPlugin
         if self._speaker is None:
+            bypass_proxy_for(self.host)
             self._speaker = self._factory(self.host)
 
     def discover(self) -> list[dict]:
         """Explicit, bounded local discovery; no cross-home multicast assumption."""
         with self._lock:
             self._dependencies()
+            bypass_proxy_for_lan_ranges()
             try:
                 speakers = self._discover(timeout=min(self.timeout, 5), include_invisible=False) if self._discover else []
                 return sorted([{"uid": zone.uid, "name": zone.player_name, "host": zone.ip_address}
@@ -566,6 +635,7 @@ class SonosAdapter:
         speaker.zone_group_state.clear_cache()
         # The configured host is only a discovery seed after the UID is pinned.
         zones = list(speaker.all_zones)
+        bypass_proxy_for(*(getattr(z, "ip_address", None) for z in zones))   # coordinators and members (DD-RES-004)
         room = next((z for z in zones if z.uid == self.room_uid), None) if self.room_uid else speaker
         if room is None:
             raise GroupChanged("The selected Sonos room is no longer available. Reconnect the intended room.")
@@ -689,7 +759,7 @@ class SonosAdapter:
                               and playback in ("PLAYING", "PAUSED_PLAYBACK")),
                  "shuffle": play_mode in SHUFFLE_MODES, "repeat": REPEAT_OF.get(play_mode, "off"),
                  "song_id": _song_id_from_uri(track.get("uri", "")), "actions": sorted(actions),
-                 "companion_shuffle": bool(self._shuffle_record_for_room()),
+                 "companion_shuffle": self._companion_shuffle_current(coordinator, str(queue.update_id)),
                  "host": room.ip_address}
         self._last_state = state
         return dict(state)
@@ -717,19 +787,50 @@ class SonosAdapter:
             try:
                 target = max(0, min(100, int(value)))
                 context = self._assert_group(expected_group_revision)
+                group_uid = getattr(context[1], "uid", None)
+                start = int(context[1].volume)
                 context[1].volume = target
                 # Group writes may return before the coordinator reports the
                 # new value. Never acknowledge an old read as this command's
                 # result, and never replay the write while awaiting readback.
                 deadline = self._now() + READBACK_S
+                stable_value, stable_since = None, None
                 while True:
                     context = self._assert_group(expected_group_revision)
-                    if int(context[1].volume) == target:
+                    observed = int(context[1].volume)
+                    if observed == target:
                         state = self._state(self._assert_group(expected_group_revision))
                         if state["volume"] == target:
+                            self._volume_confirmed[group_uid] = (target, target >= start)
                             return state
-                    remaining = deadline - self._now()
+                    now = self._now()
+                    if observed != stable_value:
+                        stable_value, stable_since = observed, now
+                    ceiling = self._volume_ceiling.get(group_uid)
+                    if ceiling is not None and observed > ceiling:
+                        self._volume_ceiling.pop(group_uid, None)   # the limit was raised or removed
+                        ceiling = None
+                    # DD-BUG-050: a Volume Limit holds the level short of the target. Accept it
+                    # once it is stable: either it moved up from the start toward the target, or
+                    # it is exactly the limit this group clamped to before.
+                    clamped = start < observed < target or (ceiling is not None and observed == ceiling < target)
+                    # ... or it never moved off a start that this group's last upward step
+                    # confirmed: the previous detent landed exactly on the limit.
+                    at_limit = observed == start < target and self._volume_confirmed.get(group_uid) == (start, True)
+                    hold = VOLUME_CLAMP_STABLE_S if clamped else VOLUME_UNMOVED_STABLE_S
+                    if (clamped or at_limit) and now - stable_since >= hold:
+                        state = self._state(self._assert_group(expected_group_revision))
+                        if state["volume"] == observed:
+                            self._volume_ceiling[group_uid] = observed
+                            self._volume_confirmed[group_uid] = (observed, True)
+                            return state
+                    remaining = deadline - now
                     if remaining <= 0:
+                        if observed == start < target and stable_since is not None and stable_value == start:
+                            # An upward write that held at its start for the whole window (first
+                            # step after a restart, at the limit): this one still errors, but the
+                            # next upward step that holds at this level is accepted as the limit.
+                            self._volume_ceiling[group_uid] = start
                         raise SonosError("The requested volume was not confirmed. Refresh the room state before retrying.")
                     self._sleep(min(READBACK_POLL_S, remaining))
             except SonosError:
@@ -1518,24 +1619,73 @@ class SonosAdapter:
     def _save_shuffle_record(self, record: dict) -> None:
         self._shuffle_store().save(record)
         self._shuffle_record = record
+        self._shuffle_checked = None
+        # A drop still pending from a failed write is superseded: this save overwrote the same
+        # file, and retrying the drop would delete the record just made (DD-BUG-034 review).
+        self._shuffle_drop_pending = False
 
     def _drop_shuffle_record(self) -> None:
         """Delete the restore record (a start replaced the queue, or it no longer attributes).
         Only a record already loaded is touched: a start never reads the store by itself (a record
-        it did not load no longer attributes to the new queue, which invalidates it, section 9.5.5)."""
-        if self._shuffle_record:
+        it did not load no longer attributes to the new queue, which invalidates it, section 9.5.5).
+        DD-BUG-034: a failed store write removes the file instead, and failing that is retried by
+        the next state read, so a dropped record never comes back at the next start."""
+        if self._shuffle_record or self._shuffle_drop_pending:
+            self._shuffle_record, self._shuffle_checked = {}, None
             try:
-                self._save_shuffle_record({})
+                self._shuffle_store().save({})
+                self._shuffle_drop_pending = False
+                return
             except Exception:
-                self._shuffle_record = {}
+                pass
+            try:
+                path = getattr(self._shuffle_store(), "path", None)
+                if path is not None:
+                    Path(path).unlink(missing_ok=True)
+                    self._shuffle_drop_pending = False
+                    return
+            except Exception:
+                pass
+            self._shuffle_drop_pending = True
 
-    def _realise(self, coordinator, position, total, model, remaining, step):
+    def _companion_shuffle_current(self, coordinator, update_id: str) -> bool:
+        """``read_state()["companion_shuffle"]`` (DD-BUG-034): the record exists for this room and
+        the queue is still the one it was made for. While no job of ours is moving rows, a queue
+        UpdateID the record has not been checked at (neither the one the shuffle finished at nor the
+        last one checked) reads the queue once; a record whose base rows are no longer all in the
+        queue (replaced or cleared elsewhere) is dropped."""
+        if self._shuffle_drop_pending:
+            self._drop_shuffle_record()
+        record = self._shuffle_record_for_room()
+        if not record:
+            return False
+        if self._shuffle_job or update_id in (self._shuffle_checked, str(record.get("update_id_after"))):
+            return True
+        try:
+            snapshot = self._queue(coordinator)
+        except Exception:
+            return True                      # unreadable now: judged at the next poll
+        if snapshot.revision != update_id:
+            return True                      # moved again while reading: judged at the next poll
+        if _record_attributes(snapshot.items, record["base_rows"]):
+            self._shuffle_checked = update_id
+            return True
+        self._drop_shuffle_record()
+        return False
+
+    def _realise(self, coordinator, position, total, model, remaining, step, expected_update_id):
         """Guarded single-row moves filling rows left to right from ``position + 1`` (section 9.5.2
         step 5, C5-50). ``model`` holds the row signatures 1..T and follows every move. Before each
         move the ``UpdateID`` and then the playing row are read; a song that ended freezes the rows
         up to the new playing row and the plan continues after it; a jump elsewhere stops the job.
-        No row at or before the playing row ever moves. Returns (model, the last playing row)."""
+        No row at or before the playing row ever moves. Returns (model, the last playing row).
+
+        DD-BUG-035: ``expected_update_id`` is the queue version ``model`` describes (the snapshot's
+        at the start). Each move compares the UpdateID it reads with it (another app's edit between
+        steps raises ``QueueChanged`` before any move), and the UpdateID read right after its own
+        Reorder, in the same locked step, becomes the next expected version."""
         k, current = position + 1, position
+        expected = str(expected_update_id)
         while remaining:
             want = remaining[0]
             found = next((i + 1 for i in range(k - 1, len(model)) if model[i] == want), None)
@@ -1547,6 +1697,8 @@ class SonosAdapter:
                 continue
             with self._lock:
                 update_id = str(coordinator.get_queue(start=0, max_items=1).update_id)
+                if update_id != expected:
+                    raise QueueChanged("The queue changed while shuffling.")
                 playing = self._position(coordinator.get_current_track_info())
                 if playing < position or playing > total:
                     raise QueueChanged("Playback moved elsewhere while shuffling.")
@@ -1563,6 +1715,7 @@ class SonosAdapter:
                 model.insert(k - 1, model.pop(found - 1))
                 remaining.pop(0)
                 k += 1
+                expected = str(coordinator.get_queue(start=0, max_items=1).update_id)
             step()
         return model, current
 
@@ -1593,6 +1746,7 @@ class SonosAdapter:
         """
         report = progress or _noop
         step = between_steps or _noop
+        self._shuffle_job = True
         try:
             if on:
                 return self._shuffle_on(expected_group_revision, expected_track_id, plan, playnext_offsets,
@@ -1602,6 +1756,8 @@ class SonosAdapter:
             raise
         except Exception:
             raise SonosUnavailable("Sonos is unavailable.") from None
+        finally:
+            self._shuffle_job = False
 
     def _shuffle_on(self, revision, track_id, plan, playnext_offsets, expected_rows, report, step):
         with self._lock:
@@ -1634,7 +1790,7 @@ class SonosAdapter:
         report({"phase": "accepted"})
         model = [_signature(x) for x in snapshot.items]
         remaining = [_signature(rows[offset]) for offset in plan]
-        model, current = self._realise(coordinator, position, total, model, remaining, step)
+        model, current = self._realise(coordinator, position, total, model, remaining, step, snapshot.revision)
         final = self._verify_order(coordinator, model, current)
         with self._lock:
             record = dict(record, update_id_after=final.revision)
@@ -1666,7 +1822,7 @@ class SonosAdapter:
         report({"phase": "accepted"})
         model = [_signature(x) for x in snapshot.items]
         remaining = pn_rows + [signature for _, signature in sorted(base_rows, key=lambda pair: pair[0])]
-        model, current = self._realise(coordinator, position, total, model, remaining, step)
+        model, current = self._realise(coordinator, position, total, model, remaining, step, snapshot.revision)
         self._verify_order(coordinator, model, current)
         with self._lock:
             self._drop_shuffle_record()

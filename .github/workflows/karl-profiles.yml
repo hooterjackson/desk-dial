@@ -1,0 +1,152 @@
+# Import Karl Malota's (katbinaris) app profiles and propose them as ONE pull request for review.
+# Plan §5c (app profiles). It never merges, never publishes a release and never pushes to main:
+# the only write is the bot branch `bot/karl-profiles` and its pull request.
+#
+# Karl's profiles live as C data in katbinaris/NanoD_RatchetH1 (feat/firmware-esp-idf-quadra). The
+# importer builds his own, unchanged JSON exporter (tools/profile_json_test) with gcc and a pinned
+# cJSON, validates every file with the same code Desk Dial ships, checks that the Windows sidecars
+# still resolve, regenerates profiles/index.json, and writes a change summary for the PR body.
+#
+# Two jobs (S3 review DD-4): `build` runs Karl's code with a read-only token and hands over only the
+# JSON files and the summary; `propose` holds the write token, never runs his code, checks the file
+# names, validates them with this repository's own tools and opens the pull request. Run in one job,
+# his exporter could have rewritten a later action's files and pushed with its token.
+#
+# Repository setting needed once: Settings -> Actions -> General -> "Allow GitHub Actions to create
+# and approve pull requests".
+name: Import Karl's app profiles
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Karl's commit or branch to import (empty = feat/firmware-esp-idf-quadra head)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: karl-profiles
+  cancel-in-progress: false
+
+env:
+  # Desk Dial's folder in this repository (the public repo keeps the app under app/).
+  APP: app
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      files: ${{ steps.pack.outputs.files }}
+      summary: ${{ steps.pack.outputs.summary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Import Karl's profiles (his exporter, pinned cJSON)
+        working-directory: ${{ env.APP }}
+        env:
+          KARL_REF: ${{ github.event.inputs.ref }}
+        run: |
+          set -euo pipefail
+          args=(--compiler gcc --out profiles/karl --summary "$RUNNER_TEMP/summary.md")
+          if [ -n "${KARL_REF:-}" ]; then args+=(--ref "$KARL_REF"); fi
+          python tools/profiles/import_karl.py "${args[@]}"
+
+      - name: Validate every profile and sidecar
+        working-directory: ${{ env.APP }}
+        run: python tools/profiles/validate.py profiles
+
+      - name: Hand over the JSON files and the summary (data only)
+        id: pack
+        working-directory: ${{ env.APP }}
+        run: |
+          set -euo pipefail
+          python - >> "$GITHUB_OUTPUT" <<'PY'
+          import base64, json, os, pathlib
+          files = {p.name: base64.b64encode(p.read_bytes()).decode("ascii")
+                   for p in sorted(pathlib.Path("profiles/karl").glob("*.json"))}
+          summary = pathlib.Path(os.environ["RUNNER_TEMP"], "summary.md").read_bytes()
+          print("files=" + base64.b64encode(json.dumps(files).encode("ascii")).decode("ascii"))
+          print("summary=" + base64.b64encode(summary).decode("ascii"))
+          PY
+
+  propose:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Unpack the imported files (names and sizes checked)
+        working-directory: ${{ env.APP }}
+        env:
+          KARL_FILES: ${{ needs.build.outputs.files }}
+          KARL_SUMMARY: ${{ needs.build.outputs.summary }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, json, os, pathlib, re
+          out = pathlib.Path("profiles/karl")
+          files = json.loads(base64.b64decode(os.environ["KARL_FILES"], validate=True))
+          if not isinstance(files, dict) or not files or len(files) > 64:
+              raise SystemExit("unexpected file list")
+          data = {}
+          for name, b64 in files.items():
+              if not re.fullmatch(r"(?:[a-z0-9_-]{1,11}|SOURCE)\.json", name):
+                  raise SystemExit(f"refused file name {name!r}")
+              raw = base64.b64decode(b64, validate=True)
+              if len(raw) > 128 * 1024:
+                  raise SystemExit(f"{name}: too big")
+              data[name] = raw
+          for stale in out.glob("*.json"):
+              if stale.name not in data:
+                  stale.unlink()
+          for name, raw in data.items():
+              (out / name).write_bytes(raw)
+          summary = base64.b64decode(os.environ["KARL_SUMMARY"], validate=True)
+          pathlib.Path(os.environ["RUNNER_TEMP"], "summary.md").write_bytes(summary[:60000])
+          PY
+
+      - name: Validate every profile and sidecar
+        working-directory: ${{ env.APP }}
+        run: python tools/profiles/validate.py profiles
+
+      - name: Regenerate profiles/index.json
+        working-directory: ${{ env.APP }}
+        run: python tools/profiles/make_index.py
+
+      - name: Open or update the review pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: bot/karl-profiles
+          delete-branch: true
+          add-paths: |
+            ${{ env.APP }}/profiles/karl/*.json
+            ${{ env.APP }}/profiles/index.json
+          commit-message: "profiles: import Karl's app profiles (automated, for review)"
+          title: "Import Karl's app profiles"
+          body-path: ${{ runner.temp }}/summary.md
+          labels: profiles
+          draft: false

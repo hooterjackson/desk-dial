@@ -249,7 +249,7 @@ class FakeQueue(list):
 
 class FakeSpeaker:
     def __init__(self):
-        self.uid, self.player_name, self.ip_address = "ROOM", "Den", "192.168.1.50"
+        self.uid, self.player_name, self.ip_address = "ROOM", "Hall", "192.168.1.50"
         self.is_satellite, self.is_bridge = False, False
         self.zone_group_state = SimpleNamespace(clear_cache=lambda: None)
         self.group = SimpleNamespace(uid="GROUP", coordinator=self, members={self}, volume=25)

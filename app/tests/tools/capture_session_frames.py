@@ -38,7 +38,7 @@ under script control, and one fake clock drives the controller, the runtime, the
 the bridge, so a capture is deterministic.
 
 Usage: .venv\\Scripts\\python.exe tests\\tools\\capture_session_frames.py [--out capture.jsonl]
-Then:  .venv\\Scripts\\python.exe ..\\harness\\parse_tests.py --frames capture.jsonl
+Then:  .venv\\Scripts\\python.exe ..\\..\\harness\\parse_tests.py --frames capture.jsonl
 """
 from __future__ import annotations
 
@@ -394,28 +394,28 @@ class FakeIcons:
 # Track and library text: multibyte (latin-ext-a and beyond), JSON escapes, control
 # characters, combining marks, compatibility forms and over-capacity titles.
 TRACKS = [  # The Sonos queue's first rows; the script skips across all of them.
-    ("Colombina", "Mari Froes"),
+    ("Varanda", "Ana Ribeira"),
     ('Say "Hello" \\ Goodbye', "The Backslashes"),
     ("Straße 🎵 Mix\tfor\nNight", "DJ Ørsted"),
     ("Cafe\u0301 ﬁnale – ½ time €", "Ensemble Übung"),
-    ("Déjà Vu", "Beyoncé"),
+    ("Maré Alta", "Renée Lys"),
     ("Łódź “Nocturne” (Live)", "Zbigniew Preisner"),
     ("x" * 91 + "éééé and more", "Überlänge " * 12),  # both over 96 bytes, cut inside "é"
 ]
 QUEUE_ROWS = 12            # TRACKS, then plain rows (the Up next windows and the queue end)
 
 ALBUMS = [  # (title, artist, kind, available): the Recently Added list, in Apple order
-    ("Colombina", "Mari Froes", "album", True), ("Déjà Vu", "Beyoncé", "song", True),
-    ("Ænima", "Tool", "album", True), ("Sigur Rós · Ágætis byrjun", "Sigur Rós", "album", True),
+    ("Varanda", "Ana Ribeira", "album", True), ("Maré Alta", "Renée Lys", "song", True),
+    ("Ænima", "Tool", "album", True), ("North of June · Ásæla ljós", "North of June", "album", True),
     ("Łódź Sessions", "Zbigniew Preisner", "playlist", True), ("Unavailable library upload", "", "song", False),
     ("Motörhead — Overkill", "Motörhead", "album", True), ("Café Tacvba", "Café Tacvba", "album", True),
     ("A very long album title that keeps its readable type size on the knob’s round screen, really",
      "Various Artists", "album", True),
     ('Quotes "and" \\backslashes\\', "Escape Artists", "playlist", True),
     ("Straße nach Süden", "Die Ärzte", "album", True), ("Ïn Cölör", "Jamie xx", "album", True),
-    ("Moon Safari", "Air", "album", True), ("Private upload (no match)", "", "album", False),
-    ("Selected Ambient Works 85–92", "Aphex Twin", "album", True), ("Ōkami Original Soundtrack", "Various", "album", True),
-    ("Kind of Blue", "Miles Davis", "album", True), ("Rhythm & Ñ", "Ñu", "song", True),
+    ("Midnight Arcade", "Air", "album", True), ("Private upload (no match)", "", "album", False),
+    ("Field Recording 01–09", "The Low Hours", "album", True), ("Ōkami Original Soundtrack", "Various", "album", True),
+    ("Tidal Glass", "Oskar Lind Trio", "album", True), ("Rhythm & Ñ", "Ñu", "song", True),
     ("日本語タイトル", "アーティスト", "album", True), ("Evening Research", "Sample", "playlist", True),
     ("Signals", "Rush", "album", True), ("Ça plane pour moi", "Plastic Bertrand", "song", True),
     ("Žužemberk", "Šoštanj", "album", True), ("Ğüzel", "Şebnem", "album", True),
@@ -425,9 +425,9 @@ ALBUMS = [  # (title, artist, kind, available): the Recently Added list, in Appl
 WINDOWS = [  # (app, title, open)
     ("Codex", "Nano_D++ control center", True), ("Claude", "Model training review", True),
     ("Chrome", "Apple Music documentation — Google Chrome", True), ("Slack", "Engineering · #firmware", False),
-    ("Microsoft Edge", "Déjà vu: a “quoted” page", True), ("Discord", "Friends", True),
+    ("Microsoft Edge", "Maré Alta: a “quoted” page", True), ("Discord", "Friends", True),
     ("Visual Studio Code", "cc_frame_parse.cpp — NanoD_RatchetH1", True), ("Spotify", "Motörhead — Overkill", True),
-    ("Outlook", "Inbox – marcelo@example.invalid", True), ("File Explorer", "C:\\Users\\Public\\Music", True),
+    ("Outlook", "Inbox – someone@example.invalid", True), ("File Explorer", "C:\\Users\\Public\\Music", True),
     ("Teams", "Weekly sync\twith tabs\nand newlines", True), ("Notepad++", "Łódź notes.txt", False),
     ("WhatsApp", "Família 👨‍👩‍👧", True), ("Figma", "Knob Face · design", True),
     ("Obsidian", "Straße — Übersicht", True), ("Calculator", "Calculator", True),
@@ -2009,8 +2009,11 @@ def script(s):
     s.press(0)
     s.step("home/paused")
     s.run("audio", "transport")
-    s.step("home/paused-idle")
-    s.wait(4.2)
+    s.step("home/paused-stays")
+    s.wait(4.2)                  # r3.1: paused keeps the Now Playing layout (art + buttons)
+    s.step("home/stopped-idle")
+    s.sonos.state["playback"] = "STOPPED"   # only a stopped player (or no media) rests on idle
+    s.wait(1.2)
     s.step("home/play-pending")
     s.press(0)
     s.step("home/playing")

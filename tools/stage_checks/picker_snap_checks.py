@@ -6,7 +6,7 @@ named with --real-hwnd): run it only from the main session, with the user's expl
 user at the PC:
 
     cd app
-    .venv\\Scripts\\python.exe -I ..\\tools\\stage_checks\\picker_snap_checks.py --run --i-have-go-ahead [--stress] [--no-s3] [--chrome gpu|cpu|both] [--real-hwnd 0x1234 ...]
+    .venv\\Scripts\\python.exe -I ..\\..\\tools\\stage_checks\\picker_snap_checks.py --run --i-have-go-ahead [--stress] [--no-s3] [--chrome gpu|cpu|both] [--real-hwnd 0x1234 ...]
 
 S3 needs two real windows the helper cannot make (K4 §6.5 S3 lists UWP and elevated): pass a UWP
 window (class ``ApplicationFrameWindow``: Settings, Calculator) and an elevated one (an

@@ -1,5 +1,30 @@
 """Roll the knob back (app0 only) to the release a cc5.x install replaced, and restore its record.
 
+--to cc5.7   cc5.8 -> cc5.7 F (firmware/BUILD-cc5.8.md, "Firmware rollback, cc5.8 -> cc5.7 F"; the v2.0.0 release
+             candidate): app0 from backups/nanod-cc5.7-before-cc5.8-active-app.bin (cc5.7 binary F at app0), full
+             image against backups/nanod-cc5.7-before-cc5.8-full.bin; --binary D|F names the cc5.8 binary rolled back
+             (evidence diagnostics/cc5.8-<X>-rollback.json). manifest.json goes back to the record in force before
+             cc5.8 (the cc5.3 record: cc5.4 D, cc5.5 F, cc5.6 F and cc5.7 F were never finalized). Desktop: no rollback
+             needed (Desk Dial 7.4.0.0 sends app profiles only to a knob that reports appProfiles).
+--to cc5.6   cc5.7 -> cc5.6 F (firmware/BUILD-cc5.7.md, "Firmware rollback, cc5.7 -> cc5.6 F"; plan F2 + F3, r4 FEEL +
+             SOUND): app0 from backups/nanod-cc5.6-before-cc5.7-active-app.bin (cc5.6 binary F at app0), full image
+             against backups/nanod-cc5.6-before-cc5.7-full.bin; --binary D|F names the cc5.7 binary rolled back
+             (evidence diagnostics/cc5.7-<X>-rollback.json). manifest.json goes back to the record in force before
+             cc5.7 (the cc5.3 record: cc5.4 D, cc5.5 F and cc5.6 F were never finalized). Desktop: no rollback needed
+             (Desk Dial 7.3.0.0 sends the r4 fields only to a knob that reports them).
+--to cc5.5   cc5.6 -> cc5.5 F (firmware/BUILD-cc5.6.md, "Firmware rollback, cc5.6 -> cc5.5 F"; plan A2): app0 from
+             backups/nanod-cc5.5-before-cc5.6-active-app.bin (cc5.5 binary F at app0), full image against
+             backups/nanod-cc5.5-before-cc5.6-full.bin; --binary D|F names the cc5.6 binary rolled back (evidence
+             diagnostics/cc5.6-<X>-rollback.json). manifest.json goes back to the record in force before cc5.6.
+             Desktop: no rollback needed (Desk Dial 7.2.0.0 keeps A0's text frames on cc5.5).
+--to cc5.4   cc5.5 -> cc5.4 D (firmware/BUILD-cc5.5.md, "Firmware rollback, cc5.5 -> cc5.4 D"): app0 from
+             backups/nanod-cc5.4-before-cc5.5-active-app.bin (cc5.4 binary D at app0), full image against
+             backups/nanod-cc5.4-before-cc5.5-full.bin. cc5.5 has its own ladder, D and F: --binary D|F names the
+             binary being rolled back (its preparation record diagnostics/cc5.5-<X>-preparation.json gives the
+             hashes; evidence diagnostics/cc5.5-<X>-rollback.json); without --binary the records choose, as below.
+             cc5.4 D was never finalized, so the record in force before cc5.5 is the cc5.3 record: manifest.json is
+             restored from firmware/manifest-cc5.3.json (tooling Release.restore_record; unchanged while cc5.5 was
+             not finalized either). Desktop: no rollback needed (every Desk Dial works with cc5.4 D and cc5.5).
 --to cc5.3   cc5.4 -> cc5.3 (firmware/BUILD-cc5.4.md, "Firmware rollback, cc5.4 -> cc5.3"): app0 from
              backups/nanod-cc5.3-before-cc5.4-active-app.bin, full image against
              backups/nanod-cc5.3-before-cc5.4-full.bin, record firmware/manifest-cc5.3.json. cc5.4 is
@@ -71,7 +96,9 @@ restored:
   2  STOPPED_BEFORE_WRITE: identity, partition table or OTA data did not match (or a usage
      error). Nothing was written, no reset; the installed release is still in app0.
   4  *_NO_RESET: a write or verify failed after the write started. The chip was NOT reset.
-     Do not reset or power-cycle; follow RECOVERY.md (manual commands).
+     Do not reset or power-cycle; run the manual commands it prints for this target (its own rollback
+     app0 and backup, the region-by-region verify, the reset only after every critical region matched,
+     then --records-only). RECOVERY.md's manual blocks name only the cc5 -> cc4 and cc5.3 -> cc5.2 files.
   5  ROLLED_BACK_VERIFIED_RESET_UNCONFIRMED: the target verified in flash, records restored, but
      the reset was not confirmed; the exact retry command is printed.
   6  The device rollback verified and reset, but manifest.json was NOT restored
@@ -118,12 +145,19 @@ def choose_binary(parser, target, binary):
                          "nothing was sent")
         return p, None
     if binary is not None:
+        if binary not in p.pipeline_binaries():
+            parser.error(f"--to {target} rolls back a {p.tag} binary ({'|'.join(p.pipeline_binaries())}), not "
+                         f"{binary}; nothing was sent")
         return p.binary_profile(binary), "--binary"
     newest, record, problems = t.newest_written_binary(p)
     if problems:
         parser.error(f"--binary is required: {'; '.join(problems)}, so the records cannot tell which {p.tag} binary "
                      f"was written last. Pass --binary {'|'.join(p.pipeline_binaries())}. Nothing was sent.")
     if newest is None:
+        if p.binary is None:
+            # A release with its own ladder (1.0.0-cc5.5) is none of its binaries: nothing of it was written.
+            parser.error(f"no {p.tag} flash record shows a write, so there is no {p.tag} binary to roll back; pass "
+                         f"--binary {'|'.join(p.pipeline_binaries())} if one was written by hand. Nothing was sent.")
         return p.binary_profile(None), f"default (no {p.tag} flash record shows a write)"
     return p.binary_profile(newest), f"records (newest write: {record})"
 
@@ -142,8 +176,8 @@ def default_target(parser):
         why = "; ".join(reason for reasons in later.values() for reason in reasons)
         parser.error(f"--to is required: the records show {', '.join(later)} written to the knob ({why}). "
                      "Pass --to cc5.3 to restore 1.0.0-cc5.3 from cc5.4, --to cc5.2 to restore 1.0.0-cc5.2 "
-                     "(RECOVERY.md section 6), or --to cc4 to go back to 1.0.0-cc4 (RECOVERY.md section 5). "
-                     "Nothing was sent.")
+                     "(RECOVERY.md section 6), or --to cc4 to go back to 1.0.0-cc4 (RECOVERY.md section 5); "
+                     "from cc5.5, --to cc5.4 restores 1.0.0-cc5.4 D. Nothing was sent.")
     return t.DEFAULT_ROLLBACK_TARGET
 
 
@@ -164,10 +198,16 @@ def check_files(prep, p=None):
 def check_record_inputs(p=None):
     """The records restored after the device rollback must be restorable before anything is sent."""
     p = p or t.CURRENT
-    record = t.load_json(p.from_record)
-    if (record.get("firmwareVersion") != p.from_version
-            or record.get("artifacts", {}).get(p.from_image.name, {}).get("sha256") != p.from_image_sha256):
-        raise SystemExit(f"{p.from_record.name} is not the {p.from_version} record; nothing was sent")
+    if p.from_finalized:
+        record = t.load_json(p.from_record)
+        if (record.get("firmwareVersion") != p.from_version
+                or record.get("artifacts", {}).get(p.from_image.name, {}).get("sha256") != p.from_image_sha256):
+            raise SystemExit(f"{p.from_record.name} is not the {p.from_version} record; nothing was sent")
+    else:
+        # A from-release never finalized (cc5.4 D under cc5.5): manifest.json goes back to the record it left in force.
+        problems = t.restore_record_problems(p)
+        if problems:
+            raise SystemExit(f"{problems[0]}; nothing was sent")
     if not t.ACTIVE_MANIFEST.is_file():
         raise SystemExit("firmware/manifest.json is missing; nothing was sent")
 
@@ -199,10 +239,10 @@ def restore_records(report, p=None):
     check_record_inputs(p)
     kept = t.unique_path(p.manifest_before_rollback(t.utc_stamp()))
     shutil.copyfile(t.ACTIVE_MANIFEST, kept)
-    shutil.copyfile(p.from_record, t.ACTIVE_MANIFEST)
-    if t.sha256_file(t.ACTIVE_MANIFEST) != t.sha256_file(p.from_record):
+    shutil.copyfile(p.restore_record, t.ACTIVE_MANIFEST)
+    if t.sha256_file(t.ACTIVE_MANIFEST) != t.sha256_file(p.restore_record):
         raise SystemExit("manifest.json restore did not verify")
-    report["manifestRestored"] = {"from": p.from_record.name, "previousKeptAs": kept.name}
+    report["manifestRestored"] = {"from": p.restore_record.name, "previousKeptAs": kept.name}
     marked = []
     for path in removed_manifests(p):
         if not path.is_file():
@@ -253,6 +293,62 @@ def device_rollback(esptool, report, before, workdir, p=None):
     return "ROLLED_BACK_VERIFIED_RESET" if report["reset"] else "ROLLED_BACK_VERIFIED_RESET_UNCONFIRMED"
 
 
+def manual_recovery_commands(p, port, target, before, workdir, python=None, baud="460800"):
+    """The exact PowerShell lines that finish a failed rollback (exit 4) by hand for profile `p`: write and verify
+    its rollback app0, verify the full image against its own backup and, region by region, every critical region
+    (their pieces are written into `workdir`), reset only when all of that passed, then restore the records.
+    Never an erase, never a full-image write."""
+    python = python or str(t.FLASH_VENV / "Scripts" / "python.exe")
+
+    def esptool(args, after="no_reset_stub"):
+        args = [str(a) for a in t.validate_esptool_args(args)]
+        shown = " ".join(f"'{a}'" if ("\\" in a or "/" in a) else a for a in args)
+        return (f"& $flashPython -u -m esptool --chip esp32s3 --port {port} --baud {baud} --before no_reset "
+                f"--after {after} {shown}")
+
+    lines = [f"$flashPython = '{python}'",
+             esptool([*WRITE_ARGS, hex(t.APP_OFFSET), str(p.rollback_app)]),
+             esptool(["verify_flash", hex(t.APP_OFFSET), str(p.rollback_app)]),
+             esptool(["verify_flash", "0x0", str(p.before_full)])]
+    regions = []
+    try:
+        partitions = t.parse_partition_table(
+            before[t.PARTITION_TABLE_OFFSET:t.PARTITION_TABLE_OFFSET + t.PARTITION_TABLE_SIZE])
+        for name, start, end in t.flash_regions(partitions):
+            if t.is_critical_region(name):
+                piece = workdir / f"region-{name}.bin"
+                piece.write_bytes(before[start:end])
+                regions.append(esptool(["verify_flash", hex(start), str(piece)]))
+    except (OSError, ValueError) as exc:
+        regions = [f"# region pieces could not be written ({type(exc).__name__}: {exc}); "
+                   f"the full verify against {p.before_full.name} must pass"]
+    records = (f"& $flashPython '{Path(__file__).resolve()}' --to {target}"
+               + (f" --binary {p.binary}" if p.binary else "") + " --records-only")
+    return {"setup": lines[:1], "write": lines[1:3], "fullVerify": lines[3:4], "regionVerify": regions,
+            "reset": [esptool(["read_mac"], after="hard_reset")], "records": [records]}
+
+
+def print_manual_recovery(p, port, target, before, workdir):
+    """Print manual_recovery_commands() as a numbered runbook; returns the commands (for the evidence)."""
+    block = manual_recovery_commands(p, port, target, before, workdir)
+    print(f"Manual recovery, {p.tag} -> {p.from_tag} (rollback app0 {p.rollback_app.name}, backup "
+          f"{p.before_full.name}). Run each line once, in order, in PowerShell from work. Stop at the first "
+          "line that does not exit 0 and leave the chip as it is, with one exception: if step 3 fails, "
+          "go on to step 4 and stop at the first line of step 4 that does not exit 0:", flush=True)
+    steps = (("1. Interpreter (the flash venv):", "setup"),
+             ("2. Write and verify app0:", "write"),
+             ("3. Verify the full image against the backup:", "fullVerify"),
+             ("4. Only if 3 failed: every critical region must still match (nvs, spiffs and coredump may differ):",
+              "regionVerify"),
+             ("5. Only when 2 and 3 (or every line of 4) passed: the reset:", "reset"),
+             ("6. After the reset: restore the records:", "records"))
+    for title, key in steps:
+        print(title, flush=True)
+        for line in block[key]:
+            print(f"  {line}", flush=True)
+    return block
+
+
 def outcome_after_exception(report):
     """What an unexpected exception leaves, from the flags; nothing here resets."""
     if report.get("verified"):
@@ -265,7 +361,9 @@ def outcome_after_exception(report):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--to", choices=sorted(t.ROLLBACK_TARGETS), default=None,
-                        help="the release to restore: cc5.3 (from cc5.4), cc5.2 (from cc5.3, RECOVERY.md "
+                        help="the release to restore: cc5.7 (binary F, from cc5.8), cc5.6 (binary F, from cc5.7), "
+                             "cc5.5 (binary D, from cc5.6), cc5.4 (binary D, from cc5.5), cc5.3 (from cc5.4), cc5.2 "
+                             "(from cc5.3, RECOVERY.md "
                              "section 6) or cc4 "
                              f"(history, RECOVERY.md section 5; the default ({t.DEFAULT_ROLLBACK_TARGET}) only "
                              "while the records never show 1.0.0-cc5.3 written)")
@@ -274,9 +372,10 @@ def main(argv=None):
                              "(after a verified manual rollback)")
     ladder = sorted({b for q in t.ROLLBACK_TARGETS.values() for b in q.pipeline_binaries()})
     parser.add_argument("--binary", choices=ladder or None, default=None,
-                        help="with --to cc5.3: the cc5.4 binary (PRESENTATION_V5 12.6 ladder, A..E, the retired "
-                             "ones included) being rolled back, whose preparation and evidence names are used "
-                             "(default: the binary the records show written last, else A)")
+                        help="with --to cc5.4: the cc5.5 binary (D or F) being rolled back; with --to cc5.3: the "
+                             "cc5.4 binary (PRESENTATION_V5 12.6 ladder, A..E, the retired ones included); its "
+                             "preparation and evidence names are used (default: the binary the records show written "
+                             "last, else A for cc5.4)")
     args = parser.parse_args(argv)
     if args.to is None:
         args.to = default_target(parser)
@@ -321,8 +420,10 @@ def main(argv=None):
             esptool = t.Esptool(port, report, p.rollback_log_prefix)
             try:
                 outcome = device_rollback(esptool, report, before, workdir, p)
-            except Exception as exc:
+            except BaseException as exc:  # Ctrl+C (KeyboardInterrupt) too: app0 may be half written, never reset
                 report["exception"] = f"{type(exc).__name__}: {exc}"
+                if isinstance(exc, KeyboardInterrupt):
+                    report["interrupted"] = True
                 traceback.print_exc()
                 outcome = outcome_after_exception(report)
         report["outcome"] = outcome
@@ -351,7 +452,15 @@ def main(argv=None):
                   "written and the chip was not reset; the installed release is still in app0.", flush=True)
         else:
             print("Rollback did NOT complete; the chip was NOT reset. Do not reset or power-cycle. "
-                  "Follow firmware/RECOVERY.md (manual commands).", flush=True)
+                  f"Follow the manual commands below for {p.tag} -> {p.from_tag} (firmware/RECOVERY.md's manual "
+                  "blocks name only the cc5 -> cc4 and cc5.3 -> cc5.2 files).", flush=True)
+            try:
+                report["manualRecovery"] = print_manual_recovery(p, port, args.to, before, workdir)
+            except Exception as exc:  # the exit-4 warning above stands; never mask the outcome
+                report["manualRecoveryError"] = f"{type(exc).__name__}: {exc}"
+                print(f"The manual commands could not be built ({report['manualRecoveryError']}): write "
+                      f"{p.rollback_app.name} at 0x10000, verify it and the full image against "
+                      f"{p.before_full.name}, then reset.", flush=True)
         if outcome in RECORD_OUTCOMES and report.get("dataRegionsChangedSinceBackup"):
             print(f"Data regions changed since {p.before_full.name}, kept as they are: "
                   f"{', '.join(report['dataRegionsChangedSinceBackup'])}. A step-down to another binary reads a "

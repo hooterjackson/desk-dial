@@ -22,42 +22,42 @@
   const LV = { back: 'LV_SYMBOL_LEFT', cancel: 'LV_SYMBOL_CLOSE', home: 'LV_SYMBOL_HOME', list: 'LV_SYMBOL_LIST', win: 'LV_SYMBOL_COPY', tracks: 'LV_SYMBOL_PREV + LV_SYMBOL_NEXT', play: 'LV_SYMBOL_PLAY', pause: 'LV_SYMBOL_PAUSE', prev: 'LV_SYMBOL_PREV', next: 'LV_SYMBOL_NEXT', more: 'LV_SYMBOL_PLUS', switch: 'LV_SYMBOL_SHUFFLE (closest)', ok: 'LV_SYMBOL_OK', dot: 'LV_SYMBOL_BULLET', warn: 'LV_SYMBOL_WARNING', usb: 'LV_SYMBOL_USB' };
 
   const QUEUE = [
-    { t: 'Águas de Março', a: 'Elis Regina & Tom Jobim', al: 'Elis & Tom' },
-    { t: 'Cloudbusting', a: 'Kate Bush', al: 'Hounds of Love' },
-    { t: 'Unfinished Sympathy', a: 'Massive Attack', al: 'Blue Lines' },
-    { t: 'So What', a: 'Miles Davis', al: 'Kind of Blue' }
+    { t: 'Águas de Março', a: 'Lua Serena & Tom Jobim', al: 'Lua & Mar' },
+    { t: 'Pressure Front', a: 'Mira Vale', al: 'Paper Lanterns' },
+    { t: 'Harbour Song', a: 'Lumen Park', al: 'Neon Littoral' },
+    { t: 'So What', a: 'Oskar Lind Trio', al: 'Tidal Glass' }
   ];
   const LOCAL = {
-    'Hounds of Love': 'hounds-of-love.png', 'Blue Lines': 'blue-lines.jpg', 'Night Drive': 'night-drive-chromatics-album-.jpg',
-    'Tropicália ou Panis et Circencis': 'tropic-lia-ou-panis-et-circencis.jpg', 'Kind of Blue': 'kind-of-blue.jpg',
-    'Moon Safari': 'moon-safari.png', 'Elis & Tom': 'elis-tom.jpg', 'Promises': 'promises-floating-points-pharoah-sanders.png',
-    'Heligoland': 'heligoland-album-.png'
+    'Paper Lanterns': 'hounds-of-love.png', 'Neon Littoral': 'blue-lines.jpg', 'Night Channel': 'night-drive-velvet circuit-album-.jpg',
+    'Copper Sun Sessions': 'tropic-lia-ou-panis-et-circencis.jpg', 'Tidal Glass': 'kind-of-blue.jpg',
+    'Midnight Arcade': 'moon-safari.png', 'Lua & Mar': 'elis-tom.jpg', 'Promises': 'promises-floating-points-pharoah-sanders.png',
+    'Glass Weather': 'glass weather-album-.png'
   };
   const P = (t, a, k, x) => Object.assign({ t, a, k }, x || {});
   const PAGES = [
-    [P('Colombina – Single', 'Mari Froes', 'Single'),
-     P('Tropicália ou Panis et Circencis', 'Caetano Veloso, Gilberto Gil, Os Mutantes & Gal Costa', 'Album'),
-     P('Night Drive', 'Chromatics', 'Album'),
+    [P('Varanda – Single', 'Ana Ribeira', 'Single'),
+     P('Copper Sun Sessions', 'Caetano Veloso, Gilberto Gil, Os Faróis & Gal Costa', 'Album'),
+     P('Night Channel', 'Velvet Circuit', 'Album'),
      P('Jazz Is Dead 023', 'Adrian Younge & Ali Shaheed Muhammad', 'Album'),
-     P('Promises', 'Floating Points, Pharoah Sanders & LSO', 'Album'),
-     P('Vespertine (Live at Royal Opera House)', 'Björk', 'Album', { na: true }),
+     P('Promises', 'Harbour Signals, Sodium Coast & LSO', 'Album'),
+     P('Perihelion (Live at Harbour Hall)', 'Linnéa Holm', 'Album', { na: true }),
      P('Deep Focus', 'Apple Music', 'Playlist'),
      P('Minuano (Six Eight)', 'Pat Metheny Group', 'Single'),
-     P('Blue Lines', 'Massive Attack', 'Album'),
-     P('Hounds of Love', 'Kate Bush', 'Album')],
-    [P('Djesse Vol. 4', 'Jacob Collier', 'Album'),
+     P('Neon Littoral', 'Lumen Park', 'Album'),
+     P('Paper Lanterns', 'Mira Vale', 'Album')],
+    [P('Field Notes No. 3', 'The Quiet Harbour', 'Album'),
      P('Glória', 'Sílvia Pérez Cruz', 'Single'),
-     P('Kind of Blue', 'Miles Davis', 'Album'),
-     P('Ágætis byrjun', 'Sigur Rós', 'Album'),
-     P('Música de Brinquedo', 'Pato Fu', 'Album', { na: true }),
-     P('Heligoland', 'Massive Attack', 'Album'),
+     P('Tidal Glass', 'Oskar Lind Trio', 'Album'),
+     P('Ásæla ljós', 'North of June', 'Album'),
+     P('Música do Porto', 'Cidade Lenta', 'Album', { na: true }),
+     P('Glass Weather', 'Lumen Park', 'Album'),
      P('Clube da Esquina', 'Milton Nascimento & Lô Borges', 'Album'),
      P('Late Night Tales', 'Khruangbin', 'Album'),
-     P('Moon Safari', 'Air', 'Album'),
+     P('Midnight Arcade', 'Air', 'Album'),
      P('Coding Mix', 'Apple Music', 'Playlist')],
-    [P('Elis & Tom', 'Elis Regina & Antônio Carlos Jobim', 'Album'),
+    [P('Lua & Mar', 'Lua Serena & Antônio Carlos Jobim', 'Album'),
      P('Sea Change', 'Beck', 'Album'),
-     P('Selected Ambient Works 85–92', 'Aphex Twin', 'Album')]
+     P('Field Recording 01–09', 'The Low Hours', 'Album')]
   ];
   const APPIC = { Codex: 'chatgpt.png', ChatGPT: 'chatgpt.png', Claude: 'claude.png', Chrome: 'chrome.png', Terminal: 'term.png', Slack: 'slack.png' };
   const WINS = [
@@ -142,7 +142,7 @@
 
   function init() {
     return {
-      conn: 'ok', sonos: 'ok', room: 'Den', qi: 1, np: null,
+      conn: 'ok', sonos: 'ok', room: 'Hall', qi: 1, np: null,
       vol: 54, volConf: 54, volSeq: 0, ext: false, volVis: false, volHideSeq: 0,
       playing: true, playReq: true, playSeq: 0,
       mode: 'home',
@@ -188,7 +188,7 @@
           if (s.sonos !== 'ok') break;
           s.volVis = true; s.volHideSeq++; later(1400, { t: 'volHide', seq: s.volHideSeq });
           const nv = clamp(s.vol + d, 0, 100);
-          if (nv !== s.vol) { s.vol = nv; s.ext = false; s.volSeq++; later(380, { t: 'volAck', seq: s.volSeq }); cmd = `Sonos · Den group volume → ${nv}`; }
+          if (nv !== s.vol) { s.vol = nv; s.ext = false; s.volSeq++; later(380, { t: 'volAck', seq: s.volSeq }); cmd = `Sonos · Hall group volume → ${nv}`; }
         } else if (s.mode === 'recent') {
           const r = s.recent; if (!['ready', 'partial'].includes(r.status)) break;
           r.idx = clamp(r.idx + d, 0, entries(s).length - 1); r.status = 'ready';
@@ -207,7 +207,7 @@
         if (s.mode === 'home') {
           if (n === 1 && s.sonos === 'ok' && !s.nothing && s.playReq === s.playing) {
             s.playReq = !s.playing; s.playSeq++; s.pIdle = false; s.pIdleSeq = (s.pIdleSeq || 0) + 1; later(420, { t: 'playAck', seq: s.playSeq });
-            cmd = `Sonos · Den ${s.playReq ? 'play' : 'pause'}`;
+            cmd = `Sonos · Hall ${s.playReq ? 'play' : 'pause'}`;
           }
           else if (n === 2) openRecent();
           else if (n === 3) openWin();
@@ -223,7 +223,7 @@
             if (!['ready', 'partial'].includes(r.status)) break;
             const e = entries(s)[r.idx];
             if (e.more) { r.stack.push(r.idx); r.page++; r.idx = 0; r.status = 'loading'; later(550, { t: 'loaded' }); cmd = `Apple Music · fetch Recently Added page ${r.page + 1}`; }
-            else if (!e.na && s.sonos === 'ok') { r.status = 'pending'; later(1200, { t: 'playDone' }); cmd = `Sonos · replace Den queue with “${e.t}”, play`; }
+            else if (!e.na && s.sonos === 'ok') { r.status = 'pending'; later(1200, { t: 'playDone' }); cmd = `Sonos · replace Hall queue with “${e.t}”, play`; }
           }
         } else if (s.mode === 'tracks') {
           const t = s.tracks;
@@ -283,7 +283,7 @@
       case 'flashEnd': if (s.flash && s.flash.id === a.id) s.flash = null; break;
       case 'external': s.vol = s.volConf = 38; s.ext = true; s.volSeq++; s.volVis = true; s.volHideSeq++; later(2600, { t: 'volHide', seq: s.volHideSeq }); later(6000, { t: 'extClear', seq: s.volSeq }); cmd = 'Sonos event · volume 38 (changed elsewhere)'; break;
       case 'extClear': if (a.seq === s.volSeq) s.ext = false; break;
-      case 'sonos': s.sonos = s.sonos === 'ok' ? 'off' : 'ok'; if (s.sonos === 'ok') s.vol = s.volConf; cmd = s.sonos === 'ok' ? 'Sonos · Den reachable, state refreshed' : 'Sonos · Den unreachable'; break;
+      case 'sonos': s.sonos = s.sonos === 'ok' ? 'off' : 'ok'; if (s.sonos === 'ok') s.vol = s.volConf; cmd = s.sonos === 'ok' ? 'Sonos · Hall reachable, state refreshed' : 'Sonos · Hall unreachable'; break;
       case 'closeWin':
         if (s.mode === 'windows' && !s.win.closed.includes(s.win.idx)) { s.win.closed.push(s.win.idx); cmd = 'Win32 · highlighted window closed (slot kept)'; }
         break;
@@ -294,7 +294,7 @@
         const f = init(); Object.assign(f, keep); f.vol = keep.volConf; cmd = 'USB · reconnected, fresh state read, Volume';
         return { s: f, fx, cmd };
       }
-      case 'nothing': s.nothing = !s.nothing; if (s.mode === 'tracks' && s.nothing) s.mode = 'home'; cmd = s.nothing ? 'Sonos · Den queue empty, transport STOPPED' : 'Sonos · Den playing'; break;
+      case 'nothing': s.nothing = !s.nothing; if (s.mode === 'tracks' && s.nothing) s.mode = 'home'; cmd = s.nothing ? 'Sonos · Hall queue empty, transport STOPPED' : 'Sonos · Hall playing'; break;
       case 'opt': s.opt[a.k] = !s.opt[a.k]; if (a.k === 'auth' && s.mode === 'recent') s.recent.status = s.opt.auth ? 'auth' : 'ready'; break;
     }
     return { s, fx, cmd };
@@ -434,8 +434,8 @@
         } else {
           Object.assign(lcd, { title: e.t, sub: e.a, meta: `${posTxt} · Replaces queue`, art: cover(e.t) });
           foot[3] = F('play', 'Play', s.sonos === 'ok' ? 'go' : 'dim'); set(cursor, ac(e), 3);
-          actions = '4 Play: whole ' + e.k.toLowerCase() + ' on Den, replaces queue.';
-          if (s.sonos !== 'ok') { lcd.meta = `${posTxt} · Sonos unavailable`; actions = 'Play disabled until Den returns.'; }
+          actions = '4 Play: whole ' + e.k.toLowerCase() + ' on Hall, replaces queue.';
+          if (s.sonos !== 'ok') { lcd.meta = `${posTxt} · Sonos unavailable`; actions = 'Play disabled until Hall returns.'; }
         }
         if (r.status === 'pending') {
           lcd.meta = 'Starting…'; lcd.mc = T2;
@@ -534,7 +534,7 @@
 
   function stress() {
     return [
-      { name: 'Long accented title, Volume', note: 'Single line, ellipsis at 170 px. Artist keeps its own line.', st: mk({ np: { t: 'Tropicália ou Panis et Circencis', a: 'Caetano Veloso, Gilberto Gil, Os Mutantes & Gal Costa' } }) },
+      { name: 'Long accented title, Volume', note: 'Single line, ellipsis at 170 px. Artist keeps its own line.', st: mk({ np: { t: 'Copper Sun Sessions', a: 'Caetano Veloso, Gilberto Gil, Os Faróis & Gal Costa' } }) },
       { name: 'Long accented title, browsing', note: 'Two lines at 22 px, then ellipsis. Never shrinks.', st: mk({ mode: 'recent', recent: { idx: 1 } }) },
       { name: '0 %', note: 'Only the start mark lit. “Minimum” explains the bound.', st: mk({ vol: 0, volConf: 0, volVis: true }) },
       { name: '100 %', note: 'Arc meets the end mark. No red, no warning.', st: mk({ vol: 100, volConf: 100, volVis: true }) },

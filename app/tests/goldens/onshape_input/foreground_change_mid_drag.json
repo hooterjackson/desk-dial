@@ -1,0 +1,13 @@
+{
+"batches": [
+ {"events": [["down", "right"], ["move", 500, 405], ["move", 500, 400]], "inputs": [{"data": 0, "dx": 0, "dy": 0, "flags": 8, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24598, "flags": 49153, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24295, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["move", 500, 411]], "inputs": [{"data": 0, "dx": 17075, "dy": 24963, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["move", 500, 422]], "inputs": [{"data": 0, "dx": 17075, "dy": 25631, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["up", "right"], ["move", 500, 400]], "inputs": [{"data": 0, "dx": 0, "dy": 0, "flags": 16, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24295, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["down", "right"], ["move", 500, 405], ["move", 500, 400]], "inputs": [{"data": 0, "dx": 0, "dy": 0, "flags": 8, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24598, "flags": 49153, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24295, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["move", 500, 411]], "inputs": [{"data": 0, "dx": 17075, "dy": 24963, "flags": 49153, "type": "mouse"}], "t": 0.0},
+ {"events": [["up", "right"], ["move", 500, 400]], "inputs": [{"data": 0, "dx": 0, "dy": 0, "flags": 16, "type": "mouse"}, {"data": 0, "dx": 17075, "dy": 24295, "flags": 49153, "type": "mouse"}], "t": 0.0}
+],
+"feedback": [],
+"status": {"action": "zoom", "active": true, "commands": 0, "commandsSkipped": 0, "dragging": false, "drags": 2, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 3, "refusals": 0, "releases": {"foreground": 1, "ku": 1}, "scrolls": 0, "short": 0, "typed": 0, "undo": 0, "undoSkipped": 0, "wheel": 0}
+}

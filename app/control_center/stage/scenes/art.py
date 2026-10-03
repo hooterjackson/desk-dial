@@ -312,7 +312,11 @@ class ArtService:
             self.add(Job(("warm", k, "fast"), (4,), lambda k=k: _warm_faces(k), owner=None, lane=LANE_FAST))
 
     def close(self, timeout=1.0):
+        """Stop the workers. DD-RES-014: ``timeout`` is one shared deadline for every worker (a
+        quit with several mid-download workers waits at most ``timeout``, not one per worker), and
+        a second close only reports (it never waits again). True when every worker stopped."""
         with self._cond:
+            again = self._closed
             self._closed = True
             self._jobs.clear()
             self._plans.clear()
@@ -320,9 +324,13 @@ class ArtService:
                 job.cancelled = True
             self._cond.notify_all()
             self._slot_cond.notify_all()
-        for t in self._threads:
-            if t is not threading.current_thread():
-                t.join(timeout)
+        me = threading.current_thread()
+        if not again:
+            deadline = time.monotonic() + max(0.0, float(timeout))
+            for t in self._threads:
+                if t is not me:
+                    t.join(max(0.0, deadline - time.monotonic()))
+        return not any(t.is_alive() for t in self._threads if t is not me)
 
     # ------------------------------------------------------------------ sizes (the scenes' VRAM accounting)
     def note_size(self, key, w, h):
@@ -727,6 +735,3 @@ def _decode(data: bytes, need_px):
     img.load()
     return img.convert("RGB") if img.mode != "RGB" else img
 
-
-def upload_key(kind, *parts):
-    return (kind,) + tuple(parts)

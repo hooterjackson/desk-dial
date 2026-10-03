@@ -55,6 +55,7 @@ class DevicePolicy:
         self.scene_open = False
         self.idle_since = None
         self.attempts = 0
+        self.attempts_at_create = 0      # the attempt count ``created`` reset (a loss in warm-up keeps it)
         self.next_try = None
         self.removed_reason_logged = False
         self.history = []
@@ -71,6 +72,7 @@ class DevicePolicy:
         return True
 
     def created(self, now: float):
+        self.attempts_at_create = self.attempts if self.state == LOST else 0
         self.state = WARM
         self.attempts = 0
         self.next_try = None
@@ -112,6 +114,16 @@ class DevicePolicy:
         self.scene_open = False
         self.idle_since = None
         self._log("lost", now)
+
+    def lost_while_creating(self, now: float):
+        """The device was lost inside its own creation warm-up (e.g. mid-TDR): count it as a failed
+        attempt, keeping the count ``created`` reset, so the recreate cap (at most twice 1 s apart)
+        holds instead of a fresh ``lost`` restarting the attempts at once every turn."""
+        self.scene_open = False
+        self.idle_since = None
+        self.state = LOST
+        self.attempts = self.attempts_at_create
+        self.create_failed(now)
 
     def recreate_due(self, now: float) -> bool:
         return self.state == LOST and self.attempts < RECREATE_ATTEMPTS and self.next_try is not None \

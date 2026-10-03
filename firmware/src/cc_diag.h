@@ -74,6 +74,51 @@ void cc_boot_rx_queue(uint8_t where, uint32_t bytes);   // CCRxQueue and the siz
 // transport only for 8192, so a PSRAM-resident queue keeps the host paced (v1 art).
 uint32_t cc_boot_rx_queue_internal_bytes();
 
+// 1.0.0-cc5.5 (F1, safety and measurement; ideas from Karl Malota's idf_upgrade branch). All read only
+// and additive to {"diag":"?"} (cc_diag_live() appends them; the capabilities are unchanged):
+//   * setup(), HmiThread::init_usb(): whether TinyUSB accepted the MIDI and HID interfaces
+//     ("usbMidiOk", "usbHidOk"; booleans). A refusal never stops or loops the boot.
+//   * setup(), HmiThread::init_pd(), before the threads start: the STUSB4500 RDO_STATUS read (I2C 0x28,
+//     register 0x91, four bytes LSB first). "pdRead" (boolean: the transfer succeeded), "pdPdo" (bits
+//     30:28 of the RDO: the requested source PDO's position 1..7; 0 = no explicit contract, i.e. Type-C
+//     5 V, or the read failed), "pdVolts" (the voltage of our sink PDO at that position, read from the
+//     chip's DPM_SNK_PDO table and rounded to whole volts: 5 or 9 as init_pd() programs it; 0 = unknown:
+//     no contract, a position past the three sink PDOs or a failed read) and, when the read worked,
+//     "pdRdo" (the 32-bit word). The motor driver runs from VBUS: the FOC task scales voltage_power_supply
+//     with the contract (cc_supply_volts(), FW-BUG-022: it fails safe high when the voltage is unknown).
+//   * HMI task: a HID report TinyUSB refused and that is retried on the next pass ("hidRetries", since
+//     boot; hmi_thread.cpp handleHid()).
+//   * FOC task, once per loop pass (cc_diag_foc_pass(); single writer, plain 32-bit stores, no lock):
+//     "focLoopHz" (loop passes in the last completed second; 0 when none completed for 2 s),
+//     "focLoopUsMax" (the longest pass-to-pass interval since the previous diag read, µs, reset on read),
+//     "uqAbsMax" (the largest |motor.voltage.q| since the previous diag read, in millivolts, reset on
+//     read), "uqCapMs" (milliseconds since boot with |Uq| at the motor voltage cap) and "uqCapMv" (that
+//     cap, motor.voltage_limit, in millivolts: 2200).
+void cc_boot_usb(bool midiOk, bool hidOk);
+void cc_boot_pd(bool readOk, uint32_t rdo, uint32_t sinkMillivolts);
+// 1.0.0-cc5.7 (plan F2): the PD contract's voltage in whole volts as diag pdVolts reports it (0 = no contract,
+// a failed read, a position past the sink table, or before init_pd()).
+uint32_t cc_boot_pd_volts();
+// FW-BUG-022: the contract as the FOC task needs it to pick the driver supply (cc_supply_volts()). Returns whether
+// init_pd() ran and its RDO read succeeded; position = RDO bits 30:28 (0 = no explicit contract), millivolts = our
+// sink PDO at that position (0 = unknown), nvmRewritten = init_pd() rewrote the sink PDO table this boot (then the
+// read may predate the new table, so any contract is assumed to be 20 V; no contract stays 5 V).
+bool cc_boot_pd_contract(uint32_t& position, uint32_t& millivolts, bool& nvmRewritten);
+// FW-BUG-022: init_pd() calls it right after it rewrites the STUSB4500 sink PDO table (setup(), before the threads).
+void cc_boot_pd_nvm_rewritten();
+// 1.0.0-cc5.7 (r4 FEEL + SOUND, HAPTICS.md "Diag"; additive, read only), appended by cc_diag_live():
+//   "supplyVolts" (the supply the driver scales with, whole volts: 5 with no contract, the contract's voltage when
+//   it is known, else assumed high: the highest sink PDO, 9, or 20 after a sink table rewrite), "supplyAssumed"
+//   (true when that voltage was assumed, FW-BUG-022), "feel" (the claim's token, "" = legacy),
+//   "reducedHaptics", "soundLevel" (0..3), "fxPlayed" / "fxPulses" / "fxDropped" (effect player counters),
+//   "wallHits" / "wallDir" (cc_wall.h), "foldbackPct" (wall force now, 50..100) / "foldbackEvents",
+//   "tripLatched" / "spinTrips" (the self-spin trip), "offlineVolume" (the Consumer volume mode runs),
+//   "calState" / "calOutcome" (recalibration), "audioReady", "audioPlayed", "audioUnderruns", "audioDropped",
+//   "audioSuperseded" (waiting sound requests outranked by a louder one, or by a newer one of equal gain,
+//   FW-BUG-021).
+void cc_diag_hid_retry();                       // HMI task only
+void cc_diag_foc_pass(uint32_t nowUs, float uq, float capV);   // FOC task only
+
 // Breadcrumbs (each called only by its own task).
 void cc_crumb_com(uint8_t op, uint8_t stage, uint32_t arg);
 void cc_crumb_com_stage(uint8_t stage);   // keeps the last op and arg
@@ -82,7 +127,10 @@ void cc_crumb_lcd(uint8_t step);
 void cc_crumb_hmi(uint8_t step);          // CC_HMI_STEP_WAIT also stores the uptime heartbeat
 
 // Adds resetReason, resetCode, rtcReset, bootCount, rtcRetained, uptimeMs,
-// previous{...} (only when the RTC state survived), coredump{...} and rxQueue.
+// previous{...} (only when the RTC state survived), coredump{...}, rxQueue and lvglLayout
+// ("ok", or "mixed" when LVGL and src/ were compiled with different lv_conf.h files; FW-BUG-017)
+// and firmwareBuild (FW-PUB-004: the internal build id, cc_fw_build(), since settings "firmwareVersion"
+// carries the public version).
 void cc_diag_boot(JsonObject diag);
 
 // ---------------------------------------------------------------------------
@@ -102,7 +150,8 @@ void cc_live_foc();                        // FOC thread, once per loop (through
 // Adds hmiAgeMs, lcdAgeMs, comAgeMs, focAgeMs, hmiStep, lcdStep, comOp, comStage, taskWdtS
 // and wdtTasks (the tasks subscribed to the task watchdog now); since 1.0.0-cc5.4 also the LED
 // frame fields ledFps, ledRenderUsMax (reset by this call), ledRenderUsAvg, ledMode,
-// ledShowGapMsMax (reset by this call) and ledLateShows (cc_diag_led_frame() below).
+// ledShowGapMsMax (reset by this call) and ledLateShows (cc_diag_led_frame() below); since
+// 1.0.0-cc5.5 the F1 fields above (usbMidiOk ... uqCapMv; focLoopUsMax and uqAbsMax reset by this call).
 void cc_diag_live(JsonObject diag);
 
 // artwork2 (1.0.0-cc5.3, ARTWORK2.md section 8; COM task): rxQueueBytes, mediaCommits,
@@ -120,15 +169,15 @@ void cc_diag_lcd_pipeline(JsonObject diag);
 // core0IdlePct, lcdSpiHz, lcdDma, lcdPeriodMs, artAsync, artDecodeRequests, artDecodeAborts,
 // artDecodeStale and stackArtDec (0 when artAsync is false), then (12.6 errata E-lcd) lcdMosiSig
 // (an integer: 103 = the LCD data line is FSPID, 102 = binary A's defect) and "build" (the ladder
-// letter "A".."E" of CC_BUILD_BINARY; absent when the image has no ladder id). lcdDma and artAsync
+// letter "A".."F" of CC_BUILD_BINARY; absent when the image has no ladder id). lcdDma and artAsync
 // are JSON booleans: with lcdPeriodMs they identify the pipeline of binary A, B or C (12.6), and
 // the host tooling (nanod_cc5_tooling.lcd_binary) accepts binary A at a period other than 16 ms
 // only for `true`; "build" tells D from A and E from C. A template so that the host wiring build
 // (media_tests.py), which has no LVGL and so no cc_display.h, runs this same code on a stand-in of
 // the struct.
 inline const char* cc_diag_build_letter(uint32_t binary) {
-    static const char* const kLetters[] = {"A", "B", "C", "D", "E"};
-    return binary >= 1u && binary <= 5u ? kLetters[binary - 1u] : nullptr;
+    static const char* const kLetters[] = {"A", "B", "C", "D", "E", "F"};   // F: 1.0.0-cc5.5 (12 ms)
+    return binary >= 1u && binary <= 6u ? kLetters[binary - 1u] : nullptr;
 }
 template <typename Perf> void cc_diag_lcd_perf_fields(JsonObject d, const Perf& p) {
     d["lcdFps"] = p.lcdFps; d["lcdFpsAnimMin"] = p.lcdFpsAnimMin;

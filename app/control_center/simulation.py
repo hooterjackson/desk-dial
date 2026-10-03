@@ -64,32 +64,32 @@ def __getattr__(name):
 # ------------------------------------------------------------------ the BS library (BS:499-535)
 _RGB = lambda c: (c[0] << 16) | (c[1] << 8) | c[2]  # noqa: E731
 ALBUMS = [
-    ("Promises", "Floating Points, Pharoah Sanders & LSO", 2021, (120, 150, 190)),
-    ("Night Drive", "Chromatics", 2007, (255, 40, 90)),
-    ("Heligoland", "Massive Attack", 2010, (255, 120, 30)),
-    ("Moon Safari", "Air", 1998, (60, 170, 255)),
-    ("Hounds of Love", "Kate Bush", 1985, (160, 90, 255)),
-    ("Elis & Tom", "Elis Regina & Antônio Carlos Jobim", 1974, (255, 190, 60)),
-    ("Blue Lines", "Massive Attack", 1991, (255, 40, 20)),
-    ("Tropicália ou Panis et Circencis", "Various artists", 1968, (255, 150, 40)),
-    ("Kind of Blue", "Miles Davis", 1959, (40, 120, 255)),
+    ("Promises", "Harbour Signals, Sodium Coast & LSO", 2021, (120, 150, 190)),
+    ("Night Channel", "Velvet Circuit", 2007, (255, 40, 90)),
+    ("Glass Weather", "Lumen Park", 2010, (255, 120, 30)),
+    ("Midnight Arcade", "Air", 1998, (60, 170, 255)),
+    ("Paper Lanterns", "Mira Vale", 1985, (160, 90, 255)),
+    ("Lua & Mar", "Lua Serena & Antônio Carlos Jobim", 1974, (255, 190, 60)),
+    ("Neon Littoral", "Lumen Park", 1991, (255, 40, 20)),
+    ("Copper Sun Sessions", "Various artists", 1968, (255, 150, 40)),
+    ("Tidal Glass", "Oskar Lind Trio", 1959, (40, 120, 255)),
 ]
 TRACKS = [
     ["Movement 1", "Movement 2", "Movement 3", "Movement 4", "Movement 5", "Movement 6", "Movement 7",
      "Movement 8", "Movement 9"],
-    ["Night Drive", "I Want Your Love", "Running Up That Hill", "Tick of the Clock", "Healer"],
+    ["Night Channel", "I Want Your Love", "Lantern Light", "Tick of the Clock", "Healer"],
     ["Pray for Rain", "Babel", "Splitting the Atom", "Girl I Love You", "Psyche", "Flat of the Blade",
      "Paradise Circus", "Rush Minute", "Saturday Come Slow", "Atlas Air"],
-    ["La Femme d’Argent", "Sexy Boy", "All I Need", "Kelly Watch the Stars", "Talisman", "Remember",
-     "You Make It Easy", "Ce Matin-là", "New Star in the Sky", "Le Voyage de Pénélope"],
-    ["Running Up That Hill", "Hounds of Love", "The Big Sky", "Mother Stands for Comfort", "Cloudbusting",
+    ["La Femme d’Argent", "Long Range", "Afterburn", "Kelly Watch the Stars", "Talisman", "Remember",
+     "You Make It Easy", "Ce Matin-là", "Blue Hour Signal", "Le voyage de Maré"],
+    ["Lantern Light", "Paper Lanterns", "The Big Sky", "Mother Stands for Comfort", "Pressure Front",
      "And Dream of Sheep", "Under Ice", "Waking the Witch", "Watching You Without Me", "Jig of Life",
      "Hello Earth", "The Morning Fog"],
     ["Águas de Março", "Pois É", "Só Tinha de Ser com Você", "Modinha", "Triste", "Corcovado",
      "O Que Tinha de Ser", "Por Toda a Minha Vida", "Fotografia", "Soneto de Separação",
      "Chovendo na Roseira", "Inútil Paisagem"],
-    ["Safe from Harm", "One Love", "Blue Lines", "Be Thankful for What You’ve Got", "Five Man Army",
-     "Unfinished Sympathy", "Daydreaming", "Lately", "Hymn of the Big Wheel"],
+    ["Safe from Harm", "One Love", "Neon Littoral", "Be Thankful for What You’ve Got", "Five Man Army",
+     "Harbour Song", "Daydreaming", "Lately", "Hymn of the Big Wheel"],
     ["Miserere Nobis", "Coração Materno", "Panis et Circencis", "Lindonéia", "Parque Industrial",
      "Geléia Geral", "Baby", "Três Caravelas", "Enquanto Seu Lobo Não Vem", "Mamãe Coragem",
      "Bat Macumba", "Hino ao Senhor do Bonfim"],
@@ -100,9 +100,9 @@ PLAYLISTS = [  # (title, albums, colour, length, unplayable index, auto)
     ("PAPER LANTERN Ep. 1", [6, 7], (150, 110, 255), 34, 20, False),
 ]
 MORE_PLAYLISTS = [
-    ("Late Night Drive", [1, 6, 2, 3], (255, 60, 110), 48),
+    ("Late Night Channel", [1, 6, 2, 3], (255, 60, 110), 48),
     ("Sunday Morning", [5, 8, 3, 0], (255, 190, 90), 36),
-    ("Bossa & Tropicália", [5, 7, 8, 4], (255, 150, 40), 52),
+    ("Bossa & Copper Sun", [5, 7, 8, 4], (255, 150, 40), 52),
     ("Deep Focus", [0, 2, 8, 1], (90, 150, 255), 27),
     ("Kitchen Dance", [4, 6, 3, 7], (200, 90, 255), 61),
     ("Headphones Only", [0, 4, 2, 5], (80, 200, 170), 22),
@@ -203,6 +203,7 @@ class SimControls:
         self.snap = "ok"              # ok | hung | move | fit | integrity
         self.stage = "ok"             # ok | refused | display
         self.recent = "normal"        # normal | many | empty | error | expired
+        self.ha = "ok"                # r3 Lights: ok | slow | offline | auth | notset
 
 
 class _SimTime:
@@ -221,9 +222,9 @@ class SimulatedSonos:
         self.controls = controls or SimControls()
         self._time = _SimTime(clock, sleep)
         self._lock = threading.RLock()
-        self.state = dict(online=True, room_id="sim-den", room_label="Den",
-                          group_id="sim-den", group_label="Den · Stereo pair", group_revision="sim:1",
-                          group_room_count=1, volume=28, title="Night Drive", artist="Sample library",
+        self.state = dict(online=True, room_id="sim-demo", room_label="Demo",
+                          group_id="sim-demo", group_label="Demo · Stereo pair", group_revision="sim:1",
+                          group_room_count=1, volume=28, title="Night Channel", artist="Sample library",
                           can_next=True, can_previous=True, track_id="1", queue_revision="1",
                           playback="PLAYING", can_play=False, can_pause=True)
         self.fail = False
@@ -253,7 +254,7 @@ class SimulatedSonos:
             self.load_album()
 
     def load_album(self, album=4, position=5, playing=True):
-        """Replace the queue with a BS album (Hounds of Love by default, BS qNow 4 → row 5)."""
+        """Replace the queue with a BS album (Paper Lanterns by default, BS qNow 4 → row 5)."""
         with self._lock:
             self.queue = [self._row(track) for track in album_tracks(album)]
             self.P = min(position, len(self.queue))
@@ -1004,6 +1005,415 @@ class SimulatedToasts:
 
     def toast(self, text, exit=False):
         self.shown.append((text, bool(exit)))
+
+
+# ------------------------------------------------------------------ Home Assistant (r3 Lights)
+SIM_SCENES = [  # the prototype's five (README 1.2 sample data): (label, brightness %, Kelvin, type)
+    ("Focus", 62, 3200, "scene"), ("Evening", 48, 2700, "scene"), ("Movie", 12, 2200, "script"),
+    ("Reading", 80, 3500, "scene"), ("Daylight", 100, 5000, "automation"),
+]
+SIM_AREAS = (("demo", "Demo"), ("kitchen", "Kitchen"), ("office", "Office"))
+SIM_AREA_LIGHTS = (  # (entity, name, area, supports colour temperature) — the r3.1 multi-light demo area
+    ("light.demo_desk", "Desk lamp", "demo", True), ("light.demo_floor", "Floor lamp", "demo", True),
+    ("light.demo_shelf", "Shelf strip", "demo", False), ("light.kitchen_ceiling", "Kitchen ceiling", "kitchen", True),
+)
+
+
+class SimulatedHomeAssistant:
+    """The HomeAssistantAdapter's interface over in-memory lights (never the network).
+
+    Two shapes, like the live adapter: the release-1 single light (the default: ``light.demo``,
+    commands aimed at ``{"entity_id": "light.demo"}``) and, with ``area="demo"``, the r3.1 area bridge:
+    ``SIM_AREAS`` / ``SIM_AREA_LIGHTS`` (three demo lights, one without colour temperature, and a
+    kitchen light), commands aimed at ``{"area_id": "demo"}``, the state aggregated exactly as the live
+    adapter does (``home_assistant.aggregate_facts``) and registry changes (``add_light``,
+    ``move_light``, ``remove_light``, ``rename_area``) that reach the listener at once — a light
+    added to the demo area appears with no restart.
+
+    ``SimControls.ha``: ``ok``; ``slow`` (every write takes 1.5 s on the sim clock); ``offline``;
+    ``auth`` (the token is refused); ``notset`` (Lights not set up). ``external(...)`` changes the
+    lights as the HA app would (the knob shows the 2.6 s reveal). Every write is recorded in ``calls``
+    and passes the same allowlist as the live adapter (``allowlist`` refusals raise the live
+    ``HomeAssistantError``)."""
+
+    def __init__(self, controls=None, *, clock=None, sleep=None, scenes=None, min_k=2200, max_k=6500, area=None,
+                 lights=None):
+        self.controls = controls or SimControls()
+        self._time = _SimTime(clock, sleep)
+        self._lock = threading.RLock()
+        self.area_id = area or ""
+        self.light_entity = "" if self.area_id else "light.demo"
+        self.on, self.bri, self.kelvin = True, 62, 3200      # the single light (release-1 shape)
+        self.min_k, self.max_k = min_k, max_k
+        self.snapshot = None             # the last All off: (on, bri, kelvin), or {entity: (on, bri, kelvin)}
+        self.calls = []                  # (domain, service, data)
+        self.scenes = [{"entity_id": f"{kind}.{label.lower()}", "type": kind, "label": label, "bri": bri,
+                        "kelvin": kelvin} for label, bri, kelvin, kind in (scenes or SIM_SCENES)]
+        self.areas = dict(SIM_AREAS)
+        self.lights = {}                 # area mode: entity -> {name, area, on, bri, kelvin, min_k, max_k, ct, available}
+        for entity, name, light_area, ct in (lights if lights is not None else SIM_AREA_LIGHTS):
+            self.lights[entity] = {"name": name, "area": light_area, "on": True, "bri": 62, "kelvin": 3200,
+                                   "min_k": min_k, "max_k": max_k, "ct": ct, "available": True}
+        self._listener = None
+        self._revision = 0
+        self._last_level = (62, 3200)    # area mode: the level shown while every light is off (r3.1)
+
+    # the adapter's lifecycle
+    def set_listener(self, callback):
+        self._listener = callback
+
+    def start(self):
+        pass
+
+    def close(self):
+        self._listener = None
+
+    @property
+    def configured(self):
+        return self.controls.ha != "notset"
+
+    def _notify(self):
+        callback = self._listener
+        if callback is not None:
+            callback(self.read_state())
+
+    def _mode(self):
+        return getattr(self.controls, "ha", "ok")
+
+    def _scene_rows(self):
+        # r3.1 (area mode, like the live adapter): scripts and automations have no preview.
+        preview = lambda s: not self.area_id or s["type"] == "scene"  # noqa: E731
+        return [{"entity_id": s["entity_id"], "type": s["type"], "label": s["label"], "running": False,
+                 "last": None, "bri": s["bri"] if preview(s) else None, "kelvin": s["kelvin"] if preview(s) else None}
+                for s in self.scenes]
+
+    def light_rows(self):
+        """Area mode: {entity_id, name, on, bri, kelvin, available} per light of the area, by name."""
+        rows = []
+        for entity in self.members():
+            light = self.lights[entity]
+            on = light["on"] and light["available"]
+            rows.append({"entity_id": entity, "name": light["name"], "on": on, "bri": light["bri"] if on else 0,
+                         "kelvin": light["kelvin"] if on and light["ct"] else None, "available": light["available"]})
+        return sorted(rows, key=lambda row: (row["name"].casefold(), row["entity_id"]))
+
+    def turn_targets(self):
+        """r3.1: the available lights that are on, else every available light (a turn from all off)."""
+        rows = self.light_rows()
+        on = [row["entity_id"] for row in rows if row["on"]]
+        return sorted(on or [row["entity_id"] for row in rows if row["available"]])
+
+    def set_available(self, entity_id, available=True):
+        """A light going unavailable (or back) in Home Assistant."""
+        with self._lock:
+            self.lights[entity_id]["available"] = bool(available)
+            self._revision += 1
+        self._notify()
+
+    # ---- the area (area mode)
+    def members(self):
+        """The lights of the configured area (sorted), as the live adapter resolves them."""
+        return sorted(entity for entity, light in self.lights.items() if light["area"] == self.area_id)
+
+    def _facts(self, entity):
+        light = self.lights[entity]
+        on = light["on"] and light["available"]
+        return {"available": light["available"], "on": on, "bri": light["bri"] if on else 0,
+                "kelvin": light["kelvin"] if on and light["ct"] else None, "min_k": light["min_k"],
+                "max_k": light["max_k"], "supports_ct": light["ct"], "name": light["name"]}
+
+    def _area_state(self, scenes):
+        from .home_assistant import aggregate_facts
+        members = self.members()
+        rows = self.light_rows()
+        state = {"configured": True, "online": True, "reason": "", "detail": "", "transport": "sim",
+                 "revision": self._revision, "scenes": scenes, "snapshot": self.snapshot is not None, "entity": "",
+                 "area_id": self.area_id, "name": self.areas.get(self.area_id, ""), "count": len(members),
+                 "entities": members, "available": False, "lights": rows,
+                 "unavailable_count": sum(1 for row in rows if not row["available"])}
+        if members:
+            aggregate = aggregate_facts([self._facts(entity) for entity in members])
+            state.update(on=aggregate["on"], on_count=aggregate["on_count"], bri=aggregate["bri"],
+                         kelvin=aggregate["kelvin"], min_k=aggregate["min_k"], max_k=aggregate["max_k"],
+                         supports_ct=aggregate["supports_ct"], available=aggregate["available"])
+            if aggregate["on"]:
+                self._last_level = (aggregate["bri"], aggregate["kelvin"] if aggregate["kelvin"] is not None
+                                    else self._last_level[1])
+            else:
+                state.update(bri=self._last_level[0], kelvin=self._last_level[1])   # r3.1: the last level
+        detail = ("area_missing" if self.area_id not in self.areas else "no_lights" if not members
+                  else "lights_unavailable" if not state["available"] else "")
+        if detail:
+            state.update(online=False, reason="unavailable", detail=detail)
+        return state
+
+    def _registry_changed(self):
+        with self._lock:
+            self._revision += 1
+        self._notify()
+
+    def add_light(self, entity_id, name="", area=None, *, on=True, bri=62, kelvin=3200, ct=True):
+        """A light added to Home Assistant (in ``area``, default the configured one): the registry
+        event re-resolves the area and the listener hears the new count."""
+        with self._lock:
+            self.lights[entity_id] = {"name": name or entity_id, "area": area or self.area_id, "on": on, "bri": bri,
+                                      "kelvin": kelvin, "min_k": self.min_k, "max_k": self.max_k, "ct": ct,
+                                      "available": True}
+        self._registry_changed()
+
+    def move_light(self, entity_id, area):
+        with self._lock:
+            self.lights[entity_id]["area"] = area
+        self._registry_changed()
+
+    def remove_light(self, entity_id):
+        with self._lock:
+            self.lights.pop(entity_id, None)
+        self._registry_changed()
+
+    def switch_area(self, area_id):
+        """Settings > Home Assistant > Save in the simulator: drive another area."""
+        with self._lock:
+            self.area_id = area_id
+            self.snapshot = None
+        self._registry_changed()
+
+    def rename_area(self, name):
+        with self._lock:
+            self.areas[self.area_id] = name
+        self._registry_changed()
+
+    # ---- the adapter's interface
+    def read_state(self):
+        mode = self._mode()
+        scenes = self._scene_rows()
+        if mode == "notset":
+            return {"configured": False, "online": False, "reason": "not_configured", "scenes": [], "revision": 0}
+        if mode in ("offline", "auth"):
+            return {"configured": True, "online": False, "reason": "offline" if mode == "offline" else "auth",
+                    "scenes": scenes, "revision": self._revision}
+        with self._lock:
+            if self.area_id:
+                return self._area_state(scenes)
+            return {"configured": True, "online": True, "reason": "", "detail": "", "transport": "sim",
+                    "revision": self._revision, "scenes": scenes, "snapshot": self.snapshot is not None,
+                    "entity": self.light_entity, "area_id": "", "count": None, "entities": [self.light_entity],
+                    "available": True, "unavailable_count": 0,
+                    "lights": [{"entity_id": self.light_entity, "name": "Demo", "on": self.on,
+                                "bri": self.bri if self.on else 0, "kelvin": self.kelvin if self.on else None,
+                                "available": True}], "on": self.on, "on_count": 1 if self.on else 0,
+                    "bri": self.bri if self.on else 0, "kelvin": self.kelvin, "min_k": self.min_k,
+                    "max_k": self.max_k, "supports_ct": True, "name": "Demo"}
+
+    def _gate(self):
+        from .home_assistant import HomeAssistantError
+        mode = self._mode()
+        if mode == "notset":
+            raise HomeAssistantError("Home Assistant is not set up", "not_configured")
+        if mode == "offline":
+            raise HomeAssistantError("Home Assistant unreachable", "offline")
+        if mode == "auth":
+            raise HomeAssistantError("Home Assistant refused the token", "auth")
+        if mode == "slow":
+            self._time.sleep(1.5)
+
+    def _target(self):
+        return {"area_id": self.area_id} if self.area_id else {"entity_id": self.light_entity}
+
+    def _record(self, domain, service, data):
+        from .home_assistant import HomeAssistantError
+        entity = data.get("entity_id")
+        if self.area_id:
+            ids = data.get("entity_id")
+            ids = [ids] if isinstance(ids, str) else ids
+            subset = (isinstance(ids, list) and bool(ids) and len(set(ids)) == len(ids)
+                      and set(ids) <= set(self.members()) and "area_id" not in data)
+            light_ok = domain == "light" and ((data.get("area_id") == self.area_id and "entity_id" not in data)
+                                              or subset)
+            snapshot = self.members()
+        else:
+            light_ok = domain == "light" and entity == self.light_entity
+            snapshot = [self.light_entity]
+        allowed = (light_ok
+                   or (domain == "scene" and service == "create" and bool(snapshot)
+                       and data.get("snapshot_entities") == snapshot)
+                   or (domain == "scene" and entity == "scene.desk_dial_snapshot")
+                   or any(s["entity_id"] == entity and {"scene": "scene", "script": "script",
+                                                       "automation": "automation"}[s["type"]] == domain
+                          for s in self.scenes))
+        if not allowed:
+            raise HomeAssistantError("This Home Assistant change is not allowed", "not_allowed")
+        self.calls.append((domain, service, dict(data)))
+
+    def _apply(self, on=None, bri=None, kelvin=None):
+        """Area mode: one change to every light of the area (each clamps to its own range)."""
+        for entity in self.members():
+            light = self.lights[entity]
+            if on is not None:
+                light["on"] = bool(on)
+            if bri is not None:
+                light["bri"] = bri
+            if kelvin is not None and light["ct"]:
+                light["kelvin"] = max(light["min_k"], min(light["max_k"], kelvin))
+
+    def set_light(self, bri=None, kelvin=None, on_bri=None, targets=None):
+        """Area mode (r3.1): only ``targets`` change (default: the lights that are on, else every
+        available light), all to the same value."""
+        self._gate()
+        if self.area_id:
+            aim = sorted(targets) if isinstance(targets, (list, tuple)) and targets else self.turn_targets()
+            if not aim:
+                from .home_assistant import HomeAssistantError
+                raise HomeAssistantError("No Home Assistant light is available", "unavailable")
+            data = {"entity_id": aim}
+        else:
+            data = self._target()
+        state = self.read_state()
+        low, high = state.get("min_k", self.min_k), state.get("max_k", self.max_k)
+        if bri is not None:
+            data["brightness_pct"] = max(1, min(100, int(bri)))
+        if kelvin is not None:
+            data["color_temp_kelvin"] = max(low, min(high, int(round(int(kelvin) / 100) * 100)))
+            if bri is None and not state.get("on") and on_bri:
+                data["brightness_pct"] = on_bri
+        with self._lock:
+            self._record("light", "turn_on", data)
+            if self.area_id:
+                for entity in data["entity_id"]:
+                    light = self.lights[entity]
+                    light["bri"] = data.get("brightness_pct", light["bri"] if light["on"] else (light["bri"] or 1))
+                    light["on"] = True
+                    if "color_temp_kelvin" in data and light["ct"]:
+                        light["kelvin"] = max(light["min_k"], min(light["max_k"], data["color_temp_kelvin"]))
+            else:
+                self.on = True
+                self.bri = data.get("brightness_pct", self.bri or 1)
+                self.kelvin = data.get("color_temp_kelvin", self.kelvin)
+            self._revision += 1
+        state = {**self.read_state(),
+                 "_applied": {"bri": data.get("brightness_pct"), "kelvin": data.get("color_temp_kelvin")}}
+        if self.area_id:
+            state["_targets"] = list(data["entity_id"])
+        return state
+
+    def power(self, on):
+        self._gate()
+        with self._lock:
+            if self.area_id:
+                self._power_area(on)
+            elif on:
+                if self.snapshot is not None:
+                    self._record("scene", "turn_on", {"entity_id": "scene.desk_dial_snapshot"})
+                    self.on, self.bri, self.kelvin = self.snapshot
+                else:
+                    self._record("light", "turn_on", {"entity_id": self.light_entity})
+                    self.on = True
+                    self.bri = self.bri or 100
+            else:
+                self._record("scene", "create", {"scene_id": "desk_dial_snapshot",
+                                                 "snapshot_entities": [self.light_entity]})
+                self.snapshot = (self.on, self.bri, self.kelvin)
+                self._record("light", "turn_off", {"entity_id": self.light_entity})
+                self.on = False
+            self._revision += 1
+        return self.read_state()
+
+    def _power_area(self, on):
+        members = self.members()
+        if on:
+            if isinstance(self.snapshot, dict) and set(self.snapshot) == set(members):
+                self._record("scene", "turn_on", {"entity_id": "scene.desk_dial_snapshot"})
+                for entity, (was_on, bri, kelvin) in self.snapshot.items():
+                    self.lights[entity].update(on=was_on, bri=bri, kelvin=kelvin)
+            else:
+                self._record("light", "turn_on", self._target())
+                for entity in members:
+                    self.lights[entity]["bri"] = self.lights[entity]["bri"] or 100
+                self._apply(on=True)
+        else:
+            self.read_state()                # the level before All off stays the last known level
+            if members:
+                self._record("scene", "create", {"scene_id": "desk_dial_snapshot", "snapshot_entities": members})
+                self.snapshot = {entity: (self.lights[entity]["on"], self.lights[entity]["bri"],
+                                          self.lights[entity]["kelvin"]) for entity in members}
+            self._record("light", "turn_off", self._target())
+            self._apply(on=False)
+
+    def run_scene(self, entity_id):
+        self._gate()
+        scene = next((s for s in self.scenes if s["entity_id"] == entity_id), None)
+        if scene is None:
+            from .home_assistant import HomeAssistantError
+            raise HomeAssistantError("This Home Assistant change is not allowed", "not_allowed")
+        domain, service = {"scene": ("scene", "turn_on"), "script": ("script", "turn_on"),
+                           "automation": ("automation", "trigger")}[scene["type"]]
+        with self._lock:
+            self._record(domain, service, {"entity_id": entity_id})
+            if self.area_id:
+                self._apply(on=True, bri=scene["bri"], kelvin=scene["kelvin"])
+            else:
+                self.on, self.bri, self.kelvin = True, scene["bri"], scene["kelvin"]
+            self._revision += 1
+        return self.read_state()
+
+    def external(self, *, on=None, bri=None, kelvin=None, entity=None):
+        """A change made elsewhere (the HA app, a wall switch): the state stream reports it. Area
+        mode: ``entity`` changes one light, else every light of the area."""
+        with self._lock:
+            if self.area_id:
+                for target in ([entity] if entity else self.members()):
+                    light = self.lights[target]
+                    if on is not None:
+                        light["on"] = bool(on)
+                    if bri is not None:
+                        light["bri"], light["on"] = bri, True
+                    if kelvin is not None and light["ct"]:
+                        light["kelvin"] = kelvin
+            else:
+                if on is not None:
+                    self.on = bool(on)
+                if bri is not None:
+                    self.bri, self.on = bri, True
+                if kelvin is not None:
+                    self.kelvin = kelvin
+            self._revision += 1
+        self._notify()
+
+    def test_connection(self):
+        mode = self._mode()
+        if mode in ("offline", "notset"):
+            return {"ok": False, "outcome": "offline", "message": "Can’t reach Home Assistant", "entities": {},
+                    "areas": [], "area_details": {}, "default_area": "", "version": ""}
+        if mode == "auth":
+            return {"ok": False, "outcome": "auth", "message": "Home Assistant refused the token", "entities": {},
+                    "areas": [], "area_details": {}, "default_area": "", "version": ""}
+        from .home_assistant import default_area
+        if self.area_id:
+            lights = sorted((entity, light["name"]) for entity, light in self.lights.items())
+        else:
+            lights = [(self.light_entity, "Demo")]
+        lists = {"light": lights, "scene": [], "script": [], "automation": []}
+        for scene in self.scenes:
+            lists[scene["type"]].append((scene["entity_id"], scene["label"]))
+        areas = sorted(((area_id, name, sum(1 for light in self.lights.values() if light["area"] == area_id))
+                        for area_id, name in self.areas.items()), key=lambda row: row[1].casefold())
+        details = {}
+        for area_id, _name, _count in areas:
+            rows = []
+            for entity, light in self.lights.items():
+                if light["area"] != area_id:
+                    continue
+                on = light["on"] and light["available"]
+                rows.append({"entity_id": entity, "name": light["name"], "on": on, "bri": light["bri"] if on else 0,
+                             "kelvin": light["kelvin"] if on and light["ct"] else None,
+                             "available": light["available"]})
+            # The prototype's scenes belong to the demo area (the simulator's other areas have none).
+            scenes = [{"entity_id": s["entity_id"], "name": s["label"], "type": s["type"]}
+                      for s in self.scenes] if area_id == SIM_AREAS[0][0] else []
+            details[area_id] = {"lights": sorted(rows, key=lambda row: row["name"].casefold()), "scenes": scenes}
+        return {"ok": True, "outcome": "ok", "message": "Connected to Home Assistant", "version": "2026.9 (simulated)",
+                "entities": lists, "areas": areas, "area_details": details,
+                "default_area": default_area(areas, self.area_id)}
 
 
 # ------------------------------------------------------------------ the device bridge (section 16 "PC connection")

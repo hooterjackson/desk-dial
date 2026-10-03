@@ -44,6 +44,14 @@ app/tests/fixtures/frames_v4.json:
   value; once it derives the v5 tones every ink, dim included, is checked
   against presentation (dim #5A5A5A) and a different CCFooterInk::dim fails.
 
+- Presentation 6 (PRESENTATION_V5.md section 19, Desk Dial r3 release 1): the same rules over
+  harness/fixtures/frames_v6.json (make_frames_v6.py): every case's input must be accepted
+  exactly when expect.accept and then store expect.stored (layout, ringStyle, ringKelvin, valueUnit,
+  prevTitle, nextTitle) plus every v4 / ALIVE / v5 default of an accepted frame. The Python reading,
+  control_center.lcd_preview.v6_parse, is checked against the same expectations first. The fixture's
+  kelvin vector (K = 2200..6500) must equal alive_lights.kelvin_rgb and the firmware's cc_kelvin_rgb
+  (cc_presentation.h) for every K, and no channel may lie within 1e-6 of a .5 tie.
+
 First runs cpp11_gate.py so the parser also compiles in the device's gnu++11.
 Reads the companion's fixtures and presentation constants; writes only under
 harness/build/parse-tests. No device or USB access. Exit status is
@@ -82,6 +90,7 @@ companion = root.parent / 'app'
 fixtures_path = companion / 'tests' / 'fixtures' / 'frames_v4.json'
 alive_fixtures_path = companion / 'tests' / 'fixtures' / 'frames_alive.json'   # 1.0.0-cc5.4
 v5_fixtures_path = companion / 'tests' / 'fixtures' / 'frames_v5.json'         # presentation 5
+v6_fixtures_path = root / 'fixtures' / 'frames_v6.json'                        # presentation 6 (make_frames_v6.py)
 cc53_source_zip = companion / 'firmware' / 'nanod-control-center-1.0.0-cc5.3-source.zip'   # the V4 parser
 arduinojson = firmware / '.pio' / 'libdeps' / 'nanofoc_d' / 'ArduinoJson' / 'src'
 out_dir = root / 'build' / 'parse-tests'
@@ -91,6 +100,7 @@ cc4_source_zip = companion / 'firmware' / 'nanod-control-center-1.0.0-cc4-source
 sys.path.insert(0, str(companion))
 from control_center import presentation  # noqa: E402  (read-only: constants and pure helpers)
 from control_center import device  # noqa: E402  (read-only: alive_parse, the host's reading of ALIVE.md section 3)
+from control_center import alive_lights, lcd_preview  # noqa: E402  (presentation 6: kelvin_rgb, v6_parse)
 
 TEXT_FIELDS = ('mode', 'target', 'value', 'detail', 'status', 'title', 'subtitle', 'counter',
                'volumeCaption', 'heading', 'meta', 'artKey', 'iconKey')   # iconKey: 1.0.0-cc5.3
@@ -113,7 +123,7 @@ def header_state(header: Path) -> tuple:
 HEADER_V5_TONES, HEADER_DIM = header_state(firmware / 'src' / 'cc_presentation.h')
 
 
-def button_expectation(slot: int, button: dict, layout: str, v5_tones: bool, dim_ink) -> tuple:
+def button_expectation(slot: int, button: dict, layout: str, v5_tones: bool, dim_ink, crumb: str = '') -> tuple:
     """(tone, ink) the header derives for `button` (effective icon: the wire token or the label map).
 
     With the v5 tones every ink, dim included, is presentation.button_ink_v5's (PRESENTATION_V5.md
@@ -123,7 +133,8 @@ def button_expectation(slot: int, button: dict, layout: str, v5_tones: bool, dim
     icon, enabled = effective_icon(button), button['enabled']
     if v5_tones:
         tone = presentation.button_tone_v5(slot, icon, enabled, button.get('lit'), layout)
-        ink = presentation.button_ink_v5(slot, icon, enabled, button.get('lit'), button.get('color', 0), layout)
+        ink = presentation.button_ink_v5(slot, icon, enabled, button.get('lit'), button.get('color', 0), layout,
+                                         crumb)
     else:
         tone = presentation.button_tone(slot, icon, enabled)
         ink = presentation.FOOTER_INK.get(tone, 0)
@@ -164,7 +175,9 @@ def v5_expected(frame: dict) -> dict:
         'color': [button.get('color', 0) for button in frame['buttons']],
         'icon': [button.get('icon', '') for button in frame['buttons']],
         'feedbackKind': feedback['kind'] if feedback else None,
-        'feedbackMoment': feedback.get('moment') if feedback else None,
+        # Section 19.9: refused is kept with kind err only (stripped with ok).
+        'feedbackMoment': (None if feedback.get('moment') == 'refused' and feedback['kind'] != 'err'
+                           else feedback.get('moment')) if feedback else None,
         'feedbackSide': feedback.get('side', 0) if feedback else 0,
         'feedbackColor': feedback.get('color', 0) if feedback else 0,
         'reducedMotion': frame.get('reducedMotion'), 'ledPink': frame.get('ledPink'),
@@ -245,7 +258,7 @@ def expected_fields(frame: dict, v4_parser: bool = False) -> dict:
     }
     v5_tones, dim_ink = (CC53_TONES, CC53_DIM) if v4_parser else (HEADER_V5_TONES, HEADER_DIM)
     for slot, button in enumerate(frame['buttons']):
-        tone, ink = button_expectation(slot, button, fields['layout'], v5_tones, dim_ink)
+        tone, ink = button_expectation(slot, button, fields['layout'], v5_tones, dim_ink, frame.get('crumb', ''))
         fields[f'enabled{slot}'] = button['enabled']
         fields[f'icon{slot}'] = button.get('icon', '')
         fields[f'iconSent{slot}'] = 'icon' in button
@@ -341,10 +354,60 @@ def check_python_alive(fixtures) -> int:
     return checked
 
 
+V6_STORED = ('layout', 'ringStyle', 'ringKelvin', 'valueUnit', 'prevTitle', 'nextTitle', 'crumb',
+             'holdMarker', 'ringNow')   # [r3.1] section 19.10
+
+
+def check_python_v6(fixtures) -> int:
+    """lcd_preview.v6_parse (the Python reading of presentation 6) against frames_v6.json, and the kelvin
+    vector against alive_lights.kelvin_rgb (with the tie margin)."""
+    for case in fixtures['cases']:
+        stored, invalid = lcd_preview.v6_parse(copy.deepcopy(case['input']))
+        expect = case['expect']
+        if (not invalid) != expect['accept'] or (
+                expect['accept'] and {k: stored[k] for k in V6_STORED} != expect['stored']):
+            raise SystemExit(f"FAIL {case['name']}: lcd_preview.v6_parse gives {stored} invalid {invalid}, "
+                             f"expected {expect}")
+    for k, r, g, b in fixtures['kelvin']:
+        if alive_lights.kelvin_rgb(k) != (r, g, b):
+            raise SystemExit(f'FAIL kelvin {k}: alive_lights.kelvin_rgb {alive_lights.kelvin_rgb(k)} != {(r, g, b)}')
+    if not fixtures['kelvinTieMargin'] > 1e-6:
+        raise SystemExit(f"FAIL kelvin: a channel lies {fixtures['kelvinTieMargin']} from a .5 tie (libm-dependent)")
+    if alive_lights.KELVIN_GAIN != (255, 255, 255):
+        raise SystemExit('FAIL kelvin: the calibration hook KELVIN_GAIN is not the identity the vector assumes')
+    return len(fixtures['cases'])
+
+
+def v6_entries(fixtures) -> list:
+    """Presentation 6: every case through the firmware parser, then the kelvin vector."""
+    entries = []
+    for case in fixtures['cases']:
+        frame, expect = case['input'], case['expect']
+        text = fields = None
+        if expect['accept']:
+            text = expected_text(frame)
+            text['prevTitle'] = expect['stored']['prevTitle']
+            text['nextTitle'] = expect['stored']['nextTitle']
+            fields = expected_fields(frame)
+            fields['ringKelvin'] = expect['stored']['ringKelvin']
+            fields['valueUnit'] = expect['stored']['valueUnit']
+            fields['crumb'] = expect['stored']['crumb']              # section 19.9
+            fields['holdMarker'] = int(expect['stored']['holdMarker'])   # [r3.1] section 19.10
+            fields['ringNow'] = expect['stored']['ringNow']          # [r3.1] kept on the queue ring
+        entries.append(entry(case['name'], 'v6', wire(frame), expect['accept'], text, fields))
+    base = {'mode': 'LIGHTS', 'target': '', 'value': '', 'detail': '', 'status': '', 'layout': 'lights',
+            'buttons': [{'label': '', 'enabled': False, 'icon': ''}] * 4}
+    for k, r, g, b in fixtures['kelvin']:
+        frame = dict(base, ring={'style': 'bri', 'value': 50, 'index': 0, 'count': 0, 'kelvin': k})
+        entries.append(entry(f'kelvin-{k}', 'v6Kelvin', wire(frame), True, None,
+                             {'ringKelvin': k, 'kelvinRgb': (r << 16) | (g << 8) | b}))
+    return entries
+
+
 def legacy_frame() -> dict:
     """Recorded v2-companion Recent frame (cc4 era), before `layout` existed on the wire."""
-    return {"id": 9, "mode": "RECENTLY ADDED", "target": "Den", "value": "Colombina", "detail": "Mari Froes",
-            "title": "Colombina", "subtitle": "Mari Froes", "counter": "1 / 3", "activity": "idle", "status": "",
+    return {"id": 9, "mode": "RECENTLY ADDED", "target": "Hall", "value": "Varanda", "detail": "Ana Ribeira",
+            "title": "Varanda", "subtitle": "Ana Ribeira", "counter": "1 / 3", "activity": "idle", "status": "",
             "buttons": [{"label": "Back", "enabled": True, "color": 15789799},
                         {"label": "Home", "enabled": True, "color": 15789799},
                         {"label": "Win", "enabled": True, "color": 15789799},
@@ -551,6 +614,19 @@ def extra_entries(fixtures) -> list:
     v5_raw('v5-side-exponent-rejected', windows_line, b'"side":1', b'"side":1e0', False)
     v5_raw('v5-moment-embedded-nul-rejected', windows_line, b'"moment":"snap"', b'"moment":"snap\\u0000"', False)
     v5_raw('v5-lit-embedded-nul-rejected', upnext_line, b'"lit":"off"', b'"lit":"off\\u0000"', False)
+
+    # 9. FW-RES-007: the haptic token is matched length-aware (cc_json_token), like every other token: a token with
+    # an embedded NUL is not the token before it. device.haptic_parse must agree on the same bytes.
+    def haptic_raw(name, member: bytes, accept):
+        line = home_line[:-2] + b',' + member + b'}}'
+        _, ok = device.haptic_parse(json.loads(line)['frame']['haptic'])
+        if ok != accept:
+            raise SystemExit(f'FAIL {name}: device.haptic_parse gives ok={ok}')
+        add(name, None, accept, None, None, raw=line)
+
+    haptic_raw('haptic-token-kept', b'"haptic":{"token":"confirm.tick","seq":5}', True)
+    haptic_raw('haptic-token-nul-suffix-rejected', b'"haptic":{"token":"confirm.tick\\u0000junk","seq":5}', False)
+    haptic_raw('haptic-token-trailing-nul-rejected', b'"haptic":{"token":"confirm.tick\\u0000","seq":5}', False)
     return entries
 
 
@@ -695,6 +771,11 @@ def main() -> int:
     print(f'parse_tests: device.alive_parse matches rules.aliveRaw in all {python_alive} alive case(s)', flush=True)
     python_v5 = check_python_v5(v5_fixtures)
     print(f'parse_tests: device.v5_parse matches rules.v5Raw in all {python_v5} v5 case(s)', flush=True)
+    v6_fixtures = json.loads(v6_fixtures_path.read_text(encoding='utf-8'))
+    python_v6 = check_python_v6(v6_fixtures)
+    print(f'parse_tests: lcd_preview.v6_parse matches frames_v6.json in all {python_v6} presentation-6 case(s); '
+          f"alive_lights.kelvin_rgb matches all {len(v6_fixtures['kelvin'])} K (tie margin "
+          f"{v6_fixtures['kelvinTieMargin']:.3g})", flush=True)
     print(f"parse_tests: cc_presentation.h tones {'v5 (5.2)' if HEADER_V5_TONES else 'V4 (5.9)'}", flush=True)
     self_test()
     verdict = dim_ink_verdict(HEADER_V5_TONES, HEADER_DIM)
@@ -709,7 +790,7 @@ def main() -> int:
               f"PRESENTATION_V5 3.6 and presentation.FOOTER_INK: 0x{presentation.FOOTER_INK['dim']:06X}; "
               f"checked against the header's value only while cc_button_tone() derives the V4 tones", flush=True)
     entries = (fixture_entries(fixtures) + extra_entries(fixtures) + fixture_entries(alive_fixtures)
-               + fixture_entries(v5_fixtures))
+               + fixture_entries(v5_fixtures) + v6_entries(v6_fixtures))
     out_dir.mkdir(parents=True, exist_ok=True)
     cases = out_dir / 'parse_cases.jsonl'
     with cases.open('w', encoding='utf-8', newline='\n') as handle:

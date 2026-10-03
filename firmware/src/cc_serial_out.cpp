@@ -16,6 +16,11 @@ uint32_t stalls = 0, dropped = 0;
 // the wire. The next reply ends that line first, so the host's line parser loses
 // only the cut reply (an unparseable line) and never the one after it.
 bool lineOpen = false;
+// FW-BUG-004: a reply cut by the stall limit marks the host dead. Every following reply is then
+// dropped at once (counted) while the FIFO is still full, instead of waiting 250 ms each: a COM pass
+// that drains many events behind a host that stopped reading costs one stall, not one per line.
+// The first reply that finds room in the FIFO (the host reads again) clears it; so does DTR low.
+bool txDead = false;
 
 enum class Outcome { kDone, kStalled, kGone };
 
@@ -56,10 +61,15 @@ void end_cut_line() {
 void send_reply(const uint8_t* head, size_t headSize, const uint8_t* tail, size_t tailSize) {
     const size_t total = headSize + tailSize;
     size_t done = 0;
+    if (txDead) {
+        if (!tud_cdc_n_connected(0)) { txDead = false; return; }   // no host: dropped uncounted, as below
+        if (Serial.availableForWrite() <= 0) { ++stalls; dropped += static_cast<uint32_t>(total); return; }
+        txDead = false;                          // the host reads again
+    }
     if (lineOpen) {                              // a cut reply's line is still open: end it first
         const Outcome ended = fifo_write(&kNewline, 1, done);
         if (ended != Outcome::kDone) {            // still no room: drop this reply whole
-            if (ended == Outcome::kStalled) { ++stalls; dropped += static_cast<uint32_t>(total); }
+            if (ended == Outcome::kStalled) { ++stalls; dropped += static_cast<uint32_t>(total); txDead = true; }
             return;
         }
         lineOpen = false;
@@ -72,7 +82,7 @@ void send_reply(const uint8_t* head, size_t headSize, const uint8_t* tail, size_
     }
     if (outcome == Outcome::kDone) return;
     if (written) end_cut_line();
-    if (outcome == Outcome::kStalled) { ++stalls; dropped += static_cast<uint32_t>(total - written); }
+    if (outcome == Outcome::kStalled) { ++stalls; dropped += static_cast<uint32_t>(total - written); txDead = true; }
 }
 }
 
@@ -98,6 +108,14 @@ void cc_send_line(const char* text) {
         return;
     }
     send_reply(reinterpret_cast<const uint8_t*>(text), length, kLineEnd, sizeof(kLineEnd));
+}
+
+void cc_send_note(const char* text) {
+    const size_t length = strlen(text);
+    if (lineOpen || !tud_cdc_n_connected(0)) return;
+    if (Serial.availableForWrite() < static_cast<int>(length + sizeof(kLineEnd))) return;
+    Serial.write(reinterpret_cast<const uint8_t*>(text), length);   // fits the FIFO: never spins
+    Serial.write(kLineEnd, sizeof(kLineEnd));
 }
 
 uint32_t cc_tx_stalls() { return stalls; }

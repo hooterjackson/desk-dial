@@ -2,7 +2,7 @@
 
 This note covers the user's request that "all of the animations ... on the knob" run at the maximum refresh rate. It deals with the **physical** knob only: the ESP32-S3, the 240 × 240 GC9A01 LCD, the 60-LED ring and the 8 button LEDs. The desktop surfaces (the Music explorer, Up next, the window picker and the floating on-screen knob) are covered by the other refresh notes.
 
-All work here was offline and read-only. Nothing was built or flashed, no COM port was opened, and no window was shown. The numbers come from three places: the firmware source, the diag snapshots the cc5/cc5.3 check tools already recorded, and an arithmetic model (`scratchpad/refresh-study/knob_model.py`, output in `knob_model.out.txt`).
+All work here was offline and read-only. Nothing was built or flashed, no COM port was opened, and no window was shown. The numbers come from three places: the firmware source, the diag snapshots the cc5/cc5.3 check tools already recorded, and an arithmetic model (`<scratch>/refresh-study/knob_model.py`, output in `knob_model.out.txt`).
 
 **Path prefixes used below** (all relative to `<repo>\`):
 - `FW/` = `firmware/`
@@ -425,9 +425,9 @@ The same flash discipline as cc5.3 applies: the app-only procedure with backup, 
 - Earlier analysis: `ui-v2-analysis/04-firmware-gaps.md:289-290,645`
 
 **External:**
-- GC9A01A datasheet V1.0 (GalaxyCore, 2019): §5.4 TE p.78–79, §6.3.2 B5h p.156–157, §6.4.1 E8h p.164–165, §7.3.4 4-line SPI timing p.190. <https://github.com/fbiego/dt78/blob/master/datasheets/GC9A01A.pdf> (local copy for reading: `scratchpad/refresh-study/GC9A01A.pdf`)
+- GC9A01A datasheet V1.0 (GalaxyCore, 2019): §5.4 TE p.78–79, §6.3.2 B5h p.156–157, §6.4.1 E8h p.164–165, §7.3.4 4-line SPI timing p.190. <https://github.com/fbiego/dt78/blob/master/datasheets/GC9A01A.pdf> (local copy for reading: `<scratch>/refresh-study/GC9A01A.pdf`)
 - ESP-IDF SPI master, ESP32-S3: IO_MUX pins, 80 MHz vs GPIO-matrix limits. <https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-reference/peripherals/spi_master.html>
 - Espressif esp_lvgl_port performance notes: buffer size, double buffering, refresh period. <https://github.com/espressif/esp-bsp/blob/master/components/esp_lvgl_port/docs/performance.md>
 - WS2811 datasheet (Worldsemi): PWM ≥ 400 Hz, 800 kbps, reset ≥ 50 µs. <https://cdn-shop.adafruit.com/datasheets/WS2811.pdf>
 
-**Model:** `<scratchpad>\refresh-study\knob_model.py` (output `knob_model.out.txt`). Pure arithmetic, with its assumptions stated in §2.2; replace them with the §8 measurements.
+**Model:** `<scratch>` (output `knob_model.out.txt`). Pure arithmetic, with its assumptions stated in §2.2; replace them with the §8 measurements.

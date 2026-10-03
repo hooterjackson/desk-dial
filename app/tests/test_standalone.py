@@ -134,7 +134,10 @@ class SmokeTestTests(unittest.TestCase):
         self.assertGreater(ui_detail['lcdPixels'],240)
         overlay=report['checks']['overlay']['detail']
         self.assertEqual((overlay['dpi100']['lcd'],overlay['dpi200']['lcd']),(302,604))
-        self.assertEqual(overlay['hiresGlyphs'],72,'every button glyph at 16/20/26 px, @2x and @3x')
+        from control_center import lcd_preview as _lp, presentation as _pres
+        glyphs=sum(1 for name in _pres.ICONS if name)*len(standalone.SMOKE_ICON_SIZES)*len(_lp.HIRES_ICON_FACTORS)
+        self.assertEqual(glyphs,126,'the 21 v4/v5 button glyphs at 16/20/26 px, @2x and @3x')
+        self.assertEqual(overlay['hiresGlyphs'],glyphs,'every button glyph at 16/20/26 px, @2x and @3x')
         self.assertTrue(report['checks']['appIcons']['detail']['appIconLoaded'])
         window=report['checks']['overlayWindow']['detail']
         self.assertLessEqual(window['gdi'][1],window['gdi'][0],'GDI objects back to the baseline')

@@ -186,12 +186,12 @@ def contract_violations(frame, caps):
 
 
 def v4_frame(**extra):
-    value = {"mode": "RECENTLY ADDED", "target": "Den", "value": "Déjà Vu", "detail": "Beyoncé",
-             "status": "", "title": "Déjà Vu", "subtitle": "Beyoncé", "counter": "3 / 10",
+    value = {"mode": "RECENTLY ADDED", "target": "Hall", "value": "Maré Alta", "detail": "Renée Lys",
+             "status": "", "title": "Maré Alta", "subtitle": "Renée Lys", "counter": "3 / 10",
              "activity": "idle", "layout": "recent", "heading": "RECENTLY ADDED · P2",
              "meta": "3/11 · Replaces queue", "titleTone": "ink", "metaTone": "meta",
              "statusTone": "meta", "page": 1, "artDim": False, "ledStyle": "color", "artKey": "al_1",
-             "volumeCaption": "Night Drive", "confirmedVolume": 28, "volumeVisible": False,
+             "volumeCaption": "Night Channel", "confirmedVolume": 28, "volumeVisible": False,
              "restLayout": "nowPlaying", "feedback": {"kind": "ok", "seq": 9},
              "buttons": [{"label": "Back", "enabled": True, "icon": "back", "color": 1},
                          {"label": "Home", "enabled": True, "icon": "home"},
@@ -514,27 +514,27 @@ class GatingTests(unittest.TestCase):
         self.assertEqual(set(result["ring"]), {"style", "value", "index", "count"})
         for name in ("counter", "volumeCaption", "confirmedVolume", "volumeVisible", "ledStyle", "layout"):
             self.assertIn(name, result)
-        self.assertEqual((result["title"], result["subtitle"]), ("Deja Vu", "Beyonce"))
+        self.assertEqual((result["title"], result["subtitle"]), ("Mare Alta", "Renee Lys"))
         # Colour kept when valid, derived from the tone rule when absent (cc4 requires it).
         self.assertEqual([b["color"] for b in result["buttons"]], [1, 0xF0EEE7, 0xF0EEE7, 0x66C991])
         self.assertEqual(result["artKey"], "", "no artwork capability: never name a cover")
         self.assertEqual(_frame(v4_frame(layout="notice"), P2)["layout"], "nowPlaying")
-        self.assertEqual(_frame(v4_frame(), {})["title"], "Deja Vu", "no capabilities means legacy ASCII")
+        self.assertEqual(_frame(v4_frame(), {})["title"], "Mare Alta", "no capabilities means legacy ASCII")
 
     def test_presentation_3_keeps_art_key_when_artwork_is_advertised(self):
         caps = {"controlCenter": 1, "presentation": 3, "artwork": ART}
         result = _frame(v4_frame(layout="notice"), caps)
         self.assertEqual((result["artKey"], result["layout"]), ("al_1", "nowPlaying"))
         self.assertNotIn("heading", result)
-        self.assertEqual(result["title"], "Deja Vu")
+        self.assertEqual(result["title"], "Mare Alta")
 
     def test_presentation_4_keeps_advertised_glyphs_and_transliterates_the_rest(self):
-        text = "Beyoncé — Déjà Vu… “Straße” · Łódź • ǅ Ω 🎵"
+        text = "Renée Lys — Maré Alta… “Straße” · Łódź • ǅ Ω 🎵"
         result = _frame(v4_frame(title=text), P4)
-        self.assertEqual(result["title"], "Beyoncé — Déjà Vu… “Straße” · Łódź • Dz ? ?")
+        self.assertEqual(result["title"], "Renée Lys — Maré Alta… “Straße” · Łódź • Dz ? ?")
         # Without a glyphs capability everything is ASCII (Ł has no decomposition).
         self.assertEqual(_frame(v4_frame(title=text), {"presentation": 4})["title"],
-                         "Beyonce - Deja Vu... \"Strasse\" / ?odz / Dz ? ?")
+                         "Renee Lys - Mare Alta... \"Strasse\" / ?odz / Dz ? ?")
         self.assertEqual(_frame(v4_frame(title="Café"), P4)["title"], "Café")
         self.assertEqual(_frame(v4_frame(heading="RECENT · P2"), P4)["heading"], "RECENT · P2")
 
@@ -556,7 +556,7 @@ class GatingTests(unittest.TestCase):
                                ring={"style": "level", "value": 30, "index": 0, "count": 101,
                                      "external": True, "moreIndex": -1}), P4)
         self.assertEqual((home["volumeCaption"], home["confirmedVolume"], home["restLayout"], home["volumeVisible"]),
-                         ("Night Drive", 28, "idle", True))
+                         ("Night Channel", 28, "idle", True))
         self.assertEqual(home["ring"], {"style": "level", "value": 30, "index": 0, "count": 101, "external": True})
         # Accents only travel in colour mode on a selection ring.
         self.assertNotIn("colors", _frame(v4_frame(ledStyle="white"), P4)["ring"])

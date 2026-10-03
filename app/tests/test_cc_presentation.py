@@ -29,7 +29,7 @@ CAPS_P2 = {"controlCenter": 1, "leaseMs": 2000, "presentation": 2}
 
 
 class PresentationTests(Fixture):
-    """Home, PLAYING row 5 of 12 (`Cloudbusting` · `Kate Bush`, volume 28), a fake clock."""
+    """Home, PLAYING row 5 of 12 (`Pressure Front` · `Mira Vale`, volume 28), a fake clock."""
 
     def palette(self, frame=None):
         frame = frame if frame is not None else self.frame()
@@ -69,7 +69,7 @@ class PresentationTests(Fixture):
         self.c.screen.status = "Volume confirmed"   # desktop-side text (K3 2.2), never knob copy
         before = (self.c.control_id, deepcopy(self.c.state), deepcopy(self.c.screen))
         frame = _frame(self.frame(), CAPS_P5)
-        self.assertEqual((frame["title"], frame["subtitle"], frame["value"]), ("Cloudbusting", "Kate Bush", "28%"))
+        self.assertEqual((frame["title"], frame["subtitle"], frame["value"]), ("Pressure Front", "Mira Vale", "28%"))
         self.assertEqual((frame["status"], frame.get("activity", "idle")), ("", "idle"))
         self.assertNotIn("counter", frame, "K1 3.1: the legacy counter is never sent (slimmed, 14.2)")
         self.assertEqual(before, (self.c.control_id, self.c.state, self.c.screen))
@@ -123,7 +123,7 @@ class PresentationTests(Fixture):
         self.publish(queue_state())
         frame = self.frame()
         self.assertEqual((frame["layout"], frame["activity"], frame["title"], frame["status"]),
-                         ("nowPlaying", "idle", "Cloudbusting", ""))
+                         ("nowPlaying", "idle", "Pressure Front", ""))
 
     def test_a_failure_line_survives_a_sonos_recovery(self):
         """A failure line is not a connection notice: it keeps its own 2600 ms through a recovery."""
@@ -328,14 +328,14 @@ class PresentationTests(Fixture):
 
     def test_lcd_font_fallback_does_not_change_source_strings(self):
         value = self.frame()
-        value["title"] = "Beyoncé — Déjà Vu…"
+        value["title"] = "Renée Lys — Maré Alta…"
         value["subtitle"] = "L'œuvre d’aujourd’hui"
         normalized = _frame(value)
-        self.assertEqual(normalized["title"], "Beyonce - Deja Vu...")
+        self.assertEqual(normalized["title"], "Renee Lys - Mare Alta...")
         self.assertEqual(normalized["subtitle"], "L'oeuvre d'aujourd'hui")
-        self.assertEqual(value["title"], "Beyoncé — Déjà Vu…")
+        self.assertEqual(value["title"], "Renée Lys — Maré Alta…")
         v5 = _frame(deepcopy(value), CAPS_P5)                           # latin-ext-a keeps them
-        self.assertEqual((v5["title"], v5["subtitle"]), ("Beyoncé — Déjà Vu…", "L'œuvre d’aujourd’hui"))
+        self.assertEqual((v5["title"], v5["subtitle"]), ("Renée Lys — Maré Alta…", "L'œuvre d’aujourd’hui"))
 
 
 class PresentationV5ConstantTests(unittest.TestCase):

@@ -1088,3 +1088,25 @@ M1–M12 are the crosswalk of §0.3. "Dev." = departs from r2.1 (K2 §12.4 has t
 | **[P2a]** K3 C5-73…C5-77 | shuffle-off Play-next units and the two-pass attribution (with the preview's limitations); `jump` landing rule; internal effect `resolve_drop`; `group_changed_ms` 2600 (per op); a start drops a waiting Seek follow-up (C5-77, review) | §7.4, §8.2, §8.5, §10 |
 | **[P2b]** K3 C5-76 (lead ruling R-j); K1 16.8 E-j | `Speaker group changed` (`knob.status.group_changed` / `knob.meta.group_changed`) is failure copy in the `error` tone (`#FF8474`, VOC-R10) wherever it shows, for its `group_changed_ms` 2600; the per-op rules are unchanged | §8.5, §10 |
 | **[P3]** K3 C5-78, C5-79; K3 §1.2 (the H5 parse caps; WP6-GIL-D1, D3, D5) | `windows_cancel` carries the close `reason` (`back` \| `hold` \| `lock` \| `sleep` \| `idle`, §7.3); the Shuffle-off preview follows the restore record when the controller knows it (no wire change); `catalog_songs` ≤ 50 ids per request, `resolve` and `playlist_meta` pages `limit=50`, `playlist_meta`'s 100-track window and 10,000-track duration reach | §7.3, §8.2, §8.3 |
+
+
+---
+
+## 17. [r3] Presentation 6 vocabulary (Desk Dial r3 release 1, 2026-09-28)
+
+Append-only (rule 1); defined in PRESENTATION_V5.md section 19 (wire, LCD) and ALIVE.md section 15 (LEDs).
+
+| Kind | Token / name | Value | Meaning |
+|---|---|---|---|
+| capability | `presentation` | 6 | the knob accepts the section 19 content |
+| CCLayout | `lights`, `lightsbig`, `scenes` | 10, 11, 12 | Lights text screen, its brightness / temperature reveal, the scenes list |
+| CCRingStyle | `bri`, `ctemp`, `clusters` | 5, 6, 7 | brightness arc, colour-temperature arc, scene clusters |
+| ring field | `kelvin` | int 2200..6500 | the arc colour (bri) / the selected K (ctemp) |
+| CCIcon | `bulb`, `thermo`, `power`, `wand`, `house`, `album` | 22..27 | Lights space, temperature, all off / turn on, scenes, Home at a space root, Recently Added |
+| field | `valueUnit` | `"%"` \| `"K"` (CCValueUnit 0, 1) | the lightsbig unit |
+| field | `prevTitle`, `nextTitle` | text ≤ 64 B | the scenes list's neighbours |
+| CCAliveFamily | `LIGHTS` | 7 | lights, lightsbig, scenes |
+| CCAliveClass | `T`, `R`, `O`, `L`, `F` | 9..13 | 0.08 / 0.12 / 0.18 / 0.34 / 0.50 awake (15.3) |
+| CCFlashKind | `WASH` | 3 | the LIGHTS ok: whole ring GREEN 0.68, 700 ms |
+| button alpha | `buttonActive` | 0.90 | a lit-on button in LIGHTS |
+| constant | `CC_KELVIN_GAIN` / `KELVIN_GAIN` | {255, 255, 255} | the ring white-point calibration hook |

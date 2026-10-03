@@ -17,8 +17,8 @@ from cc5_support import Clock, Fixture as V7Fixture, queue_state, recent_page, s
 
 P4 = {"controlCenter": 1, "presentation": 4, "glyphs": "latin-ext-a"}
 P5 = {"controlCenter": 1, "presentation": 5, "glyphs": "latin-ext-a"}
-PLAYING = dict(playback="PLAYING", can_pause=True, can_play=False, title="Cloudbusting",
-               artist="Kate Bush", queue_length=4)
+PLAYING = dict(playback="PLAYING", can_pause=True, can_play=False, title="Pressure Front",
+               artist="Mira Vale", queue_length=4)
 PAUSED = dict(PLAYING, playback="PAUSED_PLAYBACK", can_pause=False, can_play=True)
 
 
@@ -65,7 +65,7 @@ class HomeCopyTests(Fixture):
         frame = self.c.frame()
         self.assertEqual((frame["layout"], frame["restLayout"], frame["heading"]), ("nowPlaying", "nowPlaying", ""))
         self.assertEqual((frame["title"], frame["subtitle"], frame["status"], frame["value"]),
-                         ("Cloudbusting", "Kate Bush", "", "28%"))
+                         ("Pressure Front", "Mira Vale", "", "28%"))
         self.assertEqual(self.tones(), ["nav", "nav", "nav", "nav"])
 
     def test_setting_is_meta_until_confirmed_then_blank(self):
@@ -107,22 +107,23 @@ class HomeCopyTests(Fixture):
         self.assertEqual(self.f("status", "statusTone", "activity", "layout"), ("Pausing…", "meta", "pending", "nowPlaying"))
         self.c.complete(pause["request"], state(**PAUSED))
         self.assertEqual(self.f("status", "statusTone", "activity", "layout"), ("Paused", "secondary", "idle", "nowPlaying"))
-        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Cloudbusting")
+        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Pressure Front")
         self.c.button(0)
         self.one("transport")
         self.assertEqual(self.f("status", "statusTone", "activity"), ("Starting…", "meta", "pending"))
 
-    def test_paused_idle_after_4_s_and_rest_under_a_reveal(self):
+    def test_paused_keeps_now_playing_and_rest_under_a_reveal(self):
+        # r3.1 (2026-09-29): paused keeps the Now Playing layout (art + buttons); no paused idle.
         self.publish(state(**PAUSED))
         self.clock.advance(4.01)
-        self.assertEqual(self.f("layout", "restLayout", "status"), ("idle", "idle", ""))
+        self.assertEqual(self.f("layout", "restLayout", "status"), ("nowPlaying", "nowPlaying", "Paused"))
         self.assertEqual(self.slot0(), ("Play", "play", True))
         self.assertEqual(self.tones()[0], "go", "the paused Home Play is green")
         self.c.turn(1)
-        self.assertEqual(self.f("layout", "restLayout", "status"), ("volume", "idle", "Setting…"))
+        self.assertEqual(self.f("layout", "restLayout", "status"), ("volume", "nowPlaying", "Setting…"))
         self.confirm_volume(29, **PAUSED)
         self.clock.advance(1.41)
-        self.assertEqual(self.f("layout", "restLayout"), ("idle", "idle"))
+        self.assertEqual(self.f("layout", "restLayout"), ("nowPlaying", "nowPlaying"))
 
     def test_a_home_play_press_cancels_the_paused_idle(self):
         self.publish(state(**PAUSED))
@@ -168,14 +169,14 @@ class HomeCopyTests(Fixture):
         self.c.button(0)
         pause = self.one("transport")
         self.assertEqual(self.slot0(), ("Play", "play", False))
-        self.assertEqual(self.f("status", "volumeCaption"), ("Pausing…", "Cloudbusting"))
+        self.assertEqual(self.f("status", "volumeCaption"), ("Pausing…", "Pressure Front"))
         self.c.complete(pause["request"], state(**PAUSED))
         self.assertEqual(self.slot0(), ("Play", "play", True))
-        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Cloudbusting")
+        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Pressure Front")
         self.c.button(0)
         play = self.one("transport")
         self.assertEqual(self.slot0(), ("Pause", "pause", False))
-        self.assertEqual(self.f("status", "volumeCaption"), ("Starting…", "Cloudbusting"),
+        self.assertEqual(self.f("status", "volumeCaption"), ("Starting…", "Pressure Front"),
                          "no 'Paused · ' while a play request is out")
         self.c.complete(play["request"], error="Sonos did not confirm playback")
         self.assertEqual(self.slot0(), ("Play", "play", True), "a failed request shows the confirmed state again")

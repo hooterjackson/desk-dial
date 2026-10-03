@@ -9,7 +9,7 @@
  * cc_font_14: 232 glyphs, U+00A0-017F, U+2013-2014, U+2018-2019, U+201C-201D, U+2022, U+2026 (+ U+0020-007E via lv_font_montserrat_14)
  * cc_font_16: 232 glyphs, U+00A0-017F, U+2013-2014, U+2018-2019, U+201C-201D, U+2022, U+2026 (+ U+0020-007E via lv_font_montserrat_16)
  * cc_font_22: 232 glyphs, U+00A0-017F, U+2013-2014, U+2018-2019, U+201C-201D, U+2022, U+2026 (+ U+0020-007E via lv_font_montserrat_22)
- * cc_font_48: 12 glyphs, U+0025, U+002D, U+0030-0039
+ * cc_font_48: 13 glyphs, U+0025, U+002D, U+0030-0039, U+004B
  * cc_font_48t: 11 glyphs, U+0030-003A (tabular digits: zero.tf..nine.tf)
  *
  * Hybrid text fonts (cc_font_12, cc_font_14, cc_font_16, cc_font_22): ASCII is NOT

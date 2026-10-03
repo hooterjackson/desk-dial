@@ -34,19 +34,27 @@
 //                                            gate), and it NEVER writes the firmware sources or
 //                                            assets/handoff-icons.
 // Any other argument is refused, so only a bare run takes the full (firmware) export path.
+//
+// Presentation 6 (PRESENTATION_V5.md section 19.5, Desk Dial r3 release 1): six tokens appended in CCIcon order,
+// bulb 22, thermo 23, power 24, wand 25, house 26, album 27, drawn from the r3 prototype's own `I` table
+// (design_handoff_nano_d_r3/prototypes/Knob IA Prototype.dc.html, copied verbatim to
+// harness/r3-handoff/design/; src 'r3', drift-checked there like 'bs' is against BS): 20 px each at stroke
+// 2.3 (footer) and bulb also at 26 px, stroke 2.1 (the Home idle row `Music · Win · Lights · Play`). The r2.1
+// masks are unchanged (--check pins them): 16,024 B = 12,948 + 6 x 400 + 676.
+// Desk Dial r3.1: house and album also at 26 px, stroke 2.1 (the Music space idle row: Home, Recent), which drew
+// nothing before: 17,376 B = 16,024 + 2 x 676.
 'use strict';
 const fs = require('fs'); const path = require('path');
 function loadSharp() {
-  // SHARP_MODULE_PATH may point at a sharp install outside this tree; otherwise a normal require.
-  const bundled = process.env.SHARP_MODULE_PATH;
-  if (bundled) { try { return require(bundled); } catch (e) { /* fall back */ } }
-  return require('sharp');
+  const bundled = process.env.SHARP_MODULE_PATH || 'sharp';
+  try { return require(bundled); } catch (e) { return require('sharp'); }
 }
 const sharp = loadSharp();
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 const DESIGN = path.join(root, 'app/design-reference');
 const BS_FILE = path.join(DESIGN, 'design_handoff_nano_d_master_r2.1/prototypes/Browse and Snap.dc.html');
 const KF_FILE = path.join(DESIGN, 'design_handoff_nano_d_master_r2.1/prototypes/Knob Face.dc.html');
+const R3_FILE = path.join(__dirname, 'r3-handoff/design/prototypes/Knob IA Prototype.dc.html');
 const FIRMWARE_SRC = path.join(root, 'firmware/src');
 const out = path.join(root, 'app/assets/handoff-icons');
 const HIRES_OUT = path.join(root, 'app/assets/lcd-icons');
@@ -99,6 +107,17 @@ const TOKENS = [
   // [r2.2] Tone `liked` (heart + lit "on", P5-R29): the `heart` path as a fill path, footer 20 px, drawn in
   // #A3244A. Same BS `heart:` string as `heart` (R22 BS:1268 `fill: I.heart`), so the same drift needle.
   {token: 'heartfill', id: null, src: 'internal', key: 'heart', drift: HEART, fill: [HEART], sizes: [20]},
+  // Presentation 6 (section 19.5): the r3 prototype's I[key] strings, 20 px footer; bulb, house, album also 26 px (idle rows).
+  {token: 'bulb', id: 22, src: 'r3', key: 'bulb', sizes: [20, 26],
+   stroke: 'M9 18h6M10 22h4M15.1 14c.2-1 .7-1.7 1.4-2.5A4.7 4.7 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5A4.6 4.6 0 0 1 8.9 14'},
+  {token: 'thermo', id: 23, src: 'r3', key: 'temp', stroke: 'M14 4v10.5a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z', sizes: [20]},
+  {token: 'power', id: 24, src: 'r3', key: 'power', stroke: 'M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0', sizes: [20]},
+  {token: 'wand', id: 25, src: 'r3', key: 'wand', sizes: [20],
+   stroke: 'M21.6 2.6l-1.2-1.2a1.2 1.2 0 0 0-1.7 0L2.4 17.7a1.2 1.2 0 0 0 0 1.7l1.2 1.2a1.2 1.2 0 0 0 1.7 0L21.6 4.3a1.2 1.2 0 0 0 0-1.7zM14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9'},
+  {token: 'house', id: 26, src: 'r3', key: 'home', stroke: 'M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM9 21v-8h6v8',
+   sizes: [20, 26]},
+  {token: 'album', id: 27, src: 'r3', key: 'album', stroke: 'M3 3h18v18H3zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM12 11.5v1',
+   sizes: [20, 26]},
 ];
 // The markup the design draws each size with (drift gate): the strokes above follow it.
 const STYLE_ANCHORS = [
@@ -111,6 +130,11 @@ const STYLE_ANCHORS = [
   [BS_FILE, '<div style="width:6px;height:6px;border-radius:50%;background:{{ tdc }}"></div>', 'Tracks row 6 px dot'],
   [KF_FILE, '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"',
    'idle row 26 px, stroke 2.1'],
+  // Presentation 6: the r3 prototype draws the footer at 20 px / 2.3 and the idle row at 26 px / 2.1 too.
+  [R3_FILE, '<svg width="20" height="20" viewBox="0 0 24 24" fill="{{ ft.fill }}" stroke="currentColor" ' +
+            'stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round">', 'r3 footer 20 px, stroke 2.3'],
+  [R3_FILE, '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"',
+   'r3 idle row 26 px, stroke 2.1'],
 ];
 
 function firmwareMasks() {
@@ -128,10 +152,11 @@ function desktopMasks() {
 
 // The design string an entry is drift-checked against: a BS token's stroke, an internal entry's `drift`.
 // Legacy tokens (cc5.3 paths) and dotfill have none: the old design table is not read (9.2 item 1).
-function driftPath(e) { return e.src === 'bs' ? e.stroke : e.src === 'internal' ? e.drift : undefined; }
+function driftPath(e) { return e.src === 'bs' || e.src === 'r3' ? e.stroke : e.src === 'internal' ? e.drift : undefined; }
 
 function driftGate() {
   const text = fs.readFileSync(BS_FILE, 'utf8');
+  const r3 = fs.readFileSync(R3_FILE, 'utf8');
   const problems = [];
   let checked = 0;
   for (const e of TOKENS) {
@@ -139,7 +164,8 @@ function driftGate() {
     if (!d) continue;
     checked++;
     const needle = `${e.key}: '${d}'`;
-    if (!text.includes(needle)) problems.push(`${e.token}: ${needle} not in ${BS_FILE}`);
+    const [source, file] = e.src === 'r3' ? [r3, R3_FILE] : [text, BS_FILE];
+    if (!source.includes(needle)) problems.push(`${e.token}: ${needle} not in ${file}`);
     if (e.half) {
       const half = `${e.half}: '${e.fill[0]}'`;
       if (!/const HALF = \{[^\n]*\};/.test(text) || !text.match(/const HALF = \{[^\n]*\};/)[0].includes(half))
@@ -233,7 +259,8 @@ function firmwareSources(rendered) {
   const bytes = masks.reduce((n, [, size]) => n + size * size, 0);
   const counts = SIZES.map(size => `${masks.filter(([, s]) => s === size).length} x ${size} px`).join(' + ');
   let cpp = '// Generated by harness/export_handoff_icons.cjs. Do not edit by hand.\n' +
-    '// A8 masks of the r2.1 design icons (PRESENTATION_V5.md section 9.1; Browse and Snap.dc.html I/HALF),\n' +
+    '// A8 masks of the r2.1 design icons (PRESENTATION_V5.md section 9.1; Browse and Snap.dc.html I/HALF) and,\n' +
+    '// presentation 6 (section 19.5), the r3 prototype\'s bulb, thermo, power, wand, house, album (Knob IA I),\n' +
     '// trimmed per use: stroke 2.3 @20 px (footer), 2.1 @26 px (idle row), 2.3 @16 px (Tracks row);\n' +
     '// internal fills: dotfill @16 px (Tracks row), heartfill @20 px (r2.2 tone liked, the heart filled).\n' +
     `// Masks: ${counts} = ${bytes} B.\n` +
@@ -270,7 +297,9 @@ function firmwareSources(rendered) {
     '// Design icon masks (A8), generated by harness/export_handoff_icons.cjs.\n' +
     '// Sizes by use (PRESENTATION_V5.md section 9.1): 20 px every wire token and the internal "heartfill"\n' +
     '// (footer; tone liked draws it in #A3244A instead of "heart", P5-R29); 26 px play, pause, list, win,\n' +
-    '// tracks (Home idle row); 16 px prev, next and the internal "dotfill" (Tracks row).\n' +
+    '// tracks and, presentation 6 (section 19.5), bulb, house and album (Home / Music idle rows); 16 px prev,\n' +
+    '// next and the internal\n' +
+    '// "dotfill" (Tracks row). Presentation 6 appends bulb, thermo, power, wand, house, album (r3 prototype).\n' +
     '// Returns nullptr for an unknown name or a token without a mask at that size (the caller hides it).\n' +
     'const lv_image_dsc_t* cc_icon(const char* name, int size);\n';
   return {cpp, header, bytes};
@@ -285,7 +314,7 @@ function manifest(bytes) {
     source: 'design_handoff_nano_d_master_r2.1/prototypes/Browse and Snap.dc.html I/HALF (BS:485-495); ' +
             'home, more, cancel: the cc5.3 paths, unchanged',
     viewBox: 24, strokes: STROKE,
-    tokens: TOKENS.map(e => ({token: e.token, id: e.id, design: e.src === 'bs' ? e.key + (e.half ? '+HALF.' + e.half : '') :
+    tokens: TOKENS.map(e => ({token: e.token, id: e.id, design: e.src === 'r3' ? 'r3 ' + e.key : e.src === 'bs' ? e.key + (e.half ? '+HALF.' + e.half : '') :
                               e.src === 'legacy' ? 'legacy ' + e.key : 'internal' + (e.drift ? ' ' + e.key + ' filled' : ''),
                               fill: !!(e.fill && e.fill.length)})),
     firmwareSizes: firmware,
@@ -318,7 +347,7 @@ async function buildAll() {
   try { heartfillCheck(rendered.get('heart-20').alpha, rendered.get('heart-20').alpha); } catch (e) { rejects = true; }
   if (!rejects) throw new Error('heartfill self-check accepts the stroked heart');
   const {cpp, header, bytes} = firmwareSources(rendered);
-  if (bytes !== 12948) throw new Error(`firmware masks ${bytes} B, section 9.1 says 12,948 B (r2.2: 12,548 + heartfill 400)`);
+  if (bytes !== 17376) throw new Error(`firmware masks ${bytes} B, r3.1 says 17,376 B (12,948 + 6 x 400 + 3 x 676)`);
   const files = new Map();       // absolute path -> Buffer
   files.set(path.join(FIRMWARE_SRC, 'cc_icons.cpp'), Buffer.from(cpp));
   files.set(path.join(FIRMWARE_SRC, 'cc_icons.h'), Buffer.from(header));

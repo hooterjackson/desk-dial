@@ -1,4 +1,5 @@
 #include "cc_frame_parse.h"
+#include "cc_haptic_fx.h"
 #include <string.h>
 
 namespace {
@@ -15,14 +16,21 @@ constexpr Token kLayouts[] = {{"nowPlaying", CC_LAYOUT_NOW_PLAYING}, {"volume", 
     {"idle", CC_LAYOUT_IDLE}, {"recent", CC_LAYOUT_RECENT}, {"tracks", CC_LAYOUT_TRACKS},
     {"windows", CC_LAYOUT_WINDOWS}, {"notice", CC_LAYOUT_NOTICE},
     // Presentation 5 (PRESENTATION_V5.md section 3.1).
-    {"seek", CC_LAYOUT_SEEK}, {"explorer", CC_LAYOUT_EXPLORER}, {"upnext", CC_LAYOUT_UPNEXT}};
+    {"seek", CC_LAYOUT_SEEK}, {"explorer", CC_LAYOUT_EXPLORER}, {"upnext", CC_LAYOUT_UPNEXT},
+    // Presentation 6 (PRESENTATION_V5.md section 19.1).
+    {"lights", CC_LAYOUT_LIGHTS}, {"lightsbig", CC_LAYOUT_LIGHTSBIG}, {"scenes", CC_LAYOUT_SCENES}};
 constexpr Token kRestLayouts[] = {{"nowPlaying", CC_LAYOUT_NOW_PLAYING}, {"idle", CC_LAYOUT_IDLE}};
 constexpr Token kTitleTones[] = {{"ink", CC_TITLE_INK}, {"muted", CC_TITLE_MUTED}};
 constexpr Token kLineTones[] = {{"meta", CC_LINE_META}, {"secondary", CC_LINE_SECONDARY},
-    {"error", CC_LINE_ERROR}, {"success", CC_LINE_SUCCESS}};
+    {"error", CC_LINE_ERROR}, {"success", CC_LINE_SUCCESS},
+    {"warm", CC_LINE_WARM}};   // presentation 6 (section 19.9)
 constexpr Token kLedStyles[] = {{"white", 0}, {"color", 1}};
 constexpr Token kRingStyles[] = {{"off", CC_RING_OFF}, {"level", CC_RING_LEVEL},
-    {"selection", CC_RING_SELECTION}, {"transport", CC_RING_TRANSPORT}, {"lap", CC_RING_LAP}};
+    {"selection", CC_RING_SELECTION}, {"transport", CC_RING_TRANSPORT}, {"lap", CC_RING_LAP},
+    // Presentation 6 (section 19.3).
+    {"bri", CC_RING_BRI}, {"ctemp", CC_RING_CTEMP}, {"clusters", CC_RING_CLUSTERS},
+    {"marker", CC_RING_MARKER},    // presentation 6 (section 19.9)
+    {"queue", CC_RING_QUEUE}};     // [r3.1] section 19.10
 constexpr Token kIcons[] = {{"", CC_ICON_NONE}, {"play", CC_ICON_PLAY}, {"pause", CC_ICON_PAUSE},
     {"list", CC_ICON_LIST}, {"win", CC_ICON_WIN}, {"tracks", CC_ICON_TRACKS}, {"back", CC_ICON_BACK},
     {"home", CC_ICON_HOME}, {"more", CC_ICON_MORE}, {"prev", CC_ICON_PREV}, {"next", CC_ICON_NEXT},
@@ -30,7 +38,10 @@ constexpr Token kIcons[] = {{"", CC_ICON_NONE}, {"play", CC_ICON_PLAY}, {"pause"
     // Presentation 5 (PRESENTATION_V5.md section 9.1).
     {"expand", CC_ICON_EXPAND}, {"clock", CC_ICON_CLOCK}, {"playlists", CC_ICON_PLAYLISTS},
     {"playnext", CC_ICON_PLAYNEXT}, {"seek", CC_ICON_SEEK}, {"shuffle", CC_ICON_SHUFFLE},
-    {"heart", CC_ICON_HEART}, {"snapleft", CC_ICON_SNAPLEFT}, {"snapright", CC_ICON_SNAPRIGHT}};
+    {"heart", CC_ICON_HEART}, {"snapleft", CC_ICON_SNAPLEFT}, {"snapright", CC_ICON_SNAPRIGHT},
+    // Presentation 6 (section 19.5).
+    {"bulb", CC_ICON_BULB}, {"thermo", CC_ICON_THERMO}, {"power", CC_ICON_POWER}, {"wand", CC_ICON_WAND},
+    {"house", CC_ICON_HOUSE}, {"album", CC_ICON_ALBUM}};
 constexpr Token kFeedbackKinds[] = {{"ok", CC_FEEDBACK_OK}, {"err", CC_FEEDBACK_ERR}};
 // Derived tone names (cc_token_name only; tones are never parsed). [r2.2] 7 "liked" (5.2 row 4).
 constexpr Token kTones[] = {{"none", CC_TONE_NONE}, {"dim", CC_TONE_DIM}, {"stop", CC_TONE_STOP},
@@ -40,7 +51,15 @@ constexpr Token kTones[] = {{"none", CC_TONE_NONE}, {"dim", CC_TONE_DIM}, {"stop
 constexpr Token kLit[] = {{"on", CC_LIT_ON}, {"off", CC_LIT_OFF}};
 constexpr Token kMoments[] = {{"queued", CC_MOMENT_QUEUED}, {"shuffle", CC_MOMENT_SHUFFLE},
     {"like", CC_MOMENT_LIKE}, {"unlike", CC_MOMENT_UNLIKE}, {"snap", CC_MOMENT_SNAP},
-    {"started", CC_MOMENT_STARTED}};
+    {"started", CC_MOMENT_STARTED},
+    {"refused", CC_MOMENT_REFUSED}};   // presentation 6 (section 19.9): kind err only
+// Presentation 6: valueUnit (section 19.2).
+constexpr Token kUnits[] = {{"%", CC_UNIT_PERCENT}, {"K", CC_UNIT_KELVIN}};
+// Presentation 6: crumb (section 19.9), in CCCrumb order.
+constexpr Token kCrumbs[] = {{"music", CC_CRUMB_MUSIC}, {"recent", CC_CRUMB_RECENT},
+    {"onScreenRecent", CC_CRUMB_ONSCREEN_RECENT}, {"onScreenPlaylists", CC_CRUMB_ONSCREEN_PLAYLISTS},
+    {"tracks", CC_CRUMB_TRACKS}, {"upnext", CC_CRUMB_UPNEXT}, {"windows", CC_CRUMB_WINDOWS},
+    {"lights", CC_CRUMB_LIGHTS}, {"scenes", CC_CRUMB_SCENES}, {"playlists", CC_CRUMB_PLAYLISTS}};
 
 template <size_t N>
 bool token(JsonVariantConst value, const Token (&tokens)[N], uint8_t& out) {
@@ -190,6 +209,126 @@ bool parse_v5_latched(JsonObjectConst frame, CCFrame& f) {
     return true;
 }
 
+// Presentation 6 (PRESENTATION_V5.md section 19.2), after the layout is known.
+bool parse_v6_text(JsonObjectConst frame, CCFrame& f) {
+    uint8_t unit = CC_UNIT_PERCENT;
+    if (!optional_token(frame, "valueUnit", kUnits, unit)) return false;
+    if (f.layoutId == CC_LAYOUT_LIGHTSBIG) f.valueUnit = unit;
+    const bool scenes = f.layoutId == CC_LAYOUT_SCENES;
+    // Validated into the frame's own buffers, then cleared off scenes (no second 65 B buffer on the stack).
+    if (!optional_text(frame, "prevTitle", f.prevTitle) || !optional_text(frame, "nextTitle", f.nextTitle))
+        return false;
+    if (!scenes) f.prevTitle[0] = f.nextTitle[0] = '\0';
+    // Section 19.9: crumb (a token; invalid rejects), kept on every layout.
+    if (!optional_token(frame, "crumb", kCrumbs, f.crumb)) return false;
+    // [r3.1] section 19.10: holdMarker (a bool; anything else rejects), kept on every layout.
+    if (!optional_bool(frame, "holdMarker", f.holdMarker)) return false;
+    return true;
+}
+
+// A2 app canvas (1.0.0-cc5.6; CONTROL_CENTER.md "App canvas"): the optional `app` object, on any layout. Every
+// present value is validated (invalid rejects the frame, the strict rule); unknown keys inside are ignored.
+// App profiles (APP_PROFILES.md section 8): `id` is any profile id (1..11 of [a-z0-9_-]); one that is not loaded,
+// or whose optional `crc` (u32) differs, is drawn as "Loading..." by the LCD thread, never rejected here. The slot
+// tokens knob / f1..f4 follow the legacy ones; `index` goes to 32.
+constexpr Token kAppSlots[] = {{"zoom", CC_APP_SLOT_ZOOM}, {"orbit", CC_APP_SLOT_ORBIT}, {"pan", CC_APP_SLOT_PAN},
+                               {"tilt", CC_APP_SLOT_TILT}, {"knob", CC_APP_SLOT_KNOB}, {"f1", CC_APP_SLOT_F1},
+                               {"f2", CC_APP_SLOT_F2}, {"f3", CC_APP_SLOT_F3}, {"f4", CC_APP_SLOT_F4}};
+
+// The profile id: a string of 1..CC_APP_ID_CAPACITY - 1 characters of [a-z0-9_-] (so no NUL), copied with its NUL.
+bool app_id(JsonVariantConst value, char (&out)[CC_APP_ID_CAPACITY]) {
+    if (!value.is<const char*>()) return false;
+    const JsonString wire = value.as<JsonString>();
+    const size_t size = wire.size();
+    if (size < 1 || size >= CC_APP_ID_CAPACITY) return false;
+    for (size_t i = 0; i < size; ++i) {
+        const char c = wire.c_str()[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) return false;
+    }
+    memcpy(out, wire.c_str(), size);
+    out[size] = '\0';
+    return true;
+}
+constexpr Token kAppModes[] = {{"A", 0}, {"B", 1}};
+
+bool app_uint8(JsonVariantConst value, uint32_t lo, uint32_t hi, uint8_t& out) {
+    uint32_t number = 0;
+    if (!cc_json_uint(value, lo, hi, number)) return false;
+    out = static_cast<uint8_t>(number);
+    return true;
+}
+
+// r4 FEEL (1.0.0-cc5.7; HAPTICS.md "Events"): the optional `haptic` object {"token": CCFx wire token, "seq": int
+// 1..0x7FFFFFFF}, on any layout, the strict rule (an unknown token, a missing or bad seq rejects the frame; unknown
+// keys inside are ignored). device.py haptic_parse() is the Python reading.
+bool parse_haptic(JsonObjectConst frame, CCFrame& f) {
+    if (!has(frame, "haptic")) return true;
+    if (!frame["haptic"].is<JsonObjectConst>()) return false;
+    JsonObjectConst haptic = frame["haptic"].as<JsonObjectConst>();
+    const char* wire = cc_json_token(haptic["token"]);   // FW-RES-007: no NUL-suffixed token
+    if (wire == nullptr) return false;
+    uint8_t fx = CC_HFX_NONE;
+    uint32_t seq = 0;
+    if (!cc_fx_parse(wire, fx) || !cc_json_uint(haptic["seq"], 1, 0x7FFFFFFF, seq)) return false;
+    f.hapticFx = fx;
+    f.hapticSeq = seq;
+    return true;
+}
+
+bool parse_app(JsonObjectConst frame, CCFrame& f) {
+    if (!has(frame, "app")) return true;
+    if (!frame["app"].is<JsonObjectConst>()) return false;
+    JsonObjectConst app = frame["app"].as<JsonObjectConst>();
+    CCAppState a;
+    if (!app_id(app["id"], a.id) || !token(app["slot"], kAppSlots, a.slot)) return false;
+    if (has(app, "crc") && !cc_json_uint(app["crc"], 0, 0xFFFFFFFFu, a.crc)) return false;
+    if (!optional_bool(app, "refused", a.refused)) return false;
+    // DD-SEC-001: optional refusedFocus (default false), kept only with refused. Read leniently (a non-bool is
+    // false, never a rejection): device.app_parse and older firmware ignore the key, so acceptance stays the same.
+    a.refusedFocus = a.refused && app["refusedFocus"].is<bool>() && app["refusedFocus"].as<bool>();
+    if (has(app, "flash") && !cc_json_uint(app["flash"], 0, 0x7FFFFFFF, a.flash)) return false;
+    if (has(app, "wheel")) {
+        if (!app["wheel"].is<JsonObjectConst>()) return false;
+        JsonObjectConst wheel = app["wheel"].as<JsonObjectConst>();
+        if (!app_uint8(wheel["ring"], 0, CC_APP_RING_MAX, a.wheelRing) ||
+            !app_uint8(wheel["index"], 0, CC_APP_INDEX_MAX, a.wheelIndex)) return false;
+        a.wheel = true;
+    }
+    if (has(app, "param")) {
+        if (!app["param"].is<JsonObjectConst>()) return false;
+        JsonObjectConst param = app["param"].as<JsonObjectConst>();
+        uint8_t mode = 0;
+        if (!app_uint8(param["ring"], 0, CC_APP_RING_MAX, a.paramRing) ||
+            !app_uint8(param["index"], 1, CC_APP_INDEX_MAX, a.paramIndex) ||
+            !token(param["mode"], kAppModes, mode) || !app_uint8(param["step"], 0, 2, a.paramStep)) return false;
+        JsonVariantConst value = param["value"];
+        if (value.is<bool>() || !value.is<int32_t>()) return false;
+        const int32_t milli = value.as<int32_t>();
+        if (milli < -CC_APP_VALUE_MAX || milli > CC_APP_VALUE_MAX) return false;
+        if (has(param, "bump") && !cc_json_uint(param["bump"], 0, 0x7FFFFFFF, a.paramBump)) return false;
+        // App profiles (APP_PROFILES.md section 8): the live constraint. `axis` 0..3 (X, Y, Z, uniform; absent = the
+        // profile's axis_default, stored -1), `plane` a bool (the axis key with Shift; default false).
+        uint8_t axis = 0;
+        if (has(param, "axis")) {
+            if (!app_uint8(param["axis"], 0, 3, axis)) return false;
+            a.paramAxis = static_cast<int8_t>(axis);
+        }
+        if (!optional_bool(param, "plane", a.paramPlane)) return false;
+        a.param = true;
+        a.paramTyped = mode == 1;
+        a.paramValue = milli;
+    }
+    if (has(app, "echo")) {
+        if (!app["echo"].is<JsonObjectConst>()) return false;
+        JsonObjectConst echo = app["echo"].as<JsonObjectConst>();
+        if (!app_uint8(echo["ring"], 0, CC_APP_RING_MAX, a.echoRing) ||
+            !app_uint8(echo["index"], 1, CC_APP_INDEX_MAX, a.echoIndex) ||
+            !cc_json_uint(echo["seq"], 1, 0x7FFFFFFF, a.echoSeq)) return false;
+    }
+    f.app = a;
+    return true;
+}
+
 // feedback.skip (ALIVE.md section 3): the JSON integer -1 or 1 (never a bool or a float),
 // validated with any kind; kept only when the kind is ok, stripped otherwise.
 bool parse_feedback_skip(JsonObjectConst feedback, CCFrame& f) {
@@ -220,7 +359,13 @@ bool parse_feedback_v5(JsonObjectConst feedback, CCFrame& f) {
         if (side != 1 && side != -1) return false;
     }
     if (has(feedback, "color") && !cc_json_uint(feedback["color"], 0, 0xFFFFFF, color)) return false;
-    if (f.feedbackKind != CC_FEEDBACK_OK) return true;
+    // Presentation 6 (section 19.9): `refused` is kept only with kind err (then alone: no side, no colour);
+    // with kind ok it is stripped (moment none), like every other moment is with err.
+    if (f.feedbackKind != CC_FEEDBACK_OK) {
+        if (moment == CC_MOMENT_REFUSED) f.feedbackMoment = moment;
+        return true;
+    }
+    if (moment == CC_MOMENT_REFUSED) return true;
     if (hasMoment && has(feedback, "skip")) return false;
     if (moment == CC_MOMENT_SNAP && !hasSide) return false;
     f.feedbackMoment = moment;
@@ -270,6 +415,21 @@ bool parse_ring(JsonVariantConst value, CCFrame& f) {
     if ((f.ringStyle == CC_RING_SELECTION || f.ringStyle == CC_RING_TRANSPORT) && index >= count) return false;
     // PRESENTATION_V5.md 4.3: the Seek lap needs 1 <= count (D s) <= CC_LAP_COUNT_MAX and index < count.
     if (f.ringStyle == CC_RING_LAP && (count < 1 || count > CC_LAP_COUNT_MAX || index >= count)) return false;
+    // Presentation 6 (section 19.3): clusters needs 1 <= count <= 20 and index < count; ring.kelvin is an int
+    // 2200..6500, required on bri and ctemp, validated on every other style and then stripped (0).
+    if (f.ringStyle == CC_RING_CLUSTERS && (count < 1 || count > CC_CLUSTERS_MAX || index >= count)) return false;
+    // Section 19.9: marker needs 1 <= count and index < count.
+    if (f.ringStyle == CC_RING_MARKER && (count < 1 || index >= count)) return false;
+    // [r3.1] section 19.10: queue needs 1 <= count and index < count.
+    if (f.ringStyle == CC_RING_QUEUE && (count < 1 || index >= count)) return false;
+    const bool kelvinStyle = f.ringStyle == CC_RING_BRI || f.ringStyle == CC_RING_CTEMP;
+    if (has(ring, "kelvin")) {
+        uint32_t kelvin = 0;
+        if (!cc_json_uint(ring["kelvin"], CC_KELVIN_MIN, CC_KELVIN_MAX, kelvin)) return false;
+        if (kelvinStyle) f.ringKelvin = static_cast<uint16_t>(kelvin);
+    } else if (kelvinStyle) {
+        return false;
+    }
     f.ringValue = static_cast<uint8_t>(level);
     f.ringIndex = static_cast<uint16_t>(index);
     f.ringCount = static_cast<uint16_t>(count);
@@ -321,7 +481,8 @@ bool parse_ring(JsonVariantConst value, CCFrame& f) {
         if (wire.is<bool>() || !wire.is<int32_t>()) return false;
         now = wire.as<int32_t>();
         if (now < -1 || now > static_cast<int32_t>(count) - 1) return false;
-        if (upnext) f.ringNow = now;
+        // [r3.1] section 19.10: the queue ring keeps `now` (the playing row) on every layout.
+        if (upnext || f.ringStyle == CC_RING_QUEUE) f.ringNow = now;
     }
     if (has(ring, "card")) {
         if (!ring["card"].is<bool>()) return false;
@@ -341,6 +502,12 @@ bool cc_json_uint(JsonVariantConst value, uint32_t lo, uint32_t hi, uint32_t& ou
     if (number < lo || number > hi) return false;
     out = number;
     return true;
+}
+
+const char* cc_json_token(JsonVariantConst value) {
+    if (!value.is<const char*>()) return nullptr;
+    const JsonString wire = value.as<JsonString>();
+    return strlen(wire.c_str()) == wire.size() ? wire.c_str() : nullptr;
 }
 
 bool cc_json_text(JsonVariantConst value, char* out, size_t capacity) {
@@ -416,10 +583,17 @@ bool cc_parse_frame(JsonVariantConst value, CCFrame& f) {
     // iconKey is meaningful only on the windows layout (after the legacy derivation): on any
     // other layout it is stripped, like the host does.
     if (f.layoutId == CC_LAYOUT_WINDOWS && has(frame, "iconKey")) icon_key(frame["iconKey"], f.iconKey);
+    // Presentation 6 (section 19.2): valueUnit ("%" | "K") and prevTitle / nextTitle (text <= 64 B) are
+    // validated on every layout (invalid rejects), then kept only on lightsbig / scenes respectively.
+    if (!parse_v6_text(frame, f)) return false;
     // 1.0.0-cc5.4: clock, playing (Home layouts only), progress, ledDrive, ledDither.
     if (!parse_alive(frame, f)) return false;
     // Presentation 5: reducedMotion, ledPink, ledVolFull (latched by the caller on acceptance).
     if (!parse_v5_latched(frame, f)) return false;
+    // A2 (1.0.0-cc5.6): the app canvas object.
+    if (!parse_app(frame, f)) return false;
+    // 1.0.0-cc5.7 (r4 FEEL): the haptic event.
+    if (!parse_haptic(frame, f)) return false;
     if (has(frame, "page")) {
         uint32_t page = 0;
         if (!cc_json_uint(frame["page"], 0, 255, page)) return false;
@@ -460,6 +634,8 @@ const char* cc_token_name(CCTokenSet set, uint8_t value) {
         case CC_TOKENS_TONE: return token_name(kTones, value);
         case CC_TOKENS_LIT: return token_name(kLit, value);
         case CC_TOKENS_MOMENT: return token_name(kMoments, value);
+        case CC_TOKENS_UNIT: return token_name(kUnits, value);
+        case CC_TOKENS_CRUMB: return value == CC_CRUMB_NONE ? "" : token_name(kCrumbs, value);
     }
     return nullptr;
 }

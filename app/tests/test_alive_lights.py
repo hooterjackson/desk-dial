@@ -33,6 +33,17 @@ from control_center import presentation as P  # noqa: E402
 
 ORACLE = ROOT / "tests" / "fixtures" / "alive_oracle.json"
 BS_ORACLE = ROOT / "tests" / "fixtures" / "alive_oracle_bs.json"
+
+
+def need_oracle(test, *paths):
+    """Skip `test` unless every generated oracle fixture is present. tests/fixtures/alive_oracle.json is
+    generated (node tests/js/alive_oracle.cjs design-reference/design_handoff_led_choreography
+    tests/fixtures/alive_oracle.json) and git-ignored, so a fresh clone does not have it."""
+    missing = [p.name for p in (paths or (ORACLE, BS_ORACLE)) if not p.is_file()]
+    if missing:
+        test.skipTest(f"generated oracle fixture missing: {', '.join(missing)} (see tests/js/alive_oracle*.cjs)")
+
+
 Cell = al.Cell
 WARM, AMBER, RED, GREEN, BLUE = al.WARM, al.AMBER, al.RED, al.GREEN, al.BLUE
 S = al.CLASS_S
@@ -63,7 +74,7 @@ WINDOWS_BUTTONS = _buttons(("Cancel", True, "cancel"), ("Home", True, "home"), (
 
 def home_frame(v=54, c=None, led="color", external=False, activity="idle", layout="nowPlaying",
                buttons=HOME_BUTTONS, **extra):
-    frame = {"id": 1, "mode": "VOLUME", "target": "Den", "value": f"{v}%", "detail": "", "status": "",
+    frame = {"id": 1, "mode": "VOLUME", "target": "Hall", "value": f"{v}%", "detail": "", "status": "",
              "activity": activity, "layout": layout, "ledStyle": led,
              "confirmedVolume": v if c is None else c, "buttons": buttons,
              "ring": {"style": "level", "value": v, "index": 0, "count": 101, "external": external}}
@@ -88,7 +99,7 @@ def list_frame(count=10, index=2, windows=False, led="color", colors="auto", una
         colors = [accent(j) for j in range(start, start + min(20, count - start))]
     if colors is not None:
         ring["colors"] = colors
-    frame = {"id": 1, "mode": "WINDOWS" if windows else "RECENTLY ADDED", "target": "Den", "value": "",
+    frame = {"id": 1, "mode": "WINDOWS" if windows else "RECENTLY ADDED", "target": "Hall", "value": "",
              "detail": "", "status": "", "activity": activity, "layout": "windows" if windows else "recent",
              "ledStyle": led, "buttons": buttons or (WINDOWS_BUTTONS if windows else LIST_BUTTONS),
              "ring": ring}
@@ -97,7 +108,7 @@ def list_frame(count=10, index=2, windows=False, led="color", colors="auto", una
 
 
 def tracks_frame(index=1, no_prev=False, activity="idle", **extra):
-    frame = {"id": 1, "mode": "TRACKS", "target": "Den", "value": "", "detail": "", "status": "",
+    frame = {"id": 1, "mode": "TRACKS", "target": "Hall", "value": "", "detail": "", "status": "",
              "activity": activity, "layout": "tracks", "ledStyle": "color", "buttons": LIST_BUTTONS,
              "ring": {"style": "transport", "value": 0, "index": index, "count": 3,
                       "unavailable": 1 if no_prev else 0}}
@@ -118,11 +129,17 @@ def lit(cells):
 
 
 # Contract tables written out independently of the module (section 5.2, revision 2).
-AWAKE_WARM = {"P": 0.14, 1: 0.30, "Q": 0.45, 2: 0.62, "N": 0.70, "S": 0.81, 3: 1.0, 4: 1.0}
-AWAKE_SEMANTIC = {"P": 0.14, 1: 0.45, "Q": 0.45, 2: 0.62, "N": 0.70, "S": 0.81, 3: 1.0, 4: 1.0}
+# [r3] ALIVE.md 15.3: the Lights classes T 0.08, R 0.12, O 0.18, L 0.34, F 0.50 (both tables).
+R3_AWAKE = {"T": 0.08, "R": 0.12, "O": 0.18, "L": 0.34, "F": 0.50, "M": 0.10,   # [r3] 15.7 M: the marker ring
+            "W": 0.60}                                                        # [r3.1] 15.9 W: the queue's playing row
+AWAKE_WARM = {"P": 0.14, 1: 0.30, "Q": 0.45, 2: 0.62, "N": 0.70, "S": 0.81, 3: 1.0, 4: 1.0, **R3_AWAKE}
+AWAKE_SEMANTIC = {"P": 0.14, 1: 0.45, "Q": 0.45, 2: 0.62, "N": 0.70, "S": 0.81, 3: 1.0, 4: 1.0, **R3_AWAKE}
 # [user 2026-09-26, ALIVE.md 12.8] resting = one steady dim warm white: every class at 0.34 (was BS's
 # 0.05 / 0.10 / 0.16 and D10's 0.13); time of day never dims it below 0.80.
-RESTING = {"P": 0.34, 1: 0.34, "Q": 0.34, 2: 0.34, "N": 0.34, "S": 0.34, 3: 0.34, 4: 0.34}
+RESTING = {"P": 0.34, 1: 0.34, "Q": 0.34, 2: 0.34, "N": 0.34, "S": 0.34, 3: 0.34, 4: 0.34,
+           "T": 0.0, "R": 0.0, "O": 0.0, "L": 0.34, "F": 0.34,   # [r3] 15.3: the unfilled Lights cells rest dark
+           "M": 0.0,                                             # [r3] 15.7: the marker ring's rest of the arc
+           "W": 0.34}                                            # [r3.1] 15.9: the queue's playing row rests lit
 REST_TOD_MIN = 0.80
 
 
@@ -174,7 +191,8 @@ class HelperTests(unittest.TestCase):
         # [r2.2][M32] the liked heart is tone `liked` (VOC 1.2 CCButtonTone 7): PINK 0.30, not 1.0.
         self.assertEqual(al.BUTTON_TONES, {"dim": ("warm", 1, 0.14), "stop": ("red", 2, 1.0), "liked": ("pink", 1, 0.30),
                                            "on": ("warm", 3, 1.0), "off": ("warm", 1, 0.30), "go": ("green", 3, 1.0),
-                                           "paused": ("green", 3, 1.0), "nav": ("warm", 2, 0.70)})
+                                           "paused": ("green", 3, 1.0), "nav": ("warm", 2, 0.70),
+                                           "active": ("warm", 3, 0.90)})   # [r3] 15.4
         self.assertEqual((al.BUTTON_REST_HIGH, al.BUTTON_REST_LOW, al.BUTTON_REST_SPLIT), (0.34, 0.26, 0.5))   # [user 2026-09-26]
         self.assertEqual(al.MOMENT_HOLD_MS, {"queued": 640, "shuffle": 700, "like": 900, "snap": 900, "wash": 1100,
                                              "bloom": 900})
@@ -518,6 +536,7 @@ class OutputFloorTests(unittest.TestCase):
         """Both oracles' expect.bytes (tests/js referenceOutput(), float64) equal reference_output() on
         the same rounded e with the masks of the persistent view, byte for byte; the floor changes
         only dark target-lit LEDs, and only to one count per channel."""
+        need_oracle(self)
         for path in (ORACLE, BS_ORACLE):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["output"]["drive"], al.DEFAULT_DRIVE)
@@ -557,6 +576,7 @@ class OutputFloorTests(unittest.TestCase):
         F-T marks, and the chosen dominant-only channel rule is the one continuous with plain rounding
         (no floored byte brighter than its neighbours in time, no channel against its value) with the
         lowest mean hue error against the cells' full-level colours."""
+        need_oracle(self)
         sys.path.insert(0, str(ROOT / "tests" / "tools"))
         try:
             import alive_floor_report as report_tool
@@ -586,6 +606,7 @@ class OutputFloorTests(unittest.TestCase):
         node = shutil.which("node")
         if not node:
             self.skipTest("node is not installed")
+        need_oracle(self)
         design = ROOT / "design-reference"
         runs = ((JS_ORACLES[0], design / "design_handoff_led_choreography", ORACLE),
                 (JS_ORACLES[1], design / "design_handoff_nano_d_master_r2.1" / "prototypes", BS_ORACLE))
@@ -716,14 +737,14 @@ def list5(count, index, layout="recent", colors="auto", activity="idle", unavail
         ring["now"] = now
     if card:
         ring["card"] = True
-    frame = {"id": 1, "mode": "RECENTLY ADDED", "target": "Den", "value": "", "detail": "", "status": "",
+    frame = {"id": 1, "mode": "RECENTLY ADDED", "target": "Hall", "value": "", "detail": "", "status": "",
              "activity": activity, "layout": layout, "ledStyle": "color", "buttons": LIST_BUTTONS, "ring": ring}
     frame.update(extra)
     return frame
 
 
 def lap_frame(t, d, activity="idle"):
-    return {"id": 1, "mode": "TRACKS", "target": "Den", "value": "", "detail": "", "status": "", "activity": activity,
+    return {"id": 1, "mode": "TRACKS", "target": "Hall", "value": "", "detail": "", "status": "", "activity": activity,
             "layout": "seek", "ledStyle": "color", "buttons": LIST_BUTTONS,
             "ring": {"style": "lap", "value": 0, "index": t, "count": d}}
 
@@ -1264,6 +1285,28 @@ class LocalCursorTests(unittest.TestCase):
         self.assertEqual(al.alive_targets(tracks_frame(1, activity="pending"), 2, 2).cursor, 0)
         self.assertEqual(al.alive_targets(tracks_frame(1), 2, 3).cursor, 0)
 
+    # DD-DES-003: twin of lcd-preview/alive_tests.cpp briCases (cc_alive_local). Off frame: max 100,
+    # value = pos (0 = off). On frame: max 99, value = pos + 1 (positions 0..99 = 1..100 %).
+    BRI_CASES = ((0, 100, 0), (1, 100, 1), (50, 100, 50), (100, 100, 100), (120, 100, 100),
+                 (0, 99, 1), (49, 99, 50), (99, 99, 100), (120, 99, 100), (-3, 99, 1))
+
+    def test_bri_local_value_twin(self):
+        frame = {"activity": "idle", "ring": {"style": "bri", "value": 40}}
+        for pos, top, value in self.BRI_CASES:
+            with self.subTest(pos=pos, top=top):
+                out, applied, index = al._local(frame, pos, top)
+                self.assertTrue(applied)
+                self.assertIsNone(index)
+                self.assertEqual(out["ring"]["value"], value)
+                resolved, applied = al.apply_local(frame, pos, top)
+                self.assertTrue(applied)
+                self.assertEqual(resolved["ring"]["value"], value)
+        self.assertEqual(frame["ring"]["value"], 40)                    # the host frame is never mutated
+        for top in (98, 101):
+            resolved, applied = al.apply_local(frame, 5, top)
+            self.assertFalse(applied)
+            self.assertIs(resolved, frame)
+
 
 # ====================================================================== animator
 def targets_with(ring=None, buttons=None, **flags):
@@ -1624,9 +1667,9 @@ class EngineLifecycleTests(unittest.TestCase):
         self.assertEqual([(e.type, e.t0) for e in rig.eng.animator.effects], [("reveal", 3016)])
         rig.eng.start_reveal(3032)                                  # replaces its own type
         self.assertEqual([(e.type, e.t0) for e in rig.eng.animator.effects], [("reveal", 3032)])
-        ring, _ = rig.eng.render(3032)
-        self.assertEqual(ring[0], (0.0, 0.0, 0.0))                  # masked at ms 0, unfolds from the top
-        ring, _ = rig.eng.render(3032 + 200)
+        before, _ = rig.eng.render(3032)
+        self.assertEqual(rig.eng.raw[0][0], (0.0, 0.0, 0.0))        # masked at ms 0, unfolds from the top
+        ring, _ = rig.eng.render(3032 + 200)                        # (r4: what the LED shows eases there)
         self.assertGreater(ring[0][0], ring[30][0])
 
     def test_inputs_are_ignored_while_unclaimed(self):
@@ -2185,6 +2228,7 @@ class OracleTests(unittest.TestCase):
         every step up to its first eviction. Only ``designUncapped`` cases may evict, exactly
         at the first step whose design queue exceeds 8; their ``live`` counts (the design's
         queue after draw) must equal the uncapped animator's."""
+        need_oracle(self, ORACLE)
         self.assertTrue(ORACLE.exists(), "tests/fixtures/alive_oracle.json is missing: "
                         "node tests/js/alive_oracle.cjs design-reference/design_handoff_led_choreography "
                         "tests/fixtures/alive_oracle.json")
@@ -2247,6 +2291,7 @@ class OracleTests(unittest.TestCase):
         """[r2] 11.2 (gate A2): the r2.1 Browse and Snap draw() (tests/js/alive_oracle_bs.cjs), with BS's
         palette, its reduced motion (play()'s drop list and the stationary fail) and its half, scatter
         and colour bloom; every step within the tolerance, the production cap never evicting."""
+        need_oracle(self)
         self.assertTrue(BS_ORACLE.exists(), "tests/fixtures/alive_oracle_bs.json is missing: node "
                         "tests/js/alive_oracle_bs.cjs design-reference/design_handoff_nano_d_master_r2.1/prototypes "
                         "tests/fixtures/alive_oracle_bs.json")
@@ -2598,7 +2643,10 @@ class FrameRateTests(unittest.TestCase):
                     eng.press(at, value)
                 else:
                     frame, local = value, None
-            out[t] = eng.render(t, frame, *(local or (None, None)))
+            eased = eng.render(t, frame, *(local or (None, None)))
+            # The ALIVE.md 11.5 property holds on the animator's e (functions of now + damping); r4's output easer
+            # (ALIVE.md 16) then carries each rate's sampling of an effect's own edges for ~tau: checked apart.
+            out[t] = (eng.raw[0], eng.raw[1], eased)
             if eng.asleep() != asleep:
                 asleep = eng.asleep()
                 flips.append(t)
@@ -2608,9 +2656,16 @@ class FrameRateTests(unittest.TestCase):
         return not (any(0 <= t - e < self.SETTLE_MS for e in self.SCRIPT)
                     or any(0 <= t - e < self.SLEEP_SETTLE_MS for e in flips))
 
+    # r4 (ALIVE.md 16): the eased output agrees within EASED_TOLERANCE at the common instants.
+    EASED_TOLERANCE = 0.12
+
     @staticmethod
     def error(a, b):
         return max(max(abs(x - y) for x, y in zip(p, q)) for p, q in zip(a[0] + a[1], b[0] + b[1]))
+
+    @staticmethod
+    def eased_error(a, b):
+        return max(max(abs(x - y) for x, y in zip(p, q)) for p, q in zip(a[2][0] + a[2][1], b[2][0] + b[2][1]))
 
     def test_rates_agree_at_common_instants(self):
         runs = {}
@@ -2623,6 +2678,8 @@ class FrameRateTests(unittest.TestCase):
         self.assertGreater(len(compared), 50)
         worst = max(self.error(runs[rate][0][t], ref[t]) for t in compared for rate in (60, 120, 144, 240))
         self.assertLess(worst, 0.01, worst)
+        eased = max(self.eased_error(runs[rate][0][t], ref[t]) for t in compared for rate in (60, 120, 144, 240))
+        self.assertLess(eased, self.EASED_TOLERANCE, eased)
 
     def test_skipped_vblanks_resume_on_the_curve(self):
         base = sorted({math.floor(k * 1000 / 240 + 0.5) for k in range(self.END * 240 // 1000 + 1)})
@@ -2632,6 +2689,8 @@ class FrameRateTests(unittest.TestCase):
         self.assertGreater(len(compared), 700)
         worst = max(self.error(full[t], gaps[t]) for t in compared)
         self.assertLess(worst, 0.01, worst)
+        eased = max(self.eased_error(full[t], gaps[t]) for t in compared)
+        self.assertLess(eased, self.EASED_TOLERANCE, eased)
 
 if __name__ == "__main__":
     unittest.main()

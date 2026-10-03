@@ -25,6 +25,16 @@ class CredentialError(RuntimeError):
     pass
 
 
+# One process-wide lock for every read-modify-write of a credential file (DD-RES-001): the
+# MusicKit consent thread and the Home Assistant Save both merge into the same file, so neither
+# may save a stale snapshot over the other's key. Re-entrant so a caller may hold it around a
+# helper that itself loads and saves (home_assistant.save_token).
+STORE_LOCK = threading.RLock()
+
+# The keys a MusicKit authorization owns; everything else in the file (ha_token) is kept.
+MUSICKIT_KEYS = ("team_id", "key_id", "private_key", "developer_token", "music_user_token")
+
+
 # settings.apple.consent (CONTROL_CENTER_V5.md sections 14.2 and 15.3; CL section 4.5): the app
 # can now mark songs as Favorites (the Like), so the page no longer promises it does not
 # modify the library. Plain text (no markup); shown at the next sign-in.
@@ -113,6 +123,45 @@ class CredentialStore:
             if temporary and temporary.exists():
                 temporary.unlink()
 
+    def set_aside_if_unreadable(self) -> bool:
+        """DD-BUG-001: a file this Windows account cannot unlock (another account's DPAPI, a profile
+        restored on a new PC, a damaged file) is renamed ``<name>.unreadable-<time>`` so the next save
+        starts fresh instead of failing forever. Never deletes it. True when it was moved."""
+        with STORE_LOCK:
+            try:
+                self.load()
+                return False
+            except CredentialError:
+                pass
+            stem = f"{self.path.name}.unreadable-{time.strftime('%Y%m%d-%H%M%S')}"
+            aside, counter = self.path.with_name(stem), 1
+            while aside.exists():
+                aside, counter = self.path.with_name(f"{stem}-{counter}"), counter + 1
+            try:
+                os.replace(self.path, aside)
+            except OSError:
+                raise CredentialError("The encrypted credential file could not be replaced.") from None
+            return True
+
+    def update(self, change) -> dict:
+        """Load, apply ``change(current) -> new mapping`` and save, all under ``STORE_LOCK``,
+        so concurrent writers merge instead of overwriting each other. Returns the saved mapping.
+        An unreadable file is set aside first (DD-BUG-001), so the change starts from nothing."""
+        with STORE_LOCK:
+            self.set_aside_if_unreadable()
+            result = change(dict(self.load()))
+            self.save(result)
+            return result
+
+
+def musickit_saver(store: CredentialStore):
+    """An ``AuthServer.on_token`` callback that merges only the MusicKit keys of the authorized
+    mapping into ``store``'s current contents (never the click-time snapshot)."""
+    def on_token(updated: dict) -> None:
+        picked = {key: updated[key] for key in MUSICKIT_KEYS if key in updated}
+        store.update(lambda current: {**current, **picked})
+    return on_token
+
 
 class MusicKitCredentials:
     @staticmethod
@@ -172,6 +221,23 @@ class AuthServer:
         self._complete = False
         self._expires = time.monotonic() + 900
 
+    def _accept_token(self, token: str) -> tuple[int, str]:
+        """Hand a validated user token to ``on_token`` once; returns (HTTP status, JSON body)."""
+        with self._lock:
+            if self._complete:
+                return 409, '{"error":"Authorization is already complete."}'
+            updated = dict(self.credentials, music_user_token=token)
+            try:
+                if self.on_token:
+                    self.on_token(updated)
+            except Exception:
+                self.events.put({"event": "error", "message": "Authorized, but credentials could not be saved."})
+                return 500, '{"error":"Could not save credentials. Return to the companion app."}'
+            self.credentials = updated
+            self._complete = True
+            self.events.put({"event": "authorized"})
+            return 200, '{"ok":true}'
+
     def start(self) -> str:
         if self._server:
             return self.url
@@ -223,22 +289,7 @@ class AuthServer:
                 except Exception:
                     self.send(400, '{"error":"Invalid authorization response."}')
                     return
-                with owner._lock:
-                    if owner._complete:
-                        self.send(409, '{"error":"Authorization is already complete."}')
-                        return
-                    updated = dict(owner.credentials, music_user_token=token)
-                    try:
-                        if owner.on_token:
-                            owner.on_token(updated)
-                    except Exception:
-                        owner.events.put({"event": "error", "message": "Authorized, but credentials could not be saved."})
-                        self.send(500, '{"error":"Could not save credentials. Return to the companion app."}')
-                        return
-                    owner.credentials = updated
-                    owner._complete = True
-                    owner.events.put({"event": "authorized"})
-                    self.send(200, '{"ok":true}')
+                self.send(*owner._accept_token(token))
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._server.daemon_threads = True

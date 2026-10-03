@@ -9,12 +9,54 @@ hardware-window scripts (``nanod_enter_bootloader_v2.py``, ``backup_``,
 Release profiles (``Release``, ``PROFILES``, ``CURRENT``): each upgrade is one
 profile naming the release it installs, the release it upgrades from, its locked
 pre-install backup pair, its expected image and its own evidence names. ``CURRENT``
-is the 1.0.0-cc5.3 -> 1.0.0-cc5.4 upgrade ("Warm · alive" LEDs, presentation 5; with
-desktop v7); the 1.0.0-cc4 -> 1.0.0-cc5.2 and 1.0.0-cc5.2 -> 1.0.0-cc5.3 profiles stay
-defined for their history and their rollbacks (``ROLLBACK_TARGETS``: cc4, cc5.2 and
-cc5.3). Their evidence never shares a file name (``diagnostics/cc5-*.json`` is cc5.2's,
-``diagnostics/cc5.3-*.json`` cc5.3's, ``diagnostics/cc5.4-*.json`` cc5.4's), so an earlier
-install, rollback and finalize record is never renamed or rewritten by a later run.
+is the 1.0.0-cc5.4 D -> 1.0.0-cc5.5 upgrade (F1, safety and measurement; see below); the
+1.0.0-cc4 -> 1.0.0-cc5.2, 1.0.0-cc5.2 -> 1.0.0-cc5.3 and 1.0.0-cc5.3 -> 1.0.0-cc5.4 profiles stay
+defined for their history and their rollbacks (``ROLLBACK_TARGETS``: cc4, cc5.2, cc5.3 and
+cc5.4). Their evidence never shares a file name (``diagnostics/cc5-*.json`` is cc5.2's,
+``diagnostics/cc5.3-*.json`` cc5.3's, ``diagnostics/cc5.4-*.json`` cc5.4's, ``diagnostics/cc5.5-*.json``
+cc5.5's), so an earlier install, rollback and finalize record is never renamed or rewritten by a later run.
+
+1.0.0-cc5.5 (profile ``PROFILES["cc5.5"]`` = ``NEWEST`` = ``CURRENT``; firmware/BUILD-cc5.5.md; plan stage F1,
+no change to feel): the HID send fix, the USB init check, the 2.2 V motor output cap (no register command
+raises it), haptic profile validation, no String / Serial.println on the FOC thread, the clear-only ``ks`` of
+position lines with a 16-event key queue, and the diag fields F1_DIAG_FIELDS (FOC loop rate and gaps, |Uq|
+against the cap, the PD contract, USB and HID). It upgrades binary D of 1.0.0-cc5.4 (``from_binary`` "D":
+its image firmware/nanod-control-center-1.0.0-cc5.4-D.bin, 1,142,448 B, SHA-256 dcff9c95...), which was
+installed (diagnostics/cc5.4-D-flash-checks.json) but never finalized: manifest.json still holds the cc5.3
+record. The profile says so (``from_finalized=False``): the from-release's record is its package manifest,
+kept byte-identical as firmware/manifest-cc5.4-D.json when cc5.5 is packaged; prepare requires manifest.json
+to be the record that install left in force (``restore_record``: firmware/manifest-cc5.3.json) and the D
+install record to be the newest cc5.4 write (``from_install_problems``); ``rollback_nanod_cc5.py --to cc5.4
+--binary D|F`` restores app0 from the pre-cc5.5 backup (backups/nanod-cc5.4-before-cc5.5-*.bin, cc5.4 D at
+app0) and manifest.json to that same record. cc5.5 has its own ladder (``Release(ladder=("D", "F"))``): D is
+the release candidate with the 16 ms LCD period (CC_BUILD_BINARY 4, cc5.4 D's pipeline) and F the same with a
+12 ms period (CC_LCD_PERIOD_MS 12, CC_BUILD_BINARY 6; diag build "F"), built into .pio/build-cc5.5-D and -F,
+packaged as manifest-1.0.0-cc5.5-D.json and -F.json. Its build acceptance adds the flash size gate
+(``image_size_gate``: IMAGE_SIZE_GATE_BYTES, 1,245,184 B = 95 % of app0).
+1.0.0-cc5.6 (profile ``PROFILES["cc5.6"]`` = ``NEWEST``; firmware/BUILD-cc5.6.md; plan stage A2, Karl Malota's
+Onshape UI on the knob): the app canvas (the frame's ``app`` object, capability ``appCanvas`` 1) on 1.0.0-cc5.5 binary
+D, with the same ladder (D 16 ms, F 12 ms) and size gate. ``CURRENT`` stays 1.0.0-cc5.5 until F1 is installed (the
+F1 hardware session's prepare / install / check / rollback run against it); build_nanod_cc5.py and
+package_nanod_cc5.py take ``--release cc5.6`` meanwhile. ``rollback_nanod_cc5.py --to cc5.5 --binary D|F`` restores
+cc5.5 D from the pre-cc5.6 backup (backups/nanod-cc5.5-before-cc5.6-*). The from-release fields that only the cc5.5
+install can settle (its verified full image, whether it was finalized) are provisional in the profile and must be
+set after that install (firmware/BUILD-cc5.6.md "Before the hardware session").
+1.0.0-cc5.7 (profile ``PROFILES["cc5.7"]``; firmware/BUILD-cc5.7.md, HAPTICS.md; plan stages F2 and F3,
+the r4 FEEL + SOUND job): the haptic token engine (control ``feel``, frame ``haptic``), the r4 walls, fold-back and self-spin trip,
+the supply from the PD contract, the uint16 range fix, recalibration, the click sounds (control ``sound``) and the offline
+system volume (HID Consumer report 4); capabilities feel, hapticFx, knobSound, offlineVolume and recalibration 1
+(``Release(r4_feel=True)``). It upgrades cc5.6 binary F (installed 2026-09-30, never finalized: manifest.json stays the cc5.3
+record), with the same ladder (D 16 ms, F 12 ms) and size gate; ``rollback_nanod_cc5.py --to cc5.6 --binary D|F`` restores
+cc5.6 F from the pre-cc5.7 backup (backups/nanod-cc5.6-before-cc5.7-*). The desktop bundle is desktop-dist-v7-j (Desk Dial
+7.3.2.0, every press ticks; rollback desktop-dist-v7-i, 7.3.1.0).
+1.0.0-cc5.8 (profile ``PROFILES["cc5.8"]`` = ``NEWEST`` = ``CURRENT``; firmware/BUILD-cc5.8.md; the public v2.0.0 release
+candidate, reported as 2.0.0+cc5.8.<binary>): the Phase 2 audit fixes and app profiles (the ``appProfile`` upload into a
+RAM-only store; capabilities appProfiles 1, appProfileSlots 4, appProfileMaxBytes 32768, appProfileFeatures 31,
+``Release(app_profiles=True)``). It upgrades cc5.7 binary F (image 93ff0d50..., 1,128,128 B, installed 2026-09-30, never
+finalized: manifest.json stays the cc5.3 record), with the same ladder (D 16 ms, F 12 ms) and size gate;
+``rollback_nanod_cc5.py --to cc5.7 --binary D|F`` restores cc5.7 F from the pre-cc5.8 backup
+(backups/nanod-cc5.7-before-cc5.8-*). The desktop bundle is desktop-dist-v7-l (Desk Dial 7.4.1.0, ProductVersion 2.0.0;
+rollback desktop-dist-v7-k, 7.4.0.0).
 Profile paths are resolved from ``BACKUPS``, ``DIAGNOSTICS``, ``FIRMWARE_OUT`` and ``WORK``
 when they are read.
 
@@ -97,7 +139,7 @@ import zlib
 # Paths
 
 WORK = Path(__file__).resolve().parent
-ROOT = WORK.parent                                    # ...\2026-09-21\ex
+ROOT = WORK.parent
 APP = ROOT / "app"
 BACKUPS = APP / "backups"
 DIAGNOSTICS = APP / "diagnostics"
@@ -106,8 +148,10 @@ FIXTURES = APP / "tests" / "fixtures"
 FIRMWARE_SOURCE = ROOT / "firmware"
 FLASH_VENV = WORK / "nanod-flash-venv"
 PIO_VENV = WORK / "nanod-pio-venv"
-# PlatformIO core dir (toolchains, packages). NANOD_PIO_CORE overrides the in-repo default (git-ignored).
-PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or ROOT / ".pio-core")
+# PlatformIO core dir (toolchains, packages): NANOD_PIO_CORE, else PLATFORMIO_CORE_DIR, else PlatformIO's
+# default ~/.platformio (same order as harness/cpp11_gate.py).
+PIO_CORE = Path(os.environ.get("NANOD_PIO_CORE") or os.environ.get("PLATFORMIO_CORE_DIR")
+                or Path.home() / ".platformio")
 PIO_ENV = "nanofoc_d"
 BUILT_IMAGE = FIRMWARE_SOURCE / ".pio" / "build" / PIO_ENV / "firmware.bin"
 
@@ -190,7 +234,16 @@ class Release:
     itself (``binary`` "A"); ``binary_profile("B")`` .. ``("E")`` are its variants (``binary_variant``),
     which keep the release's version, backup pair, backup record and device / lease check records
     and name everything else after the binary (``artifact_version`` 1.0.0-cc5.4-D, ``prefix``
-    cc5.4-D, ``file_tag`` cc5.4-D). A release without the ladder has ``binary`` None.
+    cc5.4-D, ``file_tag`` cc5.4-D). A release without the ladder has ``binary`` None. A release with its
+    own ladder (``ladder=("D", "F")``: 1.0.0-cc5.5) is none of its binaries itself (``binary`` None, the
+    release's names are never built or written); every binary is a variant with the binary's names.
+
+    ``from_binary`` names the binary of a ladder from-release that is installed (cc5.5: "D"), so the from
+    image and manifest are that binary's (``from_artifact_version`` 1.0.0-cc5.4-D). ``from_finalized=False``
+    marks a from-release that was installed but never finalized: manifest.json still holds the record its
+    install left in force (``from_active_record``, which ``restore_record`` names and a rollback restores),
+    and its install record (``from_install_record``, the binary's flash-checks record) is the evidence that
+    it runs on the knob (tooling.from_install_problems).
     """
 
     alive = False                   # the release reports the ALIVE capability (AliveRelease)
@@ -199,19 +252,31 @@ class Release:
                  prefix, backup_stem, from_record, from_expected, from_expected_sha256, from_preparation,
                  backup_family, superseded, gates, from_token, desktop_bundle, desktop_rollback_bundle,
                  gate_patterns, validation_key, artwork2, presentation=4, heap_min_free=None, lvgl_min_free=None,
-                 ladder=False):
+                 ladder=False, from_binary=None, from_finalized=True, from_active_record=None,
+                 from_install_record=None, image_size_gate=None, app_canvas=False, r4_feel=False,
+                 app_profiles=False):
         self.version, self.tag = version, version.split("-", 2)[-1]           # "1.0.0-cc5.3", "cc5.3"
-        # The build ladder (PRESENTATION_V5 12.6): this profile is binary A; B and C are variants.
-        self.binary = PIPELINE_BINARIES[0] if ladder else None
+        # The build ladder (PRESENTATION_V5 12.6): ladder=True (1.0.0-cc5.4) stages PIPELINE_BINARIES and this
+        # profile is binary A; a tuple (1.0.0-cc5.5: ("D", "F")) stages those, and this profile is none of them.
+        self.ladder = tuple(PIPELINE_BINARIES) if ladder is True else tuple(ladder or ())
+        self.binary = PIPELINE_BINARIES[0] if ladder is True else None
         self.base, self._variants = self, {}
         # Names: A (and a release without the ladder) use the release's own; a variant replaces these.
         self.artifact_version, self.file_tag = version, self.tag
         self.release_prefix = prefix                        # names shared by every binary (backup, checks)
         self.presentation = presentation                    # capabilities.presentation this release reports
         # diag gates (check_nanod_cc5.py "diag"): None keeps the module defaults (HEAP_MIN_FREE_BYTES,
-        # LVGL_MIN_FREE_FRACTION of LVGL_HEAP_BYTES); 1.0.0-cc5.4 sets its own (PRESENTATION_V5 12.2).
+        # LVGL_MIN_FREE_FRACTION of PRE_V5_LVGL_HEAP_BYTES); 1.0.0-cc5.4 sets its own (PRESENTATION_V5 12.2).
         self.heap_min_free, self.lvgl_min_free = heap_min_free, lvgl_min_free
         self.from_version, self.from_tag = from_version, from_version.split("-", 2)[-1]
+        # The installed binary of a ladder from-release (1.0.0-cc5.5 upgrades cc5.4's binary D), else None.
+        self.from_binary = from_binary
+        self.from_artifact_version = f"{from_version}-{from_binary}" if from_binary else from_version
+        # False: the from-release was installed but never finalized (tooling.from_install_problems).
+        self.from_finalized = from_finalized
+        self.from_active_record_name = from_active_record     # firmware/: manifest.json while it runs
+        self.from_install_record_name = from_install_record   # diagnostics/: its install (flash-checks) record
+        self.image_size_gate = image_size_gate                # build acceptance: image bytes at most this
         self.from_image_sha256, self.from_image_bytes = from_image_sha256, from_image_bytes
         self.from_presentation = from_presentation          # presentation the before-inventory reports
         self.prefix = prefix                                # evidence names: diagnostics/<prefix>-*.json
@@ -228,16 +293,24 @@ class Release:
         self.gate_patterns = tuple(gate_patterns)           # diagnostics/ gate evidence recorded at packaging
         self.validation_key = validation_key                # key in diagnostics/validation.json
         self.artwork2 = artwork2                            # the release reports the artwork2 capability
+        self.app_canvas = app_canvas                        # the release reports appCanvas 1 (A2, 1.0.0-cc5.6)
+        self.r4_feel = r4_feel                              # feel, hapticFx, knobSound, offlineVolume, recalibration 1 (cc5.7)
+        self.app_profiles = app_profiles                    # appProfiles 1 and its three sizes (cc5.8, APP_PROFILES.md 7)
 
     def __repr__(self):
-        which = "" if self.binary in (None, PIPELINE_BINARIES[0]) else f" binary {self.binary}"
+        which = "" if self.is_base else f" binary {self.binary}"
         return f"Release({self.from_version} -> {self.version}{which})"
+
+    # The profile carries the release's own names (binary A of 1.0.0-cc5.4, a release without the ladder,
+    # and the never-built release profile of 1.0.0-cc5.5); every variant carries its binary's.
+    is_base = property(lambda self: self is self.base)
 
     # The build ladder (PRESENTATION_V5 12.6)
     def pipeline_binaries(self):
-        """Every binary this release ever staged ("A" .. "E", PIPELINE_BINARIES; the retired ones included), or ()
-        without the build ladder. binary_choices() gives the ones a script may still build or install."""
-        return PIPELINE_BINARIES if self.base.binary else ()
+        """Every binary this release ever staged (1.0.0-cc5.4: "A" .. "E", PIPELINE_BINARIES, the retired ones
+        included; 1.0.0-cc5.5: "D", "F"), or () without the build ladder. binary_choices() gives the ones a
+        script may still build or install."""
+        return self.base.ladder
 
     def binary_profile(self, name=None):
         """This release as binary `name`: A (or None) is the release profile itself, B .. E are its
@@ -255,8 +328,7 @@ class Release:
         """Every binary of this release (A .. E), or [the release] without the ladder."""
         return [self.base.binary_profile(name) for name in self.base.pipeline_binaries()] or [self.base]
 
-    label = property(lambda self: self.tag if self.binary in (None, PIPELINE_BINARIES[0])
-                     else f"{self.tag} binary {self.binary}")
+    label = property(lambda self: self.tag if self.is_base else f"{self.tag} binary {self.binary}")
     build_flags = property(lambda self: BINARY_BUILD_FLAGS.get(self.binary, ()))
     pipeline = property(lambda self: dict(LCD_BINARIES[self.binary]) if self.binary else None)
     # CC_BUILD_BINARY of this binary's flags (D 4, E 5), None for a binary built without it (A, B, C): diag reports
@@ -264,8 +336,7 @@ class Release:
     build_number = property(lambda self: binary_build_number(self.binary))
     # PlatformIO build folder: None is the project's own .pio/build (binary A and earlier releases);
     # B .. E build into .pio/build-<file tag> (PLATFORMIO_BUILD_DIR), never over binary A.
-    build_dir = property(lambda self: None if self.binary in (None, PIPELINE_BINARIES[0])
-                         else FIRMWARE_SOURCE / ".pio" / f"build-{self.file_tag}")
+    build_dir = property(lambda self: None if self.is_base else FIRMWARE_SOURCE / ".pio" / f"build-{self.file_tag}")
     built_image = property(lambda self: BUILT_IMAGE if self.build_dir is None
                            else self.build_dir / PIO_ENV / "firmware.bin")
     built_elf = property(lambda self: self.built_image.with_name("firmware.elf"))
@@ -275,9 +346,15 @@ class Release:
     source_zip = property(lambda self: release_source_zip(self.artifact_version))
     manifest = property(lambda self: release_manifest(self.artifact_version))
     build_log = property(lambda self: WORK / f"nanod-{self.file_tag}-build.log")
-    from_image = property(lambda self: release_image(self.from_version))
-    from_manifest = property(lambda self: release_manifest(self.from_version))
+    from_image = property(lambda self: release_image(self.from_artifact_version))
+    from_manifest = property(lambda self: release_manifest(self.from_artifact_version))
     from_record = property(lambda self: FIRMWARE_OUT / self.from_record_name)
+    # The record manifest.json holds while the from-release runs, which a rollback to it restores: its
+    # installed record, or for a from-release never finalized the record its install left in force.
+    restore_record = property(lambda self: self.from_record if self.from_finalized
+                              else FIRMWARE_OUT / self.from_active_record_name)
+    from_install_record = property(lambda self: None if self.from_install_record_name is None
+                                   else DIAGNOSTICS / self.from_install_record_name)
     # Locked pre-install backup pair and the prepared image (backups/)
     before_full = property(lambda self: BACKUPS / f"{self.backup_stem}-full.bin")
     rollback_app = property(lambda self: BACKUPS / f"{self.backup_stem}-active-app.bin")
@@ -349,6 +426,12 @@ class Release:
                 "artwork": dict(EXPECTED_ARTWORK_CAPABILITY)}
         if self.artwork2:
             caps["artwork2"] = artwork2_capability()
+        if self.app_canvas:
+            caps["appCanvas"] = 1
+        if self.r4_feel:
+            caps.update({name: 1 for name in R4_FEEL_CAPABILITIES})
+        if self.app_profiles:
+            caps.update(APP_PROFILE_CAPABILITIES)
         return caps
 
 
@@ -399,14 +482,16 @@ V5_HEAP_PROJECTION_MIN_BYTES = 45056        # 40 KB + 4 KB for estimate error
 # (art show/hide). B and C: >= 28 on both; lcdLateRefrs 0 outside cover arrivals on every binary. The fix
 # binaries run their parent's pipeline and keep its targets: D is A's (55 / 45; it cannot pass them before the
 # later performance task, lcdFpsAnimMin measured 12-16 on A's pipeline), E is C's (28 / 28).
+# 1.0.0-cc5.5 adds F: D's pipeline with CC_LCD_PERIOD_MS 12 (the speed candidate; its targets are D's).
 LCD_BINARIES = {"A": {"lcdDma": True, "lcdPeriodMs": 16, "artAsync": True},
                 "B": {"lcdDma": True, "lcdPeriodMs": 33, "artAsync": False},
                 "C": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False},
                 "D": {"lcdDma": True, "lcdPeriodMs": 16, "artAsync": True},
-                "E": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False}}
+                "E": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False},
+                "F": {"lcdDma": True, "lcdPeriodMs": 12, "artAsync": True}}
 LCD_FPS_TARGETS = {"A": {"opaque": 55, "blended": 45}, "B": {"opaque": 28, "blended": 28},
                    "C": {"opaque": 28, "blended": 28}, "D": {"opaque": 55, "blended": 45},
-                   "E": {"opaque": 28, "blended": 28}}
+                   "E": {"opaque": 28, "blended": 28}, "F": {"opaque": 55, "blended": 45}}
 LCD_DIAG_FIELDS = ("lcdFps", "lcdFpsAnimMin", "lcdRefrUsMax", "lcdRefrUsAvg", "lcdRenderUsMax", "lcdFlushUs",
                    "lcdPxPerRefr", "lcdFullRefrs", "lcdLateRefrs", "lcdMaxGapMs", "lcdBusyPct", "core0IdlePct",
                    "lcdSpiHz", "enterMsLast", "enterMsMax", "holdEvents", "holdDeferred", "lcdDma", "lcdPeriodMs",
@@ -415,6 +500,18 @@ LCD_DIAG_FIELDS = ("lcdFps", "lcdFpsAnimMin", "lcdRefrUsMax", "lcdRefrUsAvg", "l
 # LCD_DIAG_FIELDS, which the companion's control_center/device.py DIAG_LCD_FIELDS mirrors (tests/test_cc_device_diag.py);
 # the companion ignores unknown diag fields, so Desk Dial v7 needs no change. lcd_diag_summary records both tuples.
 LCD_FIX_DIAG_FIELDS = ("lcdMosiSig", "build")
+# 1.0.0-cc5.5 (F1, cc_diag.h): the FOC loop (focLoopHz; focLoopUsMax, the longest pass-to-pass gap in us, reset
+# on read), the q-axis voltage (uqAbsMax, the largest |Uq| in mV, reset on read; uqCapMs, ms at the motor cap since
+# boot; uqCapMv, that cap: 2200), the PD contract read once at boot (pdRead; pdPdo, the requested source PDO's
+# position, 0 = none or unknown; pdVolts, its voltage from the knob's sink PDO table, 0 = unknown; pdRdo, the raw
+# RDO), the USB interfaces TinyUSB accepted (usbMidiOk, usbHidOk) and the HID reports retried (hidRetries). The
+# companion's control_center/device.py DIAG_F1_FIELDS is the same tuple (tests/test_cc_device_f1.py).
+F1_DIAG_FIELDS = ("focLoopHz", "focLoopUsMax", "uqAbsMax", "uqCapMs", "uqCapMv", "pdRead", "pdPdo", "pdVolts",
+                  "pdRdo", "usbMidiOk", "usbHidOk", "hidRetries")
+# The Step 0 / F1 comparison read (plan "Step 0: measure"): reset attribution and the LCD, LED, LVGL and core 0
+# figures recorded next to the F1 fields (f1_diag_summary; check_nanod_cc5_look.py prints them).
+STEP0_DIAG_FIELDS = ("resetReason", "rtcReset", "lcdRefrUsAvg", "lcdRefrUsMax", "lcdFps", "ledLateShows",
+                     "lvglMinFree", "core0IdlePct")
 HOLD_MS = 600                               # kh: long press of Button 1 (PRESENTATION_V5 11.2)
 HOLD_ARRIVAL_S = (0.45, 1.2)                # kd -> kh as the host sees it (600 ms + debounce + 10 ms pass + USB)
 # PRESENTATION_V5 12.6 build ladder (P5-R23; lead ruling R-m): the binaries of 1.0.0-cc5.4, oldest-risk first. A is
@@ -437,10 +534,14 @@ HOLD_ARRIVAL_S = (0.45, 1.2)                # kd -> kh as the host sees it (600 
 # "build": "<letter>". The version string stays 1.0.0-cc5.4: D and E are told apart by their artifact names, the
 # diag build field and the image marker.
 PIPELINE_BINARIES = ("A", "B", "C", "D", "E")
-# The binaries build, package, prepare, install and finalize accept (binary_choices; the first is the default).
-# rollback_nanod_cc5.py and check_nanod_cc5.py keep every binary of the ladder, so any binary ever written can be
-# rolled back and checked.
-ACTIVE_BINARIES = ("D", "E")
+# 1.0.0-cc5.5's own ladder (F1): D (the release candidate, cc5.4 D's pipeline at 16 ms) and F (the same at 12 ms,
+# CC_BUILD_BINARY 6). Every letter of every ladder, in CC_BUILD_BINARY order (A..F = 1..6).
+CC55_LADDER = ("D", "F")
+ALL_BINARIES = ("A", "B", "C", "D", "E", "F")
+# The binaries build, package, prepare, install and finalize accept (binary_choices; the first of the current
+# release's ladder that is active is the default). rollback_nanod_cc5.py and check_nanod_cc5.py keep every binary
+# of the ladder, so any binary ever written can be rolled back and checked.
+ACTIVE_BINARIES = ("D", "E", "F")
 RETIRED_BINARIES = {
     "A": ("rolled back 2026-09-26 (diagnostics/cc5.4-rollback.json): the LCD stayed dark in every mode because "
           "tft.initDMA() initializes the SPI bus with MOSI = MISO = GPIO4 and re-routes GPIO4 to FSPIQ_OUT (102); "
@@ -452,11 +553,13 @@ BINARY_BUILD_FLAGS = {"A": (),
                       "B": ("-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0"),
                       "C": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0"),
                       "D": ("-DCC_BUILD_BINARY=4",),
-                      "E": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0", "-DCC_BUILD_BINARY=5")}
-# CC_BUILD_BINARY (the firmware's #error outside 0..5; 0, the default, omits diag "build"): the ladder index.
-BINARY_BUILD_NUMBERS = {name: index for index, name in enumerate(PIPELINE_BINARIES, 1)}
+                      "E": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0", "-DCC_BUILD_BINARY=5"),
+                      "F": ("-DCC_LCD_PERIOD_MS=12", "-DCC_BUILD_BINARY=6")}
+# CC_BUILD_BINARY (the firmware's #error outside 0..6; 0, the default, omits diag "build"): the ladder index.
+BINARY_BUILD_NUMBERS = {name: index for index, name in enumerate(ALL_BINARIES, 1)}
 BINARY_ROLES = {"A": "release candidate", "B": "middle", "C": "fallback",
-                "D": "release candidate (A + fixes)", "E": "fallback (C + fixes)"}
+                "D": "release candidate (A + fixes)", "E": "fallback (C + fixes)",
+                "F": "speed candidate (D at a 12 ms LCD period)"}
 # What each binary removes against the one above it (12.6 "Stepping down removes one risk class at a time").
 BINARY_STEP_DOWN = {"B": "the scheduling changes: the 16 ms period (R4) and the ArtDecode task (R5)",
                     "C": "the DMA driver (R3): cc5.3's single blocking 11,520 B draw buffer",
@@ -469,11 +572,24 @@ BINARY_FIXES = {
            "the temporal dither off by default plus the minimum brightness floor (ALIVE.md 9; user ruling "
            "2026-09-26)")
     for name in ("D", "E")}
-BINARY_PARENTS = {"D": "A", "E": "C"}
+BINARY_FIXES["F"] = ("D's pipeline and fixes with the LVGL refresh and animation period at 12 ms instead of 16 ms "
+                     "(CC_LCD_PERIOD_MS 12; plan F1: D and F are compared on diag lcdFps, F4 adopts F if healthy)")
+BINARY_PARENTS = {"D": "A", "E": "C", "F": "D"}
 # Build-only evidence of the compiled pipeline (the period, R4, is not visible in the image; diag lcdPeriodMs
 # reports it on the device): R5 is in the image exactly when it holds the decode task's name (VOC-K1f,
 # cc_art_decode.cpp xTaskCreateStaticPinnedToCore(run, "ArtDecode", ...)); R3 exactly when the ELF links the
 # second draw buffer (lcd_thread.cpp `draw_buf2`, under #if CC_LCD_DMA).
+# The flash size gate (plan "Cross-cutting rules"; 1.0.0-cc5.5 build acceptance, Release.image_size_gate): the
+# image may use at most 95 % of app0 (1,310,720 B), in bytes.
+IMAGE_SIZE_GATE_BYTES = 1245184
+# 1.0.0-cc5.7 (r4 FEEL + SOUND, plan F2 / F3): the capabilities the release adds (each an int 1; firmware HAPTICS.md).
+# knobVolume (control soundVolume 0..100) joined cc5.7 on 2026-09-30, before the release was finalized.
+R4_FEEL_CAPABILITIES = ("feel", "hapticFx", "knobSound", "offlineVolume", "recalibration", "knobVolume")
+# 1.0.0-cc5.8 (app profiles, APP_PROFILES.md section 7; control_center.cpp, after knobVolume): the appProfile upload into
+# the RAM-only store. Slots CC_APP_STORE_SLOTS (cc_app_store.h), wire bytes CC_APP_WIRE_MAX_BYTES (cc_app_store.h),
+# features CC_APP_FEATURES_SUPPORTED (cc_app_profile.h: the five feature bits, 0x1F).
+APP_PROFILE_CAPABILITIES = {"appProfiles": 1, "appProfileSlots": 4, "appProfileMaxBytes": 32768,
+                            "appProfileFeatures": 0x1F}
 R5_IMAGE_MARKER = b"ArtDecode"
 R3_ELF_SYMBOL = "draw_buf2"
 # A numbered binary (CC_BUILD_BINARY n, D and E) carries "cc-build-binary:<n>" in its image (the firmware reads the
@@ -590,9 +706,92 @@ PROFILES = {
                        "cc5.4-*-report.json", "cc5.4-build.json", "cc5-led-hue-report.json"),
         validation_key="cc5.4", artwork2=True, presentation=5,
         heap_min_free=V5_HEAP_MIN_FREE_BYTES, lvgl_min_free=V5_LVGL_MIN_FREE_BYTES, ladder=True),
+    # 1.0.0-cc5.4 binary D -> 1.0.0-cc5.5 (plan F1: safety and measurement, no change to feel; firmware/
+    # BUILD-cc5.5.md). The knob runs cc5.4 D (image SHA-256 dcff9c95..., 1,142,448 B; its PlatformIO "Flash used"
+    # line said 1,142,077 B), installed 2026-09-29 from a step-down base (verified image ed4f364b...,
+    # diagnostics/cc5.4-D-preparation.json) and never finalized: manifest.json is still the cc5.3 record
+    # (from_finalized=False, from_active_record). Presentation 6 (Desk Dial r3). The backup step reads the whole
+    # flash again (backups/nanod-cc5.4-before-cc5.5-*). Its own ladder: D (16 ms) and F (12 ms).
+    "cc5.5": AliveRelease(
+        "1.0.0-cc5.5", from_version="1.0.0-cc5.4", from_binary="D",
+        from_image_sha256="dcff9c9525c250419851177774f00882a8837d19b7ad15ecad23377a3928eee2",
+        from_image_bytes=1142448, from_presentation=6, prefix="cc5.5", backup_stem="nanod-cc5.4-before-cc5.5",
+        from_record="manifest-cc5.4-D.json", from_expected="nanod-cc5.4-D-expected-full.bin",
+        from_expected_sha256="ed4f364bd24b045530d5b893725579967cc584f17af32c06ab40ba471bd88242",
+        from_preparation="cc5.4-D-preparation.json", backup_family=("1.0.0-cc5.5",),
+        superseded=("1.0.0-cc5", "1.0.0-cc5.1", "1.0.0-cc5.2", "1.0.0-cc5.3"),
+        gates=CC52_DEVICE_GATES + ARTWORK2_DEVICE_GATES + ALIVE_DEVICE_GATES + PRESENTATION5_DEVICE_GATES,
+        from_token="CC5_4", desktop_bundle="desktop-dist-v7-d", desktop_rollback_bundle="desktop-dist-v7-c",
+        gate_patterns=("cc5.5-stage*.json", "cc5.5-stage*.log", "cc5.5-*-report.json", "cc5.5-build.json"),
+        validation_key="cc5.5", artwork2=True, presentation=6,
+        heap_min_free=V5_HEAP_MIN_FREE_BYTES, lvgl_min_free=V5_LVGL_MIN_FREE_BYTES, ladder=CC55_LADDER,
+        from_finalized=False, from_active_record="manifest-cc5.3.json",
+        from_install_record="cc5.4-D-flash-checks.json", image_size_gate=IMAGE_SIZE_GATE_BYTES),
+    # 1.0.0-cc5.5 binary F (installed 2026-09-30; was D when written) -> 1.0.0-cc5.6 (plan A2: Karl Malota's Onshape UI on the knob, the app canvas;
+    # firmware/BUILD-cc5.6.md). cc5.5 D (image SHA-256 dd9dafbb..., 1,144,112 B) is packaged UNFLASHED at the time
+    # of writing: from_expected_sha256 is None and the from-release is taken as installed but not finalized (as
+    # cc5.4 D was), so manifest.json stays the cc5.3 record; both are settled after the cc5.5 D install
+    # (BUILD-cc5.6.md). Presentation 6 plus appCanvas 1. Same ladder and size gate as cc5.5.
+    "cc5.6": AliveRelease(
+        "1.0.0-cc5.6", from_version="1.0.0-cc5.5", from_binary="F",
+        from_image_sha256="5c926d2721d26b4e71789828c2571fe537c8c235973702726441f9d6878ad1f8",
+        from_image_bytes=1144112, from_presentation=6, prefix="cc5.6", backup_stem="nanod-cc5.5-before-cc5.6",
+        from_record="manifest-cc5.5-F.json", from_expected="nanod-cc5.5-F-expected-full.bin",
+        from_expected_sha256="c5056fa52cf0b3970727da92a272fa20ce35dd01ea1a4e61945eba2a3d863fd4",
+        from_preparation="cc5.5-F-preparation.json", backup_family=("1.0.0-cc5.6",),
+        superseded=("1.0.0-cc5", "1.0.0-cc5.1", "1.0.0-cc5.2", "1.0.0-cc5.3"),
+        gates=CC52_DEVICE_GATES + ARTWORK2_DEVICE_GATES + ALIVE_DEVICE_GATES + PRESENTATION5_DEVICE_GATES,
+        from_token="CC5_5", desktop_bundle="desktop-dist-v7-g", desktop_rollback_bundle="desktop-dist-v7-f",
+        gate_patterns=("cc5.6-stage*.json", "cc5.6-stage*.log", "cc5.6-*-report.json", "cc5.6-build.json"),
+        validation_key="cc5.6", artwork2=True, presentation=6,
+        heap_min_free=V5_HEAP_MIN_FREE_BYTES, lvgl_min_free=V5_LVGL_MIN_FREE_BYTES, ladder=CC55_LADDER,
+        from_finalized=False, from_active_record="manifest-cc5.3.json",
+        from_install_record="cc5.5-F-flash-checks.json", image_size_gate=IMAGE_SIZE_GATE_BYTES, app_canvas=True),
+    # 1.0.0-cc5.6 binary F (installed 2026-09-30, the tilt rebuild: image SHA-256 81ee99fc..., 1,177,424 B; verified install
+    # image 0f877393..., diagnostics/cc5.6-F-preparation.json) -> 1.0.0-cc5.7 (plan F2 + F3, the r4 FEEL + SOUND job;
+    # firmware/BUILD-cc5.7.md, HAPTICS.md). cc5.6 F was never finalized (manifest.json stays the cc5.3 record), like cc5.5 F
+    # and cc5.4 D before it. Presentation 6, appCanvas 1 and the r4 capabilities. Same ladder and size gate.
+    "cc5.7": AliveRelease(
+        "1.0.0-cc5.7", from_version="1.0.0-cc5.6", from_binary="F",
+        from_image_sha256="81ee99fca7f1b4bc42e7ed7ddc1313e9198704356533e770d3e8bfbdbf1ed888",
+        from_image_bytes=1177424, from_presentation=6, prefix="cc5.7", backup_stem="nanod-cc5.6-before-cc5.7",
+        from_record="manifest-cc5.6-F.json", from_expected="nanod-cc5.6-F-expected-full.bin",
+        from_expected_sha256="0f8773931487deefe7a0dd91c31be17ea532969a0c2c77aaf9a1974adcb9a2f1",
+        from_preparation="cc5.6-F-preparation.json", backup_family=("1.0.0-cc5.7",),
+        superseded=("1.0.0-cc5", "1.0.0-cc5.1", "1.0.0-cc5.2", "1.0.0-cc5.3"),
+        gates=CC52_DEVICE_GATES + ARTWORK2_DEVICE_GATES + ALIVE_DEVICE_GATES + PRESENTATION5_DEVICE_GATES,
+        from_token="CC5_6", desktop_bundle="desktop-dist-v7-j", desktop_rollback_bundle="desktop-dist-v7-i",
+        gate_patterns=("cc5.7-stage*.json", "cc5.7-stage*.log", "cc5.7-*-report.json", "cc5.7-build.json"),
+        validation_key="cc5.7", artwork2=True, presentation=6,
+        heap_min_free=V5_HEAP_MIN_FREE_BYTES, lvgl_min_free=V5_LVGL_MIN_FREE_BYTES, ladder=CC55_LADDER,
+        from_finalized=False, from_active_record="manifest-cc5.3.json",
+        from_install_record="cc5.6-F-flash-checks.json", image_size_gate=IMAGE_SIZE_GATE_BYTES, app_canvas=True,
+        r4_feel=True),
+    # 1.0.0-cc5.7 binary F (installed 2026-09-30: image SHA-256 93ff0d50..., 1,128,128 B; verified install image
+    # aa64fef5..., diagnostics/cc5.7-F-preparation.json) -> 1.0.0-cc5.8 (the public v2.0.0 release candidate: the Phase 2
+    # audit fixes and app profiles; firmware/BUILD-cc5.8.md). cc5.7 F was never finalized (manifest.json stays the cc5.3
+    # record), like cc5.6 F, cc5.5 F and cc5.4 D before it. Presentation 6, appCanvas 1, the r4 capabilities and the app
+    # profile capabilities. Same ladder and size gate.
+    "cc5.8": AliveRelease(
+        "1.0.0-cc5.8", from_version="1.0.0-cc5.7", from_binary="F",
+        from_image_sha256="93ff0d50fcb39dfa81e9b70249a653aab8aa4374ee267ac9a3b7eec016ae6f05",
+        from_image_bytes=1128128, from_presentation=6, prefix="cc5.8", backup_stem="nanod-cc5.7-before-cc5.8",
+        from_record="manifest-cc5.7-F.json", from_expected="nanod-cc5.7-F-expected-full.bin",
+        from_expected_sha256="aa64fef511f9f33cf661307e2bc636442b820b198c4db2ebb71dc4b5fbcf53dd",
+        from_preparation="cc5.7-F-preparation.json", backup_family=("1.0.0-cc5.8",),
+        superseded=("1.0.0-cc5", "1.0.0-cc5.1", "1.0.0-cc5.2", "1.0.0-cc5.3"),
+        gates=CC52_DEVICE_GATES + ARTWORK2_DEVICE_GATES + ALIVE_DEVICE_GATES + PRESENTATION5_DEVICE_GATES,
+        from_token="CC5_7", desktop_bundle="desktop-dist-v7-l", desktop_rollback_bundle="desktop-dist-v7-k",
+        gate_patterns=("cc5.8-stage*.json", "cc5.8-stage*.log", "cc5.8-*-report.json", "cc5.8-build.json"),
+        validation_key="cc5.8", artwork2=True, presentation=6,
+        heap_min_free=V5_HEAP_MIN_FREE_BYTES, lvgl_min_free=V5_LVGL_MIN_FREE_BYTES, ladder=CC55_LADDER,
+        from_finalized=False, from_active_record="manifest-cc5.3.json",
+        from_install_record="cc5.7-F-flash-checks.json", image_size_gate=IMAGE_SIZE_GATE_BYTES, app_canvas=True,
+        r4_feel=True, app_profiles=True),
 }
-CURRENT = PROFILES["cc5.4"]         # the release these scripts build, package, install, check and finalize
-NEWEST = list(PROFILES.values())[-1]   # the release the firmware tree builds (1.0.0-cc5.4 = CURRENT)
+CURRENT = PROFILES["cc5.8"]         # the release these scripts build, package, install, check and finalize
+# (2026-10-03: cc5.7 F (rest sleep, 93ff0d50...) is on the knob; cc5.8 upgrades from F.)
+NEWEST = list(PROFILES.values())[-1]   # the release the firmware tree builds (1.0.0-cc5.8)
 
 
 def all_profiles():
@@ -603,11 +802,12 @@ def all_profiles():
 
 def binary_choices(profile=None):
     """The --binary choices of build, package, prepare, install and finalize for `profile` (CURRENT): the active
-    binaries of its ladder (ACTIVE_BINARIES: ("D", "E"); the first is the default), or () without the ladder. The
-    retired binaries (RETIRED_BINARIES: A, B, C) are refused by argparse there (exit 2, nothing written);
-    rollback_nanod_cc5.py and check_nanod_cc5.py take every binary of the ladder (pipeline_binaries)."""
+    binaries of its ladder in ladder order (ACTIVE_BINARIES; cc5.4: ("D", "E"), cc5.5: ("D", "F"); the first is the
+    default), or () without the ladder. The retired binaries (RETIRED_BINARIES: A, B, C) are refused by argparse
+    there (exit 2, nothing written); rollback_nanod_cc5.py and check_nanod_cc5.py take every binary of the ladder
+    (pipeline_binaries)."""
     staged = (profile or CURRENT).pipeline_binaries()
-    return tuple(name for name in ACTIVE_BINARIES if name in staged)
+    return tuple(name for name in staged if name in ACTIVE_BINARIES)
 
 
 def binary_build_number(binary):
@@ -617,7 +817,9 @@ def binary_build_number(binary):
             return int(flag.split("=", 1)[1])
     return None
 # rollback_nanod_cc5.py --to <release>: the profile whose locked pre-install backup it restores.
-ROLLBACK_TARGETS = {"cc4": PROFILES["cc5.2"], "cc5.2": PROFILES["cc5.3"], "cc5.3": PROFILES["cc5.4"]}
+ROLLBACK_TARGETS = {"cc4": PROFILES["cc5.2"], "cc5.2": PROFILES["cc5.3"], "cc5.3": PROFILES["cc5.4"],
+                    "cc5.4": PROFILES["cc5.5"], "cc5.5": PROFILES["cc5.6"], "cc5.6": PROFILES["cc5.7"],
+                    "cc5.7": PROFILES["cc5.8"]}
 DEFAULT_ROLLBACK_TARGET = "cc4"     # RECOVERY.md section 5 and BUILD-cc5.md run it without --to
 
 # The current profile's names, for reference, messages and the runbooks. Scripts read the profile
@@ -661,7 +863,10 @@ def history_backup_names(profile=None):
 ART_WIDTH = 120
 ART_BYTES = ART_WIDTH * ART_WIDTH * 2                     # 28,800 B RGB565_LE
 ART_CHUNK = 384
-LVGL_HEAP_BYTES = 64 * 1024                               # include/lv_conf.h LV_MEM_SIZE
+LVGL_HEAP_BYTES = 80 * 1024                               # include/lv_conf.h LV_MEM_SIZE (FW-RES-001: was 64 KB)
+# The pool of the releases before 1.0.0-cc5.4 (64 KB): their diag gate is a fraction of it
+# (diag_margins without a profile lvgl_min_free); 1.0.0-cc5.4 on gate lvglMinFree in bytes.
+PRE_V5_LVGL_HEAP_BYTES = 64 * 1024
 LVGL_MIN_FREE_FRACTION = 0.25
 STACK_MIN_BYTES = 1024
 # Internal heap (diag heapMinFree: the lowest free MALLOC_CAP_INTERNAL since boot, so the final
@@ -683,7 +888,66 @@ JPEG_DECODE_MAX_MS = 200            # ARTWORK2.md section 10 / 12.11: diag jpegD
 COVER_TRANSFER_MAX_SECONDS = 1.5    # one unpaced cover, begin to commit ack (a paced 120 px v1 cover took ~5 s)
 MEDIA_DIAG_FIELDS = ("rxQueueBytes", "mediaCommits", "mediaErrors", "mediaEvictions", "jpegDecodes",
                      "jpegDecodeErrors", "jpegDecodeMsMax", "jpegDecodeMsLast")
-DESIGN_ASSETS = APP / "design-reference" / "design_handoff_nano_d_artwork_color" / "assets"
+_DESIGN_HANDOFF_ASSETS = APP / "design-reference" / "design_handoff_nano_d_artwork_color" / "assets"
+SYNTHETIC_MEDIA_VERSION = 1
+
+
+def _synthetic_design_assets(target):
+    """Fictional stand-ins for the design hand-off's covers/ and apps/ folders, which the public
+    repository does not ship (third-party album art and app logos). Nine covers and five app icons,
+    drawn deterministically and asymmetric (so every orientation of cover_pool/icon_pool is a distinct
+    image), written once into `target` (outside the repository). Returns `target`."""
+    from PIL import Image, ImageDraw
+    covers, apps = target / "covers", target / "apps"
+    done = target / f"ready-v{SYNTHETIC_MEDIA_VERSION}"
+    if done.is_file():
+        return target
+    covers.mkdir(parents=True, exist_ok=True)
+    apps.mkdir(parents=True, exist_ok=True)
+    rng = random.Random("desk-dial synthetic media")
+    for n in range(9):
+        size = 300 + 4 * n
+        image = Image.new("RGB", (size, size))
+        draw = ImageDraw.Draw(image)
+        a = [rng.randrange(256) for _ in range(3)]
+        b = [rng.randrange(256) for _ in range(3)]
+        for y in range(size):
+            t = y / (size - 1)
+            draw.line([(0, y), (size - 1, y)], fill=tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3)))
+        for _ in range(6 + n):
+            x0, y0 = rng.randrange(size), rng.randrange(size)
+            w, h = rng.randrange(20, size // 2), rng.randrange(10, size // 3)
+            colour = tuple(rng.randrange(256) for _ in range(3))
+            (draw.ellipse if rng.random() < 0.5 else draw.rectangle)([x0, y0, x0 + w, y0 + h], fill=colour)
+        draw.polygon([(0, 0), (size // 3, 0), (0, size // 4)], fill=(250, 250, 250))   # top-left marker
+        if n % 2:
+            image.save(covers / f"synthetic-cover-{n + 1}.jpg", format="JPEG", quality=92)
+        else:
+            image.save(covers / f"synthetic-cover-{n + 1}.png")
+    for n in range(5):
+        size = 250 + 20 * n
+        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        colour = tuple(rng.randrange(40, 256) for _ in range(3)) + (255,)
+        draw.rounded_rectangle([8, 8, size - 9, size - 9], radius=size // 5, fill=colour)
+        draw.polygon([(size // 4, size // 4), (3 * size // 4, size // 3), (size // 3, 3 * size // 4)],
+                     fill=(255, 255, 255, 255))
+        draw.ellipse([size - size // 3, 12, size - 16, size // 3], fill=(20, 20, 20, 160))
+        image.save(apps / f"synthetic-app-{n + 1}.png")
+    done.write_text("synthetic design media\n", encoding="utf-8")
+    return target
+
+
+def _design_assets():
+    """The design hand-off's assets when a private checkout has them, else fictional stand-ins."""
+    if (_DESIGN_HANDOFF_ASSETS / "covers").is_dir() and any((_DESIGN_HANDOFF_ASSETS / "covers").iterdir()) \
+            and (_DESIGN_HANDOFF_ASSETS / "apps").is_dir():
+        return _DESIGN_HANDOFF_ASSETS
+    import tempfile
+    return _synthetic_design_assets(Path(tempfile.gettempdir()) / "desk-dial-synthetic-media")
+
+
+DESIGN_ASSETS = _design_assets()
 _presentation_module = None
 
 
@@ -855,8 +1119,7 @@ def find_app_port(ports=None):
 
 def find_rom_port(ports=None, mac=CHIP_MAC):
     return select_one(list_ports() if ports is None else ports, lambda p: is_rom_port(p, mac),
-                      f"ESP32-S3 ROM bootloader port (303A:1001, serial {mac})"
-                      + (" - set NANOD_CHIP_MAC to your chip's MAC" if normalize_mac(mac) == normalize_mac(CHIP_MAC_PLACEHOLDER) else "")).device
+                      f"ESP32-S3 ROM bootloader port (303A:1001, serial {mac})").device
 
 
 def poll_ports(predicate, timeout, *, lister=list_ports, clock=time.monotonic, sleep=time.sleep,
@@ -1191,6 +1454,103 @@ def newest_written_binary(profile, diagnostics=None):
 
 
 # ---------------------------------------------------------------------------
+# The installed from-release (1.0.0-cc5.5: cc5.4 binary D, installed but never finalized)
+
+def from_profile(profile):
+    """The profile whose release `profile` upgrades from (its from_version), or None (cc4)."""
+    return next((q for q in PROFILES.values() if q.version == profile.from_version), None)
+
+
+def from_record_problems(profile, path=None):
+    """Why `path` (profile.from_record) is not the from-release's record: its firmwareVersion must be the
+    from_version and its artifacts must name the from image (the installed binary's, for from_binary) with
+    its SHA-256."""
+    path = Path(profile.from_record if path is None else path)
+    try:
+        record = load_json(path)
+    except (OSError, ValueError):
+        return [f"{path.name} is missing or unreadable"]
+    if (not isinstance(record, dict) or record.get("firmwareVersion") != profile.from_version
+            or (record.get("artifacts") or {}).get(profile.from_image.name, {}).get("sha256") != profile.from_image_sha256):
+        return [f"{path.name} is not the {profile.from_version} record ({profile.from_image.name}, SHA-256 "
+                f"{profile.from_image_sha256})"]
+    return []
+
+
+def from_install_problems(profile, diagnostics=None):
+    """Why the records do not show `profile`'s from-release running on the knob (empty: they do), for a
+    from-release that was installed but never finalized (profile.from_finalized False; always [] otherwise, where
+    manifest.json is the evidence). Its install record (profile.from_install_record: 1.0.0-cc5.5 reads
+    diagnostics/cc5.4-D-flash-checks.json) must record a verified, reset install (outcome INSTALLED_VERIFIED_RESET or
+    its _UNCONFIRMED form) of the from image (candidate file and SHA-256, firmwareVersion, binary), be the newest
+    write of that release (newest_written_binary of its profile), and no rollback of that release may be recorded
+    after it (a later rollback left the knob on the release before it)."""
+    if profile.from_finalized:
+        return []
+    diagnostics = Path(DIAGNOSTICS if diagnostics is None else diagnostics)
+    path = diagnostics / profile.from_install_record_name
+    try:
+        record = load_json(path)
+    except (OSError, ValueError):
+        return [f"{path.name} (the {profile.from_version} install record) is missing or unreadable"]
+    if not isinstance(record, dict):
+        return [f"{path.name} is not an install record"]
+    problems = []
+    outcome = str(record.get("outcome") or "")
+    if not outcome.startswith("INSTALLED_VERIFIED_RESET"):
+        problems.append(f"{path.name} records outcome {outcome or 'none'}, not a verified install")
+    if (record.get("candidate") != profile.from_image.name or record.get("candidateSha256") != profile.from_image_sha256
+            or record.get("firmwareVersion") != profile.from_version
+            or (profile.from_binary and record.get("binary") != profile.from_binary)):
+        problems.append(f"{path.name} does not record {profile.from_image.name} (SHA-256 {profile.from_image_sha256})")
+    source = from_profile(profile)
+    stamp = record.get("startedUtc") if isinstance(record.get("startedUtc"), str) else ""
+    if source is not None:
+        _, newest, unreadable = newest_written_binary(source, diagnostics)
+        problems += unreadable
+        if newest != path.name:
+            problems.append(f"the newest {source.tag} write is {newest or 'none'}, not {path.name}")
+        for variant in source.variants():
+            for rollback in sorted(diagnostics.glob(f"{variant.prefix}-rollback*.json")):
+                try:
+                    started = load_json(rollback).get("startedUtc")
+                except (OSError, ValueError, AttributeError):
+                    problems.append(f"{rollback.name} is unreadable")
+                    continue
+                if isinstance(started, str) and started > stamp:
+                    problems.append(f"{rollback.name} records a {variant.label} rollback after {path.name}")
+    return problems
+
+
+def active_record_problems(profile):
+    """Why manifest.json is not the record `profile`'s install must start from (empty: it is): the installed
+    from-release's record (profile.from_record), or for a from-release never finalized the record its install left
+    in force (profile.restore_record) together with its install evidence (from_install_problems)."""
+    record = profile.restore_record
+    if not ACTIVE_MANIFEST.is_file() or not record.is_file() or sha256_file(ACTIVE_MANIFEST) != sha256_file(record):
+        what = (f"the installed {profile.from_version} record" if profile.from_finalized else
+                f"the record in force while the never-finalized {profile.from_version} runs")
+        return [f"manifest.json is not {what} ({record.name})"]
+    return from_install_problems(profile)
+
+
+def restore_record_problems(profile):
+    """Why profile.restore_record is not the record a rollback to the from-release puts back into manifest.json:
+    the from-release's record (from_record_problems), or for a from-release never finalized the record of the
+    release before it (its own from_version and from image, e.g. manifest-cc5.3.json for 1.0.0-cc5.5). A chain of
+    never-finalized releases that leave the same record in force (1.0.0-cc5.6 from cc5.5 F from cc5.4 D, all with
+    manifest-cc5.3.json) is followed back to the release that record belongs to."""
+    if profile.from_finalized:
+        return from_record_problems(profile)
+    source = from_profile(profile)
+    if source is None:
+        return []
+    if not source.from_finalized and source.restore_record.name == profile.restore_record.name:
+        return restore_record_problems(source)
+    return from_record_problems(source, profile.restore_record)
+
+
+# ---------------------------------------------------------------------------
 # Partition table and OTA selection (same rules as analyze_nanod_backup.py)
 
 _PART_ROW = struct.Struct("<2sBBII16sI")
@@ -1402,6 +1762,28 @@ def app_image_problems(image, version=None, limit=APP_SIZE):
     return problems
 
 
+def home_path_hits(image, home=None):
+    """FW-PUB-003: occurrences of the build host's home directory (both slash forms, any case) in `image`.
+    GCC __FILE__ strings put it there before platformio.ini mapped the build roots (-fmacro-prefix-map);
+    a root-like prefix (a drive or "/") counts nothing."""
+    home = (str(Path.home()) if home is None else str(home)).rstrip("\\/")
+    if len(home.replace("\\", "/").strip("/")) < 4:
+        return 0
+    lowered = bytes(image or b"").lower()
+    forms = {home.replace("\\", "/").lower().encode("utf-8"), home.replace("/", "\\").lower().encode("utf-8")}
+    return sum(lowered.count(form) for form in forms)
+
+
+def release_image_problems(image, home=None):
+    """What keeps an accepted image from being staged as a release asset (package_nanod_cc5.py): it must not
+    carry the build host's home directory (FW-PUB-003). Installs and rollbacks of older images do not use it."""
+    hits = home_path_hits(image, home)
+    if hits:
+        return [f"the image holds the build host's home directory {hits} time(s) (__FILE__ paths; FW-PUB-003): "
+                "build with platformio.ini's path_prefix_map.py pre-script from a clean build folder"]
+    return []
+
+
 def build_markers(image):
     """The CC_BUILD_BINARY numbers whose marker "cc-build-binary:<n>" the image holds, sorted."""
     return sorted({int(n) for n in re.findall(re.escape(BUILD_MARKER_PREFIX) + rb"(\d+)", bytes(image or b""))})
@@ -1553,6 +1935,175 @@ def _defines(tokens):
         if match:
             values[match.group(1)] = True if match.group(2) is None else match.group(2)
     return values
+
+
+def _ini_string_define(value):
+    """A -D string value as platformio.ini writes it (\\"1.0.0\\" or "1.0.0") without its quotes, or None."""
+    if not isinstance(value, str):
+        return None
+    text = value.replace('\\"', '"').strip()
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        text = text[1:-1]
+    return text or None
+
+
+def firmware_version_defines(ini_text=None):
+    """(NANO_FIRMWARE_PUBLIC, NANO_FIRMWARE_VERSION) of platformio.ini's [env:nanofoc_d] build_flags (None for a
+    name it does not set). `ini_text` None reads FIRMWARE_SOURCE/platformio.ini (None, None when unreadable)."""
+    if ini_text is None:
+        try:
+            ini_text = (FIRMWARE_SOURCE / "platformio.ini").read_text(encoding="utf-8")
+        except OSError:
+            return None, None
+    values = _defines(platformio_build_flags(ini_text))
+    return (_ini_string_define(values.get("NANO_FIRMWARE_PUBLIC")),
+            _ini_string_define(values.get("NANO_FIRMWARE_VERSION")))
+
+
+def reported_firmware_versions(profile, binary=None, ini_text=None):
+    """The settings "firmwareVersion" strings a knob running `profile` may report, as a tuple (FW-PUB-004).
+
+    A source that sets NANO_FIRMWARE_PUBLIC for this profile's internal id (platformio.ini NANO_FIRMWARE_VERSION ==
+    profile.version) reports "<public>+<internal after its first '-'>.<binary letter>" (src/cc_fw_version.h, e.g.
+    1.0.0+cc5.7.F); without a letter (CC_BUILD_BINARY unset) it ends at the build id. The letter is `binary`, else
+    the profile's own binary, else any binary of its ladder that the build gives a CC_BUILD_BINARY number. Any
+    other profile (an earlier release, or a source without the public define) reports profile.version itself."""
+    public, internal = firmware_version_defines(ini_text)
+    if not public or internal != profile.version:
+        return (profile.version,)
+    build = internal.split("-", 1)[1] if "-" in internal else ""
+    if not build:
+        return (public,)
+    letter = binary or getattr(profile, "binary", None)
+    letters = [letter] if letter else list(profile.pipeline_binaries())
+    numbered = [name for name in letters if binary_build_number(name)]
+    if not numbered:
+        return (f"{public}+{build}",)
+    return tuple(f"{public}+{build}.{name}" for name in numbered)
+
+
+def knob_reported_version(profile, binary=None, public=None, ini_text=None):
+    """The one settings "firmwareVersion" string a knob running `profile` reports (FW-PUB-004), mirroring
+    src/cc_fw_version.h: "<public>+<profile.version after its first '-'>" plus ".<letter>" when the binary's build
+    flags carry -DCC_BUILD_BINARY=n with n in 1..6 (letter chr(ord('A') + n - 1): D 4, E 5, F 6), nothing otherwise.
+    The binary is `binary`, else profile.binary. `public` None takes the profile's public_version field (set by the
+    release stage), else platformio.ini's NANO_FIRMWARE_PUBLIC when its NANO_FIRMWARE_VERSION is profile.version.
+    Without a public version the knob reports profile.version itself (an image built before FW-PUB-004)."""
+    if public is None:
+        public = getattr(profile, "public_version", None)
+    if public is None:
+        defined, internal = firmware_version_defines(ini_text)
+        public = defined if internal == profile.version else None
+    if not public:
+        return profile.version
+    build = profile.version.split("-", 1)[1] if "-" in profile.version else ""
+    if not build:
+        return public
+    number = binary_build_number(binary or getattr(profile, "binary", None))
+    letter = f".{chr(ord('A') + number - 1)}" if number and 1 <= number <= 6 else ""
+    return f"{public}+{build}{letter}"
+
+
+def reports_version(value, profile, binary=None, public=None, ini_text=None):
+    """True when a knob's reported "firmwareVersion" `value` names `profile`: the internal id itself (an image built
+    before FW-PUB-004) or knob_reported_version(profile, binary, public, ini_text) (the public form)."""
+    if not isinstance(value, str) or not value:
+        return False
+    return value == profile.version or value == knob_reported_version(profile, binary, public, ini_text)
+
+
+# FW-PUB-004: the public release record of the Desk Dial + knob pair. One public version names one firmware image:
+# release.json maps each public version to the image's SHA-256, the string the knob reports and the internal
+# manifest; Desk Dial's ProductVersion is the public version (FileVersion keeps its own series).
+RELEASE_RECORD = FIRMWARE_OUT / "release.json"
+DESKTOP_VERSION_FILE = APP / "desktop-version.txt"
+INTERNAL_ID = re.compile(r"cc\d+(?:\.\d+)?", re.IGNORECASE)     # an internal build id (cc5, cc5.7)
+PUBLIC_VERSION = re.compile(r"\d+\.\d+\.\d+")                      # semver core, no pre-release or build part
+
+
+def public_version_fields(profile, binary=None, ini_text=None):
+    """The manifest fields of FW-PUB-004: {"publicVersion": NANO_FIRMWARE_PUBLIC or None, "reportedVersion": the one
+    settings "firmwareVersion" string this image reports, or None when it is not one string (no public define for
+    this profile, or no binary letter to pick)}."""
+    public, internal = firmware_version_defines(ini_text)
+    if not public or internal != profile.version:
+        return {"publicVersion": None, "reportedVersion": None}
+    reported = reported_firmware_versions(profile, binary, ini_text)
+    return {"publicVersion": public, "reportedVersion": reported[0] if len(reported) == 1 else None}
+
+
+def desktop_product_version(text=None):
+    """Desk Dial's ProductVersion string from desktop-version.txt (`text` None reads the file; None when absent)."""
+    if text is None:
+        try:
+            text = DESKTOP_VERSION_FILE.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    match = re.search(r"StringStruct\(\s*'ProductVersion'\s*,\s*'([^']*)'\s*\)", text)
+    return match.group(1) if match else None
+
+
+def release_entry(manifest, product_version):
+    """One release.json entry from a packaged firmware manifest (FW-PUB-004 fields present) and Desk Dial's
+    ProductVersion. Stops when the manifest has no public version or no single reported string."""
+    public, reported = manifest.get("publicVersion"), manifest.get("reportedVersion")
+    if not public or not reported:
+        raise SystemExit("the manifest records no public version or reported string; package the binary again")
+    image = manifest.get("image") or {}
+    binary = (manifest.get("binary") or {}).get("name")
+    return {"version": public,
+            "firmware": {"reportedVersion": reported, "internalVersion": manifest.get("firmwareVersion"),
+                         "binary": binary, "image": image.get("file"), "sha256": image.get("sha256"),
+                         "manifest": f"manifest-{manifest.get('firmwareVersion')}{'-' + binary if binary else ''}.json"},
+            "desktop": {"productVersion": product_version}}
+
+
+def add_release(record, entry):
+    """release.json content with `entry` added (a new dict). A public version is never reused for another image:
+    an existing version with a different firmware SHA-256 stops; the same image again replaces its entry."""
+    releases = [dict(r) for r in (record or {}).get("releases", [])]
+    for index, old in enumerate(releases):
+        if old.get("version") == entry["version"]:
+            if old["firmware"].get("sha256") != entry["firmware"]["sha256"]:
+                raise SystemExit(f"public version {entry['version']} already names image "
+                                 f"{str(old['firmware'].get('sha256'))[:8]}; a changed image needs a new public version")
+            releases[index] = entry
+            break
+    else:
+        releases.append(entry)
+    return {"schema": 1, "current": entry["version"], "releases": releases}
+
+
+def release_version_problems(record, product_version):
+    """What breaks the FW-PUB-004 rules in a release.json record (empty list = good): the current version is Desk
+    Dial's ProductVersion; each version is a public semver core with no internal cc id; its reported firmware string
+    starts with "<version>+" and ends with ".<binary letter>"; each version maps to one SHA-256."""
+    problems = []
+    releases = (record or {}).get("releases") or []
+    if not releases:
+        return ["release.json lists no release"]
+    current = record.get("current")
+    if current != product_version:
+        problems.append(f"ProductVersion {product_version} is not the current release {current}")
+    shas = {}
+    for entry in releases:
+        version, fw = entry.get("version") or "", entry.get("firmware") or {}
+        reported, binary = fw.get("reportedVersion") or "", fw.get("binary") or ""
+        if not PUBLIC_VERSION.fullmatch(version) or INTERNAL_ID.search(version):
+            problems.append(f"{version!r} is not a public version")
+        desktop = (entry.get("desktop") or {}).get("productVersion") or ""
+        if desktop != version or INTERNAL_ID.search(desktop):
+            problems.append(f"{version}: Desk Dial ProductVersion {desktop!r} is not the public version")
+        if not reported.startswith(f"{version}+"):
+            problems.append(f"{version}: reported firmware {reported!r} does not start with it")
+        if binary not in ALL_BINARIES or not reported.endswith(f".{binary}"):
+            problems.append(f"{version}: reported firmware {reported!r} does not end with the binary letter {binary!r}")
+        sha = fw.get("sha256")
+        if not sha or not re.fullmatch(r"[0-9a-f]{64}", sha):
+            problems.append(f"{version}: no firmware SHA-256")
+        shas.setdefault(version, set()).add(sha)
+    problems += [f"{version} maps to {len(s)} images" for version, s in shas.items() if len(s) > 1]
+    return problems
 
 
 def tft_spi_config(ini_text, flags=()):
@@ -2162,7 +2713,7 @@ REQUIRED_STACKS = ("stackLcd", "stackCom", "stackHmi", "stackFoc")   # stackFoc 
 RECORDED_ONLY = ("heapFree", "psramFree", "stackUsbd", "txStalls", "txDroppedBytes")
 
 
-def diag_margins(diag, heap_bytes=LVGL_HEAP_BYTES, profile=None):
+def diag_margins(diag, heap_bytes=PRE_V5_LVGL_HEAP_BYTES, profile=None):
     """LVGL heap >= 25 % free at its minimum; internal heap minimum (heapMinFree) >=
     HEAP_MIN_FREE_BYTES (1.0.0-cc5.3); every task stack high-water mark > 1 KB.
 
@@ -2340,6 +2891,36 @@ def lcd_mosi_problems(diag):
 
 def lcd_diag_summary(diag):
     return {k: diag.get(k) for k in LCD_DIAG_FIELDS + LCD_FIX_DIAG_FIELDS if isinstance(diag, dict) and k in diag}
+
+
+def f1_diag_summary(diag):
+    """The 1.0.0-cc5.5 F1 fields (F1_DIAG_FIELDS) and the Step 0 comparison figures (STEP0_DIAG_FIELDS, plus the
+    binary's build letter) of one diag reply, as read; absent fields are left out (a cc5.4 knob has no F1 ones)."""
+    if not isinstance(diag, dict):
+        return {}
+    return {k: diag[k] for k in ("build",) + STEP0_DIAG_FIELDS + F1_DIAG_FIELDS if k in diag}
+
+
+def f1_diag_lines(diag):
+    """Readable lines of f1_diag_summary for the console (units spelled out; nothing gated)."""
+    s = f1_diag_summary(diag)
+    if not s:
+        return []
+    lines = []
+    if any(k in s for k in ("focLoopHz", "focLoopUsMax", "uqAbsMax", "uqCapMs")):
+        lines.append(f"FOC loop {s.get('focLoopHz', '?')} Hz, longest gap {s.get('focLoopUsMax', '?')} us; |Uq| max "
+                     f"{s.get('uqAbsMax', '?')} mV of the {s.get('uqCapMv', '?')} mV cap, {s.get('uqCapMs', '?')} ms at "
+                     "the cap since boot")
+    if "pdRead" in s:
+        lines.append(f"PD contract: read {'ok' if s.get('pdRead') else 'FAILED'}, PDO {s.get('pdPdo', '?')}, "
+                     f"{s.get('pdVolts', '?')} V (0 = none or unknown)"
+                     + (f", RDO 0x{s['pdRdo']:08X}" if isinstance(s.get("pdRdo"), int) else ""))
+    if "usbHidOk" in s or "hidRetries" in s:
+        lines.append(f"USB MIDI {s.get('usbMidiOk', '?')}, HID {s.get('usbHidOk', '?')}; HID retries {s.get('hidRetries', '?')}")
+    step0 = {k: s[k] for k in ("build",) + STEP0_DIAG_FIELDS if k in s}
+    if step0:
+        lines.append("Step 0: " + ", ".join(f"{k} {v}" for k, v in step0.items()))
+    return lines
 
 
 LATE_SINCE_BOOT, LATE_RESET_ON_READ = "since boot", "reset on read"
@@ -3024,12 +3605,54 @@ def probe_diag(device, *, knob_factory=None, settle=0.3):
         knob.close()
 
 
-def raw_control(ident, profile, maximum, position, frame, *, windows_button=2, windows_hid=False):
+# The r4 control fields a check may add to a control (CONTROL_CENTER.md): without them the knob runs the cc5.6 haptic
+# loop exactly and silent, and the r4 wall law runs only with a `feel` token. Built by feel_fields() (Desk Dial's own
+# DeviceBridge._feel_fields for the live capabilities) and checked by control_extra_problems() before anything is sent.
+CONTROL_EXTRA_FIELDS = ("feel", "reducedHaptics", "sound", "soundVolume")
+CONTROL_SOUND_MAX = 3
+CONTROL_SOUND_VOLUME_MAX = 100
+
+
+def control_extra_problems(extra):
+    """What a control parser would reject in the extra control fields `extra` (empty: valid)."""
+    if not isinstance(extra, dict):
+        return [f"extra control fields must be a dict, not {type(extra).__name__}"]
+    problems = [f"unknown control field {key!r}" for key in extra if key not in CONTROL_EXTRA_FIELDS]
+    if "feel" in extra and not (isinstance(extra["feel"], str) and extra["feel"]):
+        problems.append("feel must be a non-empty token")
+    if "reducedHaptics" in extra and not isinstance(extra["reducedHaptics"], bool):
+        problems.append("reducedHaptics must be true or false")
+    for key, top in (("sound", CONTROL_SOUND_MAX), ("soundVolume", CONTROL_SOUND_VOLUME_MAX)):
+        if key in extra and not (type(extra[key]) is int and 0 <= extra[key] <= top):
+            problems.append(f"{key} must be an integer 0..{top}")
+    return problems
+
+
+def feel_fields(device, capabilities, feel=None, *, reduced_haptics=False, volume=0):
+    """The r4 control fields Desk Dial would send to a knob with these live `capabilities` (`device`: the companion's
+    control_center.device module): `feel` (when given and the knob has the feel capability) with reducedHaptics, and
+    sound/soundVolume for `volume` (0: silent). Empty for an older knob, so its control line stays byte-identical."""
+    from types import SimpleNamespace
+    bridge = SimpleNamespace(capabilities=capabilities, _knob_volume=int(volume),
+                             _reduced_haptics=bool(reduced_haptics))
+    value = {} if feel is None else {"feel": feel}
+    device.DeviceBridge._feel_fields(bridge, value)
+    return value
+
+
+def raw_control(ident, profile, maximum, position, frame, *, windows_button=2, windows_hid=False, extra=None):
     """A control command as the companion builds it (HID off for checks, except the opt-in 1.0.0-cc5.4
-    F24 icon-gate check, which enables it on one Home and one Tracks control)."""
-    return {"id": ident, "profile": profile, "min": 0, "max": maximum, "position": position,
-            "windowsButton": windows_button, "buttonOrder": [0, 1, 2, 3], "windowsHidEnabled": bool(windows_hid),
-            "frame": {**frame, "id": ident}}
+    F24 icon-gate check, which enables it on one Home and one Tracks control). `extra`: r4 control fields
+    (CONTROL_EXTRA_FIELDS, from feel_fields), validated first (ValueError); without it the line is unchanged."""
+    control = {"id": ident, "profile": profile, "min": 0, "max": maximum, "position": position,
+               "windowsButton": windows_button, "buttonOrder": [0, 1, 2, 3], "windowsHidEnabled": bool(windows_hid)}
+    if extra:
+        problems = control_extra_problems(extra)
+        if problems:
+            raise ValueError(f"control fields the knob would reject: {problems}")
+        control.update(extra)
+    control["frame"] = {**frame, "id": ident}
+    return control
 
 
 def fixture_frames():
@@ -3075,7 +3698,10 @@ PROMPT_SEE = "Can you see this?"
 PROMPT_SEE_SUB = "Press Button 4"
 PROMPT_SEE_NOTE = "It lights green"
 PROMPT_LET_GO_KEYS = "Let go of the buttons"
-PROMPT_YES_NO = "Yes: Button 4 · No: Button 1"
+# Both fit the one note line of the Seek overlay (TL-TST-002: "Yes: Button 4 · No: Button 1" and "That was Button 2 ·
+# Yes 4 · No 1" were cut there with an ellipsis).
+PROMPT_YES_NO = "Yes Button 4 · No Button 1"
+PROMPT_YES_NO_RETRY = "Not Button {n} · Yes 4 · No 1"   # ask(): a button that is neither answer
 PROMPT_DONE = "Done"
 PROMPT_SEED_KIND = "ok"
 PROMPT_SEQ_START = 50000            # feedback seq of prompt flashes (P4 5.8: any new value plays one moment)
@@ -3350,13 +3976,17 @@ class KnobPrompter:
             self._mark = len(knob.messages)
         return wire
 
-    def _enter(self, frame, profile, maximum, position, windows_button=2, windows_hid=False):
+    def _enter(self, frame, profile, maximum, position, windows_button=2, windows_hid=False, extra=None):
         knob = self._knob()
+        if extra:
+            problems = control_extra_problems(extra)
+            if problems:
+                raise ValueError(f"control fields the knob would reject: {problems}")
         cid = self.next_id()
         self.seq += 1
         wire = self.dressed({**frame, "id": cid, "feedback": {"kind": PROMPT_SEED_KIND, "seq": self.seq}})
         knob.enter(raw_control(cid, profile, maximum, position, wire, windows_button=windows_button,
-                               windows_hid=windows_hid))
+                               windows_hid=windows_hid, extra=extra))
         self.cid = cid
         # The feedback seq is seeded by the first frame after a claim (P4 5.8): the control frame and this line
         # carry the same seq, so whichever the firmware takes as the first frame, the next flash plays once.
@@ -3405,12 +4035,14 @@ class KnobPrompter:
 
     def enter(self, base=None, profile=PROMPT_PROFILE, maximum=PROMPT_MAX, position=PROMPT_POSITION, *,
               windows_button=2, windows_hid=False, say="", progress="", note="", tone=None, buttons=None,
-              attention=False, heading=None):
+              attention=False, heading=None, extra=None):
         """Enter a new control (it supersedes the claimed one) whose frame is overlay(base) (base None: the notice
-        screen). Ready ks keeps being recorded (knob.ready_replies). Returns its id; it is the current screen."""
+        screen). Ready ks keeps being recorded (knob.ready_replies). `extra`: r4 control fields (feel_fields: feel,
+        reducedHaptics, sound, soundVolume), validated before anything is sent. Returns its id; it is the current
+        screen."""
         self._require_confirmed()
         view = self._view(heading or self.heading(), say, progress, note, tone, buttons, base, attention)
-        cid = self._enter(self._render(view), profile, maximum, position, windows_button, windows_hid)
+        cid = self._enter(self._render(view), profile, maximum, position, windows_button, windows_hid, extra)
         self.own = base is None
         self.view = view
         self._shown(say)
@@ -3565,7 +4197,7 @@ class KnobPrompter:
                     if m["kd"] in (YES_RAW, NO_RAW):
                         state["kd"] = m["kd"]
                     else:
-                        self.retry(f"That was Button {m['kd'] + 1} · Yes 4 · No 1")
+                        self.retry(PROMPT_YES_NO_RETRY.format(n=m['kd'] + 1))
                 if state["kd"] is not None and m.get("ku") == state["kd"]:
                     return state["kd"] == YES_RAW
             return None
@@ -3833,3 +4465,314 @@ class DeferredPlanner:
     def record(self):
         return {"estimateS": round(self.estimate, 4), "entryS": self.entry_s,
                 "observedS": [round(x, 4) for x in self.observed], "delays": self.k}
+
+
+
+# ---------------------------------------------------------------------------
+# Consistent builds and a redraw check (added 2026-09-30 after the cc5.7 failure).
+#
+# What happened: include/lv_conf.h (LV_OBJ_STYLE_CACHE 0 -> 1) changed after LVGL's objects were compiled, and the
+# incremental build recompiled only part of src/. platformio.ini includes lv_conf.h through
+# -DLV_CONF_PATH=..., a macro include that the build system's dependency scan cannot see. The image mixed two
+# lv_obj_t layouts: an inline lv_obj_set_user_data in cc_display.cpp wrote into LVGL's coords.y1. The host screen
+# became zero-size, so it was never drawn, and the knob kept showing its native screen.
+#
+# The guards:
+#   * build_nanod_cc5.py empties the binary's build folder before every build (clean_build_folder);
+#   * every object file must have been compiled by that run and be newer than the config headers
+#     (stale_object_problems);
+#   * the host harness (harness) must have been built with the firmware's lv_conf.h
+#     (harness_conf_problems);
+#   * after a flash, check_nanod_cc5_look.py claims the knob, changes frames and requires flushes
+#     (redraw_check / redraw_problems).
+
+BUILD_CONFIG_HEADERS = ("include/lv_conf.h", "include/nanofoc_d.h")   # relative to FIRMWARE_SOURCE
+OBJECT_SUFFIXES = (".o", ".a")
+BUILD_CLOCK_SLACK_S = 2.0                   # file-system timestamp granularity
+HARNESS_HOST_OVERRIDES = {"LV_USE_TFT_ESPI": ("1", "0")}   # harness/build.py HOST_OVERRIDES
+REDRAW_SETTLE_S = 1.2                       # after the claim, so its own full refresh leaves the diag window
+REDRAW_SECONDS = 3.4                        # frames alternate this long
+REDRAW_FRAME_EVERY_S = 0.4
+REDRAW_DIAG_EVERY_S = 1.0
+REDRAW_MIN_LIVE_SAMPLES = 2                 # diag windows that must show flushes (lcdFps >= 1, lcdFlushUs > 0)
+REDRAW_CONTROL_ID = 907
+REDRAW_FIELDS = ("lcdFps", "lcdFlushUs", "lcdFullRefrs", "lcdStep", "sessionPhase", "ledMode")
+
+
+def build_folder(p):
+    """The folder PlatformIO builds binary `p` into (its PLATFORMIO_BUILD_DIR, else the project's .pio/build)."""
+    return p.build_dir if p.build_dir is not None else FIRMWARE_SOURCE / ".pio" / "build"
+
+
+def clean_build_folder(folder):
+    """Delete `folder` (a build folder directly inside FIRMWARE_SOURCE/.pio, named build or build-*) so the next
+    build compiles every file. Returns how many files were removed. Anything else is refused (ValueError)."""
+    import shutil
+    folder = Path(folder)
+    pio = (FIRMWARE_SOURCE / ".pio").resolve()
+    resolved = folder.resolve()
+    if resolved.parent != pio or not (resolved.name == "build" or resolved.name.startswith("build-")):
+        raise ValueError(f"{folder} is not a build folder inside {pio}; not deleting it")
+    if not resolved.exists():
+        return 0
+    removed = sum(1 for path in resolved.rglob("*") if path.is_file())
+    shutil.rmtree(resolved)
+    return removed
+
+
+def stale_object_problems(folder, started_epoch, config_files=None):
+    """(record, problems) for the object files under `folder` after a build that started at `started_epoch` (Unix
+    seconds): every one must be compiled by that build and be newer than every config header that exists
+    (BUILD_CONFIG_HEADERS). An object older than a header was compiled with a config that no longer exists."""
+    folder = Path(folder)
+    if config_files is None:
+        config_files = [FIRMWARE_SOURCE / name for name in BUILD_CONFIG_HEADERS]
+    headers = {Path(path).name: Path(path).stat().st_mtime for path in config_files if Path(path).is_file()}
+    objects = [path for path in folder.rglob("*") if path.suffix in OBJECT_SUFFIXES and path.is_file()] \
+        if folder.is_dir() else []
+    before_build, before_header = [], {}
+    for path in objects:
+        mtime = path.stat().st_mtime
+        rel = path.relative_to(folder).as_posix()
+        if mtime < started_epoch - BUILD_CLOCK_SLACK_S:
+            before_build.append(rel)
+        for name, header_mtime in headers.items():
+            if mtime < header_mtime:
+                before_header.setdefault(name, []).append(rel)
+    record = {"folder": str(folder), "objects": len(objects), "configHeaders": sorted(headers),
+              "compiledBeforeThisBuild": len(before_build),
+              "olderThanConfig": {k: len(v) for k, v in before_header.items()},
+              "examples": sorted(before_build)[:5], "passed": False}
+    problems = []
+    if not objects:
+        problems.append(f"no object files under {folder}: the build cannot be shown to be complete")
+    if before_build:
+        problems.append(f"{len(before_build)} of {len(objects)} object files were not compiled by this build "
+                        f"(for example {', '.join(sorted(before_build)[:3])}): a partial rebuild can mix configs")
+    for name, rels in sorted(before_header.items()):
+        problems.append(f"{len(rels)} object files are older than {name} (for example {', '.join(sorted(rels)[:3])}): "
+                        "they were compiled with a config that has since changed")
+    record["passed"] = not problems
+    return record, problems
+
+
+def lv_conf_defines(text):
+    """The `#define NAME VALUE` lines of an lv_conf.h, in order, as (NAME, VALUE) with comments and extra
+    whitespace removed."""
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    out = []
+    for line in text.splitlines():
+        line = line.split("//", 1)[0].strip()
+        match = re.match(r"#\s*define\s+([A-Za-z_]\w*)(?:\s+(.*))?$", line)
+        if match:
+            out.append((match.group(1), " ".join((match.group(2) or "").split())))
+    return out
+
+
+def harness_firmware_units(cmakelists, firmware_src):
+    """The firmware files the harness compiles: every "${NANOD_FIRMWARE_SRC}/<name>" source named in its
+    CMakeLists.txt (firmware_shared, firmware_shared_full, jpeg_glue), the header next to each, the generated
+    fonts (src/fonts/cc_font_*.c, the CMakeLists glob), and every local header those files reach through
+    #include "..." lines, followed transitively (cc_presentation.h, cc_lcd_logic.h, cc_sleep.h, fonts/cc_fonts.h,
+    ...). An include resolves against the including file's folder, then firmware_src, then firmware_src/fonts; only
+    files inside firmware_src count. Only files that exist; empty without a CMakeLists."""
+    cmakelists, firmware_src = Path(cmakelists), Path(firmware_src)
+    if not cmakelists.is_file():
+        return []
+    text = cmakelists.read_text(encoding="utf-8", errors="replace")
+    names = sorted(set(re.findall(r'"\$\{NANOD_FIRMWARE_SRC\}/([^"$*{}]+\.(?:cpp|c))"', text)))
+    units = []
+    for name in names:
+        source = firmware_src / name
+        units += [source, source.with_suffix(".h")]
+    units += sorted((firmware_src / "fonts").glob("cc_font_*.c"))
+    seen, out = set(), []
+    queue = list(units)
+    while queue:
+        path = queue.pop(0)
+        key = os.path.normcase(str(_resolved(path) or path))
+        if not path.is_file() or key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+        queue += _local_includes(path, firmware_src)
+    return out
+
+
+_INCLUDE_LINE = re.compile(r'^[ 	]*#[ 	]*include[ 	]*"([^"]+)"', re.M)
+
+
+def _local_includes(path, firmware_src):
+    """The files a source's #include "..." lines name that exist inside firmware_src (resolved against the
+    including file's folder, then firmware_src, then firmware_src/fonts)."""
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    root = _resolved(firmware_src)
+    found = []
+    for name in _INCLUDE_LINE.findall(text):
+        for base in (Path(path).parent, firmware_src, firmware_src / "fonts"):
+            candidate = base / name
+            resolved = _resolved(candidate)
+            if resolved is None or not candidate.is_file():
+                continue
+            if root is not None and root in resolved.parents:
+                found.append(Path(firmware_src) / resolved.relative_to(root))
+                break
+    return found
+
+
+def _resolved(path):
+    try:
+        return Path(path).resolve()
+    except OSError:
+        return None
+
+
+def cmake_cache_value(cache, name):
+    """The value of `name` in a CMakeCache.txt (NAME:TYPE=value), or None."""
+    cache = Path(cache)
+    if not cache.is_file():
+        return None
+    for line in cache.read_text(encoding="utf-8", errors="replace").splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key.split(":", 1)[0] == name:
+            return value.strip()
+    return None
+
+
+def _same_dir(a, b):
+    try:
+        return os.path.normcase(str(Path(a).resolve())) == os.path.normcase(str(Path(b).resolve()))
+    except OSError:
+        return False
+
+
+def harness_conf_problems(firmware_conf=None, harness_conf=None, harness_exe=None, *, cmake_cache=None,
+                          firmware_src=None, cmakelists=None):
+    """(record, problems): the host harness (harness) was built with the firmware's lv_conf.h and its
+    current sources. Every #define of the harness copy must equal the firmware's, apart from HARNESS_HOST_OVERRIDES;
+    the harness renderer must be newer than its copy and than every firmware unit the harness compiles
+    (harness_firmware_units: a renderer older than src/cc_display.cpp renders the old code); and the build's
+    CMakeCache NANOD_LV_CONF_DIR must be the harness folder (a cached scratch lv_conf.h, as perf.py's
+    build-perf-conf uses, would keep compiling). Without a firmware lv_conf.h there is nothing to compare (passed)."""
+    firmware_conf = Path(firmware_conf or FIRMWARE_SOURCE / "include" / "lv_conf.h")
+    harness_conf = Path(harness_conf or ROOT / "harness" / "lv_conf.h")
+    harness_exe = Path(harness_exe or ROOT / "harness" / "build" / "Release" / "lcd-preview.exe")
+    harness_dir = harness_conf.parent
+    cmake_cache = Path(cmake_cache or harness_dir / "build" / "CMakeCache.txt")
+    firmware_src = Path(firmware_src or firmware_conf.parent.parent / "src")
+    cmakelists = Path(cmakelists or harness_dir / "CMakeLists.txt")
+    record = {"firmwareConf": str(firmware_conf), "harnessConf": str(harness_conf), "harnessExe": str(harness_exe),
+              "differences": [], "newerSources": [], "lvConfDir": None, "applicable": firmware_conf.is_file(),
+              "passed": True}
+    if not firmware_conf.is_file():
+        return record, []
+    problems = []
+    rebuild = "run harness/build.py and re-check the renders"
+    if not harness_conf.is_file():
+        problems.append(f"the harness has no lv_conf.h ({harness_conf}): {rebuild}")
+    else:
+        expected = [(name, HARNESS_HOST_OVERRIDES[name][1] if name in HARNESS_HOST_OVERRIDES
+                     and value == HARNESS_HOST_OVERRIDES[name][0] else value)
+                    for name, value in lv_conf_defines(firmware_conf.read_text(encoding="utf-8", errors="replace"))]
+        actual = lv_conf_defines(harness_conf.read_text(encoding="utf-8", errors="replace"))
+        if expected != actual:
+            want, have = dict(expected), dict(actual)
+            diffs = [f"{name}: firmware {want.get(name)!r}, harness {have.get(name)!r}"
+                     for name in sorted(set(want) | set(have)) if want.get(name) != have.get(name)]
+            record["differences"] = diffs or ["the #define order differs"]
+            problems.append(f"the harness's lv_conf.h differs from the firmware's ({'; '.join(record['differences'][:3])}): "
+                            f"its renders are not evidence for this build; {rebuild}")
+        elif not harness_exe.is_file() or harness_exe.stat().st_mtime < harness_conf.stat().st_mtime:
+            problems.append(f"the harness renderer is missing or older than its lv_conf.h: {rebuild}")
+        else:
+            built = harness_exe.stat().st_mtime
+            newer = [path for path in harness_firmware_units(cmakelists, firmware_src) if path.stat().st_mtime > built]
+            record["newerSources"] = [path.relative_to(firmware_src).as_posix() for path in newer]
+            if newer:
+                listed = ", ".join(record["newerSources"][:4]) + (" ..." if len(newer) > 4 else "")
+                problems.append(f"the harness renderer is older than firmware sources it compiles ({listed}): its "
+                                f"renders show the old code; {rebuild}")
+    conf_dir = cmake_cache_value(cmake_cache, "NANOD_LV_CONF_DIR")
+    record["lvConfDir"] = conf_dir
+    if conf_dir is not None and not _same_dir(conf_dir, harness_dir):
+        problems.append(f"the harness build compiles the lv_conf.h in {conf_dir} (CMakeCache NANOD_LV_CONF_DIR), not "
+                        f"the harness copy in {harness_dir}: {rebuild}")
+    record["passed"] = not problems
+    return record, problems
+
+
+def redraw_problems(samples):
+    """Why the knob did not redraw while claimed with changing frames (empty: it did). `samples` are the diag
+    fields read once a second while the frames alternated; a live one shows lcdFps >= 1 and lcdFlushUs > 0."""
+    live = [s for s in samples if isinstance(s, dict) and (diag_int(s, "lcdFps") or 0) >= 1
+            and (diag_int(s, "lcdFlushUs") or 0) > 0]
+    if len(live) >= REDRAW_MIN_LIVE_SAMPLES:
+        return []
+    figures = ", ".join(f"fps {s.get('lcdFps')} / flush {s.get('lcdFlushUs')} us" for s in samples if isinstance(s, dict))
+    return [f"the screen did not redraw while the frames changed: {len(live)} of {len(samples)} one-second windows "
+            f"flushed pixels (at least {REDRAW_MIN_LIVE_SAMPLES} needed; {figures or 'no diag replies'}); the knob "
+            "is not drawing the Desk Dial screens"]
+
+
+def redraw_frames(path=None):
+    """(control, [frame A, frame B]) for the redraw check: work/lcd_bench_frames.json with its own control id and
+    neither feedback nor artwork (only the text and layout change)."""
+    data = load_json(Path(path or WORK / "lcd_bench_frames.json"))
+    frames = []
+    for frame in data["frames"][:2]:
+        frame = copy.deepcopy(frame)
+        frame["id"] = REDRAW_CONTROL_ID
+        frame.pop("feedback", None)
+        frame.pop("artKey", None)
+        frames.append(frame)
+    control = copy.deepcopy(data["control"])
+    control["id"] = REDRAW_CONTROL_ID
+    control["frame"] = frames[0]
+    return control, frames
+
+
+def redraw_check(port, *, knob_factory=None, clock=time.monotonic, sleep=time.sleep, frames_path=None):
+    """Claim the knob on `port`, alternate two frames for REDRAW_SECONDS while reading diag once a second, then
+    release it (the knob returns to its native screen). Returns {"samples", "claimErrors", "problems", "passed"};
+    the knob is released even when a step fails."""
+    control, frames = redraw_frames(frames_path)
+    factory = knob_factory or (lambda device: RawKnob(device, paced=False))
+    samples, problems, errors = [], [], []
+    knob = None
+    try:
+        # Opened inside the try (TL-BUG-011): a port that cannot be reopened (the companion grabbed it, Windows still
+        # holds the handle, the knob re-enumerated) is a recorded problem, never an uncaught exception.
+        knob = factory(port)
+        knob.enter(control)
+        knob.pump(REDRAW_SETTLE_S)
+        start = clock()
+        last_frame = last_diag = start
+        index = 0
+        while clock() - start < REDRAW_SECONDS:
+            now = clock()
+            if now - last_frame >= REDRAW_FRAME_EVERY_S:
+                index += 1
+                knob.frame(frames[index % 2])
+                last_frame = now
+            if now - last_diag >= REDRAW_DIAG_EVERY_S:
+                diag = knob.diag()
+                last_diag = clock()
+                samples.append({k: diag.get(k) for k in REDRAW_FIELDS})
+            knob.pump(0.01)
+            sleep(0)
+    except Exception as exc:
+        problems.append(f"the redraw check could not run ({type(exc).__name__}: {exc})")
+    finally:
+        if knob is not None:
+            knob.release_quietly()
+            errors = [str(e) for _, e in getattr(knob, "errors", [])]
+            knob.close()
+    if not problems:
+        problems = redraw_problems(samples)
+    if errors:
+        problems.append(f"the knob answered errors during the redraw check: {'; '.join(errors[:3])}")
+    return {"controlId": REDRAW_CONTROL_ID, "seconds": REDRAW_SECONDS, "samples": samples, "claimErrors": errors,
+            "problems": problems, "passed": not problems}

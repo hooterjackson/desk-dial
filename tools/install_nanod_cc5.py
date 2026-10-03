@@ -53,7 +53,9 @@ Exit codes (the "outcome" field in the flash record says the same):
 _VERIFIED_RESET_UNCONFIRMED forms: Release.restored_outcome names them per profile.)
 """
 import argparse
+import contextlib
 from pathlib import Path
+import signal
 import sys
 import traceback
 
@@ -209,7 +211,8 @@ def install(esptool, report, p, base=None):
         ok, _ = esptool("after-verify", ["verify_flash", "0x0", str(p.expected_full)])
         report["postWriteVerified"] = ok
     if not ok:
-        return recover_after_failed_write(esptool, report, p, base)
+        with sigint_ignored():
+            return recover_after_failed_write(esptool, report, p, base)
     report["resetAttempted"] = True
     ok, output = esptool("reset", ["read_mac"], after="hard_reset")
     report["reset"] = t.reset_confirmed(ok, output)
@@ -217,13 +220,30 @@ def install(esptool, report, p, base=None):
     return report["outcome"]
 
 
+@contextlib.contextmanager
+def sigint_ignored():
+    """Ctrl+C is ignored while the restore runs (a second Ctrl+C must not cut the restore short); off the main
+    thread signal handlers cannot be set, and nothing changes."""
+    try:
+        previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    except ValueError:
+        previous = None
+    try:
+        yield
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGINT, previous)
+
+
 def outcome_after_exception(esptool, report, p, base=None):
-    """Map an unexpected exception to what the flags prove; never resets unless verified."""
+    """Map an unexpected exception (Ctrl+C included) to what the flags prove; never resets unless verified."""
     if report["postWriteVerified"]:
         return "INSTALLED_VERIFIED_RESET" if report["reset"] else "INSTALLED_VERIFIED_RESET_UNCONFIRMED"
     if report["writeAttempted"]:
-        print("Unexpected failure after the write started. Not resetting.", flush=True)
-        return recover_after_failed_write(esptool, report, p, base)
+        print("Unexpected failure after the write started. Not resetting. Do not reset or power-cycle the knob "
+              f"while {p.from_tag} is restored in this stub session.", flush=True)
+        with sigint_ignored():
+            return recover_after_failed_write(esptool, report, p, base)
     return "STOPPED_BEFORE_WRITE"
 
 
@@ -256,8 +276,10 @@ def main(argv=None):
     try:
         try:
             outcome = install(esptool, report, p, base)
-        except Exception as exc:
+        except BaseException as exc:  # Ctrl+C (KeyboardInterrupt) too: the child esptool is gone, app0 may be half written
             report["exception"] = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, KeyboardInterrupt):
+                report["interrupted"] = True
             traceback.print_exc()
             outcome = outcome_after_exception(esptool, report, p, base)
         report["outcome"] = outcome

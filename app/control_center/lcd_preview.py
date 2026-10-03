@@ -52,6 +52,14 @@ times k, icon masks from the ``@2x``/``@3x`` exports in ``assets/lcd-icons``, ti
 times k, shadows one knob pixel (k device pixels) lower, and an anti-aliased glass. Every
 composite at scale k is a masked paste over the run's own box (never ``alpha_composite``,
 DESKTOP_STAGE.md 11.5). ``hires_cover`` / ``hires_icon`` are used only at k != 1.
+
+Presentation 6 (PRESENTATION_V5.md section 19, Desk Dial r3 release 1), as ``cc_display.cpp`` draws it:
+``lights`` is the Home text drawing (title 22/26 two lines, sub-line 14, the 12 px line = ``meta`` in its
+``metaTone``, never ``status``), ``lightsbig`` the Home reveal (caption = ``volumeCaption``, 48 px digits of
+``value`` and the 22 px unit ``valueUnit`` "%" | "K"), ``scenes`` the scenes list (``prevTitle`` 14 px #7C7C7C,
+``title`` 22 px one line, ``nextTitle`` 14 px #7C7C7C, ``meta`` 12 px); none of them draws art. The six icons
+bulb thermo power wand house album come from the same handoff-icons export. ``v6_parse`` is the Python
+reading of the presentation-6 parser rules (parity with ``cc_frame_parse.cpp``: harness parse_tests.py).
 """
 from __future__ import annotations
 
@@ -94,6 +102,7 @@ ELLIPSIS = '…'
 ART_SIZE = 120             # v1 wire artwork: 120 x 120 RGB565 LE, pre-composited
 ART_BYTES = ART_SIZE * ART_SIZE * 2
 ART_DIM = 0.4375           # artDim: image_opa 112 = 0.35 / 0.8 of the composited cover
+ART_PAUSED = 1.0           # [r3.1] a paused Home / Music cover: image_opa 255 (cc_art_image_opa; user ruling 2026-09-29)
 CLOSED_OPACITY = 0.35      # Windows tile of a closed (unavailable) entry
 SHADOW_OPACITY = 204       # text-shadow twins: 0 1px 0 black at 80 % (section 8.5.3)
 _ICON_KEY = re.compile(ICON_KEY_PATTERN)
@@ -108,12 +117,16 @@ LINE_SPACE = 2             # two-line labels: line pitch = LINE_HEIGHT + 2 (26 /
 
 FOOTER_X = (56, 99, 141, 184)
 FOOTER_TOP, FOOTER_ICON = 154, 20
+# [r3.1] (section 19.10; r3.1 prototype L349) the hold tick: 16 x 2 px, radius 1, #A6A6A6 at (176, 180) under the
+# button-4 footer icon, drawn with holdMarker outside the idle icon view.
+HOLD_TICK = (176, 180, 16, 2)
+HOLD_TICK_RGB = (0xA6, 0xA6, 0xA6)
 IDLE_X = (51, 97, 143, 189)
 IDLE_TOP, IDLE_ICON, IDLE_COLUMN = 100, 26, 60
 TRACK_ICON_X = (72, 112, 152)          # left edges of the 16 px prev / dotfill / next boxes
 TRACK_ICON_TOP, TRACK_ICON = 88, 16
 TILE_BOX = (104, 42, 32)                # x, y, size
-DIGIT_GAP = 2
+DIGIT_GAP = 4                           # r4 README 3.6: number | 4 px | unit around a computed centre
 DIGIT_CHARS = '0123456789-'
 DIGIT_LIMIT = 7                         # cc_display.cpp: char number[8]
 DIGIT_TRACKING = -1                     # -0.02em at 48 px (volume digits and the Seek time)
@@ -268,6 +281,7 @@ class Label:
     tracking: int = 0
     radius: int = SAFE_RADIUS
     shadow: bool = False
+    crumb_clear: bool = False            # FW-DES-001: line 1 also clears the crumb's ink (the list title)
 
     @property
     def top(self):
@@ -281,14 +295,46 @@ class Label:
     def centre(self):
         return self.x + self.width // 2
 
-    def line_width(self, ink, row=0):
-        """cc_display lineWidth: the box width clamped to the chord of the ink rows on this row."""
+    def line_width(self, ink, row=0, crumb=''):
+        """cc_display lineWidth: the box width clamped to the chord of the ink rows on this row; with
+        ``crumb_clear`` and a crumb shown, line 1 is also clamped to that crumb's clearance (FW-DES-001)."""
         if ink is None:
             half = CENTRE                    # nothing inked: the chord never binds
         else:
             baseline = self.baseline + row * self.pitch
             half = safe_half(baseline + ink[0], baseline + ink[1], self.radius)
-        return min(max(0, 2 * (half - abs(self.centre - CENTRE))), self.width)
+        width = 2 * (half - abs(self.centre - CENTRE))
+        if row == 0 and self.crumb_clear and crumb and ink is not None:
+            baseline = self.baseline
+            width = min(width, 2 * crumb_clear_half(crumb, self.centre, baseline + ink[0], baseline + ink[1]))
+        return min(max(0, width), self.width)
+
+
+CRUMB_INK_ALPHA, CRUMB_GAP = 32, 2       # cc_display.cpp CRUMB_INK_ALPHA / CRUMB_GAP (FW-DES-001)
+
+
+def crumb_clear_half(crumb, centre, top, bottom):
+    """cc_display crumbClearHalf: the half-width around ``centre`` clear of ``crumb``'s ink (both masks,
+    alpha >= CRUMB_INK_ALPHA, plus CRUMB_GAP px) over pixel rows [top, bottom]; CENTRE when the crumb has
+    no ink there. A centred line 2 * half wide then shares no pixel with the crumb."""
+    from control_center import crumb_arc
+    half = CENTRE
+    try:
+        masks = crumb_arc.render(crumb)
+    except KeyError:                     # an unknown token draws no crumb
+        return half
+    for mask in masks:
+        if mask is None or not mask.w:
+            continue
+        for y in range(max(top, mask.y), min(bottom, mask.y + mask.h - 1) + 1):
+            row = mask.data[(y - mask.y) * mask.w:(y - mask.y + 1) * mask.w]
+            for x, alpha in enumerate(row):
+                if alpha < CRUMB_INK_ALPHA:
+                    continue
+                px = mask.x + x
+                room = (centre - px - 1 if px < centre else px - centre) - CRUMB_GAP
+                half = min(half, room)
+    return max(half, 0)
 
 
 def fit_line(text, width, size, tracking=0, force=False):
@@ -407,10 +453,11 @@ def fit_two_lines(text, width1, width2, size, tracking=0):
     return [text[:end1], last_line(rest, width2, size, tracking)] if rest else [text[:end1]]
 
 
-def fit_label(label, text):
-    """showText: the drawn lines of a label and the width each line was fitted to."""
+def fit_label(label, text, crumb=''):
+    """showText: the drawn lines of a label and the width each line was fitted to (``crumb``: the crumb
+    on screen, which a ``crumb_clear`` label's first line keeps clear of, FW-DES-001)."""
     ink = ink_rows(text, label.size)
-    width1 = label.line_width(ink, 0)
+    width1 = label.line_width(ink, 0, crumb)
     if label.lines > 1:
         width2 = label.line_width(ink, 1)
         return fit_two_lines(text, width1, width2, label.size, label.tracking), [width1, width2]
@@ -457,19 +504,25 @@ def volume_digits(value):
 HEADING = Label(51, 138, 43, 12, tracking=1, radius=HEADING_RADIUS, shadow=True)   # top 32, y 31
 HOME_TITLE = Label(35, 170, 81, 22, lines=2, shadow=True)       # top 60
 HOME_ARTIST = Label(35, 170, 128, 14, shadow=True)              # top 114
-STATUS = Label(40, 160, 145, 12)                                # top 134
+STATUS = Label(30, 180, 145, 12)                                # top 134; r3 x 30 w 180 (L-6)
+# Presentation 6 scenes list (section 19.4; README r3 2.2): prev top 56, current top 78 (x 30..210), next top
+# 108, meta top 134 (x 30..210).
+SCENE_PREV = Label(68, 104, 70, 14)                             # y 57; r4 3.6 previous <= 104
+SCENE_TITLE = Label(40, 160, 99, 22, shadow=True)               # y 79, one line; r4 3.6 current <= 160
+SCENE_NEXT = Label(45, 150, 122, 14)                            # y 109; r4 3.6 next <= 150
+SCENE_META = Label(32, 176, 145, 12)                            # y 133; r4 3.6 meta <= 176
 VOLUME_CAPTION = Label(35, 170, 66, 14, shadow=True)            # top 52
 DIGITS_BASELINE = 116                                           # top 76, 48/46; '%' shares it
 IDLE_WORD_BASELINE = 145                                        # top 134 (icon 100..126, gap 8)
-LIST_TITLE = Label(35, 170, 73, 22, lines=2, shadow=True)       # top 52
+LIST_TITLE = Label(35, 170, 73, 22, lines=2, shadow=True, crumb_clear=True)       # top 52
 LIST_SUBTITLE = Label(35, 170, 120, 14, shadow=True)            # top 106
 LIST_META = Label(35, 170, 138, 12)                             # top 127
 TRACKS_TITLE = Label(35, 170, 75, 22, shadow=True)              # top 54, single line
 TRACKS_SUBTITLE = Label(35, 170, 124, 14, shadow=True)          # top 110
-TRACKS_META = Label(35, 170, 141, 12)                           # top 130
+TRACKS_META = Label(32, 176, 141, 12)                           # top 130; r3 x 30 w 180 (L-6); r4 3.6 meta <= 176
 SEEK_CAPTION = Label(35, 170, 66, 14, shadow=True)              # top 52
 SEEK_TIME = Label(0, 240, SEEK_TIME_BASELINE, SEEK_FONT, tracking=DIGIT_TRACKING, shadow=True)  # top 76, 48/46
-SEEK_LINE = Label(35, 170, 142, 14)                             # top 128, 14/18
+SEEK_LINE = Label(25, 190, 142, 14)                             # top 128, 14/18; r3 x 25 w 190
 WINDOWS_APP = Label(35, 170, 94, 14)                            # top 80
 WINDOWS_TITLE = Label(35, 170, 114, 16, lines=2)                # top 98, 16/20
 WINDOWS_META = Label(35, 170, 151, 12)                          # top 140
@@ -493,10 +546,27 @@ OFFLINE = {'title': 'Waiting for PC', 'subtitle': 'Open Desk\u00a0Dial on your P
 LEGACY_ICON = {'Play': 'play', 'Pause': 'pause', 'Browse': 'list', 'Win': 'win', 'Tracks': 'tracks',
                'Back': 'back', 'Home': 'home', 'More': 'more', 'Prev': 'prev', 'Next': 'next',
                'Skip': 'next', 'Switch': 'switch', 'Cancel': 'cancel'}
-ICON_NAMES = frozenset(name for name in ICONS if name)   # every wire token (section 9.1)
+ICON_NAMES = frozenset(name for name in tuple(ICONS) + ('bulb', 'thermo', 'power', 'wand', 'house', 'album') if name)   # 9.1, 19.5 (ICONS_V6)
 LIKED_GLYPH = 'heartfill'                                # [r2.2] tone liked (section 5.2 row 4)
 DOT_GLYPH = 'dotfill'                                    # the Tracks position-row centre
 ART_LAYOUTS = ('nowPlaying', 'volume', 'recent', 'tracks', 'seek', 'explorer', 'upnext')   # section 8.4
+# Presentation 6 (section 19): tokens appended to the presentation-5 ones (whatever presentation.py has yet).
+LAYOUTS_V6 = ('lights', 'lightsbig', 'scenes')
+RING_STYLES_V6 = ('bri', 'ctemp', 'clusters', 'marker',   # marker: section 19.9 (r3 navigation)
+                  'queue')                                 # [r3.1] section 19.10: the whole-queue ring
+ICONS_V6 = ('bulb', 'thermo', 'power', 'wand', 'house', 'album')
+VALUE_UNITS = ('%', 'K')
+KELVIN_MIN, KELVIN_MAX = 2200, 6500
+CLUSTERS_MAX = 20
+TITLE_V6_CAPACITY = 64                          # prevTitle / nextTitle (char[65])
+# Section 19.9 (the r3 navigation): the crumb tokens, the `warm` line tone and feedback.moment `refused`.
+CRUMBS_V6 = ('music', 'recent', 'onScreenRecent', 'onScreenPlaylists', 'tracks', 'upnext', 'windows', 'lights',
+             'scenes', 'playlists')                      # r3.1 appends `playlists` (MUSIC › PLAYLISTS)
+LINE_TONES_V6 = tuple(LINE_TONES) + ('warm',)
+MOMENTS_V6 = ('queued', 'shuffle', 'like', 'unlike', 'snap', 'started', 'refused')
+ALL_LAYOUTS = tuple(dict.fromkeys(tuple(LAYOUTS) + LAYOUTS_V6))
+ALL_RING_STYLES = tuple(dict.fromkeys(('off', 'level', 'selection', 'transport', 'lap') + RING_STYLES_V6))
+ALL_ICONS = tuple(dict.fromkeys(tuple(ICONS) + ICONS_V6))
 
 
 @lru_cache(maxsize=64)
@@ -687,8 +757,11 @@ class Scene:
     layout: str
     art: bool = False           # draw the cover (if pixels were supplied)
     art_dim: bool = False
+    art_paused: bool = False    # [r3.1] a paused Home / Music cover (playing false): drawn at ART_PAUSED
+    hold_tick: bool = False     # [r3.1] the hold tick under the button-4 icon (holdMarker, not the idle view)
     window_icon_box: tuple = ()  # (x, y, size, opacity) for a supplied app icon
     items: list = field(default_factory=list)
+    crumb: str = ''             # presentation 6 (19.9): the arc breadcrumb token (crumb_arc), '' = none
 
     def texts(self, role=None):
         return [item for item in self.items if isinstance(item, TextRun) and role in (None, item.role)]
@@ -723,20 +796,29 @@ def normalize(frame):
     source = frame if isinstance(frame, dict) else {}
     out = {key: _text(source.get(key), TEXT_CAPACITY.get(key)) for key in (
         'mode', 'value', 'status', 'title', 'subtitle', 'heading', 'meta', 'volumeCaption')}
+    # Presentation 6 (section 19.2): kept on lightsbig / scenes only, like cc_parse_frame.
+    for key in ('prevTitle', 'nextTitle'):
+        out[key] = _text(source.get(key), TITLE_V6_CAPACITY) if source.get('layout') == 'scenes' else ''
+    unit = source.get('valueUnit')
+    out['valueUnit'] = unit if unit in VALUE_UNITS and source.get('layout') == 'lightsbig' else '%'
     out['artKey'] = _text(source.get('artKey'))
     icon = source.get('iconKey')
     # artwork2 section 6: a malformed iconKey is stripped (the letter tile shows).
     out['iconKey'] = icon if isinstance(icon, str) and _ICON_KEY.fullmatch(icon) else ''
     layout = source.get('layout')
-    out['layout'] = layout if layout in LAYOUTS else LEGACY_LAYOUT.get(out['mode'], 'nowPlaying')
+    out['layout'] = layout if layout in ALL_LAYOUTS else LEGACY_LAYOUT.get(out['mode'], 'nowPlaying')
     rest = source.get('restLayout')
     out['restLayout'] = rest if rest in REST_LAYOUTS else 'nowPlaying'
     tone = source.get('titleTone')
     out['titleTone'] = tone if tone in TITLE_TONES else 'ink'
     for key in ('metaTone', 'statusTone'):
         tone = source.get(key)
-        out[key] = tone if tone in LINE_TONES else 'meta'
+        out[key] = tone if tone in LINE_TONES_V6 else 'meta'
+    crumb = source.get('crumb')
+    out['crumb'] = crumb if crumb in CRUMBS_V6 else ''
     out['artDim'] = source.get('artDim') is True
+    out['holdMarker'] = source.get('holdMarker') is True     # [r3.1] section 19.10
+    out['paused'] = source.get('playing') is False           # [r3.1] a paused Home cover (cc_art_image_opa)
     buttons = []
     raw_buttons = source.get('buttons') if isinstance(source.get('buttons'), list) else []
     for slot in range(4):
@@ -761,6 +843,111 @@ def normalize(frame):
     return out
 
 
+def _v6_text(value, capacity):
+    """cc_json_text: a str without control characters, cut at the last whole code point within capacity
+    bytes; None when invalid (a non-string, or a character below U+0020, or a lone surrogate)."""
+    if not isinstance(value, str) or any(ord(c) < 0x20 or 0xD800 <= ord(c) <= 0xDFFF for c in value):
+        return None
+    out, used = [], 0
+    for char in value:
+        size = len(char.encode('utf-8'))
+        if used + size > capacity:
+            break
+        out.append(char)
+        used += size
+    return ''.join(out)
+
+
+def _wire_int(value, lo, hi):
+    return value if type(value) is int and lo <= value <= hi else None
+
+
+def v6_parse(frame):
+    """Presentation 6 (PRESENTATION_V5.md section 19) as ``cc_parse_frame`` reads it: (stored, invalid).
+
+    ``stored``: layout, ringStyle, ringKelvin (0 unless bri / ctemp), valueUnit ('%' unless lightsbig),
+    prevTitle / nextTitle ('' unless scenes) and the four button icons. ``invalid``: the presentation-6 reasons
+    the knob rejects the frame for (an unknown layout / style / icon / unit token, a clusters ring outside
+    1 <= count <= 20 or index >= count, a missing ring.kelvin on bri / ctemp, a ring.kelvin that is not an int
+    2200..6500 on any style, a prevTitle / nextTitle that is not valid text). Every other field follows the
+    presentation-5 rules (device.v5_parse); this reads only what presentation 6 adds."""
+    invalid = []
+    source = frame if isinstance(frame, dict) else {}
+    layout = source.get('layout', LEGACY_LAYOUT.get(source.get('mode'), 'nowPlaying'))
+    if layout not in ALL_LAYOUTS:
+        invalid.append('layout')
+    ring = source.get('ring') if isinstance(source.get('ring'), dict) else {}
+    style = ring.get('style')
+    if style not in ALL_RING_STYLES:
+        invalid.append('ring.style')
+    index, count = _wire_int(ring.get('index'), 0, 65535), _wire_int(ring.get('count'), 0, 65535)
+    if style == 'clusters' and (count is None or index is None or not 1 <= count <= CLUSTERS_MAX or index >= count):
+        invalid.append('clusters')
+    if style == 'marker' and (count is None or index is None or count < 1 or index >= count):
+        invalid.append('marker')   # section 19.9
+    if style == 'queue' and (count is None or index is None or count < 1 or index >= count):
+        invalid.append('queue')    # [r3.1] section 19.10
+    ring_now = -1                  # [r3.1] ring.now: kept on the queue ring (the v5 Up next mirror keeps its own)
+    if style == 'queue' and 'now' in ring:
+        now = ring['now']
+        if type(now) is int and count is not None and -1 <= now <= count - 1:
+            ring_now = now
+        else:
+            invalid.append('ring.now')
+    kelvin = 0
+    if 'kelvin' in ring:
+        value = _wire_int(ring['kelvin'], KELVIN_MIN, KELVIN_MAX)
+        if value is None:
+            invalid.append('ring.kelvin')
+        elif style in ('bri', 'ctemp'):
+            kelvin = value
+    elif style in ('bri', 'ctemp'):
+        invalid.append('ring.kelvin missing')
+    unit = '%'
+    if 'valueUnit' in source:
+        if source['valueUnit'] not in VALUE_UNITS:
+            invalid.append('valueUnit')
+        elif layout == 'lightsbig':
+            unit = source['valueUnit']
+    titles = {}
+    for key in ('prevTitle', 'nextTitle'):
+        text = ''
+        if key in source:
+            text = _v6_text(source[key], TITLE_V6_CAPACITY)
+            if text is None:
+                invalid.append(key)
+                text = ''
+        titles[key] = text if layout == 'scenes' else ''
+    crumb = ''
+    if 'crumb' in source:
+        if source['crumb'] in CRUMBS_V6:
+            crumb = source['crumb']
+        else:
+            invalid.append('crumb')   # section 19.9: a token, invalid rejects
+    hold_marker = False            # [r3.1] section 19.10: a bool, every layout
+    if 'holdMarker' in source:
+        if type(source['holdMarker']) is bool:
+            hold_marker = source['holdMarker']
+        else:
+            invalid.append('holdMarker')
+    for key in ('metaTone', 'statusTone'):
+        if key in source and source[key] not in LINE_TONES_V6:
+            invalid.append(key)
+    feedback = source.get('feedback') if isinstance(source.get('feedback'), dict) else {}
+    if 'moment' in feedback and feedback['moment'] not in MOMENTS_V6:
+        invalid.append('feedback.moment')
+    icons = []
+    buttons = source.get('buttons') if isinstance(source.get('buttons'), list) else []
+    for raw in buttons[:4]:
+        icon = raw.get('icon', '') if isinstance(raw, dict) else ''
+        if icon not in ALL_ICONS:
+            invalid.append('icon')
+        icons.append(icon)
+    stored = {'layout': layout, 'ringStyle': style, 'ringKelvin': kelvin, 'valueUnit': unit, **titles,
+              'icons': icons, 'crumb': crumb, 'holdMarker': hold_marker, 'ringNow': ring_now}
+    return stored, invalid
+
+
 def _run(scene, role, label, line, row, ink, limit, tracking=None):
     tracking = label.tracking if tracking is None else tracking
     pen = label.x + _c_half(label.width - text_width(line, label.size, tracking))
@@ -772,7 +959,7 @@ def _label(scene, role, label, text, ink):
     """showText: fit the text to the label's per-line chord and centre each line in the box."""
     if not text:
         return
-    lines, limits = fit_label(label, text)
+    lines, limits = fit_label(label, text, scene.crumb)
     for row, line in enumerate(lines):
         _run(scene, role, label, line, row, ink, limits[row])
 
@@ -799,25 +986,26 @@ def knob_has_mask(name, size):
     return bool(name) and size in firmware_sizes().get(name, ())
 
 
-def button_look(slot, button, layout):
+def button_look(slot, button, layout, crumb=''):
     """Section 5.2: (tone, glyph name, ink RGB) of one button; glyph '' when none is drawn."""
     tone = button_tone_v5(slot, button['icon'], button['enabled'], button['lit'], layout)
     if tone == 'none':
         return tone, '', (0, 0, 0)
-    ink = button_ink_v5(slot, button['icon'], button['enabled'], button['lit'], button['color'], layout)
+    ink = button_ink_v5(slot, button['icon'], button['enabled'], button['lit'], button['color'], layout, crumb)
     return tone, LIKED_GLYPH if tone == 'liked' else button['icon'], _rgb(ink)
 
 
 def _footer(scene, frame):
+    scene.hold_tick = frame.get('holdMarker') is True     # [r3.1] the hold tick shows with the footer
     for slot, button in enumerate(frame['buttons']):
-        tone, name, ink = button_look(slot, button, frame['layout'])
+        tone, name, ink = button_look(slot, button, frame['layout'], frame.get('crumb', ''))
         if knob_has_mask(name, FOOTER_ICON):
             scene.items.append(IconRun('footer', name, FOOTER_X[slot] - FOOTER_ICON // 2, FOOTER_TOP, FOOTER_ICON, ink))
 
 
 def _idle_row(scene, frame):
     for slot, button in enumerate(frame['buttons']):
-        tone, name, ink = button_look(slot, button, frame['layout'])
+        tone, name, ink = button_look(slot, button, frame['layout'], frame.get('crumb', ''))
         if tone == 'none':
             continue
         centre = IDLE_X[slot]
@@ -830,17 +1018,31 @@ def _status(scene, frame):
     _label(scene, 'status', STATUS, frame['status'], _rgb(TONE_INK[frame['statusTone']]))
 
 
-def _volume(scene, frame):
+def _volume(scene, frame, unit='%'):
+    """The reveal: caption, 48 px digits and the 22 px unit ('%'; presentation 6 lightsbig: valueUnit)."""
     _label(scene, 'caption', VOLUME_CAPTION, frame['volumeCaption'] or frame['title'], SECONDARY_RGB)
     digits = volume_digits(frame['value'])
     if not digits:
         return
     digits_width = text_width(digits, 48, DIGIT_TRACKING)
-    percent_width = text_width('%', 22)
+    percent_width = text_width(unit, 22)
     left = CENTRE - (digits_width + DIGIT_GAP + percent_width + 1) // 2
     scene.items.append(TextRun('digits', digits, left, DIGITS_BASELINE, 48, INK_RGB, DIGIT_TRACKING, shadow=True))
-    scene.items.append(TextRun('percent', '%', left + digits_width + DIGIT_GAP, DIGITS_BASELINE, 22,
+    scene.items.append(TextRun('percent', unit, left + digits_width + DIGIT_GAP, DIGITS_BASELINE, 22,
                                SECONDARY_RGB, shadow=True))
+
+
+def _lights_line(scene, frame):
+    """Presentation 6: the 12 px line of lights / lightsbig is ``meta`` in its metaTone (the STATUS label)."""
+    _label(scene, 'status', STATUS, frame['meta'], _rgb(TONE_INK[frame['metaTone']]))
+
+
+def _scenes(scene, frame):
+    """Presentation 6 (section 19.4): prev / current / next and the meta line."""
+    _label(scene, 'prev', SCENE_PREV, frame['prevTitle'], META_RGB)
+    _label(scene, 'title', SCENE_TITLE, frame['title'], _rgb(TONE_INK[frame['titleTone']]))
+    _label(scene, 'next', SCENE_NEXT, frame['nextTitle'], META_RGB)
+    _label(scene, 'meta', SCENE_META, frame['meta'], _rgb(TONE_INK[frame['metaTone']]))
 
 
 def _list(scene, frame):
@@ -854,7 +1056,10 @@ def _tracks(scene, frame):
     ring = frame['ring']
     selected = ring['index'] if ring['index'] <= 2 else 1   # renderTracks: 0 Prev, 1 Neutral, 2 Next
     no_prev = bool(ring['unavailable'] & 1)
-    for position, name in enumerate(('prev', DOT_GLYPH, 'next')):
+    # Desk Dial r3.1: the prev / dot / next row belongs to the 3-position transport ring only; any other ring
+    # (the whole-queue Tracks sends a selection ring) hides it, as renderTracks does.
+    positions = ('prev', DOT_GLYPH, 'next') if ring['style'] == 'transport' else ()
+    for position, name in enumerate(positions):
         ink = INK_RGB if position == selected else META_RGB
         if position == 0 and no_prev:
             ink = DISABLED_GLYPH_RGB
@@ -939,8 +1144,14 @@ def compose(frame, *, window_icon=False, artwork2=True, native=False):
         return scene
     f = normalize(frame)
     layout, has_key = f['layout'], bool(f['artKey'])
-    scene = Scene(layout, art_dim=f['artDim'])
-    _heading(scene, f['heading'])           # the heading row is drawn on every layout when sent
+    scene = Scene(layout, art_dim=f['artDim'],
+                  art_paused=f['paused'] and layout in ('nowPlaying', 'volume', 'idle', 'notice'))
+    # Presentation 6 (section 19.9): a crumb replaces the flat heading. r3.1 (2026-09-29): the crumb shows in
+    # the idle icon view too (Music idle keeps MUSIC; Home idle is sent without one), as the r3.1 prototype.
+    if f['crumb']:
+        scene.crumb = f['crumb']
+    else:
+        _heading(scene, f['heading'])       # the heading row is drawn on every layout when sent
     if layout == 'nowPlaying':
         scene.art = has_key
         _label(scene, 'title', HOME_TITLE, f['title'], INK_RGB)
@@ -967,10 +1178,24 @@ def compose(frame, *, window_icon=False, artwork2=True, native=False):
     elif layout == 'windows':
         _windows(scene, f, window_icon, artwork2)
         _footer(scene, f)
+    elif layout == 'lights':                # presentation 6: the Home text drawing, no art
+        _label(scene, 'title', HOME_TITLE, f['title'], INK_RGB)
+        _label(scene, 'subtitle', HOME_ARTIST, f['subtitle'], SECONDARY_RGB)
+        _lights_line(scene, f)
+        _footer(scene, f)
+    elif layout == 'lightsbig':             # presentation 6: the reveal with valueUnit, no art
+        _volume(scene, f, 'K' if f['valueUnit'] == 'K' else '%')
+        _lights_line(scene, f)
+        _footer(scene, f)
+    elif layout == 'scenes':                # presentation 6: the scenes list, no art
+        _scenes(scene, f)
+        _footer(scene, f)
     else:  # recent, explorer, upnext, notice
         scene.art = has_key and layout in ART_LAYOUTS
         _list(scene, f)
         _footer(scene, f)
+    # r4 render speed (cc_display.cpp, MOTION.md 4): the knob hides these twins while no cover is shown; a black
+    # shadow over black draws nothing, so the mirror keeps them (identical pixels).
     return scene
 
 
@@ -1194,8 +1419,9 @@ def render_lcd(frame, artwork=None, window_icon=None, overlay=False, *, artwork2
             tile_icon = window_icon if isinstance(window_icon, Image.Image) else icon_pixels
         return _paint_scaled(scene, cover, tile_icon, k, hires_cover)
     if cover is not None:
-        if scene.art_dim:
-            cover = cover.point(lambda v: round(v * ART_DIM))
+        if scene.art_dim or scene.art_paused:
+            factor = ART_DIM if scene.art_dim else ART_PAUSED
+            cover = cover.point(lambda v: round(v * factor))
         image = cover.copy()
     else:
         image = Image.new('RGB', (SIZE, SIZE), 'black')
@@ -1209,6 +1435,9 @@ def render_lcd(frame, artwork=None, window_icon=None, overlay=False, *, artwork2
         else:
             icon = window_icon.convert('RGBA').resize((size, size), Image.Resampling.LANCZOS)
             image.paste(icon.convert('RGB'), (x, y), _scaled(icon.getchannel('A'), opacity))
+    if scene.crumb:
+        from control_center import crumb_arc
+        crumb_arc.composite(image, scene.crumb)
     for item in scene.items:
         if isinstance(item, TextRun):
             if item.shadow:
@@ -1221,6 +1450,9 @@ def render_lcd(frame, artwork=None, window_icon=None, overlay=False, *, artwork2
         elif isinstance(item, BoxRun):
             fill = tuple(round(c * item.opacity) for c in item.fill)
             draw.rectangle((item.x, item.y, item.x + item.size - 1, item.y + item.size - 1), fill=fill)
+    if scene.hold_tick:                                   # [r3.1] section 19.10
+        x, y, w, h = HOLD_TICK
+        draw.rectangle((x, y, x + w - 1, y + h - 1), fill=HOLD_TICK_RGB)
     if overlay:
         image = _overlay(image)
     result = image.convert('RGBA')
@@ -1343,11 +1575,16 @@ def _paint_scaled(scene, cover, tile_icon, k, hires_cover):
         image = source.convert('RGB')
         if image.size != (pixels, pixels):
             image = image.resize((pixels, pixels), Image.Resampling.LANCZOS)
-        if scene.art_dim:
-            image = image.point(lambda v: round(v * ART_DIM))
+        if scene.art_dim or scene.art_paused:
+            factor = ART_DIM if scene.art_dim else ART_PAUSED
+            image = image.point(lambda v: round(v * factor))
     else:
         image = Image.new('RGB', (pixels, pixels), 'black')
     draw = ImageDraw.Draw(image)
+    if scene.crumb:
+        from control_center import crumb_arc
+        layer = crumb_arc.layer_rgba(scene.crumb).resize((pixels, pixels), Image.Resampling.LANCZOS)
+        image.paste(layer.convert('RGB'), (0, 0), layer.getchannel('A'))
     if scene.window_icon_box and tile_icon is not None:
         x, y, size, opacity = scene.window_icon_box
         (x0, box), (y0, _) = _span(x, size, k), _span(y, size, k)
@@ -1368,6 +1605,10 @@ def _paint_scaled(scene, cover, tile_icon, k, hires_cover):
             fill = tuple(round(c * item.opacity) for c in item.fill)
             (x0, width), (y0, height) = _span(item.x, item.size, k), _span(item.y, item.size, k)
             draw.rectangle((x0, y0, x0 + width - 1, y0 + height - 1), fill=fill)
+    if scene.hold_tick:                                   # [r3.1] section 19.10
+        x, y, w, h = HOLD_TICK
+        (x0, width), (y0, height) = _span(x, w, k), _span(y, h, k)
+        draw.rectangle((x0, y0, x0 + width - 1, y0 + max(1, height) - 1), fill=HOLD_TICK_RGB)
     result = image.convert('RGBA')
     result.putalpha(_glass_mask(pixels))
     return result
@@ -1387,163 +1628,163 @@ def _paint_scaled(scene, cover, tile_icon, k, hires_cover):
 # Regenerate: python tests/test_cc_lcd_preview.py --print-font-metrics
 # (tests/test_cc_lcd_preview.py checks it against the firmware sources when present).
 _KNOB_FONT_METRICS = """
-eNrVfdvOJLmN5rv0dSQQEnWcV2k0DK/h2THW6wHG3ivD774hnqVQZP5/dTd2Fl1dlclgKiSKIimJn/TPn/70n3/9P//7b3//6d9S
-P3769//82z+uj//8KcTx9x///qe//OWnf/v55xyPc/z3y/FzDgccHT/WfKTrv3x9DJAvIpFD6Ec9AhyvOL6VeIRTHkG8Pl1fX+H6
-ls4j8u9LvkodP4H1S61HHv9hwfEquByj2JQunkSvqKMW0cgR31XaxTpKGa8KsR1Nqh0udqnqeZW4+ezYZx5Pz44/OXpTOlan2sfO
-MsGGXDLSz/m4091r+yW0OP6gSEIKTqQp26uhWy9k9zl2V9Von1Nz/EXLKaNj6GMfUpTSfeOTldLAVccVE4qv51W35YG153QFu6oG
-sM+XClozq5Ubw9XLyTW0uT4xAbjGJa9qXkmmJ17ZehlcrEkho7Y1VYHKlQoHVst0xh40e9D0wfXurHSIxETv9mVlrBV/HkPBatgm
-riif43n9IEz1qtr3ba2vvtHeX/uRmA2bTh8vatYecO07qxVa/ZvPsjDp285TSy31epc0KdfRCukb/4S64zIXv/xy/PQ//vj3P//h
-r3/5259/+jc4fvrTn9BilfOyVGaoLkIYhKDD7qJcVo37ZlSFaDBoNn4vShoUGJTGlIyUIvp0UcooG2tLSnyR6kUiTQlSdsP3kcJU
-pPRByclKqqPadagCWsKLMKrdh+oV5qBaj/anYRouyqjzaS2t6VZq5jdneXMdNW4nGtOEhKrFcjPrqO41mI2lL4R2rg1qAUXjdOmi
-RRZpNVE0kM6AgwiJi0IzTr/L9Lqkr9M6s2xaXWTTUMLDPAZpeus3Uj+FFJUUVBVEOzpWO41fXT8lLriT0p2U76RyJ1UjRSaN2scz
-+Hph7aESF8olnlh9tOFc2PWbOyneSXAnjepf9j0ZJd8ohSjZKPXGg4LPXQ3xRSLdHpZWuALW3Kx9QGLYEeOOCDti2hEzK3MmV3pR
-imMLwoZ9gK7Efto2tH6nxXNDC2o8pMkRGwLqxS4KtgLE6tAPRfuNK98o5UapN0q7UbpSyB38FIHUH8VVmRQmS4hqBmRnmpUFcKOk
-GyXfKGgbkwRZF6GuhEaErIROBBBCOtd2JTM0QiGF17jgosCNkm6UfKOUG8VMIwZjF6U5HurC1Llbi/wsnzdKuFHijYKVJv8oIz4n
-s6pKyxu+m5mJ+aYjud2Z+sqE3pMDSy2+BK9LTIuTgUJRkA+1gPWipA1XvnGVDVe9cbUNV1+56skGyVpZRWVGm3gskDOd7FYFZtP+
-J3862c16U/Na7kz1xtTuTH1las6+i+jJr0qEx7S7hW+3EUp+FQN7lVaj+CV61Wllw1c3fG3D1+985GOVj2jB+EBo8eYlunSAdR15
-2ambyMsCWDf1m5/qdTEs6GEnx9X7bIwAvasvBdC5TiyRWECbBuhaKTRXErvWaAVlYhKzCycpfHOuANC3hhMnIlrUqHbH+UEUNqx3
-ZhJykXfFWZnRnN4ozQw714Mca0imSYBuFRutlMxMrmKhSIuMVJWNxRWaFnUypa886E1xAUEIgVmaUuLcmUCO1KsOxLR4BSA/SkxS
-RfKkU5AK5EvnwtqtMKx3Ok0NgZzpXD7cg2CATUADsDoogLRjyze2smOrNzYMKANOaYXUMcbEaSP3PjnXdLreR++K0z7+GTlX4pFm
-ontFJm0l+de5qExc2m3kX4OYN6x60smSMLUNU1+YyMEGbygBXSxNu6RS5GPnstDLTmVRJANTWVr1ETESqRgbNxA9LHGxepOHtdWK
-i9Jl5kJzKyj36BHKGh0AOdeFC25cacOVb1zFuEC4qnJJ3UvbFLaGNlDn6qNoapjiWqJFU0CRF/lXWhmQ4tIaN0O9hzfALnZiI533
-w5Z87Olr229M5GM9E3nYmSnemECcAxEazV5QkXDFcVDwVx1NotJGzXmNMhOlrhQ0gW5222g6MVOKeB7gksn+wBjfYxb5r+On//Xn
-//obrgeE45z+o+9x+f7uv/Dh6SWEq3KvpKQXTq0iPhptezX8OGKpOObo+3KGnF7P7xrFv/yPXyQ2/BjxrdiqF/91ffVVivLPC9xP
-0uZFgwcfDsZXRgrIG0c9inyJ2JyxUCH1CE/1f9W3QrxeM147JHkJa5JCpXZTi4LUC5v7CumpvIAFPr/0esuOXFQ1XumjXpy49ha+
-wPed/z5I6q5+CXuBOzihoMbXsTabSWsii7Hw/6/QiEyEV8QyqDRRlMswja7HvwbbUF1Q5XWVDNRdwzXguxN1Unwv6BMHyKemkT55
-TnpXZyXFIcP6zvUOj3INfRr3+/rwq15VRQX4S/xXVT8AFoU6wuq4+y+jcJ+f98W4BJI/FYtyld4INuZt6NKXjN1d+FuaVZd/H61r
-pSRna9BwxPUlYbGAzGCmgXmKf5EWGLgBp7NIO5lrodPzYMXTo6df+4LMZhX8XsQoJdpQY2EFtZavfkSp62kDIIgeocmpXI1Aoyvf
-dIjU3tlmU/24a2q4N0YtbnBtfT2p6is6iVKZMnxfwxzFtYLhLlnnI9bXLJ0lHgOVorC4Cqs3SimQzU6HFio/AfFSQ0Y4stCdsM1g
-hWLZ4YjDstCVslpHdkBICFx/rV14M6CddEw3aNAQtdzZJ4N2bgvv28jgua/grc1ZR/apNsy0CdSmsZFjGW5f9dZvxdlasVFIalTu
-4wxrocKL2hOv4uIHJ8mQVyWLqwsYvucFuFcx3tfIsoA0O1Ar0dxSc2Goxov+LlIWG+uwyFBsJlVRHN334jmvPC5cSu+6eepN7oGk
-AVkiVR9/sg09safgIjLmgskGxKnY03kd+u29UjIWwVpRpOzgpBRuVsW1MOro8SZWTRRXjYM1GqVBwo1hD0a4gL/rVMkRUfj6nEJx
-ShnJqUoLSfwuHiV1hW0MHb8bZ8FvHLht7e23fxzfaZmP3VfeV9zXwHtJmPSoiAFI6g9Ze148bIe+ZgnjuF8rh+nkCYOzC9GGzPgh
-Ddmm5UnwpiHUi2cPiYx/kDErSpLIWET9CY8aHirJxWIhHOEeEQSswS2ELH6EZ202DbziPMepChwlyNLWmVvkh8A9kjSEE3UvMnvb
-2N72K0xvPNoHy/tWSSdP8Qo3BXT9lsgOhwczCjh/kCgIm1ksKsVWogWgYCq5kH28rfovURt4HhTAsWkJpC70gzD1SDvm6SryJdG+
-fLCeh8SvAW09c4E3uUkbXng2xZOQwK+oPL/nto6/85GnSbUaeSDBlWl2wloCUka28L3Iw+TkMNYONLCNVkDi8TlqFHUcg0WvKGsM
-rai8QkR2wUlqITPsZprIbyjS5+WgyJmCuIBP6cU0L2JZU+CymX7gaFZbc2rJbBFuYejkh8rGvvnINRzxHr1WlLwWnT54iYLx7PsR
-w2WDTnpCV38V/VSCAsXnCe4LF0Vj/fCuH/AesIzcL3qrV56WxmLmIrDb8xHNOT+H2/mD/HShZ/lwaki+THD7G+ntQzlvrswcsGDM
-rmW10Lq+Je9TR0UWpKmBktfSDHIjdw1XzqklSZRfTC67meQDvjAVi2bSz7rINZsPfc2Ll1xiOH6vgCauweU8bYnzGt5Wrn4Jhs1F
-8L35Crt47KXGWiJFEMvczVuMLCG0ZvmIvMKaHnURc4rUo8bhN5s4T2lpfY4PN33vejwUqVWzqAJ+NBb9/rva14PMeaIQcXEvylSO
-Z15xHrVuTVlmbiGaywuuG3kK5szQ7yPN8EacL/m5KybY0lRmp0ArJqO2jdtSxbM2do0gQV10MW5QPwQWHJW38Za3QKfO/r7rAabl
-n9nu6ZyZqxxsMSzNS2TPdrWs3eVf9gq3aW6zUEyWnnCpZozYgv+LtFVBKebx1t4tF7E1EC0qtozvdyzYzkS38Fvm9cQ4LUHrqmqR
-kH4Mc5NH8ItixS8ou2ZHNxfxq6GfXaxFIPc4RynJhSk638GJzciC4F2kxvbpaZUnfKjML7Qz9oe//+mPf70Sha8x9tNIGf7Df/z5
-L//zP/5xEfK1dzayHhzOoehvOd2DPrdmGIRcLZ2IE+5xBwYT4SlNn5/l5HIPf071AC4D0x5C4lzr4r70E5eLMqdYj4yNKJgLfkkb
-kcq1HShkkNzsiqVginrqhLLAuoPmYXB6vH5p7ks+fbMmPmhWGqVFy5eU/BNXHNas2UfeTudGNQI44GdKsJ/ovl5XUuJolmaBXyn6
-TsL1dO8nnIl8a9l/y6evdXRfKky/ilZg6ZZR7/MpNQ1D2g2uugHTZ3bFXanKvupl80gbCV6s3X8J7kut7kvu7sVXluERij2b6puy
-r2Jyhcx66TVqekKJLsUhVgQaAQnzzbsqSuMKgG6yc/fag64PoOqD6+VF6TkTE73cl1WiJlsN8EZ2VWx7rgiITPL1aqoVfa2vvtHe
-36PkdPjc+Z87HE7e0YqNWYvFRG99d0wLk74vVC2WskyS4iGi7x7f3BMXHuA9OKKcCzhCktUYwEDphZJO5tARKauSCDwiGwRH8BG5
-uURLQkj4KjNCgjUmThAJVBwYmBqBSLTTtJRBEp3AC0VBEpRxUxgTIYm1mDX3jJJYCs78+uHAu+IkesIJYTacBJwGEMGEE0wBKczS
-FwJlm0DCnIhmOAmvWIKTQPwWo+UYJ4H9MuEksKgRZypOohfcdM2Kk+A6F8VJTOLBNE60pqCNxzTOhYZpnGJ1T4+ViI3xHGBgiULm
-DjxaYqGlDS1vaGVDq46WPGQC8lQ/1JhCHiyRkBg0QYYfPGhiJsU7Ce4kzOzsBEdyoImJUohSjFKJko2Cyt6cARbUBHkK8KgJdgpp
-Qk2sxLgjwo6YdkRLGiseNcFscUJNkLtJE2piofU7jVATCy2YUQGPmnBOUWATOUx4C4NmGS1vaGVDqxta29C60ThvjpKurkoS0pBp
-YTKXySAUUH15lPO50NKGljc0VKro0pcx53OmNKJYFjSmfE486bQ2BY+ncN5UABXoCLUGBKlYaGlDyxta2dDMmjYPrSAuRosxtmLG
-2uQN/obwFQstbmiUd5tZCx3GggSQJozFwuctU/QgC5Env6PdLBjjLGb9okxQtWqkOJwKmrwykT82s+agFqp1wcAWK2PeMJYdY90w
-th1jvzNSXigH2+BhFxlYEMwY76aPEkMzTEguxjKe9BaHvaCRIdKm1NDJSrOjngYQ5YbObP3O1pyzkC5hZGP1XdLu7qJthjf5bJ5a
-pAmEkSfdIhDGylg3jG3H2O+MBMMwxmQ4DGLMEw5j8jvd9wd4IEbLNncRJIaE5Q6K4X1dr6tZIixGJwSDYTGI5/RgDFcOgTG8MWM0
-RucZSVI0BjFlIbHPjlZSJqYoOdmnJNWbXjEaIxae/BgaY0wBi8qe4BgleTYFO3arGHltmo1Izchpg06DBI5BE0lwcAxqUfJwDACn
-owTHoPmNll6NLTg8Bok5ejyGm7kyIKNVB4MhNw1ugsyYDN+rDMrwesSgDO9aGJVBXFJ5ctLEFoVW76W1e2kU8JGFCR6XIb/0uIwp
-6GZchs24HS5DfVAwZMYcMTEyY3JpjM1YGeuGEWPXjJ0lAiV4BuDA7IJ7OLl5JgT01t3LnZw1MYlE0Vl37mgmpXtZmbiKlVUYs2pB
-GqR5shYMpLHw9TsfAyG7rxu5auVLBtSYyyNXvZSXDCCm5WErgMdkMqwGsYHDahBX8FgNt5DCYA03gxe0xhS1MlpjAUpE44MJr0F8
-okvkoZfy8qa8Ynx5wmwsOI62Ke8eMzFsQ/mSwTaULxlsg1eNwME2eM1CoRZpjdwZtzGFTIzbmNloPFRPIrNaHbSGfPPExUcOeC7y
-zDNXvHMhWum0rmfshpwkAQbeuOYVo/JKK3JWAU2nGbwxUdBcos4oJdwohWqASSMOvJFx+H8XvRF/NXoj0Pa/348OlICIq0BjjQ8T
-hXElvh/PoIIAx9vkrbQm92M2RJo2WT4DOOC7AA7azagewFE9gKNSIkj6sF35YXORc2EoVabPYui8q2YIjmSbKPVx0wR3bfrzG/sD
-JONbCI7+eyA42je31wkLOyE4RlZS4L1s7knZ+qF8Kd49rLKRdUdwXKMX92jld7RLXu+VDJpnmnjncNpffJOIkb+A4KCMoUWRY9Tk
-VVPW+HHnM35AcCQahtq+qlCgSP+q7mPVgXdin7foCwr3OVEnrCnokmB2h3DEe4ZLtqyvyvvObyEc8QbhcFCDL0A4wNsFZ3jqE4Rj
-BiN8hHDAM9DgCxCOaRu48iiYIBzF9rMlaSQE2QR+hegwHNEnjHbJ6QyKX4M1p0Ve+1UMBzxvyy/52+dHEx0nDAfsMBzxlo/jRQvf
-wHBUTgKsrOACVhxW22E48qyNnFDg9tAFw6FZ/pIYHILkJWbJriws43LHcMTvYTg05zHcoXJfxXAsIMX4EcSRPoE44g7EEZw6gUIj
-xcmX51d9BnGkKV8mriAOuAMK50ziLDbHQBwO0Nf8ABYAywysG/4HjWlV3KaiOATDECWFhxNkMOnUZZBr7jY8oTgEFRTD/1sUByf+
-afpP8eJ02KLTo6rEphiKYwLvTKPLZdE9oDii5NMvaUjwAcUBi+n2kApRB0yJCy7nXFQJM+XA1DmRqjnDUycYR9rBONIK40iKOqq/
-BYwj/U5Zj694/N4wDvgOjCM+wTgo4n0p1lctTdYETMrP8rjGjn+C9jqtlYGlcQaXA544BU9KPH0cwoO8UqowpQUKmk9CiEQGQxWF
-3qX+uWhBaA3CPds76qTCB53OstGoNECYjpalqFOi6+raFydVrQauWrAcrPDpwQT3X2GB/Uxnb4DfK9v3sBzpa1iOqhGDhKfYSsKz
-delYD99o+gVElpJTmyxJLxKGa/D0Q/uq0nxvnrnixCiL/uHxmOjcC78mGUY0i4sBn+mdJcTNgk09HUK1McBbmlcJJuFHmUNcoODq
-NE/xma6MUKxcn+oeVsNyhKAe14M5FMbdWfMcmIOHTnKAqqpxXGRYBb+paShmdj5KKBa4L4rEeAzEGhkkaA+yG+wUwKTVakXCjkS3
-aFC/Aeaom/xSP2K2YI6Oog8Hx92fwBz1bSquyzonV0dVivEAD+aIev4ApyvCm2nwNbcOH172A04kfR/NEX2Azr64cxGVUFnRT1Sf
-iukfBOhAaucczk5QhuyV+PMqwic4R/GhkbhPg4nP2L7g85Zp1HQ1UvJegziteI602FUxMuAjpGxYrFOwCvGIU7Gv6GZg2Xz0FsUZ
-PYrw9wpt4A7JWSEBp0ej7STrl2TYZoTgBRu/hujgKJkPxWUzimvrmNpV8PRLXj9+WoRJbFQV1EE5d20yE+05XNwML5hAK2xK+9LG
-H4pNf+Bl/du4jmy4Dhwq9QHXUcwAW9BPe+TRh5DueXEzm99Nng/WQh0nkD3jqncFdnD2fp6AHYKe7BLvdV6pUATkOiOiABhs/lQ/
-RPqvGYTwZlryxo/EG0Bjit7ijE5Vuzet7jxb2HpboYA7sMNNUbvFZfHQRQvCCVVZsPZ4ipMDIG+zp7MKFD2pkWG77WSAQHgN2FFn
-vEWcVqZfoNGWHUDVXJETsqPekB3RYpowH+fyJdwWLojlryA78vKzF050AkXGuMHU2UilZ+jar4N2lAHtKDO0oxu0o9OxnScfRT9i
-wop5+Kclecnpoxh/yz0D9rNaXHoTnYhJhbTCWSgjMbtV9yWcdKBwZojGSP9AdEczdEcnAAwImdAdHROOuCJX7jMnTOGjrGkdsiUq
-X4r7UoNv2cTHadvRZ+Tzl5KnR54Ra9fto93lYA2jz+W4093743hJMSG16sXck683p4/xD+mjtjD6ivtW9Ob4rhxcV0b1mgBBc86u
-V00vzq7wK/3R1XAuL4bsa9+8/PCZ04ZWJuH26dvpf3jGSQjRv36knTQvBMdZihdQ8RVtqDZZUUemXi17lcVeIxASZf5FVsJMUI9g
-SsM3Q9RJZ1J5euIABKMC1dpQp7tBajLR12DdVTFfQ+qZ28Rl3T0UX2+tqO5GkOIvLdGq8Tvnr2e2O1D8xTB4v4WgVKqTQXJlX3v+
-rgZ4CvfEpW+xk40JBiZtqxgkWlflqXc63pXwHvbRV9hHd8cWM+yDrAVMsA8//AX3UbtLumLgR3MDkYEfVOnCgAWfYpom4IdTI0Z+
-8FG1UhplsJx0jJKDfkRSTAf9QFWlw//30I+15MwVKFoByls5q3tZ1aIVMtL06PHq4B+DMs4SdfdkZEK1dMN/VE6JYRwHpXAVTp1x
-+A8y/WD4j3zDf4z3ZalBk4pXqTglkXopEQKErW30CJCZRgiQQatGk4wbO5yVESCtctqbQ4AstLShZUfLHgGy8NUNH7WjTXUmEAUl
-BJYJAVI559AhQGZSvJPgTkp69HFyCBBBYRkChJBrySFAZh46oDk4RSQEiPiR7CAg4k2yh4DciHFHBEcsHgJy48ys4JXMPENAHFtU
-CIg4ouwxIDdi3xAxW+pGDKz+Bu9hHIj3mwIEqZKW7JEgGVzmHSNBFlrZ0OqG1ja0brQ0IUEyML7SQ0HUhDooCKOFYcKCrMS0I+Yd
-ETVsrBeIbDDNtAaXU41JpjUcxSh95aEE07mxhAdx3lbwIGUWPAFCVmLaEfOOWHZEs7Ldg0KKekiHCqlTtfO5oYUNLW5olPULEuYn
-g4VwBKDEvOO8GywGhsySpYzTyYgxMGTmo6RTjn/LBAxRRgcMYWuXJ2CI6qADhqyMecNYdox1w9h2jP3OWE8xdCacKj7QY9D4xPDJ
-IvKJ4XlGkKSbVa67QUJOnPiyR4asfO1eXt/wNXEjvu8ZzqmcDh0yldh2A55cem+TEMmpc/CrrymOs0z4kJWz7crsG06+DIs4xw6O
-IUSYswpndI4peYxITd5ZdXIshBmNHiOisbyBRMhBZgcSmYwVevfJZfbVfBFIxJdDIJGZJxKPDSUCiZD1rB4kQlzJgURwBtE9SKQl
-n+JNIJGEaC0tyi6P0NRt9OwVeHaVDCTCs0uWPqNEMs6KlRaV1j1KJDv1IpQItTt7lAgxaVFF2mSkamzRoUSoLPAokYkpyjH6Juko
-+eTW0wQTmfojwk2XGCfiXQ7hRIRNKks+nPiS0OqmvHYvjwJDNxFmpIj8VPoFnPsDoW1CK4aKzA6MsCJLvMVYkZWz7MqsO06Mrvz8
-XtAiIxRyF8iQN+flhOTwIjRxld+SN2c2ES158zPzYQLZICNLefleXrErerQlyc30YEKNrIz9zphPx1gm3IgyOtzIUmKGTYkCJpxK
-pLYUHqkOOpJP32by5WexczAEPeKXZxg+wnwK5PABb5kQJFMMQgiSJTJmCMnCmHYl5g1j2TFWY0weRHJ79T3GIhSJK9HBSKoPTBhG
-wiqbPIyEFkFEYuTKp8ifcSRziMVAkoWRBss08smXAxholKEkM1s7b2zkyBe2eGcDuplDp8QCJuFFMQ8mue4GCmUBk9ASb3VgEk9h
-q4rHRwgp3El8G6YsDQichJws9upnPAn8lngS2i/yO+KoXJnW3/BQ0cBH5+KaERxPeIGQ3yNK8u1w7axH3037LWC703mThSZbvPB0
-urigTixV9AXBNo+zbOTgGUy44PTSejzulH7Y1uRtvuDOM11AO3yu1x1T8ghYoJ348G5DZ09vqiSvr2z8Uv/+1gmJ/fgerAQPj5Fu
-zpJ9C3j57XBt9Ei2nSh1i/friPACLOOU6z0kPwCLF7GgBifVYVdLw5Vk3qebNtbeXdVRvwAsSZoz6IElmZUVHNoB3Gbd0+Gl55vj
-MzkzMVsDm57TmelfHQKhypG/b3NTK4r3WUVCfACWZMuQhtumvyUAvbId6ts0d2U+djX69EVwpg2mfGHwRz/b0YVfAZa0+9mPK7AE
-3hwOuRyQfweWwO3pLl12OktVzjHPZrGy3jHkgSXxAAGWJBsEbI74PEi9twOOk4uZz6Z9ZU00XM7BXIXyDCyBKQU8vj+8fgMskSGM
-W9ywJv9sgCXgT99/DywBvYSGd92DNJWPhg4ggBAwxN+kjpS5iCOMN/E9skSzNPXQeD0wu0mCQuD0RslJdtcJPI9q6Wh3aGmSFMxw
-B/HN2JK4TaTabNLHT5cNvN5bnnV4Ww6JaVTSnBI2dQ83SPmTeZ/zwtxjUOOdnwYbpZuCh1AVO0tcOtlEGc81tfmeHDicENrTZtns
-iqiT5DGQU8wpH5Rze/o9D02s9oIu0csJAju9H4CX2MHF06HH8I0Tt7PCSwqZG05FBn+otF32tIeXuDwly5DMM7wEdpoH8xGs0wHw
-e3gJ/BC8JJwOr/WKRzZIlLs6LirOzAFMmiBGpuQloDwhvRsILJFLACZZbld4n/z4/zPABD5mDsOCGV9Tr58AJmlCKvEdPYVixqgI
-Xb31ItgNTpqurldDhWgglVDNSICNHUqZx3RAK3UBmTTKF5Mc+VM8DV8k8qJkoeRBJjqBeIFOCuhGoJAfQCZBc1zrYuMEZVKt+UES
-X2EtS4dTcygT85V8prXkyGUN7II7Wzs/GONw/gpjPE1+9sb4zRHdlme9Ak3sVILsPr0FmlCOg940kyiCaHbtDG7lg0RZWY0iMHDE
-fYnaRjrpUkwNnr1xVNHH4LoFl1TmOS3eZlScHjKWiaAuYHe9nMKWPLCmaOMbg1t4iiLp4QywCILhaATj8FNvDWtZeG2au/BtI0ka
-XPjvU4KhYigYXYzQsBdM3RRwHoRk7iIwLj870FejyWAQ3yw3ltiFnWG6A4FrEbhDqh31gBLAm0jCKbGggE0oqrktUAAN7uiuWWkf
-ACd+Pacd4fuAk0DOWREn+cPyUHubI+yy4sndkV+KWd0Yz1YNZhLiu5UTWuiG8uFtPw45yd+FnNRpNQ3kjqRG4DEwr/0cj8NRv3M9
-qotyJ7RFsdAsfmF9IWyRmfmGi5Z7DN3SVHH5yfZCdV58q8ep5kpebEis9QyCvGJOioaGcGR/JD5xz5iT6jEnMJ95L/cy/nfBnJRl
-agPzql/eitav1ojdAC/YuIvW9DIEjSOTmOkgbhQNbQA8HELwJ3RO8ONpP7jno/P7OLzpOIxibm//FkgiTbgatqbhXFr5W6FOPr/t
-25Esquop/gMkQpN16D3wRCFRLNbNVVenTNjy95En3xXqAz7DuVG0azI74vWAoDeT0T0YQUBg/kaubJeHuRH/iD9JchrQebQPEwEz
-TJ/xJ/l5Pruuxjn8CUiwpFFKddboA/6k2lrg4t5fcMefFMVcSrSmi5C4ypP4np/5dia766NOk/HlUB0H3sPO7DfgC1t2d7emzABk
-PdKvj4bTTjjxd5P26UI6t6rW/Jr0tA77oxiUsruFeV06zQsmFiHUOA8KI8NfN6UCW638DLb7dSiU9q+RRDihUHpWFEofKb2jRXxf
-wQiQO+ILcF+an1z5lHjcGmeJXxkzuLnKDxPu3OJlgyNTPKElx+sXwkihQcA0fyv2jZPQG2IL5ERehKucB80hsEoZwU9Z6EnvLRji
-C4yKAcl5OPkegqKVO3EXUL8F/w2yb+PMSXnH+u10L7hSNzHJyHHqM6ykwBtOS/zRNgaEMfC3euwe+XpcO+6jmWMjDVlz85IvxVck
-J9+cjtvk2tTimxOT/1aj/13zZYaTk5cI9BF4851eB/7lZ3fPYLyu7ou8ErD8s5y8ZMezhvfNo57l4h+SEuoLvdivPLpJEsG9Aq5C
-o7UPJsWObZJS8G0P1WvvrHLjoSnzrMAMywKBbI1+HrISRTKgTiK1qpNybp/NkJ6YKLOKGKUfqCoJJzP8sDdKNBOQWbMqs4Irn77r
-SqDA4MrVw2pFZ1QudfSvtq8jNa2uULUJFpZZ6h4aFXp1b4CRw3BOQKwbp7yO80FNRNU67xzRke/KuvbdFYkuAJY0A1jMaDKARUwn
-o0uiHFSKeGhGtWDaiTcXjGC5MpCPoNmFhGC5MotNFxnBwhWPlBTFEBYWZZeXSDY/ahkYhqVFXx5hWBLdCtMNwyIX+BiIRY3TGxTL
-UnbmKjS8acVQLIlu02mKYpGRkjyMJfM5uNVwLEQKDCORNF5ENYIiWVDhLEWPoCw4pFGD+X4TkL5KDItJXFrGY0gNy0K3PHA1WtHj
-XVlcU8br6eAsbKNFGJjvutAw3RVp0WhBEpqiqRFlu2a0SvF0eJaVlja0vKEVo4Xu8CzCFxyeBcZJ5a6CqEUZewtn14pnYXcSTwdo
-WWlxQwOjcWUI0zLcTDG2fCcVJnUjVSZVKwtHwnB84iIF10IeSH5KuBbyQzFMuJaVGHdE2BGTI54e1zJUflQcDNfCLrBPuBZyYVZg
-2xH7hki4FiaeHteCYyFruyMpl/O4jGsRE9w8rkV8VfPAlhux7Ih1R2yOWD24RYjdo1uuhE20/ODRLWJfJWF8yo1tHt5yI6YdMTti
-9fCWjoC16uAtiIlWSrvxdOUpDt4igWPz+JbJRTPABR2rZ4QdMe2IeUcsjlg9wEUMcCScFabFCmP2EJdVJ/K5I4YdMTpinWAu5LLF
-nxHMhcMGI2bHKWYn3+0YwVxWjcrtZtwI57LqIyXH5iajOCvQxRWZFeni7KAhXZy/N6jLjTPvOMuOs+44246zbzgpQ5bifhnyVRWu
-2gAjLz/bScqQTbRX1zzaZTHYdTdo0NuLtQ8O77IOudrubqH2DWM7pxKpJ1qY350V8LIU2XY2gBw/zXZUko1CL5hUEJ2/cEaPeLlx
-tl2ZfcNJiFYrsyjiRThBOOPdZXXtHlNrigHmbqQYIFGUXh3ihTylFldXA4YBwOxOe1em4jAvXFJwoBdfEoFeBpMNX0K94GRE5AHq
-+EFqRbCX3nQGzbgXnGmaKWHgS8dYzYprAgI/tSMI+jLmPd0Yg2Ink/YDMKiVdAiEGI2o+BQa9l3WnhX/grZfhMJ+n7j0HUVloG+o
-xifiC009SXMImGmCLRAYqE7u5PFPN0lmCMzUO+TvJ+UiCMzslRgDw3zSBPL2zNiEWDcltk2JXfLSs9IIBcO/FWWB2UkyMd7jK4LB
-LG6OYTDMGT0MZvGSDIOZAzmCwdw4MTweCwkmW3T5FzgAaeBhMLxuIcIgGIwAtQwGI2wiXb7lDGfNIlxy+Ut5mfm6lUdhWBdr6WAw
-PFtsHgdz4+wbTnL4xpkNCMOc0jfk8JcyyeGvZRJ+BJdurEzDgo6ezQqFEcbTQ2Fo6aB5KMy0FiRQGOIrExRmDpwJCrNEL4yFmaNp
-wsIsIQ2DYZgzejDMrcyy46yOs09wmLWem3iM8TDGmRUP4+qZFRCDymsDFN29rK5UB4iZpwwMiJnDNgLEMCM7CwLE8AKa/tjjdKtD
-xCx8hIiZ+cjVL3xxw0c39QQbDAKKIdXDtWNBxVyaOlqhNMWyVDp7g2ExM4lMbSq4Ni60sKEVrknG01AUGsPu/YvQmPRbQmMKpVa4
-hFBKrmEUJubN4JUzIzocvZmOx3MjY/D7MPtDQJfEUtvPnbaCprN/N5kQeTp7brs1aBlzsrXnNuSqNAKPU8Ulwypn2RIo5cfODcW9
-p6SJNWmByCSfjHcE21nDvcbyuJ9IqT7w4dCzB8hCWnMz3ujD2AT7zUEy3zxrle6/CXrVDh0DjGlTjbLl6sGoKTqsPshfI2GFkk0D
-5+ukQ47LDe7UzIjpk01/i7c1m1r7ChtgpriUdjvp+w2ABb4AmOl6YKfbeITMm7pJ0iL4JPHzHZAK0puD6vSmluBP+Y+S2g2J/rVh
-EZNku71NT6dr6NJzU0PdgWaSbovbjUq2f2spJrxzjFklnC1TlaOuKUJJTv02s5emPOjkkx9tY97byuwvYHA7uCHcMxxW3Ez6ePtT
-mp+H6azF9ekDbsaAGnw8K67Dqy2rnI3aVbQo5Xokgc50GxGhudM/QS704OuJwjntOQePYgphTfmYJeNuXslPpnlKmE+fMiCSy2ub
-bqBJH8EzzpmkHbwCloQv1o0QlhOnOecZ/89SD0wMAE0Lw99SLmYElwTBp5e+xCC/giGXmlzB0eROB0qGkXRQBdH4Q7bTu1QjTY1O
-E+QsbE59fsEORZP2A3mDoknvzqFOX8pQqvMNYyH4Y6ub3cv2nP/k8/7e3PRWpq9y6cDD4OPTqpO/FcpOYQezICbP2LzaZe3qvCRV
-vmi9gOMAzivOllNPEKyokN1Mpi8z2MbyUOkalni/IIkHV5Cb89g1/gCiJvnz8M1upi8haqrizgQYnQTJ0r1o3QUMp8+gpJRmf0dC
-nJB71SVkvspG3WSQZmuFHWrtcTvhdvWUGxhpA6nRO1SS5OmHJCOMeUS1QnZ50qFSTfnUd8lZC3ZEtFPUxBcMCBhSrxRIcvQvne+7
-jci/mzb6Ksd/R1QNvFO2V57+mQbx/cK2uz/NUz4xI3xfjSJMuwtRoSEhCRZBL01JenYwR/0dtSEmRdppqqtkHxZmT1rwjKwhxDTu
-lfN1GKf6ITERCfOfCH5i+cVJz9WPxWXmxnAD17D+a3YjrIZPUbeWj8mHW+t1GXFOXeMone1asdO97eSAaACxqmFgtGTo86gPhjqk
-X2WowWfJ7e30B5RNfbhd7GU3briZVlm1ProjIqrkrWMNi9xmEeWCD2ouWgkKyuwewiRiPu2KEbCWngdHg4LO7QzbYefBCfBRsH0h
-Hcs0mQ5cbaahnSdJqFIIluAE0+Zua8keZdRUGKTCSSY6VBu5BVBvC8TxQBnAYR6XDgRM9+LFaR7EiJ2i1zfwPKHZ7VhcGZtN0ppk
-MQ7VxuYAcsCTvWrCaRRwVgPGEO4sRLn7AmgFgasU7Oq17M61T5ZwLP3FNyBRvBgDY3twaCZ5C8GUGn6+rYjwzV3RgZdCWPE48JSR
-TmtlN4Ppw+XgcmM1ZMYGFio8O7ANvLuYM3xyFVyRYnMuyOoFE7nioHEhnvfweI0JrdCn/uF1P+CUikNGfAeTE+Z1vCTXMbIWBLFE
-6UjP0+5XKkf42srL7hAVw+WdCuZ9B2TwYOywhSbV2YSwhMw0hlPvQbLVOIOIJL3gBpU9Tfj5mO6Hzfh7bYrD/ViL+Lybamnl7u5C
-PiniENCBRhrBjvNo7mgE2MB7o0f+/F6BU95gSeMc2Xr51r18/frQS86AaF66cadrBn6SCIMn/7ytkySaxl3kcjRWX1oiPvkg6v0K
-X2QjLDgS3lBoU+Qa4Dks3SiDRzFoDB+SC17SjwbBP/K2kL4e4Gr/6s2udCSVHYWR5vtaugH/q8yXEt/hnNwQV2wszwWrW6/5ncQa
-2rNcxSeDzH0pdnZoHcTuNPQ3gS8oVayuuFyOu4O7p1njoDhdDxdk9hyf769x87nkx098NyN643PSAtU//aVY6XCVju72wzZDA5/N
-sKxDlmUOM62h+llyyBbyhUPXQGldKRO8hIKY6OY1yUUR52TkqSOzm1T7oyPSEdwJGGyR+ApKd+iFXdQXNJAFfzRbsiDO4EoBnIii
-X9kLwdaIJk1Obn6UplttPnnr7VlJYZlk1gUHRsD4kzbKMBmZ9850s+IRu9h/HYYnpmvfcGzc/9Pnp3fJT8eMhXKlKl/7vsBHKFJW
-YMdJwKjtL1TAz3ls0Ts2yo7FngXKycZt/3Shc64ZgZDGbmeCjiT+Je7553FUU1A2cL8UtrGnnC5M0JUEr7RRt5S7f8PYO01Xir1n
-q+tP/7XIJUeUyz+eBEMtvqRyRR9Ti5E2txhJc4uFNLWYS3MtRlKdW4y0NrdYaK7FS92wxetP5TjZOl6yF8Ig/fnf/8G7ypFvFR3j
-v+DBZ50uAjHsCWZLCFooVMbcUP5cdBu+EbOhRtoA5qxdwrjqELHOo9ondn7kr+NCR5QpIL6+4POKf67mXBsT14i9AorLSuEZQrjm
-d4UTlze8op02IvnrRNMrz/EiXtv04w8gPQvbdSDK1arr6fWhDs4reXP86ePvgqXjttUltf8i2XxRHqs0IgskkhCCRTYmDcC/8/y5
-OKLSgQ4e2EpOBcanC6iw6M+J/zYW3XjSUIAR5Sl/X/JMyYQ0xFmG5Hh+1Ydo+y//+r8xuu+o
+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
 """

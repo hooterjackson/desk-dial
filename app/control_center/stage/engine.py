@@ -328,6 +328,7 @@ class StageEngine:
         self.capture_gen = 0
         self.pending = None           # the open waiting for its frost
         self.scene = None
+        self.building = None          # the scene of an open still being built (released if it fails)
         self.surface = None
         self.phase = None             # None | 'capturing' | 'open' | 'closing'
         self.ctx = None
@@ -471,6 +472,8 @@ class StageEngine:
                     self._event("click_action", t0=t_seen, surface=self.surface)
             elif kind in ("lock", "sleep", "motion"):
                 self._event("system", t0=t_seen, kind=kind)
+            elif kind == "session_disconnect":
+                self._event("system", t0=t_seen, kind="lock")    # as before DD-BUG-036 split it out
             elif kind == "display_off":
                 if self.core is not None:
                     self.core.display_on = False
@@ -526,7 +529,6 @@ class StageEngine:
         self.lru = SurfaceLRU(dev)
         self.target = None
         self.policy.created(now)
-        self.removed_reason_logged = False              # each loss logs GetDeviceRemovedReason once (§4.3)
         self.counters["device_creates"] += 1
         if clock.begin_mode != CK.BEGIN_ABSOLUTE:
             self._log("stage: timeFrequency != QPF: begin times use the hold fallback (G1-8)")
@@ -541,8 +543,9 @@ class StageEngine:
                 prime()
                 self.prime_ms = round((time.perf_counter() - t) * 1000.0, 2)
         except com.ComError as exc:
-            self._com_error(exc)
+            self._com_error(exc, creating=True)     # a loss here is a failed attempt, not a fresh loss
             return False
+        self.removed_reason_logged = False              # each loss logs GetDeviceRemovedReason once (§4.3)
         return True
 
     def _check_device(self) -> bool:
@@ -554,7 +557,7 @@ class StageEngine:
             self._device_lost("check_device_state")
         return ok
 
-    def _com_error(self, exc):
+    def _com_error(self, exc, *, creating: bool = False):
         self.counters["com_errors"] += 1
         lost = isinstance(exc, com.DeviceLost)
         if not lost and self.device is not None:
@@ -566,9 +569,9 @@ class StageEngine:
         if self.phase is not None or self.pending is not None or self.opening is not None:
             self._close_now("device", release=not lost)
         if lost:
-            self._device_lost(repr(exc))
+            self._device_lost(repr(exc), creating=creating)
 
-    def _device_lost(self, why):
+    def _device_lost(self, why, *, creating: bool = False):
         """§4.3: close (done by the caller), release in reverse order, log the reason once,
         recreate at most twice 1 s apart (the policy's wakes)."""
         self.counters["device_lost"] += 1
@@ -582,7 +585,10 @@ class StageEngine:
                 pass
             self.removed_reason_logged = True
         self._release_device()
-        self.policy.lost(self.monotonic())
+        if creating:
+            self.policy.lost_while_creating(self.monotonic())
+        else:
+            self.policy.lost(self.monotonic())
 
     def _release_device(self):
         if self.device is None:
@@ -731,7 +737,7 @@ class StageEngine:
         self.ctx = ctx
         self.core.surface = surface
         self.core.reduced_motion = ctx.reduced_motion
-        scene = p["factory"](ctx, payload)
+        scene = self.building = p["factory"](ctx, payload)          # DD-RES-012: a failed open releases it
         scene.build(payload, container)
         if self.fps_hud:
             self._hud_build(tree, root, layout, dev)
@@ -752,6 +758,7 @@ class StageEngine:
         batch.commit()
         self.core.finish(batch, "open")
         self.scene, self.surface, self.phase = scene, surface, "open"
+        self.building = None
         self.control_id = cid
         self.input.expected_dpi = p.get("dpi")                       # WP7a-R5: our own move is no display change
         self.host.show(layout.monitor)
@@ -914,21 +921,25 @@ class StageEngine:
                 self.core.end_episode()
             except Exception:
                 pass
-        if self.scene is not None:
-            try:
-                self.scene.release()
-            except Exception:
-                pass
+        for scene in (self.scene, self.building if self.building is not self.scene else None):
+            if scene is not None:
+                try:
+                    scene.release()                    # DD-RES-012: a half-built scene too (its jobs, surfaces)
+                except Exception:
+                    pass
         if release and self.tree is not None:
             try:
                 self.tree.release_all()
-                if self.frost_surface:
-                    self.device.release(self.frost_surface)
                 if self.hud is not None and self.hud.get("surface"):
                     self.device.release(self.hud["surface"])
             except Exception:
                 pass
-        self.scene = self.tree = self.root = self.root_op = self.ctx = None
+        if release and self.frost_surface and self.device is not None:
+            try:
+                self.device.release(self.frost_surface)          # DD-RES-012: even if the tree was never made
+            except Exception:
+                pass
+        self.scene = self.building = self.tree = self.root = self.root_op = self.ctx = None
         self.frost_surface = None
         self.hud = None
         was_open = self.phase is not None or surface is not None
@@ -1210,11 +1221,14 @@ class StageThread:
         return self.engine.metrics()
 
     def close(self, timeout: float = 2.0) -> bool:
+        """Stop the stage thread, waiting up to ``timeout``. DD-RES-014: idempotent; a second close
+        (main's ``finally`` after ``app.close``) only reports, it never waits again."""
+        again = self._stop
         self._stop = True
         with self.mailbox.lock:
             self.mailbox.closed = True
         self._set_event()
-        if self._thread.is_alive() and self._thread is not threading.current_thread():
+        if not again and self._thread.is_alive() and self._thread is not threading.current_thread():
             self._thread.join(timeout)
         return not self._thread.is_alive()
 

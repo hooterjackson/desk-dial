@@ -2,51 +2,43 @@
 #pragma once
 
 #include <inttypes.h>
-#include <driver/i2s.h>
-#include "./audio_api.h"
 #include <Arduino.h>
+#include "./audio_api.h"
+#include "./cc_sound.h"
 
-typedef enum {
-    NONE = 0x00,
-    CONFIG = 0x01,
-    PLAY_HAPTIC = 0x02,
-    PLAY_WAV = 0x03
-} AudioCommandType;
-
-
-struct AudioCommand {
-    AudioCommandType type;
-    union {
-        audioConfig config;
-        const uint8_t* audio_file;
-    };
+// 1.0.0-cc5.7 (plan F3; HAPTICS.md "Sound"): the knob's click player. MAX98357A on I2S0, DIN 9 / BCLK 10 / LRC 11
+// (nanofoc_d.h; confirmed on Karl Malota's board, no shutdown pin), 22.05 kHz, 16-bit, the same sample in both slots.
+// The clicks (cc_sound.h) are rendered into RAM once by audio_init(); the FOC task posts a request with every
+// haptic that has a sound (cc_sound_post), the HMI task plays it (audio_loop, non-blocking writes). Silent unless
+// the host's claim asked for sounds (control `sound` 1..3); nothing plays at boot, on a key or on a native detent.
+struct CCSoundCounters {
+    uint32_t played;      // sounds started
+    uint32_t underruns;   // the DMA ran dry mid-sound (cc_sound_underrun)
+    uint32_t dropped;     // requests the ring could not take
+    uint32_t superseded;  // waiting requests a louder (or newer, equal) one outranked (CCSoundRing::popNext)
+    bool ready;           // bank rendered and I2S installed
 };
 
 class BinarisAudioPlayer {
-    friend class HmiThreadButtonHandler;
-    friend class HmiThread;
 public:
     BinarisAudioPlayer();
-    ~BinarisAudioPlayer();
     void audio_init();
-    void play_audio(const uint8_t* audio_file, uint16_t volume);
+    // Kept for the profile code (dispatchAudioConfig): stored, never played.
     void put_audio_config(audioConfig& config);
-    void play_haptic_audio();
-    void audio_loop();
-    bool check_file(String fName, const uint8_t* audio_file);
-protected:
-    void handle_audio_commands();
-    void start_play(const uint8_t* audio_file);
+    void audio_loop();           // HMI task, every pass
+    bool playing() const;        // a sound is playing or waiting (the HMI shortens its wait meanwhile)
+    CCSoundCounters counters() const;
+    audioConfig audio_config;
 
-    i2s_driver_config_t i2s_config;
-    i2s_pin_config_t pin_config;
-
-    QueueHandle_t _q_audio_in;
-    audioConfig audio_config; // haptic audio config
-
-    size_t num_bytes_remaining = 0;
-    const uint8_t* data_ptr = nullptr;
+private:
+    bool ready_ = false;
+    bool pending_ = false;             // `stereo_` holds frames the DMA has not taken yet
+    uint32_t pendingFrames_ = 0, pendingOffset_ = 0;
+    int16_t stereo_[CC_SOUND_DMA_FRAMES * 2];
+    uint32_t underruns_ = 0;
 };
 
-
 extern BinarisAudioPlayer audioPlayer;
+
+// FOC task: a haptic with a sound started. `master` is the claim's sound level (0 off .. 3 High).
+void cc_sound_post(const CCSoundCue& cue, uint8_t master);

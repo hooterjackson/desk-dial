@@ -92,7 +92,7 @@ class DeviceTests(unittest.TestCase):
             def write(self, data): self.parts.append(data); return len(data)
         port, sleeps = Port(), []
         paced = PacedSerial(port, sleep=sleeps.append)
-        payload = ('{"title":"Beyoncé","padding":"' + 'a' * 900 + '"}\n').encode()
+        payload = ('{"title":"Renée Lys","padding":"' + 'a' * 900 + '"}\n').encode()
         self.assertEqual(paced.write(payload), len(payload))
         self.assertEqual(b''.join(port.parts), payload)
         self.assertTrue(all(len(part) <= 64 for part in port.parts))
@@ -218,7 +218,14 @@ class DeviceTests(unittest.TestCase):
         self.connect(); self.bridge._enter(control()); self.events()
         for message in ({"id": 1, "kd": 0, "ks": 1}, {"id": 1, "kd": 0, "ks": 1}, {"id": 1, "ku": 0, "ks": 0}, {"id": 1, "kd": 0, "ks": 1}):
             self.bridge._consume(message)
-        self.assertEqual([e["index"] for e in self.events()], [0, 0])
+        events = self.events()
+        # DD-BUG-006: a second kd of a button still down means its ku was lost (the knob sends one kd per
+        # press): the missing release, then the new press, never a swallowed press.
+        self.assertEqual([e["index"] for e in events if e["kind"] == "button"], [0, 0, 0])
+        # r3 (README 1): the release of a press this control saw is its own event (button 1 acts on it).
+        self.assertEqual([(e["kind"], e["button"]) for e in events if e["kind"] == "release"],
+                         [("release", 0), ("release", 0)])
+        self.assertEqual([e["kind"] for e in events], ["button", "release", "button", "release", "button"])
 
     def test_heartbeat_uses_latest_frame_and_does_not_reenter_control(self):
         self.connect(); self.bridge._enter(control()); self.events()
@@ -401,8 +408,8 @@ LATCHED_V5 = ("reducedMotion", "ledPink", "ledVolFull")
 
 
 def upnext_frame():
-    return {"mode": "RECENTLY ADDED", "target": "Den", "value": "", "detail": "", "status": "", "layout": "upnext",
-            "heading": "UP NEXT", "title": "Hunter", "subtitle": "Björk", "meta": "5 / 12",
+    return {"mode": "RECENTLY ADDED", "target": "Hall", "value": "", "detail": "", "status": "", "layout": "upnext",
+            "heading": "UP NEXT", "title": "Drift", "subtitle": "Linnéa Holm", "meta": "5 / 12",
             "buttons": [{"label": "Back", "enabled": True, "icon": "back"},
                         {"label": "Shuffle", "enabled": True, "icon": "shuffle", "lit": "off"},
                         {"label": "Like", "enabled": True, "icon": "heart", "lit": "on"},
@@ -473,11 +480,11 @@ class PresentationV5BridgeTests(unittest.TestCase):
                 # A cc5.3 knob (presentation 4) keeps artwork2, alive, the Latin glyphs and the v4 fields.
                 self.assertIsNotNone(artwork2_capability({**caps, **art2}))
                 self.assertIsNotNone(alive_capability(caps))
-                self.assertEqual(_device_text("Björk · “Jóga”", caps, 96), "Björk · “Jóga”")
+                self.assertEqual(_device_text("Linnéa Holm · “Jóga”", caps, 96), "Linnéa Holm · “Jóga”")
                 self.assertEqual(_frame({**frame(), "heading": "WINDOWS", "meta": "2 / 3"}, caps)["heading"], "WINDOWS")
         self.assertEqual(presentation_level({"presentation": True}), 0)
         self.assertIsNone(artwork2_capability({"presentation": 3, **art2}))
-        self.assertEqual(_device_text("Björk", {"presentation": 3, "glyphs": "latin-ext-a"}, 96), "Bjork")
+        self.assertEqual(_device_text("Linnéa Holm", {"presentation": 3, "glyphs": "latin-ext-a"}, 96), "Linnea Holm")
 
     def test_presentation_5_frames_keep_v5_fields_and_older_knobs_get_the_downgrade(self):
         v5 = _frame(upnext_frame(), CAPS_P5)
@@ -587,7 +594,8 @@ class PresentationV5BridgeTests(unittest.TestCase):
         self.assertEqual(self.events(), [])
         self.bridge._consume({"id": 1, "ks": 0, "ku": 3})
         self.bridge._consume({"id": 1, "ks": 8, "kd": 3})
-        self.assertEqual(self.events(), [{"kind": "button", "id": 1, "index": 3, "button": 3, "pressed": True,
+        self.assertEqual(self.events(), [{"kind": "release", "id": 1, "index": 3, "button": 3},
+                                         {"kind": "button", "id": 1, "index": 3, "button": 3, "pressed": True,
                                           "hid": False}])
         for invalid in (16, -1, True, None):
             self.serial.ready_ks = invalid
@@ -602,7 +610,8 @@ class PresentationV5BridgeTests(unittest.TestCase):
         self.bridge._consume({"id": 1, "ks": 0, "ku": 3})
         self.bridge._consume({"id": 1, "ks": 4, "kd": 2})
         self.bridge._consume({"id": 1, "ks": 5, "kd": 0, "hid": True})   # not the JSON integer 1
-        self.assertEqual([(e["button"], e["hid"]) for e in self.events()], [(3, True), (2, False), (0, False)])
+        self.assertEqual([(e["button"], e["hid"]) for e in self.events() if e["kind"] == "button"],
+                         [(3, True), (2, False), (0, False)])
 
     def test_kh_is_a_hold_of_the_logical_button(self):
         self.bridge_for(CAPS_P5)

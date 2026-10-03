@@ -205,6 +205,34 @@ FROM_RELEASE_HISTORY = {
 }
 
 
+def settings_version_ok(before_value, after_value, p, ini_text=None, record=None):
+    """True when the settings "firmwareVersion" of the before- and after-inventory name the from-release and this
+    release (FW-PUB-004). After: this release's internal id or the composed public form it reports
+    (tooling.reports_version). Before: the from-release's internal id, the composed form of its profile, or the
+    reportedVersion a release.json entry (`record`, None reads tooling.RELEASE_RECORD) records for the from image,
+    so a later release whose from-image already reports "<public>+<build>.<letter>" still finalizes."""
+    if not t.reports_version(after_value, p, ini_text=ini_text):
+        return False
+    if not isinstance(before_value, str) or not before_value:
+        return False
+    if before_value == p.from_version:
+        return True
+    fp = t.from_profile(p)
+    if fp is not None and t.reports_version(before_value, fp, binary=p.from_binary, ini_text=ini_text):
+        return True
+    if record is None:
+        try:
+            record = t.load_json(t.RELEASE_RECORD) if t.RELEASE_RECORD.is_file() else {}
+        except (OSError, ValueError):
+            record = {}
+    for entry in (record or {}).get("releases") or []:
+        fw = (entry.get("firmware") or {}) if isinstance(entry, dict) else {}
+        if (fw.get("internalVersion") == p.from_version and fw.get("reportedVersion") == before_value
+                and (not p.from_binary or fw.get("binary") in (None, p.from_binary))):
+            return True
+    return False
+
+
 def supersede_from_release(p):
     """The upgraded-from release manifest becomes SUPERSEDED once this release is recorded INSTALLED.
 
@@ -213,7 +241,7 @@ def supersede_from_release(p):
     <name>.superseded-<UTC>.json, never overwritten. Runs after every record of this release is
     written, so a failure here never leaves this release unrecorded.
     """
-    path = t.release_manifest(p.from_version)
+    path = p.from_manifest      # the from binary's manifest for a ladder from-release (1.0.0-cc5.5: cc5.4 D's)
     if not path.is_file():
         return f"{path.name} not present; nothing to supersede"
     record = t.load_json(path)
@@ -590,6 +618,15 @@ def rollback_traces():
     return traces + [PARTITION_READ]
 
 
+def refused_boot_entry(record):
+    """True for a readable nanod_enter_bootloader_v2.py record that sent no touch and found no ROM bootloader (a run
+    refused because Desk Dial was running, both ports were present or no application port was found): it changed
+    nothing on the knob, so it is no trace of a rollback (TL-BUG-010). An unreadable record, one without touchSent,
+    one with touchSent true and one that found the knob already in the bootloader still count."""
+    return (isinstance(record, dict) and record.get("touchSent") is False
+            and record.get("alreadyInBootloader") in (None, False) and not record.get("romPort"))
+
+
 def rollbacks_since_install(flash_path, flash):
     """Reasons why a rollback happened, or was started, at or after the install (empty: none was)."""
     flash_time = Path(flash_path).stat().st_mtime
@@ -615,9 +652,12 @@ def rollbacks_since_install(flash_path, flash):
                 reasons.append(f"{base.name}/{path.name} shows {meaning} after the install")
     for path in sorted(t.BOOT_ENTRY.parent.glob(f"{t.BOOT_ENTRY.stem}*.json")):
         try:
-            started = stamp_of(t.load_json(path), "startedUtc")
+            record = t.load_json(path)
         except (OSError, ValueError):
-            started = None   # unreadable: its file time and name still count
+            record = None    # unreadable: its file time and name still count
+        if refused_boot_entry(record):
+            continue         # a refused run sent nothing and found no bootloader: not a rollback (TL-BUG-010)
+        started = stamp_of(record, "startedUtc")
         if at_or_after_install(path, flash_time, install_started, started):
             reasons.append(f"{t.BOOT_ENTRY.parent.name}/{path.name} records a ROM bootloader entry after the "
                            "install, which only a rollback makes")
@@ -798,8 +838,8 @@ def main(argv=None):
     before_settings, after_settings = before.get("settings") or {}, after.get("settings") or {}
     changed = sorted(k for k in set(before_settings) | set(after_settings)
                      if before_settings.get(k) != after_settings.get(k))
-    require(changed == ["firmwareVersion"] and after_settings.get("firmwareVersion") == p.version
-            and before_settings.get("firmwareVersion") == p.from_version,
+    require(changed == ["firmwareVersion"]
+            and settings_version_ok(before_settings.get("firmwareVersion"), after_settings.get("firmwareVersion"), p),
             f"unexpected settings change {changed}")
     caps = after.get("capabilities") or {}
     expected_caps = p.expected_capabilities()
@@ -823,7 +863,14 @@ def main(argv=None):
     require(status in ("UNFLASHED", "INSTALLED"),
             f"{p.manifest.name} status is {status} (a rollback marks it ROLLED_BACK)")
     active_sha = t.sha256_file(t.ACTIVE_MANIFEST) if t.ACTIVE_MANIFEST.is_file() else None
-    if status == "UNFLASHED":
+    if status == "UNFLASHED" and not p.from_finalized:
+        # The from-release was never finalized (cc5.4 D under cc5.5): manifest.json is still the record it left in
+        # force (tooling Release.restore_record), and its kept package record names the from image.
+        require(p.restore_record.is_file() and active_sha == t.sha256_file(p.restore_record)
+                and not t.from_record_problems(p),
+                f"manifest.json is not {p.restore_record.name} (the record in force while the never-finalized "
+                f"{p.from_artifact_version} ran), or {p.from_record.name} is not its record")
+    elif status == "UNFLASHED":
         require(p.from_record.is_file() and active_sha == t.sha256_file(p.from_record),
                 f"manifest.json is not the installed {p.from_version} record ({p.from_record.name})")
     else:  # INSTALLED: a re-run; manifest.json must still be this release's record

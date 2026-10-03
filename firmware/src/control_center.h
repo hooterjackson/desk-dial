@@ -10,10 +10,21 @@ struct CCControl {
     uint32_t id = 0;
     DetentProfile profile;
     uint16_t position = 0;
+    // r4 FEEL + SOUND (1.0.0-cc5.7, plan F2/F3; HAPTICS.md), each from the control command and never stored on the
+    // knob: `feel` (capability feel 1; CCFeel, 0 = none: the legacy haptic loop), `reducedHaptics` (the r4 section
+    // 7 fallbacks) and `sound`: the master volume percent 0..100, from `soundVolume` (capability knobVolume 1) or the
+    // older `sound` level (capability knobSound 1; 0 off, 1 Low, 2 Medium, 3 High; cc_sound_volume_of_level). A
+    // control without them (any older host) gets 0 / false / 0: the 1.0.0-cc5.6 feel and no sound.
+    uint8_t feel = 0;
+    bool reducedHaptics = false;
+    uint8_t sound = 0;
 };
 bool cc_handle_command(JsonDocument& doc);
 void cc_service(); // serial replies, only from COM thread
 bool cc_claimed();
+// FW-BUG-029: the COM task asked the FOC task for a recalibration (after cc_cal_request()); a {"control"} is refused
+// ("Recalibrating; wait for calibrated") from then until that run has finished.
+void cc_cal_requested();
 bool cc_timeout_notice(); // True only after a lease timeout has restored native control.
 uint32_t cc_input_id(); // zero while entering/releasing
 // The session's current frame. Its `reducedMotion` is the EFFECTIVE latched value (PRESENTATION_V5
@@ -104,6 +115,18 @@ void cc_hold_deferred(uint8_t raw);
 void cc_hold_key_up(uint8_t raw);
 // COM task only: a kh line sent directly (a hold of the ready control), for diag holdEvents.
 void cc_hold_sent();
+// 1.0.0-cc5.5 (F1), COM task only: the clear-only key state of position lines. cc_key_line_sent(): a kd,
+// ku or kh line of the ready control went out with `ks` = mask (the ready line and a deferred kh record
+// theirs inside control_center.cpp). cc_live_key_state(): the HMI's published mask now.
+// cc_position_key_state(): the `ks` a position line of the ready control carries, reported & live, so a
+// position line can clear a bit the host still holds (a key-up lost to a full key queue) but never set
+// one; while key events are still queued (keyEventsPending, read by the caller AFTER `live`: the HMI
+// queues a ku before it publishes the cleared bit) it reports the last mask unchanged, so a key-up on
+// its way is never pre-empted by a position line. An installed v7 Desk Dial, which copies any `ks` into
+// its pressed mask, therefore never loses a kd or a ku to a position line.
+void cc_key_line_sent(uint8_t mask);
+uint8_t cc_live_key_state();
+uint8_t cc_position_key_state(uint8_t live, bool keyEventsPending);
 
 // Native button input while unclaimed (PRESENTATION_V5 8.10; ALIVE.md 8.1: "an FOC position
 // change or a button state change while unclaimed"), for the LCD's offline screen.

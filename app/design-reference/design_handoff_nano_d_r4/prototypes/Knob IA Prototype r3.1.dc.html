@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+<script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+<script src="motion-lab.js"></script>
+<script src="haptic-lab.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&amp;display=swap">
+<style>body{margin:0;background:var(--color-bg)}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent)}</style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:32px 32px 56px;box-sizing:border-box;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--color-text);padding-bottom:16px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-accent-700)">Nano D · IA r3.1 prototype · with r4 motion + haptics</div>
+      <h1 style="margin:0;font-family:var(--font-heading);font-size:34px;line-height:1.05;font-weight:700;letter-spacing:-0.02em">Home, Music, Windows, Lights</h1>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:end">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Music state</div>
+        <div style="display:flex;gap:2px;background:var(--color-text);border:2px solid var(--color-text)">
+          <sc-for list="{{ homeOpts }}" as="o" hint-placeholder-count="3">
+            <button onClick="{{ o.pick }}" style="font:600 14px var(--font-body);padding:8px 14px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Demo area</div>
+        <div style="display:flex;gap:2px;background:var(--color-text);border:2px solid var(--color-text)">
+          <sc-for list="{{ lightOpts }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.pick }}" style="font:600 14px var(--font-body);padding:8px 14px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Navigator</div>
+        <div style="display:flex;gap:2px;background:var(--color-text);border:2px solid var(--color-text)">
+          <sc-for list="{{ navOpts }}" as="o" hint-placeholder-count="3">
+            <button onClick="{{ o.pick }}" style="font:600 14px var(--font-body);padding:8px 14px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <button onClick="{{ tour }}" style="font:600 14px var(--font-body);padding:10px 14px;border:2px solid var(--color-accent);background:var(--color-accent);color:#FFFFFF;cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-accent-600)">{{ tourLabel }}</button>
+      <button onClick="{{ toggleSound }}" style="font:600 14px var(--font-body);padding:10px 14px;border:2px solid var(--color-text);background:{{ sdBg }};color:{{ sdFg }};cursor:pointer;text-align:left;border-radius:0">{{ sdLabel }}</button>
+      <button onClick="{{ reset }}" style="font:600 14px var(--font-body);padding:10px 14px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Reset</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)"><span>Monitor · 5120 × 1440 · 32:9</span><span>{{ monLabel }}</span></div>
+    <div ref="{{ monRef }}" style="width:100%;height:{{ monH }};position:relative;overflow:hidden;background:#111;border:2px solid var(--color-text)">
+      <div style="position:absolute;left:0;top:0;width:2560px;height:720px;transform-origin:0 0;transform:{{ monTf }};overflow:hidden;font-family:Archivo, sans-serif;background:#0e1a2b">
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 20% 10%, #2a4a78 0%, #0e1a2b 60%, #080d16 100%)"></div>
+        <sc-for list="{{ deskWins }}" as="w" hint-placeholder-count="2">
+          <div style="position:absolute;left:{{ w.x }};top:8px;width:1264px;height:656px;overflow:hidden;background:#1b1b1d;box-shadow:{{ w.sh }};transition:box-shadow 300ms ease">
+            <div style="position:absolute;left:0;top:0;right:0;height:32px;background:{{ w.bar }};display:flex;align-items:center;gap:10px;padding:0 12px;color:#d8d8d8;font-size:13px;white-space:nowrap">
+              <div style="width:16px;height:16px;flex:none;background:{{ w.ic }};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ w.letter }}</div>
+              <span>{{ w.app }} · {{ w.title }}</span>
+            </div>
+            <div style="position:absolute;left:0;top:32px;right:0;bottom:0;background:{{ w.thumb }};transition:background 200ms ease"></div>
+          </div>
+        </sc-for>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:48px;background:rgba(32,32,32,0.96);display:flex;align-items:center;justify-content:center;gap:12px">
+          <sc-for list="{{ taskIcons }}" as="ti" hint-placeholder-count="7">
+            <div style="width:26px;height:26px;background:{{ ti.ic }};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;border-bottom:2px solid {{ ti.line }}">{{ ti.letter }}</div>
+          </sc-for>
+        </div>
+
+        <div style="position:absolute;left:20px;top:0;bottom:48px;display:flex;align-items:center;pointer-events:none">
+        <div style="position:relative;width:250px;opacity:{{ nav.op }};transform:{{ nav.tf }};transition:opacity 280ms cubic-bezier(0.22,1,0.36,1), transform 420ms cubic-bezier(0.22,1,0.36,1)">
+          <div style="position:absolute;inset:0;border-radius:26px;overflow:hidden;backdrop-filter:blur(14px) saturate(1.8) brightness(1.06);-webkit-backdrop-filter:blur(14px) saturate(1.8) brightness(1.06);background:linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0.09) 100%), rgba(18,18,22,0.3);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(255,255,255,0.14), inset 1px 0 0 rgba(255,255,255,0.22), inset -1px 0 0 rgba(255,255,255,0.1), 0 18px 50px rgba(0,0,0,0.35)">
+            <div style="position:absolute;left:-40px;top:-60px;width:220px;height:160px;background:radial-gradient(closest-side, rgba(255,255,255,0.22), transparent);"></div>
+          </div>
+          <div style="position:relative;padding:16px;display:flex;flex-direction:column;gap:14px;color:#fff;font-family:Archivo, sans-serif;text-shadow:0 1px 2px rgba(0,0,0,0.35)">
+            <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.path }}</div>
+            <div style="opacity:{{ cOp }};transform:{{ cTf }};transition:{{ cTr }};display:flex;flex-direction:column">
+            <sc-if value="{{ nav.isNow }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;gap:12px;align-items:center;min-width:0">
+                  <div style="width:64px;height:64px;flex:none;border-radius:8px;background:{{ nav.art }};box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.2)"></div>
+                  <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <div style="font-size:15px;line-height:19px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.t }}</div>
+                    <div style="font-size:12px;line-height:16px;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.a }}</div>
+                    <div style="font-size:11px;line-height:15px;color:{{ nav.stc }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.st }}</div>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;opacity:{{ nav.volOp }};transition:opacity 200ms ease">
+                  <div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.75)"><span>Volume</span><span style="font-variant-numeric:tabular-nums">{{ nav.vol }}</span></div>
+                  <div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.2);position:relative;overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ nav.volW }};background:#fff;transition:width 120ms linear"></div></div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ nav.isLights }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:5px;opacity:{{ nav.briOp }};transition:opacity 200ms ease">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.75)">{{ nav.briCap }}</span><span style="font-size:16px;line-height:18px;font-weight:600;font-variant-numeric:tabular-nums">{{ nav.bri }}</span></div>
+                  <div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.18);position:relative;overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ nav.briW }};background:{{ nav.kel }};transition:width 120ms linear, background 200ms ease"></div></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px;opacity:{{ nav.tempOp }};transition:opacity 200ms ease">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.75)">Temperature</span><span style="font-size:16px;line-height:18px;font-weight:600;font-variant-numeric:tabular-nums">{{ nav.temp }}</span></div>
+                  <div style="height:4px;border-radius:2px;background:{{ nav.tempGrad }};position:relative"><div style="position:absolute;top:-4px;width:4px;height:12px;border-radius:2px;margin-left:-2px;left:{{ nav.tempX }};background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4);transition:left 120ms linear"></div></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:12px;line-height:15px;color:{{ nav.areaC }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-weight:600;color:#fff">{{ nav.scene }}</span> · {{ nav.areaLine }}</div>
+                  <sc-for list="{{ nav.lightsList }}" as="l" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ l.dot }}"></span>
+                      <span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.n }}</span>
+                      <span style="font-size:11px;color:{{ l.c }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ l.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ nav.isCovers }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="position:relative;height:196px;overflow:hidden">
+                  <sc-for list="{{ nav.covers }}" as="c" hint-placeholder-count="5">
+                    <div style="position:absolute;left:50%;top:50%;width:120px;height:120px;border-radius:8px;transform:{{ c.tf }};opacity:{{ c.op }};z-index:{{ c.z }};background:{{ c.bg }};box-shadow:0 10px 24px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.2);transition:transform 380ms cubic-bezier(0.22,1,0.36,1), opacity 280ms ease"></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <div style="font-size:15px;line-height:19px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.t }}</div>
+                  <div style="font-size:12px;line-height:16px;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.a }}</div>
+                  <div style="font-size:11px;line-height:15px;color:{{ nav.stc }}">{{ nav.st }}</div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ nav.isRows }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="position:relative;height:190px;overflow:hidden">
+                  <div style="position:absolute;left:0;right:0;top:76px;height:38px;border-radius:10px;background:rgba(255,255,255,0.16);box-shadow:inset 0 1px 0 rgba(255,255,255,0.35);opacity:{{ nav.plateOp }};transform:{{ nav.plateTf }};transition:transform 320ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease"></div>
+                  <sc-for list="{{ nav.rows }}" as="r" hint-placeholder-count="5">
+                    <div style="position:absolute;left:0;right:0;top:76px;height:38px;transform:{{ r.tf }};opacity:{{ r.op }};transition:transform 380ms cubic-bezier(0.22,1,0.36,1), opacity 280ms ease;display:flex;align-items:center;gap:10px;padding:0 10px;box-sizing:border-box">
+                      <div style="width:16px;font-size:11px;color:rgba(255,255,255,0.7);font-variant-numeric:tabular-nums">{{ r.n }}</div>
+                      <div style="flex:1;min-width:0;font-size:13px;line-height:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.tc }}">{{ r.t }}</div>
+                      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:{{ r.tagc }};white-space:nowrap">{{ r.tag }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="font-size:11px;line-height:15px;color:{{ nav.stc }}">{{ nav.st }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ nav.isSeek }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;gap:12px;align-items:center;min-width:0">
+                  <div style="width:44px;height:44px;flex:none;border-radius:6px;background:{{ nav.art }}"></div>
+                  <div style="font-size:14px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nav.t }}</div>
+                </div>
+                <div style="display:flex;align-items:baseline;gap:6px"><span style="font-size:36px;line-height:40px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">{{ nav.big }}</span><span style="font-size:12px;color:rgba(255,255,255,0.8)">{{ nav.unit }}</span></div>
+                <div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.2);position:relative;overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ nav.seekW }};background:#FFBE69;transition:width 120ms linear"></div></div>
+              </div>
+            </sc-if>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;border-top:1px solid rgba(255,255,255,0.18);padding-top:12px;position:relative">
+              <sc-for list="{{ nav.keys }}" as="k" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:6px;opacity:{{ k.op }};min-width:0">
+                  <span style="width:16px;height:16px;flex:none;border-radius:4px;border:1px solid rgba(255,255,255,0.55);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:{{ k.bg }};color:{{ k.fg }};text-shadow:none;transition:background 120ms ease, color 120ms ease">{{ k.k }}</span>
+                  <span style="font-size:11px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.l }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ nav.hasHolds }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:-2px">
+                <span style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.6)">Hold</span>
+                <sc-for list="{{ nav.holds }}" as="h" hint-placeholder-count="1">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                    <span style="width:16px;height:16px;flex:none;border-radius:4px;border:1px solid rgba(255,255,255,0.55);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:{{ h.bg }};color:{{ h.fg }};text-shadow:none">{{ h.k }}</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,0.9);white-space:nowrap">{{ h.l }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        </div>
+
+        <div style="position:absolute;inset:0;opacity:{{ pOp }};transition:opacity 280ms cubic-bezier(0.22,1,0.36,1);pointer-events:none">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);background:rgba(10,10,12,0.5)"></div>
+          <div style="position:absolute;left:0;width:2560px;top:96px;display:flex;justify-content:center;gap:16px">
+            <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="position:relative;width:176px;height:110px;overflow:hidden;border:2px solid {{ sl.border }};background:{{ sl.thumb }};transition:border-color 260ms ease">
+                  <div style="position:absolute;left:8px;bottom:8px;width:22px;height:22px;background:{{ sl.ic }};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ sl.letter }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.86)">
+                  <span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ sl.key }}</span>
+                  <span>{{ sl.label }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ pCards }}" as="c" hint-placeholder-count="7">
+            <div style="position:absolute;left:1280px;top:370px;width:400px;height:250px;transform:{{ c.tf }};opacity:{{ c.op }};z-index:{{ c.z }};transition:transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease">
+              <div style="position:absolute;inset:0;overflow:hidden;background:{{ c.thumb }};box-shadow:0 24px 60px rgba(0,0,0,0.45)"></div>
+              <div style="position:absolute;left:-8px;top:-8px;right:-8px;bottom:-8px;border:2px solid rgba(255,255,255,0.9);opacity:{{ c.ring }};transition:opacity 300ms ease"></div>
+              <div style="position:absolute;left:12px;bottom:12px;width:30px;height:30px;background:{{ c.ic }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">{{ c.letter }}</div>
+              <div style="position:absolute;left:12px;top:12px;padding:4px 8px;background:rgba(18,18,20,0.72);color:#fff;font-size:12px;font-weight:600;opacity:{{ c.badgeOp }}">{{ c.badge }}</div>
+              <div style="position:absolute;inset:0;background:#111;opacity:{{ c.shade }};transition:opacity 300ms ease"></div>
+            </div>
+          </sc-for>
+          <div style="position:absolute;left:830px;width:900px;top:516px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:#fff">
+            <div style="font-size:15px;color:rgba(255,255,255,0.9)">{{ pCur.app }}</div>
+            <div style="font-size:26px;line-height:32px;font-weight:600;white-space:nowrap">{{ pCur.title }}</div>
+          </div>
+          <div style="position:absolute;left:0;width:2560px;top:664px;display:flex;justify-content:center;gap:28px;color:rgba(255,255,255,0.8);font-size:13px">
+            <sc-for list="{{ pHints }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ h.k }}</span><span>{{ h.l }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="position:absolute;inset:0;opacity:{{ xOp }};transition:opacity 340ms cubic-bezier(0.22,1,0.36,1);overflow:hidden;pointer-events:none">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(36px) saturate(1.3);-webkit-backdrop-filter:blur(36px) saturate(1.3);background:rgba(8,8,10,0.5)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ xAmb }};filter:blur(90px) saturate(1.5);opacity:0.8;transition:background 600ms ease"></div>
+          <div style="position:absolute;left:700px;top:50px;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.7)">{{ xPath }}</div>
+          <div style="position:absolute;left:0;width:2560px;top:44px;display:flex;justify-content:center;gap:36px">
+            <sc-for list="{{ xTabs }}" as="tb" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;opacity:{{ tb.op }};transition:opacity 240ms ease">
+                <div style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600">
+                  <span style="width:18px;height:18px;border:1px solid currentColor;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ tb.k }}</span>
+                  <span>{{ tb.l }}</span>
+                </div>
+                <div style="width:100%;height:2px;background:#fff;transform:scaleX({{ tb.sx }});transition:transform 320ms cubic-bezier(0.22,1,0.36,1)"></div>
+              </div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ xCards }}" as="c" hint-placeholder-count="9">
+            <div style="position:absolute;left:1280px;top:300px;width:340px;height:340px;transform:{{ c.tf }};opacity:{{ c.op }};z-index:{{ c.z }};transition:transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease">
+              <div style="position:absolute;inset:0;overflow:hidden;background:#222;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;box-shadow:0 30px 70px rgba(0,0,0,0.5)">
+                <sc-for list="{{ c.tiles }}" as="t" hint-placeholder-count="1">
+                  <div style="grid-column:{{ t.col }};grid-row:{{ t.row }};background:{{ t.bg }}"></div>
+                </sc-for>
+              </div>
+              <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12)"></div>
+              <div style="position:absolute;inset:0;background:#0b0b0c;opacity:{{ c.shade }};transition:opacity 300ms ease"></div>
+            </div>
+          </sc-for>
+          <div style="position:absolute;left:830px;width:900px;top:500px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:#fff">
+            <div style="font-size:30px;line-height:36px;font-weight:600;letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:900px">{{ xCur.t }}</div>
+            <div style="font-size:17px;line-height:22px;color:rgba(255,255,255,0.9)">{{ xCur.a }}</div>
+            <div style="font-size:14px;line-height:18px;color:rgba(255,255,255,0.72)">{{ xCur.m }}</div>
+          </div>
+          <div style="position:absolute;left:0;width:2560px;top:664px;display:flex;justify-content:center;gap:28px;color:rgba(255,255,255,0.8);font-size:13px">
+            <sc-for list="{{ xHints }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ h.k }}</span><span>{{ h.l }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="position:absolute;inset:0;opacity:{{ qOp }};transition:opacity 340ms cubic-bezier(0.22,1,0.36,1);overflow:hidden;pointer-events:none">
+          <div style="position:absolute;inset:0;backdrop-filter:blur(36px) saturate(1.3);-webkit-backdrop-filter:blur(36px) saturate(1.3);background:rgba(8,8,10,0.55)"></div>
+          <div style="position:absolute;left:-160px;top:-160px;right:-160px;bottom:-160px;background:{{ qAmb }};filter:blur(90px) saturate(1.5);opacity:0.8"></div>
+          <div style="position:absolute;left:760px;top:50px;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.7)">Music › Tracks › Up next</div>
+          <div style="position:absolute;left:760px;top:120px;width:380px;display:flex;flex-direction:column;gap:18px">
+            <div style="width:380px;height:380px;background:{{ qArt }};box-shadow:0 40px 80px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)"></div>
+            <div style="display:flex;flex-direction:column;gap:6px;color:#fff">
+              <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,0.72)">Up next</div>
+              <div style="font-size:24px;line-height:30px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ qCtx.t }}</div>
+              <div style="font-size:15px;color:rgba(255,255,255,0.86)">{{ qCtx.a }}</div>
+              <div style="font-size:13px;color:{{ qCtx.shc }}">{{ qCtx.sh }}</div>
+            </div>
+          </div>
+          <div style="position:absolute;left:1240px;top:276px;width:560px;height:88px;background:rgba(255,255,255,0.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.28)"></div>
+          <sc-for list="{{ qRows }}" as="r" hint-placeholder-count="7">
+            <div style="position:absolute;left:1240px;top:276px;width:560px;height:88px;transform:{{ r.tf }};opacity:{{ r.op }};transition:transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease;display:flex;align-items:center;gap:18px;padding:0 22px;box-sizing:border-box;color:#fff">
+              <div style="width:28px;font-size:15px;color:rgba(255,255,255,0.7);font-variant-numeric:tabular-nums">{{ r.n }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:20px;line-height:24px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.tc }}">{{ r.t }}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.7)">{{ r.a }}</div>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="{{ r.hf }}" stroke="{{ r.hs }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"></path></svg>
+            </div>
+          </sc-for>
+          <div style="position:absolute;left:0;width:2560px;top:664px;display:flex;justify-content:center;gap:28px;color:rgba(255,255,255,0.8);font-size:13px">
+            <sc-for list="{{ qHints }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border:1px solid rgba(255,255,255,0.6);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ h.k }}</span><span>{{ h.l }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <div ref="{{ devRef }}" onPointerDown="{{ onKnobDown }}" style="flex:none;width:374px;height:440px;touch-action:none;user-select:none;cursor:grab">
+      <div style="zoom:1.1;position:relative;width:340px;height:400px;background:#141414">
+        <div style="position:absolute;left:170px;top:170px;width:0;height:0">
+          <sc-for list="{{ segs }}" as="sg" hint-placeholder-count="60">
+            <div style="position:absolute;left:-2px;top:-5px;width:4px;height:10px;transform:{{ sg.tf }};background:{{ sg.bg }};box-shadow:{{ sg.sh }};transition:background 200ms cubic-bezier(0.22,1,0.36,1) {{ sg.dl }}, box-shadow 200ms cubic-bezier(0.22,1,0.36,1) {{ sg.dl }}"></div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;left:44px;top:44px;width:252px;height:252px;border-radius:50%;background:#0a0a0a;box-shadow:inset 0 0 0 1px #262626;transform:{{ knobTf }}">
+          <div style="position:absolute;left:124px;top:1px;width:4px;height:4px;background:#3a3a3a"></div>
+        </div>
+        <div style="position:absolute;left:49px;top:336px;display:flex;gap:22px">
+          <sc-for list="{{ btns }}" as="b" hint-placeholder-count="4">
+            <div onPointerDown="{{ b.down }}" onPointerUp="{{ b.up }}" onPointerLeave="{{ b.leave }}" style="width:44px;height:44px;background:#202020;box-shadow:{{ b.sh }};border-bottom:3px solid {{ b.strip }};display:flex;align-items:center;justify-content:center;color:#6a6a6a;font:600 13px Montserrat, sans-serif;cursor:pointer;transform:{{ b.tf }};transition:box-shadow 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms cubic-bezier(0.22,1,0.36,1), transform 80ms ease-out">{{ b.n }}</div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;left:50px;top:50px;width:240px;height:240px;border-radius:50%;overflow:hidden;background:#000;font-family:Montserrat, sans-serif;font-weight:500;color:#F2F2F2;-webkit-font-smoothing:antialiased;pointer-events:none">
+          <div style="position:absolute;inset:0;background:{{ lcdArt }};opacity:{{ lcdArtOp }};transition:opacity 300ms ease"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.72) 45%, rgba(0,0,0,0.92) 62%, #000 70%);opacity:{{ lcdScrimOp }};transition:opacity 300ms ease"></div>
+          <div style="position:absolute;inset:0;opacity:{{ cOp }};transform:{{ cTf }};transition:{{ cTr }};text-shadow:0 1px 0 rgba(0,0,0,0.8)">
+            <div style="position:absolute;left:0;width:240px;top:17px;display:flex;justify-content:center;gap:5px;opacity:{{ pipsOp }};transition:opacity 200ms ease-out">
+              <sc-for list="{{ pips }}" as="pp" hint-placeholder-count="0">
+                <div style="width:5px;height:5px;border-radius:50%;background:{{ pp.bg }};box-shadow:{{ pp.sh }}"></div>
+              </sc-for>
+            </div>
+            <div style="position:absolute;left:0;top:0;width:240px;height:240px;opacity:{{ arcOp }};transition:opacity 200ms ease-out">{{ arcEl }}</div>
+            <div style="position:absolute;left:30px;width:180px;top:32px;display:flex;justify-content:center;gap:5px;font-size:12px;line-height:14px;letter-spacing:0.08em;white-space:nowrap;overflow:hidden;opacity:{{ labelOp }}"><span style="color:#7C7C7C">{{ v.parent }}</span><span style="color:#A6A6A6">{{ v.label }}</span></div>
+            <div style="position:absolute;inset:0;opacity:{{ ly.text.op }};transform:{{ ly.text.tf }};transition:{{ ly.text.tr }}">
+              <div style="position:absolute;left:35px;width:170px;top:60px;text-align:center;font-size:22px;line-height:26px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance">{{ v.title }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:114px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.sub }}</div>
+            </div>
+            <div style="position:absolute;inset:0;opacity:{{ ly.big.op }};transform:{{ ly.big.tf }};transition:{{ ly.big.tr }}">
+              <div style="position:absolute;left:35px;width:170px;top:52px;text-align:center;font-size:14px;line-height:18px;color:#A6A6A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.cap }}</div>
+              <div style="position:absolute;left:0;width:240px;top:76px;display:flex;justify-content:center;align-items:baseline;gap:3px;font-size:48px;line-height:46px;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">{{ v.big }}<span style="font-size:22px;letter-spacing:0;color:#A6A6A6">{{ v.unit }}</span></div>
+            </div>
+            <div style="position:absolute;inset:0;opacity:{{ ly.list.op }};transform:{{ ly.list.tf }};transition:{{ ly.list.tr }}">
+              <div style="position:absolute;left:35px;width:170px;top:56px;text-align:center;font-size:14px;line-height:18px;color:#7C7C7C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.prev }}</div>
+              <div style="position:absolute;left:30px;width:180px;top:78px;text-align:center;font-size:22px;line-height:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.ltitle }}</div>
+              <div style="position:absolute;left:35px;width:170px;top:108px;text-align:center;font-size:14px;line-height:18px;color:#7C7C7C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.next }}</div>
+            </div>
+            <div style="position:absolute;left:28px;width:184px;top:100px;display:flex;justify-content:space-between">
+              <sc-for list="{{ center }}" as="c" hint-placeholder-count="4">
+                <div style="width:46px;display:flex;flex-direction:column;align-items:center;gap:8px;color:{{ c.col }};opacity:{{ c.op }};transform:{{ c.tf }};transition:{{ c.tr }}">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round"><path d="{{ c.d }}"></path></svg>
+                  <div style="font-size:12px;line-height:14px;white-space:nowrap">{{ c.w }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="position:absolute;left:30px;width:180px;top:134px;text-align:center;font-size:12px;line-height:14px;color:{{ v.sc }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:{{ stOp }};transform:translateY({{ stY }}px);transition:{{ stTr }}">{{ v.st }}</div>
+            <div style="position:absolute;inset:0;opacity:{{ ly.foot.op }};transition:opacity 240ms ease-out">
+              <sc-for list="{{ foot }}" as="ft" hint-placeholder-count="4">
+                <div style="position:absolute;left:{{ ft.x }}px;top:152px;width:44px;height:24px;display:flex;align-items:center;justify-content:center;color:{{ ft.col }};transform:{{ ft.tf }};transition:{{ ft.tr }}">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="{{ ft.fill }}" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round"><path d="{{ ft.d }}" style="d:{{ ft.dc }};transition:d 300ms cubic-bezier(0.22,1,0.36,1)"></path></svg>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:162px;top:152px;width:44px;height:24px;opacity:{{ hf.op }}"><div style="position:absolute;left:0;right:0;bottom:0;height:{{ hf.h }};overflow:hidden;transition:{{ hf.tr }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFBE69" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round" style="position:absolute;left:12px;bottom:2px"><path d="{{ hf.d }}"></path></svg></div></div>
+              <div style="position:absolute;left:176px;top:180px;width:16px;height:2px;border-radius:1px;background:#A6A6A6;opacity:{{ holdTickOp }};transition:opacity 200ms ease"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1 1 360px;min-width:0;max-width:620px;display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">You are in</div>
+        <div style="font-family:var(--font-heading);font-size:30px;font-weight:700;letter-spacing:-0.01em">{{ where }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+        <sc-for list="{{ map }}" as="m" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;padding:9px 0;border-bottom:1px solid var(--color-neutral-300);font-size:15px;line-height:1.35;opacity:{{ m.op }}">
+            <div style="font-weight:700">{{ m.k }}</div>
+            <div>{{ m.v }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5;color:var(--color-neutral-700)">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase">Controls</div>
+        <div>Turn: drag around the knob, scroll over it, or use the arrow keys (Shift for 5 detents).</div>
+        <div>Buttons: click them or press 1–4. Hold 1 for 0.6 s to jump Home. Hold 4 for 1 s for the secondary action (a warm arc fills the ring). Tap 4 acts on release.</div>
+        <div style="color:var(--color-text)">{{ hint }}</div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:1080px">
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)"><span>Companion · Settings window</span><span>New in r3.1 · Home Assistant</span></div>
+    <div style="background:#1B1A1A;color:#F3F2F2;font-family:Archivo, sans-serif;border:2px solid var(--color-text)">
+      <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding-left:14px;background:#242323;border-bottom:1px solid #2D2B2B">
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#BAB6B6">
+          <div style="position:relative;width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px #FFBE69"><div style="position:absolute;left:5px;top:5px;width:4px;height:4px;border-radius:50%;background:#FF8338"></div></div>
+          <span>Nano_D++ Settings</span>
+        </div>
+        <div style="display:flex;height:36px">
+          <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#9B9797;font-size:13px">—</div>
+          <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#9B9797;font-size:12px">☐</div>
+          <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#9B9797;font-size:13px">✕</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:2px solid #444141">
+        <sc-for list="{{ set.strip }}" as="c" hint-placeholder-count="4">
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #2D2B2B;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797"><span style="width:8px;height:8px;flex:none;background:{{ c.mark }}"></span><span>{{ c.name }}</span></div>
+            <div style="font-size:15px;font-weight:600">{{ c.state }}</div>
+            <div style="font-size:12px;line-height:16px;color:#9B9797;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.detail }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:180px minmax(0,1fr)">
+        <div style="display:flex;flex-direction:column;border-right:1px solid #2D2B2B;padding:12px 0">
+          <div style="padding:9px 16px;font-size:14px;color:#BAB6B6">General</div>
+          <div style="padding:9px 16px;font-size:14px;color:#BAB6B6">Music</div>
+          <div style="padding:9px 16px;font-size:14px;color:#BAB6B6">Windows</div>
+          <div style="padding:9px 16px;font-size:14px;font-weight:600;color:#F3F2F2;background:#242323">Home Assistant</div>
+          <div style="padding:9px 16px;font-size:14px;color:#BAB6B6">Knob</div>
+        </div>
+        <div style="padding:24px;display:flex;flex-direction:column;gap:20px;min-width:0">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:22px;line-height:28px;font-weight:700">Home Assistant</div>
+            <div style="font-size:13px;line-height:19px;color:#BAB6B6;max-width:640px;text-wrap:pretty">The knob controls every light in the area you choose, including lights you add later. The area’s scenes, scripts and automations appear in the knob’s Scenes list.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px">
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797">Address</div>
+              <input value="{{ set.addr }}" onChange="{{ set.onAddr }}" spellcheck="false" style="height:36px;box-sizing:border-box;padding:0 10px;background:#242323;border:1px solid #444141;border-radius:0;color:#F3F2F2;font:14px Archivo, sans-serif;outline:none;min-width:0" style-focus="border-color:#F3F2F2">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797">Long-lived access token</div>
+              <div style="display:flex;gap:0;min-width:0">
+                <input type="{{ set.tokType }}" value="{{ set.token }}" onChange="{{ set.onToken }}" spellcheck="false" style="flex:1;height:36px;box-sizing:border-box;padding:0 10px;background:#242323;border:1px solid #444141;border-right:0;border-radius:0;color:#F3F2F2;font:14px Archivo, sans-serif;outline:none;min-width:0" style-focus="border-color:#F3F2F2">
+                <button onClick="{{ set.onShow }}" style="height:36px;padding:0 12px;background:#242323;border:1px solid #444141;border-radius:0;color:#BAB6B6;font:600 13px Archivo, sans-serif;cursor:pointer;text-align:left" style-hover="color:#F3F2F2">{{ set.showLabel }}</button>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797">Area</div>
+              <select value="{{ set.area }}" onChange="{{ set.onArea }}" style="height:36px;box-sizing:border-box;padding:0 8px;background:#242323;border:1px solid #444141;border-radius:0;color:#F3F2F2;font:14px Archivo, sans-serif;outline:none" style-focus="border-color:#F3F2F2">
+                <sc-for list="{{ set.areaOpts }}" as="o" hint-placeholder-count="3">
+                  <option value="{{ o.v }}">{{ o.l }}</option>
+                </sc-for>
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:0;justify-content:flex-end">
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <button onClick="{{ set.onTest }}" style="height:36px;padding:0 14px;background:transparent;border:1px solid #F3F2F2;border-radius:0;color:#F3F2F2;font:600 14px Archivo, sans-serif;cursor:pointer;text-align:left" style-hover="background:#2D2B2B">{{ set.testLabel }}</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:18px">
+            <span style="width:8px;height:8px;flex:none;margin-top:5px;background:{{ set.stMark }}"></span>
+            <span style="color:#F3F2F2;text-wrap:pretty">{{ set.stText }}</span>
+          </div>
+          <div style="border-top:2px solid #444141"></div>
+          <sc-if value="{{ set.notOk }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;line-height:19px;color:#9B9797">{{ set.placeholder }}</div>
+          </sc-if>
+          <sc-if value="{{ set.isOk }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+              <div style="display:flex;flex-direction:column;min-width:0">
+                <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797;padding-bottom:8px;border-bottom:1px solid #444141">{{ set.lightsHead }}</div>
+                <sc-if value="{{ set.noLights }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:12px 0;font-size:13px;line-height:19px;color:#BAB6B6;text-wrap:pretty">{{ set.emptyLights }}</div>
+                </sc-if>
+                <sc-for list="{{ set.lights }}" as="l" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:10px;height:36px;border-bottom:1px solid #2D2B2B;min-width:0">
+                    <span style="width:8px;height:8px;flex:none;background:{{ l.dot }}"></span>
+                    <span style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.n }}</span>
+                    <span style="font-size:13px;color:{{ l.c }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ l.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;min-width:0">
+                <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;color:#9B9797;padding-bottom:8px;border-bottom:1px solid #444141">{{ set.scenesHead }}</div>
+                <sc-if value="{{ set.noScenes }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:12px 0;font-size:13px;line-height:19px;color:#BAB6B6">No scenes, scripts or automations in this area.</div>
+                </sc-if>
+                <sc-for list="{{ set.scenes }}" as="x" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:10px;height:36px;border-bottom:1px solid #2D2B2B;min-width:0">
+                    <span style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.n }}</span>
+                    <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;color:#9B9797">{{ x.k }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:2px solid #444141;padding-top:16px">
+            <button onClick="{{ set.onSave }}" style="height:36px;min-width:96px;padding:0 14px;background:#F3F2F2;border:0;border-radius:0;color:#1B1A1A;font:600 14px Archivo, sans-serif;cursor:pointer;text-align:left;opacity:{{ set.saveOp }}" style-hover="background:#FFFFFF">Save</button>
+            <button onClick="{{ set.onCancel }}" style="height:36px;padding:0 14px;background:transparent;border:1px solid #444141;border-radius:0;color:#BAB6B6;font:600 14px Archivo, sans-serif;cursor:pointer;text-align:left" style-hover="color:#F3F2F2">Cancel</button>
+            <span style="font-size:13px;color:#6ED996">{{ set.savedText }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;navMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;pinned&quot;,&quot;off&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const cov = f => `url("assets/covers/${f}") center / cover no-repeat`;
+const ALB = [
+  { t: 'Promises', a: 'Harbour Signals, Sodium Coast & LSO', y: 2021, f: 'promises-floating-points-pharoah-sanders.png', c: '120,150,190', tr: ['Movement 1', 'Movement 2', 'Movement 3', 'Movement 4', 'Movement 5', 'Movement 6'] },
+  { t: 'Night Channel', a: 'Velvet Circuit', y: 2007, f: 'night-drive-velvet circuit-album-.jpg', c: '255,40,90', tr: ['Night Channel', 'I Want Your Love', 'Tick of the Clock', 'Lantern Light', 'Mask'] },
+  { t: 'Glass Weather', a: 'Lumen Park', y: 2010, f: 'glass weather-album-.png', c: '255,120,30', tr: ['Pray for Rain', 'Babel', 'Splitting the Atom', 'Girl I Love You', 'Psyche', 'Paradise Circus'] },
+  { t: 'Midnight Arcade', a: 'Air', y: 1998, f: 'moon-safari.png', c: '60,170,255', tr: ['La femme d’argent', 'Long Range', 'Afterburn', 'Kelly Watch the Stars', 'Talisman', 'Remember'] },
+  { t: 'Paper Lanterns', a: 'Mira Vale', y: 1985, f: 'hounds-of-love.png', c: '160,90,255', tr: ['Lantern Light', 'Paper Lanterns', 'The Big Sky', 'Mother Stands for Comfort', 'Pressure Front'] },
+  { t: 'Lua & Mar', a: 'Lua Serena & Antônio Carlos Jobim', y: 1974, f: 'elis-tom.jpg', c: '255,190,60', tr: ['Águas de Março', 'Pois É', 'Só Tinha de Ser com Você', 'Modinha', 'Triste'] },
+  { t: 'Neon Littoral', a: 'Lumen Park', y: 1991, f: 'blue-lines.jpg', c: '255,40,20', tr: ['Safe from Harm', 'One Love', 'Neon Littoral', 'Harbour Song', 'Daydreaming'] },
+  { t: 'Copper Sun Sessions', a: 'Various artists', y: 1968, f: 'tropic-lia-ou-panis-et-circencis.jpg', c: '255,150,40', tr: ['Miserere Nobis', 'Coração Materno', 'Panis et Circencis', 'Lindonéia', 'Parque Industrial'] },
+  { t: 'Tidal Glass', a: 'Oskar Lind Trio', y: 1959, f: 'kind-of-blue.jpg', c: '40,120,255', tr: ['So What', 'Freddie Freeloader', 'Blue in Green', 'All Blues', 'Flamenco Sketches'] }
+];
+const PL = [
+  { t: 'Late Night', al: [1, 2, 6, 3], n: 38 }, { t: 'Sunday Morning', al: [5, 7, 8, 3], n: 24 },
+  { t: 'Deep Focus', al: [0, 8, 3, 4], n: 51 }, { t: 'Demo Party', al: [1, 4, 6, 7], n: 30 }
+];
+const thumbCss = w => { const L = (x, y, ww, h, c) => `linear-gradient(${c},${c}) ${x}% ${y}% / ${ww}% ${h}% no-repeat`;
+  return [L(24, 10, 30, 3, w.hd), L(24, 18, 52, 2, w.ln), L(24, 24, 46, 2, w.ln), L(24, 30, 58, 2, w.ln), L(24, 36, 40, 2, w.ln), L(24, 50, 36, 18, w.acc), L(70, 50, 22, 18, w.ln), L(24, 78, 60, 2, w.ln), L(24, 84, 50, 2, w.ln), L(0, 0, 18, 100, w.side), w.body].join(','); };
+const WIN = [
+  { app: 'Claude', title: 'Knob IA r3 review', img: 'claude.png', c: '217,119,87', body: '#262624', side: '#1f1e1c', ln: '#5a5850', hd: '#d9d4c7', acc: '#3a3935' },
+  { app: 'Chrome', title: 'Home Assistant · Demo', img: 'chrome.png', c: '66,133,244', body: '#f1f3f4', side: '#ffffff', ln: '#c8c8c8', hd: '#303030', acc: '#8ab4f8' },
+  { app: 'Slack', title: '#demo-automation', img: 'slack.png', c: '224,30,90', body: '#1a1d21', side: '#3f0e40', ln: '#4e5157', hd: '#d1d2d3', acc: '#2c2d30' },
+  { app: 'Terminal', title: 'pio run -t upload', img: 'term.png', c: '60,200,90', body: '#0c0c0c', side: '#0c0c0c', ln: '#2f7f45', hd: '#3fbf5f', acc: '#141414' },
+  { app: 'ChatGPT', title: 'LVGL font subsetting', img: 'chatgpt.png', c: '16,163,127', body: '#212121', side: '#171717', ln: '#555', hd: '#ececec', acc: '#2f2f2f' },
+  { app: 'Figma', title: 'Nano D · Knob faces', letter: 'F', lbg: '#a259ff', c: '162,89,255', body: '#2c2c2c', side: '#1e1e1e', ln: '#444', hd: '#e5e5e5', acc: '#0d99ff' },
+  { app: 'Explorer', title: 'Downloads', letter: 'E', lbg: '#d99a00', c: '245,180,0', body: '#1f1f1f', side: '#191919', ln: '#4a4a4a', hd: '#dcdcdc', acc: '#2b2b2b' }
+].map(w => Object.assign(w, { thumb: thumbCss(w), ic: w.img ? `url("assets/apps/${w.img}") center / contain no-repeat` : w.lbg, letter: w.letter || '' }));
+const SCENES = [{ n: 'Focus', b: 62, t: 3200, k: 'Scene' }, { n: 'Evening', b: 48, t: 2700, k: 'Scene' }, { n: 'Movie', b: 12, t: 2200, k: 'Script' }, { n: 'Reading', b: 80, t: 3500, k: 'Scene' }, { n: 'Daylight', b: 100, t: 5000, k: 'Automation' }];
+const AREA_SCENES = { Demo: SCENES, Office: [{ n: 'Work', b: 90, t: 4500, k: 'Scene' }, { n: 'Wind down', b: 35, t: 2700, k: 'Automation' }], Kitchen: [] };
+const LT = (n, on, b, t, ok = true) => ({ n, on, b, t, ok });
+const DEMO = {
+  all: () => [LT('Ceiling', true, 62, 3200), LT('Desk lamp', true, 62, 3200), LT('Shelf strip', true, 62, 3200)],
+  mixed: () => [LT('Ceiling', true, 80, 3000), LT('Desk lamp', true, 44, 3400), LT('Shelf strip', false, 50, 2700)],
+  unavail: () => [LT('Ceiling', true, 62, 3200), LT('Desk lamp', true, 62, 3200), LT('Shelf strip', false, 62, 3200, false)],
+  none: () => []
+};
+const AREAS0 = () => ({ Demo: DEMO.all(), Office: [LT('Desk light', true, 70, 4000)], Kitchen: [] });
+const agg = S => { const ls = (S.areas && S.areas[S.area]) || [], ok = ls.filter(l => l.ok), on = ok.filter(l => l.on);
+  const avg = f => on.reduce((a, l) => a + l[f], 0) / Math.max(1, on.length);
+  const mem = S.lastLevel || { b: 62, t: 3200 };
+  return { name: S.area, ls, cnt: ls.length, nOk: ok.length, nOn: on.length, on: on.length > 0,
+    bri: on.length ? Math.round(avg('b')) : mem.b, temp: on.length ? Math.round(avg('t') / 100) * 100 : mem.t,
+    bad: ls.filter(l => !l.ok).map(l => l.n), empty: ls.length === 0,
+    mixed: on.length > 0 && (on.length < ok.length || on.some(l => l.b !== on[0].b || l.t !== on[0].t)) }; };
+const mos = it => it.f ? `url("assets/covers/${it.f}") center / cover no-repeat` : it.al.map((a, k) => `url("assets/covers/${ALB[a].f}") ${k % 2 ? '100%' : '0%'} ${k < 2 ? '0%' : '100%'} / 50% 50% no-repeat`).join(', ');
+const lightsWord = n => n === 1 ? '1 light' : n + ' lights';
+const kelv = K => { const t = K / 100, cl = x => Math.round(Math.max(0, Math.min(255, x)));
+  const r = t <= 66 ? 255 : 329.7 * Math.pow(t - 60, -0.1332), g = t <= 66 ? 99.47 * Math.log(t) - 161.12 : 288.12 * Math.pow(t - 60, -0.0755), b = t >= 66 ? 255 : 138.52 * Math.log(t - 10) - 305.04;
+  return [cl(r), cl(g), cl(b)].join(','); };
+const DEP = { home: 0, music: 1, windows: 1, lights: 1, albums: 2, tracks: 2, scenes: 2, explorer: 3, upnext: 3 };
+const durOf = (a, t) => 180 + ((a * 53 + t * 37) % 140);
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+function cssSpring(r, z) { const k = Math.pow(2 * Math.PI / r, 2), c = 4 * Math.PI * z / r, w0 = Math.sqrt(k), zz = c / (2 * w0);
+  const f = ms => { const t = ms / 1000; if (zz < 1) { const wd = w0 * Math.sqrt(1 - zz * zz); return 1 - Math.exp(-zz * w0 * t) * (Math.cos(wd * t) + (zz * w0 / wd) * Math.sin(wd * t)); } return 1 - Math.exp(-w0 * t) * (1 + w0 * t); };
+  let st = 1200; for (let ms = 40; ms < 1600; ms += 8) { let ok = true; for (let j = 0; j <= 120; j += 8) if (Math.abs(1 - f(ms + j)) > 0.004) { ok = false; break; } if (ok) { st = ms; break; } }
+  const pts = []; for (let i = 0; i <= 40; i++) pts.push(f(st * i / 40).toFixed(4)); pts[40] = '1'; return { ms: st, css: 'linear(' + pts.join(', ') + ')' }; }
+const SPRING = { snap: cssSpring(0.36, 0.72), soft: cssSpring(0.46, 0.82), pop: cssSpring(0.42, 0.52), wall: cssSpring(0.34, 0.42) };
+const TR = (prop, sp, delay = 0) => `${prop} ${sp.ms}ms ${sp.css} ${delay}ms`;
+class Component extends DCLogic {
+  constructor(p) { super(p); this.devRef = React.createRef(); this.monRef = React.createRef(); this.state = this.initial(); }
+  initial(o = {}) {
+    return Object.assign({ touring: false, tourStep: '', pop: -1, sound: true, wallPh: 0, wallDir: 0, sweepUntil: 0, stIn: 0, lIn: 0, crumbs: 'arc', navMode: this.props.navMode ?? 'auto', lastAct: 0, space: 'home', hd: 'music',
+      loaded: true, playing: true, pausedAt: 0, np: { a: 3, t: 2 }, pos: 64, vol: 34,
+      area: 'Demo', areas: AREAS0(), demoScn: 'all', snap: null, lastLevel: { b: 62, t: 3200 }, scene: 0, custom: false, lm: 'bri',
+      haLinked: true, ha: { addr: 'http://homeassistant.local:8123', token: 'eyJhbGciOiJIUzI1NiJ9.nano-d-demo-token', show: false, area: 'Demo', status: 'ok', err: '', saved: 0 },
+      rev: null, revUntil: 0, msg: null, flash: null, src: 'recent', ai: 3, tI: 2, seek: false, seekFrom: 0, holdAt: 0, hold4At: 0, qI: 2, shuffle: false, liked: {}, queued: null,
+      pickI: 1, left: 0, right: 1, focus: 0, sceneI: 0, pend: null, down: -1, rot: 0, ent: 0, anim: true, mw: 1200, now: Date.now() }, o);
+  }
+  componentDidMount() {
+    this._lastKey = this.state.space + '|' + this.state.hd;
+    this._t = Date.now();
+    this._iv = setInterval(() => this.tick(), 100);
+    this._kd = e => {
+      if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      if (e.key >= '1' && e.key <= '4') { if (!e.repeat) this.bDown(+e.key - 1); e.preventDefault(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { this.turn(e.shiftKey ? 5 : 1); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { this.turn(e.shiftKey ? -5 : -1); e.preventDefault(); }
+    };
+    this._ku = e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.key >= '1' && e.key <= '4') this.bUp(+e.key - 1); };
+    window.addEventListener('keydown', this._kd); window.addEventListener('keyup', this._ku);
+    this._acc = 0;
+    this._wh = e => { e.preventDefault(); this._acc += e.deltaY; while (Math.abs(this._acc) >= 30) { const d = this._acc > 0 ? 1 : -1; this._acc -= d * 30; this.turn(d); } };
+    if (this.devRef.current) this.devRef.current.addEventListener('wheel', this._wh, { passive: false });
+    if (this.monRef.current && window.ResizeObserver) {
+      this._ro = new ResizeObserver(en => { const w = Math.round(en[0].contentRect.width); if (w && w !== this.state.mw) this.setState({ mw: w }); });
+      this._ro.observe(this.monRef.current);
+    }
+  }
+  componentWillUnmount() {
+    clearInterval(this._iv); clearTimeout(this._hold); clearTimeout(this._hold4); clearTimeout(this._haT);
+    window.removeEventListener('keydown', this._kd); window.removeEventListener('keyup', this._ku);
+    if (this.devRef.current) this.devRef.current.removeEventListener('wheel', this._wh);
+    if (this._ro) this._ro.disconnect();
+    this.endDrag();
+  }
+  componentDidUpdate() {
+    const S = this.state, key = S.space + '|' + S.hd, prev = this._lastKey;
+    this._lastKey = key;
+    if (prev !== undefined && prev !== key) {
+      const ps = prev.split('|')[0];
+      const dir = ps !== S.space ? (DEP[S.space] >= DEP[ps] ? 1 : -1) : (S.hd === 'lights' ? 1 : -1);
+      cancelAnimationFrame(this._r1); cancelAnimationFrame(this._r2);
+      this.setState({ ent: dir, anim: false });
+      this._r1 = requestAnimationFrame(() => { this._r2 = requestAnimationFrame(() => this.setState({ ent: 0, anim: true })); });
+    }
+    const pulse = (k, v) => { cancelAnimationFrame(this['_p' + k]); this.setState({ [k]: v }); this['_p' + k] = requestAnimationFrame(() => { this['_p' + k] = requestAnimationFrame(() => this.setState({ [k]: 0 })); }); };
+    if (this._lastPlaying !== undefined && this._lastPlaying !== S.playing) this.popIcon(3); this._lastPlaying = S.playing;
+    const mk = S.msg ? S.msg.t + '|' + S.msg.until : ''; if (this._lastMsg !== undefined && mk && mk !== this._lastMsg) pulse('stIn', 1); this._lastMsg = mk;
+    const ik = [S.ai, S.qI, S.pickI, S.sceneI, S.tI, S.np.a, S.np.t], same = prev === key;
+    if (this._lastIk && same) { for (let j = 0; j < ik.length; j++) if (ik[j] !== this._lastIk[j]) { pulse('lIn', j >= 5 ? 1 : Math.sign(ik[j] - this._lastIk[j]) || 1); break; } }
+    this._lastIk = ik;
+  }
+  tick() {
+    const now = Date.now(), dt = (now - this._t) / 1000, S = this.state, p = { now };
+    this._t = now;
+    if (S.playing && S.loaded && !S.seek) {
+      const pos = S.pos + dt;
+      if (pos >= durOf(S.np.a, S.np.t)) { const n = ALB[S.np.a].tr.length, nt = (S.np.t + 1) % n; p.np = { a: S.np.a, t: nt }; p.pos = 0; if (S.tI === S.np.t) p.tI = nt; }
+      else p.pos = pos;
+    }
+    this.setState(p);
+  }
+  mapArea(fn) { const S = this.state; return Object.assign({}, S.areas, { [S.area]: (S.areas[S.area] || []).map(fn) }); }
+  lightsBlock() { const S = this.state, A = agg(S); if (!S.haLinked) return 'Home Assistant not connected'; if (A.empty) return 'No lights in ' + S.area; if (!A.nOk) return 'Lights unavailable'; return null; }
+  applyScene(i, now) { this.hz('thump');
+    const S = this.state, sc = AREA_SCENES[S.area][i];
+    return { scene: i, custom: false, areas: this.mapArea(l => l.ok ? Object.assign({}, l, { on: true, b: sc.b, t: sc.t }) : l), lastLevel: { b: sc.b, t: sc.t }, flash: { c: '110,217,150', until: now + 700 }, msg: { t: 'Scene running', c: '#7EE0A2', until: now + 2200 } };
+  }
+  deny(reason) { const nw = Date.now(); if (nw - (this._denyAt || 0) > 1000) { this._denyAt = nw; this.hz('buzz'); } this.setState({ msg: this.msg(reason, '#FF8474', 2000), flash: { c: '255,60,40', until: Date.now() + 480, segs: [26, 27, 28, 29, 30, 31, 32, 33, 34] } }); }
+  runTour() {
+    (this._tt || []).forEach(clearTimeout); if (this.state.touring) { this._tt = []; return this.setState({ touring: false, tourStep: '' }); }
+    this.setState(Object.assign(this.initial({ navMode: this.state.navMode, mw: this.state.mw, sound: this.state.sound }), { touring: true, navMode: 'pinned' }));
+    const T = [], at = (ms, fn, label) => T.push([ms, fn, label]), tap = i => { this.bDown(i); setTimeout(() => this.bUp(i), 90); }, hold = (i, ms) => { this.bDown(i); setTimeout(() => this.bUp(i), ms); }, turns = (d, n, gap) => { for (let j = 0; j < n; j++) setTimeout(() => this.turn(d), j * gap); };
+    at(600, () => turns(1, 4, 140), 'Turn: volume reveal');
+    at(2600, () => tap(0), 'Push into Music'); at(3500, () => tap(1), 'Push into Recently Added');
+    at(4400, () => turns(1, 3, 260), 'List glides one row per notch'); at(5700, () => turns(-1, 6, 60), 'Turn past the start: wall bounce');
+    at(7000, () => hold(3, 1150), 'Hold 4: icon fills, lands with a pop · Queued');
+    at(9200, () => tap(2), 'Tap 3: Playlists'); at(10200, () => tap(2), 'Back to Recently Added');
+    at(11200, () => tap(0), 'Back to Music'); at(12100, () => tap(3), 'Pause: bars melt into the triangle'); at(13300, () => tap(3), 'Play');
+    at(14400, () => tap(2), 'Tracks'); at(15200, () => turns(1, 2, 300), 'Browse the queue'); at(16300, () => tap(3), 'Jump to the track');
+    at(17400, () => hold(0, 700), 'Hold 1: home');
+    at(18800, () => hold(3, 1150), 'Hold 4 on Home: ring sweeps to lights'); at(20600, () => turns(1, 4, 140), 'Brightness'); at(21800, () => turns(1, 44, 24), 'Past 100 %: wall bounce');
+    at(23600, () => hold(3, 1150), 'Hold 4: back to volume');
+    at(25200, () => tap(1), 'Windows picker'); at(26100, () => turns(1, 2, 300), 'Turn through windows'); at(27000, () => tap(1), 'Snap left'); at(27900, () => tap(3), 'Switch');
+    at(29200, () => this.setState({ touring: false, tourStep: '' }), '');
+    this._tt = T.map(([ms, fn, label]) => setTimeout(() => { if (label) this.setState({ tourStep: label }); fn(); }, ms));
+  }
+  popIcon(i) { cancelAnimationFrame(this._pp1); cancelAnimationFrame(this._pp2); this.setState({ pop: i }); this._pp1 = requestAnimationFrame(() => { this._pp2 = requestAnimationFrame(() => this.setState({ pop: -1 })); }); }
+  hz(type) { if (!this.state.sound || !window.NanoHaptic) return; try { window.NanoHaptic.preview(type); } catch (e) {} }
+  msg(t, c = '#A6A6A6', ms = 2000) { return { t, c, until: Date.now() + ms }; }
+  fl(c, ms = 500) { return { c, until: Date.now() + ms }; }
+  homeDom() { return this.state.hd; }
+  list() { return this.state.src === 'recent' ? ALB : PL; }
+  hasHold4() { const sp = this.state.space; return sp === 'home' || sp === 'albums' || sp === 'explorer' || sp === 'upnext'; }
+  go(space, extra = {}) {
+    const S = this.state, p = Object.assign({ space, rev: null, msg: null }, extra);
+    if (space === 'lights' && S.space === 'home') p.lm = 'bri';
+    if (space === 'windows' && S.space === 'home') p.pickI = WIN.length > 1 ? 1 : 0;
+    if (S.space === 'tracks') p.seek = false;
+    this.setState(p);
+  }
+  turn(d) {
+    const S = this.state, now = Date.now(), A = agg(S);
+    let wall = 0; const cl = (x, a, b) => { if (x > b) wall = 1; else if (x < a) wall = -1; return Math.max(a, Math.min(b, x)); };
+    const p = { rot: S.rot + d * 12, lastAct: now };
+    const rev = k => { p.rev = k; p.revUntil = now + 1400; };
+    const vol = () => { p.vol = cl(S.vol + d, 0, 100); rev('vol'); };
+    const ok = () => { const r = this.lightsBlock(); if (r) { this.deny(r); return false; } return true; };
+    const bri = () => { if (!ok()) return; const nb = A.on ? cl(A.bri + d, 1, 100) : Math.max(1, d);
+      p.areas = this.mapArea(l => l.ok && (l.on || !A.on) ? Object.assign({}, l, { on: true, b: nb, t: A.on ? l.t : A.temp }) : l); p.lastLevel = { b: nb, t: A.temp }; p.custom = true; rev('bri'); };
+    const temp = () => { if (!ok()) return; const nt = cl(A.temp + d * 100, 2200, 6500);
+      p.areas = this.mapArea(l => l.ok && (l.on || !A.on) ? Object.assign({}, l, { on: true, t: nt, b: A.on ? l.b : A.bri }) : l); p.lastLevel = { b: A.bri, t: nt }; p.custom = true; rev('temp'); };
+    switch (S.space) {
+      case 'home': this.homeDom() === 'music' ? vol() : bri(); break;
+      case 'music': vol(); break;
+      case 'albums': case 'explorer': p.ai = cl(S.ai + d, 0, this.list().length - 1); break;
+      case 'tracks':
+        if (S.seek) p.pos = cl(S.pos + d * 5, 0, durOf(S.np.a, S.np.t) - 1);
+        else { p.tI = cl(S.tI + d, 0, ALB[S.np.a].tr.length - 1); p.msg = null; }
+        break;
+      case 'upnext': p.qI = cl(S.qI + d, 0, ALB[S.np.a].tr.length - 1); p.msg = null; break;
+      case 'windows': p.pickI = cl(S.pickI + d, 0, WIN.length - 1); p.msg = null; break;
+      case 'lights': S.lm === 'temp' ? temp() : bri(); break;
+      case 'scenes': p.sceneI = cl(S.sceneI + d, 0, AREA_SCENES[S.area].length - 1); break;
+    }
+    if (wall) { p.wallDir = wall; p.wallPh = 1; clearTimeout(this._wt1); clearTimeout(this._wt2); this._wt1 = setTimeout(() => this.setState({ wallPh: 2 }), 90); this._wt2 = setTimeout(() => this.setState({ wallPh: 0 }), 650); }
+    else { const moved = ['ai', 'qI', 'pickI', 'sceneI', 'tI'].some(k => p[k] != null && p[k] !== S[k]) || (p.areas && S.space === 'lights' && S.lm === 'temp');
+      const snd = { albums: 'click', explorer: 'click', tracks: S.seek ? null : 'click', upnext: 'click', windows: 'thudtick', scenes: 'thudtick', lights: S.lm === 'temp' ? 'fine' : null }[S.space];
+      if (moved && snd) this.hz(snd); }
+    this.setState(p);
+  }
+  bDown(i) {
+    const now = Date.now();
+    this.setState({ down: i, lastAct: now });
+    if (i === 0) {
+      this._held = false; clearTimeout(this._hold); this.setState({ holdAt: now });
+      this._hold = setTimeout(() => { this._held = true; this.setState({ holdAt: 0 }); if (this.state.space !== 'home') { this.hz('thump'); this._homeAt = Date.now(); this.go('home'); this.setState({ flash: this.fl('255,190,105', 400) }); } }, 600);
+      return;
+    }
+    if (i === 3) {
+      this._held4 = false; clearTimeout(this._hold4);
+      if (this.hasHold4()) { this.setState({ hold4At: now }); this._hold4 = setTimeout(() => { this._held4 = true; this.setState({ hold4At: 0 }); this.secondary(); }, 1000); }
+      return;
+    }
+    this.tap(i);
+  }
+  bUp(i) {
+    if (this.state.down === i) this.setState({ down: -1 });
+    if (i === 0) { clearTimeout(this._hold); if (this.state.holdAt) this.setState({ holdAt: 0 }); if (!this._held) this.tap(0); this._held = true; }
+    if (i === 3) { clearTimeout(this._hold4); if (this.state.hold4At) this.setState({ hold4At: 0 }); if (!this._held4) this.tap(3); this._held4 = true; }
+  }
+  secondary() {
+    const S = this.state, now = Date.now(), OK = '110,217,150'; this.popIcon(3);
+    if (S.space === 'home') { const hd = S.hd === 'music' ? 'lights' : 'music', A = agg(S);
+      this.hz('thump'); return this.setState({ hd, rev: null, sweepUntil: now + 800, msg: this.msg(hd === 'lights' ? 'Knob sets brightness' : 'Knob sets volume', '#FFBE69', 1800) }); }
+    if (S.space === 'albums' || S.space === 'explorer') { const it = this.list()[S.ai];
+      this.hz('thump'); return this.setState({ queued: { key: S.src + S.ai, until: now + 2200 }, flash: this.fl(OK, 600), msg: this.msg('Queued · ' + it.t, '#7EE0A2', 2200) }); }
+    if (S.space === 'upnext') {
+      if (S.qI === S.np.t) return this.deny('Already playing');
+      this.hz('thump'); return this.setState({ queued: { key: 'q' + S.qI, until: now + 2200 }, flash: this.fl(OK, 600), msg: this.msg('Plays next · ' + ALB[S.np.a].tr[S.qI], '#7EE0A2', 2200) });
+    }
+  }
+  togglePlay() { const S = this.state; if (!S.loaded) return this.deny('Nothing loaded · pick in Recent'); this.hz('tick'); this.setState({ playing: !S.playing, pausedAt: Date.now(), msg: this.msg(S.playing ? 'Paused' : 'Playing', '#A6A6A6', 1400) }); }
+  toggleLights() {
+    const S = this.state, A = agg(S), r = this.lightsBlock(); if (r) return this.deny(r);
+    const cur = S.areas[S.area] || [];
+    this.hz(A.on ? 'thumpsoft' : 'thump');
+    if (A.on) return this.setState({ snap: cur, areas: this.mapArea(l => Object.assign({}, l, { on: false })), lastLevel: { b: A.bri, t: A.temp }, msg: this.msg('Lights off', '#A6A6A6', 1400) });
+    const snap = S.snap && S.snap.length === cur.length ? S.snap : null;
+    let next = cur.map((l, i) => !l.ok ? l : snap ? Object.assign({}, l, { on: snap[i].on, b: snap[i].b, t: snap[i].t }) : Object.assign({}, l, { on: true }));
+    if (!next.some(l => l.ok && l.on)) next = cur.map(l => l.ok ? Object.assign({}, l, { on: true }) : l);
+    this.setState({ areas: Object.assign({}, S.areas, { [S.area]: next }), msg: this.msg('Lights on', '#A6A6A6', 1400) });
+  }
+  playItem(i) { this.hz('thump');
+    const S = this.state, a = S.src === 'recent' ? i : PL[i].al[0];
+    this.setState({ loaded: true, np: { a, t: 0 }, pos: 0, qI: 0, tI: 0, playing: true, flash: this.fl('110,217,150', 600) });
+  }
+  tap(i) {
+    const S = this.state, now = Date.now(), OK = '110,217,150', nT = ALB[S.np.a].tr.length;
+    switch (S.space) {
+      case 'home':
+        if (i === 0) { if (now - (this._homeAt || 0) < 700) return this.setState({ msg: this.msg('Home · press 1 again for Music', '#A6A6A6', 1400) }); return this.go('music'); }
+        if (i === 1) return this.go('windows');
+        if (i === 2) return this.go('lights');
+        return this.homeDom() === 'music' ? this.togglePlay() : this.toggleLights();
+      case 'music':
+        if (i === 0) { this._homeAt = now; return this.go('home'); }
+        if (i === 1) return this.go('albums', { src: 'recent', ai: 0 });
+        if (i === 2) { if (!S.loaded) return this.deny('Nothing loaded'); return this.go('tracks', { tI: S.np.t, seek: false }); }
+        return this.togglePlay();
+      case 'albums':
+        if (i === 0) return this.go('music');
+        if (i === 1) return this.go('explorer');
+        if (i === 2) { const src = S.src === 'recent' ? 'pl' : 'recent'; return this.setState({ src, ai: 0, msg: this.msg(src === 'pl' ? 'Favourite playlists' : 'Recently Added', '#FFBE69', 1200) }); }
+        this.playItem(S.ai); this.go('music'); setTimeout(() => this.setState({ msg: this.msg('Queue replaced', '#7EE0A2') }), 30); return;
+      case 'explorer':
+        if (i === 0) return this.go('albums');
+        if (i === 1) return this.setState({ src: 'recent', ai: 0 });
+        if (i === 2) return this.setState({ src: 'pl', ai: 0 });
+        this.playItem(S.ai); this.go('music'); setTimeout(() => this.setState({ msg: this.msg('Queue replaced', '#7EE0A2') }), 30); return;
+      case 'tracks':
+        if (i === 0) { if (S.seek) return this.setState({ seek: false, pos: S.seekFrom, msg: this.msg('Seek cancelled', '#A6A6A6', 1400) }); return this.go('music'); }
+        if (i === 1) return this.go('upnext', { qI: S.tI, seek: false });
+        if (i === 2) return this.setState({ seek: !S.seek, seekFrom: S.pos, tI: S.np.t, msg: S.seek ? this.msg('Seek set', '#7EE0A2', 1400) : null, flash: S.seek ? this.fl(OK, 400) : null });
+        if (S.seek) return this.deny('Set or cancel seek first');
+        if (S.tI === S.np.t) return this.deny('Turn to browse the queue');
+        this.hz(S.tI > S.np.t ? 'bump+' : 'bump-'); return this.setState({ np: { a: S.np.a, t: S.tI }, pos: 0, playing: true, flash: this.fl(OK), msg: this.msg('Playing ' + (S.tI + 1) + ' / ' + nT, '#7EE0A2') });
+      case 'upnext': {
+        if (i === 0) return this.go('tracks', { tI: S.qI });
+        if (i === 1) return this.hz('tick'), this.setState({ shuffle: !S.shuffle, msg: this.msg(S.shuffle ? 'Shuffle off' : 'Shuffle on', '#FFBE69', 1400) });
+        const key = S.np.a + ':' + S.qI;
+        if (i === 2) { if (S.liked[key]) return this.setState({ msg: this.msg('Unfavourite in Music app', '#A6A6A6') }); return this.hz('tick'), this.setState({ liked: Object.assign({}, S.liked, { [key]: true }), flash: this.fl('255,40,90', 500), msg: this.msg('Liked', '#FF7AA0') }); }
+        return this.setState({ np: { a: S.np.a, t: S.qI }, pos: 0, playing: true, flash: this.fl(OK), msg: this.msg('Playing', '#7EE0A2') });
+      }
+      case 'windows':
+        if (i === 0) { this._homeAt = now; return this.go('home'); }
+        if (i === 1 || i === 2) { this.hz(i === 1 ? 'bump-' : 'bump+'); const side = i === 1 ? 'left' : 'right', other = i === 1 ? 'right' : 'left', p = { [side]: S.pickI, flash: this.fl(WIN[S.pickI].c, 600), msg: this.msg('Snapped ' + side, '#7EE0A2') };
+          if (S[other] === S.pickI) p[other] = S[side]; return this.setState(p); }
+        this.hz('tick'); this.setState({ focus: S.pickI, flash: this.fl(OK) }); this.go('home'); setTimeout(() => this.setState({ msg: this.msg('Switched to ' + WIN[S.pickI].app, '#7EE0A2') }), 30); return;
+      case 'lights': {
+        if (i === 0) { this._homeAt = now; return this.go('home'); }
+        const r = this.lightsBlock();
+        if (i === 1) { if (r) return this.deny(r); if (!AREA_SCENES[S.area].length) return this.deny('No scenes in ' + S.area); return this.go('scenes', { sceneI: Math.min(S.scene, AREA_SCENES[S.area].length - 1) }); }
+        if (i === 2) { if (r) return this.deny(r); return this.setState({ lm: S.lm === 'temp' ? 'bri' : 'temp', rev: null, msg: this.msg(S.lm === 'temp' ? 'Knob: brightness' : 'Knob: temperature', '#FFBE69', 1400) }); }
+        return this.toggleLights();
+      }
+      case 'scenes':
+        if (i === 0) return this.go('lights');
+        if (i === 1 || i === 2) return this.deny('Turn to choose · 4 runs it');
+        this.setState(this.applyScene(S.sceneI, now)); this.go('lights'); setTimeout(() => this.setState({ msg: this.msg('Scene running', '#7EE0A2', 2200) }), 30); return;
+    }
+  }
+  haSet(patch) { this.setState(s => ({ ha: Object.assign({}, s.ha, patch) })); }
+  haTest() {
+    this.haSet({ status: 'testing', err: '' }); clearTimeout(this._haT);
+    this._haT = setTimeout(() => { const h = this.state.ha, addr = h.addr.trim();
+      if (!/^https?:\/\/[^\s/]+/.test(addr)) return this.haSet({ status: 'error', err: 'Can’t reach ' + (addr || 'an empty address') + '. Check the address and that Home Assistant is running.' });
+      if (h.token.trim().length < 20) return this.haSet({ status: 'error', err: 'Token rejected (401). Create a long-lived access token in your Home Assistant profile.' });
+      this.haSet({ status: 'ok', err: '' }); }, 900);
+  }
+  haSave() { const S = this.state, h = S.ha; if (h.status !== 'ok') return;
+    this.setState({ haLinked: true, area: h.area, scene: 0, custom: h.area !== 'Demo' || S.demoScn === 'mixed', snap: null, ha: Object.assign({}, h, { saved: Date.now() }), lastAct: Date.now() }); }
+  onKnobDown(e) {
+    if (e.button !== 0 || !this.devRef.current) return;
+    const r = this.devRef.current.getBoundingClientRect(), cx = r.left + 187, cy = r.top + 187;
+    if (Math.hypot(e.clientX - cx, e.clientY - cy) > 175) return;
+    let last = Math.atan2(e.clientY - cy, e.clientX - cx), acc = 0;
+    this._mv = ev => { const a = Math.atan2(ev.clientY - cy, ev.clientX - cx); let da = (a - last) * 180 / Math.PI; if (da > 180) da -= 360; if (da < -180) da += 360; last = a; acc += da; while (Math.abs(acc) >= 12) { const d = acc > 0 ? 1 : -1; acc -= d * 12; this.turn(d); } };
+    this._up = () => this.endDrag();
+    window.addEventListener('pointermove', this._mv); window.addEventListener('pointerup', this._up);
+  }
+  endDrag() { if (this._mv) window.removeEventListener('pointermove', this._mv); if (this._up) window.removeEventListener('pointerup', this._up); this._mv = this._up = null; }
+
+  renderVals() {
+    const S = this.state, now = S.now, A = agg(S), SC = AREA_SCENES[S.area] || [];
+    const I = {
+      play: 'M6 3l14 9-14 9V3z', pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
+      music: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+      win: 'M3 4h18v16H3zM3 9h18', bulb: 'M9 18h6M10 22h4M15.1 14c.2-1 .7-1.7 1.4-2.5A4.7 4.7 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5A4.6 4.6 0 0 1 8.9 14',
+      back: 'M15 18l-6-6 6-6', home: 'M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM9 21v-8h6v8',
+      temp: 'M14 4v10.5a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z', scene: 'M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z',
+      power: 'M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0', clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2', wand: 'M21.6 2.6l-1.2-1.2a1.2 1.2 0 0 0-1.7 0L2.4 17.7a1.2 1.2 0 0 0 0 1.7l1.2 1.2a1.2 1.2 0 0 0 1.7 0L21.6 4.3a1.2 1.2 0 0 0 0-1.7zM14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9', album: 'M3 3h18v18H3zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM12 11.5v1',
+      list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', check: 'M20 6L9 17l-5-5',
+      expand: 'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
+      listMusic: 'M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 12H3M16 6H3M12 18H3', listPlus: 'M11 12H3M16 6H3M16 18H3M18 9v6M21 12h-6',
+      seek: 'M3 12h8.7M17.7 12H21M14.7 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z', heart: 'M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z',
+      shuffle: 'M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M2 6h1.9c1.5 0 2.9.9 3.6 2.2M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8M18 14l4 4-4 4',
+      snapL: 'M3 5h18v14H3zM12 5v14M5.5 8v8M8.5 8v8', snapR: 'M3 5h18v14H3zM12 5v14M15.5 8v8M18.5 8v8',
+      skipF: 'M5 4l10 8-10 8V4zM19 5v14', skipB: 'M19 20L9 12l10-8v16zM5 19V5'
+    };
+    const C = { nav: '#E6E6E6', ok: '#6ED996', no: '#FF8474', dis: '#5A5A5A', act: '#FFBE69', pink: '#A3244A' };
+    const WARM = '255,190,105', BULB = '255,214,160', GREEN = '110,217,150', RED = '255,60,40', WHITE = '240,240,240', WW = '255,232,205';
+    const kel = K => { const t = K / 100, cl = x => Math.round(Math.max(0, Math.min(255, x)));
+      const r = t <= 66 ? 255 : 329.7 * Math.pow(t - 60, -0.1332), g = t <= 66 ? 99.47 * Math.log(t) - 161.12 : 288.12 * Math.pow(t - 60, -0.0755), b = t >= 66 ? 255 : 138.52 * Math.log(t - 10) - 305.04;
+      return [cl(r), cl(g), cl(b)].join(','); };
+    const seg = (c, a) => { const v = c.split(',').map(Number).map(x => Math.round(31 + (x - 31) * a)); return { bg: `rgb(${v.join(',')})`, sh: a > 0.3 ? `0 0 ${Math.round(3 + a * 9)}px rgba(${c},${(a * 0.7).toFixed(2)})` : 'none' }; };
+    const OFF = { bg: '#1f1f1f', sh: 'none' };
+    const mk = fn => Array.from({ length: 60 }, (_, i) => Object.assign({ tf: `rotate(${i * 6}deg) translateY(-138px)` }, fn(i)));
+    const arcK = i => { const k = (i - 38 + 60) % 60; return k < 45 ? k : -1; };
+    const R = {
+      rest: () => mk(() => seg(WARM, 0.12)), off: () => mk(() => OFF), fill: (c, a) => mk(() => seg(c, a)),
+      arc: (p, c, hi, lo = 0.08) => mk(i => { const k = arcK(i); return k < 0 ? OFF : k < Math.round(p * 45) ? seg(c, hi) : lo ? seg(c, lo) : OFF; }),
+      temp: (p, hi) => { const col = kel(A.temp), m = Math.round(p * 44); return mk(i => { const k = arcK(i); if (k < 0) return OFF; return k === m ? seg(col, 1) : k < m ? seg(col, hi) : OFF; }); },
+      marker: (n, idx, c, base) => mk(i => { const k = arcK(i); if (k < 0) return OFF; const pos = Math.round(idx * 44 / Math.max(1, n - 1)); return Math.abs(k - pos) <= 1 ? seg(c, 1) : seg(base || c, 0.1); }),
+      scene: (n, idx) => mk(i => { for (let s = 0; s < n; s++) { const cen = Math.round(s * 60 / n); if (Math.abs(i - cen) <= 1) return s === idx ? seg(WARM, 1) : seg(WARM, 0.18); } return OFF; }),
+      queue: (n, idx, nowI, c) => mk(i => { const k = arcK(i); if (k < 0) return OFF; const Pq = j => Math.round(j * 44 / Math.max(1, n - 1)); return Math.abs(k - Pq(idx)) <= 1 ? seg(c, 1) : k === Pq(nowI) ? seg(WW, 0.6) : seg(c, 0.1); }),
+      side: pos => mk(i => { const right = i >= 1 && i <= 14, left = i >= 46 && i <= 59; return (pos > 0 && right) || (pos < 0 && left) ? seg(GREEN, 0.9) : seg(WARM, 0.1); })
+    };
+    const rev = S.rev && now < S.revUntil ? S.rev : null;
+    const msg = S.msg && now < S.msg.until ? S.msg : null;
+    const flash = S.flash && now < S.flash.until ? S.flash : null;
+    const alb = ALB[S.np.a], trackName = alb.tr[S.np.t % alb.tr.length];
+    const sceneName = !S.custom && SC[S.scene] ? SC[S.scene].n : A.name;
+    const lightLine = `${A.bri}% · ${A.temp} K`;
+    const dom = this.homeDom();
+    const L = this.list(), cur = L[S.ai], isRec = S.src === 'recent';
+    const itemCol = it => it.c || ALB[it.al[0]].c;
+    const v = { parent: '', label: '', title: '', sub: '', cap: '', big: '', unit: '', prev: '', next: '', ltitle: '', st: '', sc: '#A6A6A6' };
+    let mode = 'text', ring = R.rest(), bc = ['w2', 'w2', 'w2', 'w2'], ft = [], where = '', map = [], idle = false, art = null;
+    const bigVol = () => { mode = 'big'; v.cap = S.playing ? trackName : `Paused · ${trackName}`; v.big = String(S.vol); v.unit = '%'; v.st = S.vol === 0 ? 'Minimum' : S.vol === 100 ? 'Maximum' : ''; ring = R.arc(S.vol / 100, WARM, 1); };
+    const bigBri = cap => { mode = 'big'; v.cap = cap; v.big = String(A.bri); v.unit = '%'; ring = R.arc(A.bri / 100, kel(A.temp), 1, 0); };
+    const bigTemp = () => { mode = 'big'; v.cap = 'Colour temperature'; v.big = String(A.temp); v.unit = 'K'; ring = R.temp((A.temp - 2200) / 4300, 1); };
+    const listOf = (arr, idx, name) => { mode = 'list'; v.prev = idx > 0 ? name(arr[idx - 1]) : ''; v.ltitle = name(arr[idx]); v.next = idx < arr.length - 1 ? name(arr[idx + 1]) : ''; };
+    const pp = S.playing ? 'pause' : 'play';
+    const dash = { v: '—', op: 0.4 };
+    const blocked = !S.haLinked ? 'nc' : A.empty ? 'empty' : !A.nOk ? 'unav' : null;
+    const lightsSt = () => A.bad.length ? { t: A.bad.length === 1 ? A.bad[0] + ' unavailable' : A.bad.length + ' lights unavailable', c: '#FF8474' } : A.mixed ? { t: A.nOn < A.nOk ? `${A.nOn} of ${A.nOk} on · average` : `${lightsWord(A.nOk)} · average`, c: '#A6A6A6' } : null;
+    const blockedView = () => { ring = R.off();
+      if (blocked === 'nc') { v.title = 'Not connected'; v.sub = 'Home Assistant'; v.st = 'Open Settings on your PC'; v.sc = '#FF8474'; }
+      else if (blocked === 'empty') { v.title = `No lights in ${A.name}`; v.sub = 'Add them in Home Assistant'; v.st = ''; }
+      else { v.title = 'Lights unavailable'; v.sub = `${A.name} · ${lightsWord(A.cnt)}`; v.st = 'Check them in Home Assistant'; v.sc = '#FF8474'; } };
+    switch (S.space) {
+      case 'home':
+        where = dom === 'music' ? 'Home · music on the knob' : 'Home · lights on the knob';
+        ft = [['music'], ['win'], ['bulb'], dom === 'music' ? [pp, !S.loaded ? 'dis' : S.playing ? 'nav' : 'ok'] : ['power', blocked ? 'dis' : 'nav']];
+        if (dom === 'music') {
+          if (!S.loaded) idle = true;
+          else { v.title = trackName; v.sub = alb.a; if (!S.playing) { v.st = 'Paused'; bc[3] = 'g'; } art = alb.f; if (rev) bigVol(); }
+        } else {
+          v.label = 'LIGHTS';
+          if (blocked) { blockedView(); bc[3] = 'w1'; }
+          else if (!A.on) { v.title = 'Lights off'; v.sub = 'Tap 4 to turn on'; ring = R.off(); }
+          else { v.title = sceneName; v.sub = `${A.name} · ${lightLine}`; const ls = lightsSt(); if (ls) { v.st = ls.t.replace(' · average', ''); v.sc = ls.c; } ring = R.arc(A.bri / 100, kel(A.temp), 0.34, 0); }
+          if (rev && !blocked) bigBri(A.name);
+        }
+        map = [{ k: 'Knob', v: dom === 'music' ? 'Volume' : 'Brightness · all ' + A.name + ' lights that are on' }, { k: '1', v: 'Music' }, { k: '2', v: 'Windows (opens the picker on screen)' }, { k: '3', v: 'Lights' },
+          { k: '4', v: (dom === 'music' ? 'Play / Pause' : 'Lights on / off') }, { k: 'Hold 4', v: 'Swap the Home knob to ' + (dom === 'music' ? 'brightness' : 'volume') }];
+        break;
+      case 'music':
+        where = 'Music'; v.label = 'MUSIC';
+        ft = [['home'], ['album'], ['list', S.loaded ? 'nav' : 'dis'], [pp, !S.loaded ? 'dis' : S.playing ? 'nav' : 'ok']];
+        if (!S.loaded) { idle = true; bc = ['w2', 'w2', 'w1', 'w1']; }
+        else { v.title = trackName; v.sub = alb.a; if (!S.playing) { v.st = 'Paused'; bc[3] = 'g'; } art = alb.f; if (rev) bigVol(); }
+        map = [{ k: 'Knob', v: 'Volume' }, { k: '1', v: 'Home' }, { k: '2', v: 'Recently Added' }, { k: '3', v: 'Tracks (browse the queue)', op: S.loaded ? 1 : 0.4 }, { k: '4', v: 'Play / Pause', op: S.loaded ? 1 : 0.4 }];
+        break;
+      case 'albums':
+        where = 'Music › ' + (isRec ? 'Recently Added' : 'Favourite playlists'); v.label = isRec ? 'RECENTLY ADDED' : 'PLAYLISTS'; listOf(L, S.ai, x => x.t);
+        v.st = isRec ? `${S.ai + 1} / ${L.length} · ${cur.a}` : `${S.ai + 1} / ${L.length} · ${cur.n} songs`; v.sc = '#7C7C7C'; art = cur;
+        ring = R.marker(L.length, S.ai, itemCol(cur)); bc = ['w2', 'w2', isRec ? 'w2' : 'a', 'g'];
+        ft = [['back'], ['expand'], ['listMusic', isRec ? 'nav' : 'act'], ['play', 'ok']];
+        map = [{ k: 'Knob', v: 'Scroll ' + (isRec ? 'albums' : 'playlists') }, { k: '1', v: 'Back to Music · hold: Home' }, { k: '2', v: 'Full screen (explorer, same ' + (isRec ? 'album' : 'playlist') + ')' }, { k: '3', v: isRec ? 'Show Favourite playlists' : 'Back to Recently Added' }, { k: '4', v: 'Play (replaces queue)' }, { k: 'Hold 4', v: 'Queue ' + (isRec ? 'the album' : 'the playlist') + ' (plays next)' }];
+        break;
+      case 'explorer':
+        where = 'Music › Explorer (full screen)'; v.label = 'ON SCREEN'; listOf(L, S.ai, x => x.t);
+        v.st = `${S.ai + 1} / ${L.length}`; v.sc = '#7C7C7C'; art = cur;
+        ring = R.marker(L.length, S.ai, itemCol(cur)); bc = ['w2', isRec ? 'a' : 'w1', isRec ? 'w1' : 'a', 'g'];
+        ft = [['back'], ['album', isRec ? 'act' : 'nav'], ['listMusic', isRec ? 'nav' : 'act'], ['play', 'ok']];
+        map = [{ k: 'Knob', v: 'Scroll covers' }, { k: '1', v: 'Back to the knob list (same item)' }, { k: '2', v: 'Recently Added' }, { k: '3', v: 'Favourite playlists' }, { k: '4', v: 'Play' }, { k: 'Hold 4', v: 'Queue (plays next)' }];
+        break;
+      case 'tracks': {
+        const dur = durOf(S.np.a, S.np.t), nT = alb.tr.length, atNow = S.tI === S.np.t;
+        where = 'Music › Tracks'; v.label = 'TRACKS'; art = alb.f;
+        if (S.seek) { mode = 'big'; v.cap = trackName; v.big = mmss(S.pos); v.unit = ''; v.st = `of ${mmss(dur)} · 3 sets · 1 cancels`; v.sc = '#FFBE69'; ring = R.arc(S.pos / dur, WARM, 1); }
+        else if (atNow) { v.title = trackName; v.sub = alb.a; v.st = 'Turn to browse the queue'; v.sc = '#7C7C7C'; ring = R.queue(nT, S.tI, S.np.t, alb.c); }
+        else { v.title = alb.tr[S.tI]; v.sub = alb.a; v.st = `${S.tI > S.np.t ? 'Skip to' : 'Back to'} ${S.tI + 1} / ${nT} · 4 plays`; v.sc = '#7EE0A2'; ring = R.queue(nT, S.tI, S.np.t, alb.c); }
+        bc = ['w2', 'w2', S.seek ? 'a' : 'w2', !atNow && !S.seek ? 'g' : 'w1'];
+        ft = [['back'], ['expand'], ['seek', S.seek ? 'act' : 'nav'], ['play', !atNow && !S.seek ? 'ok' : 'dis']];
+        map = [{ k: 'Knob', v: S.seek ? 'Scrub ±5 s' : 'Browse the whole queue' }, { k: '1', v: S.seek ? 'Cancel seek' : 'Back to Music · hold: Home' }, { k: '2', v: 'Up next on screen (same row)' }, { k: '3', v: S.seek ? 'Set position' : 'Seek the playing song' }, { k: '4', v: 'Play the focused track', op: !atNow && !S.seek ? 1 : 0.4 }];
+        break;
+      }
+      case 'upnext': {
+        const key = S.np.a + ':' + S.qI, liked = !!S.liked[key];
+        where = 'Music › Up next (full screen)'; v.label = 'UP NEXT'; listOf(alb.tr, S.qI, x => x);
+        v.st = `${S.qI + 1} / ${alb.tr.length}${S.qI === S.np.t ? ' · playing' : ''}`; v.sc = '#7C7C7C'; art = alb.f;
+        ring = R.queue(alb.tr.length, S.qI, S.np.t, alb.c); bc = ['w2', S.shuffle ? 'a' : 'w2', liked ? 'p' : 'w2', 'g'];
+        ft = [['back'], ['shuffle', S.shuffle ? 'act' : 'nav'], ['heart', liked ? 'pink' : 'nav', liked], ['play', 'ok']];
+        map = [{ k: 'Knob', v: 'Scroll the queue' }, { k: '1', v: 'Back to Tracks (same row)' }, { k: '2', v: 'Shuffle ' + (S.shuffle ? 'off' : 'on') }, { k: '3', v: liked ? 'Liked (add-only)' : 'Like' }, { k: '4', v: 'Play this track' }, { k: 'Hold 4', v: 'Play next' }];
+        break;
+      }
+      case 'windows': {
+        const w = WIN[S.pickI];
+        where = 'Windows (picker on screen)'; v.label = 'WINDOWS'; v.title = w.title; v.sub = w.app; v.st = `${S.pickI + 1} / ${WIN.length}`; v.sc = '#7C7C7C';
+        ring = R.marker(WIN.length, S.pickI, WHITE, WARM);
+        bc = ['w2', S.left === S.pickI ? { c: w.c, a: 1 } : 'w2', S.right === S.pickI ? { c: w.c, a: 1 } : 'w2', 'g'];
+        ft = [['home'], ['snapL'], ['snapR'], ['check', 'ok']];
+        map = [{ k: 'Knob', v: 'Scroll windows' }, { k: '1', v: 'Home (restores focus)' }, { k: '2', v: 'Snap left' }, { k: '3', v: 'Snap right' }, { k: '4', v: 'Switch to window' }];
+        break;
+      }
+      case 'lights': {
+        const tempOn = S.lm === 'temp';
+        where = 'Lights · ' + A.name + ' area'; v.label = 'LIGHTS';
+        if (blocked) blockedView();
+        else if (!A.on) { v.title = 'Lights off'; v.sub = 'Tap 4 to turn on'; v.st = `${A.name} · ${lightsWord(A.cnt)}`; v.sc = '#7C7C7C'; ring = R.off(); }
+        else { v.title = sceneName; v.sub = lightLine; const ls = lightsSt();
+          if (tempOn) { v.st = 'Knob: temperature'; v.sc = '#FFBE69'; } else if (ls) { v.st = ls.t; v.sc = ls.c; } else { v.st = `${A.name} · ${lightsWord(A.cnt)}`; v.sc = '#7C7C7C'; }
+          ring = tempOn ? R.temp((A.temp - 2200) / 4300, 0.5) : R.arc(A.bri / 100, kel(A.temp), 0.34, 0); }
+        if (!blocked) { if (rev === 'bri') bigBri(A.mixed ? 'Brightness · average' : 'Brightness'); else if (rev === 'temp') bigTemp(); }
+        bc = blocked ? ['w2', 'w1', 'w1', 'w1'] : ['w2', SC.length ? 'w2' : 'w1', tempOn ? 'a' : 'w2', 'w2'];
+        ft = [['home'], ['wand', blocked || !SC.length ? 'dis' : 'nav'], ['temp', blocked ? 'dis' : tempOn ? 'act' : 'nav'], ['power', blocked ? 'dis' : 'nav']];
+        map = [{ k: 'Knob', v: (tempOn ? 'Colour temperature' : 'Brightness') + ' · every ' + A.name + ' light that is on' }, { k: '1', v: 'Home' }, { k: '2', v: 'Scenes list · ' + SC.length + ' in ' + A.name, op: blocked || !SC.length ? 0.4 : 1 }, { k: '3', v: tempOn ? 'Back to brightness' : 'Colour temperature', op: blocked ? 0.4 : 1 }, { k: '4', v: A.on ? 'All off' : 'Turn on (restores last state)', op: blocked ? 0.4 : 1 }];
+        break;
+      }
+      case 'scenes': {
+        const si = Math.min(S.sceneI, SC.length - 1), sc2 = SC[si];
+        where = 'Lights › Scenes'; v.label = 'SCENES'; listOf(SC, si, x => x.n);
+        v.st = si === S.scene && !S.custom && A.on ? `${si + 1} / ${SC.length} · running now` : `${si + 1} / ${SC.length} · ${sc2.b}% · ${sc2.t} K`; v.sc = '#7C7C7C';
+        ring = R.scene(SC.length, si); bc = ['w2', 'o', 'o', 'g'];
+        ft = [['back'], null, null, ['check', 'ok']];
+        map = [{ k: 'Knob', v: 'Scroll ' + A.name + ' scenes, scripts and automations' }, { k: '1', v: 'Back to Lights · hold: Home' }, Object.assign({ k: '2' }, dash), Object.assign({ k: '3' }, dash), { k: '4', v: 'Run' }];
+        break;
+      }
+    }
+    if (msg && mode !== 'big') { v.st = msg.t; v.sc = msg.c; }
+    const ANC = { home: [], music: [], albums: ['MUSIC'], explorer: ['MUSIC', isRec ? 'RECENT' : 'PLAYLISTS'], tracks: ['MUSIC'], upnext: ['MUSIC', 'TRACKS'], windows: [], lights: v.label === 'LIGHTS' ? [] : ['LIGHTS'], scenes: ['LIGHTS'] }[S.space];
+    const arcOn = S.crumbs === 'arc', arcC = v.label, cwid = s => { const c = this._cv || (this._cv = document.createElement('canvas').getContext('2d')); c.font = '500 12px Montserrat, sans-serif'; return c.measureText(s).width + s.length * 0.96; };
+    let arcA = ANC.length > 1 ? '… › ' + ANC[ANC.length - 1] + ' › ' : ANC.map(x => x + ' › ').join(''); if (cwid(arcA + arcC) > 190) arcA = '‹ ';
+    const CR = { home: [0, 0, ''], music: [1, 3, ''], albums: [2, 3, 'MUSIC ›'], explorer: [3, 3, isRec ? 'RECENT ›' : 'PLAYLISTS ›'], tracks: [2, 3, 'MUSIC ›'], upnext: [3, 3, 'TRACKS ›'], windows: [1, 1, ''], lights: [1, 2, v.label === 'LIGHTS' ? '' : 'LIGHTS ›'], scenes: [2, 2, 'LIGHTS ›'] }[S.space];
+    const cm = S.crumbs, showPath = cm === 'both' || cm === 'path', showPips = cm === 'both' || cm === 'pips';
+    if (showPath) { v.parent = CR[2]; if (v.parent && v.label === 'RECENTLY ADDED') v.label = 'RECENT'; }
+    const pips = Array.from({ length: CR[1] }, (_, k) => k < CR[0] ? { bg: '#E6E6E6', sh: 'none' } : { bg: 'transparent', sh: 'inset 0 0 0 1px #5A5A5A' });
+    if (cm === 'ring' && CR[0] && !flash) { const at = [[30], [29, 31], [28, 30, 32]][CR[0] - 1]; ring = ring.map((sg, i) => at.includes(i) ? Object.assign({}, sg, seg(WHITE, 0.7)) : sg); }
+    if (S.hold4At) { const hp4r = Math.min(1, (now - S.hold4At) / 1000); if (hp4r > 0.15) ring = R.arc(hp4r, WARM, 1); }
+    if (S.holdAt && S.space !== 'home') { const hp = Math.min(1, (now - S.holdAt) / 600); if (hp > 0.12) ring = R.arc(hp, WARM, 1); }
+    if (flash) ring = flash.segs ? ring.map((sg, i) => flash.segs.includes(i) ? Object.assign({}, sg, seg(flash.c, 0.9)) : sg) : R.fill(flash.c, 0.68);
+    if (idle) { ring = R.fill(WARM, 0.06); art = null; }
+
+    const BL = { w1: [WW, 0.12], w2: [WW, 0.34], g: [GREEN, 0.68], r: [RED, 0.5], a: [WARM, 0.9], p: ['255,40,90', 0.3], o: null };
+    const btns = bc.map((cd, i) => {
+      const b = typeof cd === 'object' ? [cd.c, cd.a] : BL[cd], pr = S.down === i, n = String(i + 1);
+      const base = { n, tf: pr ? 'translateY(2px)' : 'none',
+        down: e => { e.stopPropagation(); e.preventDefault(); this.bDown(i); },
+        up: e => { e.stopPropagation(); this.bUp(i); },
+        leave: () => { if (this.state.down === i) this.bUp(i); } };
+      if (!b) return Object.assign(base, { strip: pr ? '#3a3a3a' : '#262626', sh: 'inset 0 0 0 1px #2c2c2c' });
+      const a = pr ? 1 : b[1];
+      return Object.assign(base, { strip: `rgba(${b[0]},${Math.max(a, 0.18)})`, sh: `inset 0 0 0 1px #2c2c2c, 0 6px 16px -6px rgba(${b[0]},${(a * 0.9).toFixed(2)})` });
+    });
+    const xs = [34, 77, 119, 162];
+    const PPM = { pause: 'M6 4L10 4L10 20L6 20ZM14 4L18 4L18 20L14 20Z', play: 'M6 3L20 12L20 12L6 21ZM20 12L20 12L20 12L20 12Z' };
+    const foot = ft.map((f, i) => { if (!f) return { x: xs[i], d: '', dc: 'none', col: 'transparent', fill: 'none', tf: 'none', tr: 'none' }; const dd = PPM[f[0]] || I[f[0]]; const holding4 = i === 3 && S.hold4At && this.hasHold4(); const pressed = S.down === i, popping = S.pop === i; return { x: xs[i], d: dd, dc: 'path("' + dd + '")', col: holding4 ? '#6a6a6a' : C[f[1] || 'nav'], fill: f[2] ? 'currentColor' : 'none', tf: popping ? 'scale(1.28)' : pressed ? 'translateY(2px) scale(0.8, 0.86)' : 'none', tr: popping ? 'color 220ms ease-out' : pressed ? 'transform 70ms cubic-bezier(0.4,0,1,1), color 220ms ease-out' : 'color 220ms ease-out 120ms, ' + TR('transform', SPRING.pop) }; });
+    const hf = { d: foot[3] ? foot[3].d : '', op: this.hasHold4() && !idle ? 1 : 0, h: S.hold4At ? '100%' : '0%', tr: S.hold4At ? 'height 1000ms linear' : 'height 180ms cubic-bezier(0.4,0,1,1)' };
+
+    const OUT = 'cubic-bezier(0.22,1,0.36,1)', IN = 'cubic-bezier(0.4,0,1,1)', SPR = 'cubic-bezier(0.34,1.45,0.64,1)';
+    const vis = (on, hideTf, showTr, hideTr) => ({ op: on ? 1 : 0, tf: on ? 'none' : hideTf, tr: on ? showTr : hideTr });
+    const ly = {
+      text: vis(mode === 'text' && !idle, 'translateY(-12px)', `opacity 260ms ${OUT} 90ms, ` + TR('transform', SPRING.soft, 90), `opacity 130ms ${IN}, transform 160ms ${IN}`),
+      big: vis(mode === 'big', 'translateY(14px) scale(0.94)', `opacity 180ms ${OUT} 40ms, ` + TR('transform', SPRING.snap, 40), `opacity 130ms ${IN}, transform 160ms ${IN}`),
+      list: vis(mode === 'list', 'none', `opacity 220ms ${OUT}, ` + TR('transform', SPRING.snap), `opacity 120ms ${IN}`),
+      st: { op: idle ? 0 : 1 }, foot: { op: idle ? 0 : 1 }
+    };
+    if (S.lIn) { const g = `translateY(${S.lIn * 14}px)`; if (mode === 'list') { ly.list.tf = g; ly.list.tr = 'none'; } else if (mode === 'text' && !idle) { ly.text.tf = g; ly.text.tr = 'none'; } }
+    const idleSet = S.space === 'music' ? [[I.home, 'Home', C.nav], [I.album, 'Recent', C.nav], [I.list, 'Tracks', C.dis], [I.play, 'Play', C.dis]] : [[I.music, 'Music', C.nav], [I.win, 'Win', C.nav], [I.bulb, 'Lights', C.nav], [I.play, 'Play', C.dis]];
+    const center = idleSet.map((c, i) => Object.assign({ d: c[0], w: c[1], col: c[2] }, idle
+      ? { op: 1, tf: 'none', tr: `opacity 260ms ${OUT} ${140 + i * 40}ms, ` + TR('transform', SPRING.pop, 140 + i * 40) }
+      : { op: 0, tf: 'translateY(16px) scale(0.85)', tr: `opacity 120ms ${IN}, transform 140ms ${IN}` }));
+
+    // monitor
+    const sc = S.mw / 2560;
+    const pickerOn = S.space === 'windows', xOn = S.space === 'explorer', qOn = S.space === 'upnext';
+    const focusI = pickerOn ? -1 : S.focus;
+    const deskWins = [['left', S.left, '0px'], ['right', S.right, '1288px']].map(([side, wi, x]) => { const w = WIN[wi], f = wi === focusI;
+      return { x, app: w.app, title: w.title, ic: w.ic, letter: w.letter, thumb: w.thumb, bar: f ? '#2c2c30' : '#1c1c1e', sh: f ? `inset 0 0 0 1px rgba(255,255,255,0.14), 0 0 0 2px rgba(${w.c},0.55)` : 'inset 0 0 0 1px rgba(255,255,255,0.06)' }; });
+    deskWins[0].x = '8px';
+    const taskIcons = WIN.map((w, i) => ({ ic: w.ic, letter: w.letter, line: i === S.left || i === S.right ? `rgba(${w.c},1)` : 'transparent' }));
+    const XP = [0, 300, 540, 730, 880, 1000, 1090, 1160, 1220], SP = [1, 0.8, 0.68, 0.6, 0.54, 0.5, 0.46, 0.43, 0.4], OP = [1, 0.95, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0];
+    const pCards = WIN.map((w, i) => { const d = i - S.pickI, a = Math.min(8, Math.abs(d)), sg = Math.sign(d); const side = S.left === i ? 'Left' : S.right === i ? 'Right' : '';
+      return { tf: `translate(-50%,-50%) translateX(${sg * XP[a]}px) scale(${SP[a]})`, op: OP[a], z: 20 - a, thumb: w.thumb, ic: w.ic, letter: w.letter, ring: d === 0 ? 1 : 0, shade: d === 0 ? 0 : Math.min(0.55, 0.14 * a), badge: side, badgeOp: side ? 1 : 0 }; });
+    const pw = WIN[S.pickI];
+    const slots = [['2', 'Left', S.left], ['3', 'Right', S.right]].map(([k, l, wi]) => ({ key: k, label: l + ' · ' + WIN[wi].app, thumb: WIN[wi].thumb, ic: WIN[wi].ic, letter: WIN[wi].letter, border: wi === S.pickI ? `rgb(${WIN[wi].c})` : 'rgba(255,255,255,0.35)' }));
+    const XC = [0, 280, 500, 680, 830, 950, 1045, 1120, 1180];
+    const xCards = L.map((it, i) => { const d = i - S.ai, a = Math.min(8, Math.abs(d)), sg = Math.sign(d);
+      const tiles = it.f ? [{ bg: cov(it.f), col: '1 / 3', row: '1 / 3' }] : it.al.map((ai, k) => ({ bg: cov(ALB[ai].f), col: String(k % 2 + 1), row: String(Math.floor(k / 2) + 1) }));
+      return { tf: `translate(-50%,-50%) translateX(${sg * XC[a]}px) scale(${SP[a]})`, op: OP[a], z: 20 - a, tiles, shade: d === 0 ? 0 : Math.min(0.6, 0.12 * a) }; });
+    let xCur = isRec ? { t: cur.t, a: cur.a, m: `${cur.y} · ${cur.tr.length} tracks` } : { t: cur.t, a: 'Favourite playlist', m: `${cur.n} songs` };
+    const amb = c => `radial-gradient(60% 70% at 50% 45%, rgba(${c},0.9) 0%, rgba(${c},0.25) 55%, transparent 80%)`;
+    const qRows = alb.tr.map((t, j) => { const d = j - S.qI, a = Math.abs(d), key = S.np.a + ':' + j, lk = !!S.liked[key];
+      return { tf: `translateY(${d * 96}px)`, op: a > 3 ? 0 : a === 0 ? 1 : 0.75 - a * 0.15, n: j === S.np.t ? '♪' : String(j + 1), t, a: alb.a, tc: j === S.np.t ? '#9CF0BC' : '#fff', hf: lk ? '#ff2a5a' : 'none', hs: lk ? '#ff2a5a' : 'rgba(255,255,255,0.35)' }; });
+    const H = arr => arr.map(([k, l]) => ({ k, l }));
+    const monLabel = pickerOn ? 'Window picker (full screen)' : xOn ? 'Music explorer (full screen)' : qOn ? 'Up next (full screen)' : 'Desktop · navigator appears on knob input';
+
+    // navigator
+    const kelC = 'rgb(' + kel(A.temp) + ')';
+    const navKind = ({ home: dom === 'music' ? 'now' : 'lights', music: 'now', albums: 'covers', tracks: S.seek ? 'seek' : 'rows', lights: 'lights', scenes: 'scenes' })[S.space] || null;
+    const navSticky = ['albums', 'tracks', 'scenes'].includes(S.space) || (S.space === 'lights' && S.lm !== 'bri');
+    const navVisible = !!navKind && S.navMode !== 'off' && (S.navMode === 'pinned' || navSticky || now - S.lastAct < 4000);
+    const K = arr => arr.map((x, i) => { const l = Array.isArray(x) ? x[0] : x, dis = Array.isArray(x) && x[1] === false, pr = S.down === i && i !== 3; return { k: String(i + 1), l: l || '—', op: dis || !l ? 0.4 : 1, bg: pr ? '#fff' : 'transparent', fg: pr ? '#000' : '#fff' }; });
+    const ppL = S.playing ? 'Pause' : 'Play', tempOnN = S.lm === 'temp';
+    const hp4 = S.hold4At ? Math.min(1, (now - S.hold4At) / 1000) : 0, hp1 = S.holdAt ? Math.min(1, (now - S.holdAt) / 600) : 0;
+    const HK = (k, l, p) => { const q = Math.round(p * 100); return { k, l, bg: q > 4 ? `linear-gradient(to top, #fff ${q}%, transparent ${q}%)` : 'transparent', fg: q > 55 ? '#000' : '#fff' }; };
+    const holds = [];
+    if (DEP[S.space] >= 2) holds.push(HK('1', 'Home', hp1));
+    const h4 = ({ home: dom === 'music' ? 'Knob to lights' : 'Knob to music', albums: 'Queue', upnext: 'Play next' })[S.space];
+    if (h4) holds.push(HK('4', h4, hp4));
+    const lightKeys = ['Home', ['Scenes', !blocked && SC.length > 0], [tempOnN ? 'Brightness' : 'Temperature', !blocked], [A.on ? 'All off' : 'Turn on', !blocked]];
+    const nav = { hasHolds: holds.length > 0, holds, op: navVisible ? 1 : 0, tf: navVisible ? 'none' : 'translateX(-24px)', path: '',
+      isNow: navKind === 'now', isLights: navKind === 'lights', isCovers: navKind === 'covers', isRows: navKind === 'rows' || navKind === 'scenes', isSeek: navKind === 'seek',
+      art: S.loaded ? cov(alb.f) : 'linear-gradient(135deg, #3a3a3a, #202020)', t: S.loaded ? trackName : 'Nothing playing', a: S.loaded ? alb.a : 'Pick an album in Recent', st: '', stc: 'rgba(255,255,255,0.7)',
+      vol: S.vol + '%', volW: S.vol + '%', volOp: rev === 'vol' ? 1 : 0.6,
+      cap: '', big: '', unit: '', briCap: 'Brightness', bri: A.bri + '%', briW: (A.on && !blocked ? A.bri : 0) + '%', kel: kelC, temp: A.temp + ' K', tempX: ((A.temp - 2200) / 43) + '%',
+      tempGrad: 'linear-gradient(90deg, rgb(' + kel(2200) + '), rgb(' + kel(3400) + '), rgb(' + kel(6500) + '))', briOp: 1, tempOp: 1, scene: blocked ? (blocked === 'nc' ? 'Home Assistant' : A.name) : sceneName,
+      areaLine: '', areaC: 'rgba(255,255,255,0.75)', lightsList: [],
+      covers: [], rows: [], plateOp: 0, plateTf: 'none', seekW: '0%', keys: [] };
+    if (msg) { nav.st = msg.t; nav.stc = msg.c; }
+    if (navKind === 'now') {
+      nav.path = S.space === 'home' ? 'Home' : 'Music';
+      if (!nav.st && S.loaded) nav.st = S.playing ? 'Playing · ' + mmss(S.pos) + ' of ' + mmss(durOf(S.np.a, S.np.t)) : 'Paused';
+      nav.keys = K(S.space === 'home' ? ['Music', 'Windows', 'Lights', [ppL, S.loaded]] : ['Home', 'Recent', ['Tracks', S.loaded], [ppL, S.loaded]]);
+    } else if (navKind === 'lights') {
+      nav.path = (S.space === 'home' ? 'Home › ' : 'Lights › ') + A.name;
+      if (blocked) { nav.cap = blocked === 'nc' ? 'Home Assistant' : A.name; nav.big = '—'; nav.bri = '—'; nav.temp = '—'; nav.briOp = 0.3; nav.tempOp = 0.3;
+        nav.areaLine = blocked === 'nc' ? 'Not connected · open Settings' : blocked === 'empty' ? 'No lights in ' + A.name : 'All lights unavailable'; nav.areaC = blocked === 'empty' ? 'rgba(255,255,255,0.75)' : '#FF8474'; }
+      else {
+        if (!A.on) { nav.cap = 'Lights'; nav.big = 'Off'; }
+        else if (tempOnN && S.space === 'lights') { nav.cap = 'Colour temperature'; nav.big = String(A.temp); nav.unit = 'K'; nav.briOp = 0.5; }
+        else { nav.cap = 'Brightness'; nav.big = String(A.bri); nav.unit = '%'; nav.tempOp = 0.5; }
+        if (A.mixed && A.on) nav.briCap = 'Brightness · avg';
+        if (!A.on) { nav.bri = 'Off'; nav.tempOp = 0.5; }
+        nav.areaLine = lightsWord(A.cnt) + ' · ' + A.nOn + ' on' + (A.bad.length ? ' · ' + A.bad.length + ' unavailable' : '');
+        nav.areaC = A.bad.length ? '#FF8474' : 'rgba(255,255,255,0.75)';
+      }
+      nav.lightsList = blocked === 'nc' || !(A.mixed || A.bad.length) ? [] : A.ls.map(l => ({ n: l.n, v: !l.ok ? 'Unavailable' : l.on ? l.b + '% · ' + l.t + ' K' : 'Off', c: !l.ok ? '#FF8474' : l.on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.55)', dot: !l.ok ? '#FF8474' : l.on ? 'rgb(' + kel(l.t) + ')' : 'rgba(255,255,255,0.25)' }));
+      nav.keys = K(S.space === 'home' ? ['Music', 'Windows', 'Lights', [A.on ? 'Lights off' : 'Lights on', !blocked]] : lightKeys);
+    } else if (navKind === 'covers') {
+      nav.path = 'Music › ' + (isRec ? 'Recently Added' : 'Playlists');
+      nav.covers = L.map((it, i) => { const d = i - S.ai, a = Math.abs(d), sg = Math.sign(d); const off = [0, 86, 132, 170][Math.min(3, a)], scl = [1, 0.55, 0.38, 0.3][Math.min(3, a)];
+        return { tf: 'translate(-50%,-50%) translateY(' + (sg * off) + 'px) scale(' + scl + ')', op: a > 2 ? 0 : [1, 0.55, 0.25][a], z: 10 - a, bg: mos(it) }; });
+      nav.t = cur.t; nav.a = isRec ? cur.a : 'Favourite playlist'; if (!nav.st) nav.st = (S.ai + 1) + ' / ' + L.length + (isRec ? ' · ' + cur.y : ' · ' + cur.n + ' songs');
+      nav.keys = K(['Back', 'Full screen', isRec ? 'Playlists' : 'Recent', 'Play']);
+    } else if (navKind === 'rows') {
+      nav.path = 'Music › Tracks'; const nT = alb.tr.length, atNow = S.tI === S.np.t;
+      nav.rows = alb.tr.map((t, j) => { const d = j - S.tI, a = Math.abs(d), isNow = j === S.np.t, isF = j === S.tI && !atNow;
+        return { tf: 'translateY(' + (d * 38) + 'px)', op: a > 2 ? 0 : a === 0 ? 1 : 0.8 - a * 0.15, n: isNow ? '♪' : String(j + 1), t, s: '', tc: isNow ? '#9CF0BC' : '#fff', tag: isF ? (j > S.np.t ? 'Skip to' : 'Back to') : isNow ? 'Now' : '', tagc: isF ? '#6ED996' : 'rgba(255,255,255,0.6)' }; });
+      nav.plateOp = 1; nav.plateTf = 'none';
+      if (!nav.st) nav.st = atNow ? 'Turn to browse the queue' : (S.tI + 1) + ' / ' + nT + ' · Press 4 to play';
+      nav.keys = K(['Back', 'Up next', 'Seek', ['Play', !atNow]]);
+    } else if (navKind === 'seek') {
+      nav.path = 'Music › Tracks › Seek'; const dur = durOf(S.np.a, S.np.t); nav.big = mmss(S.pos); nav.unit = 'of ' + mmss(dur); nav.seekW = (S.pos / dur * 100) + '%';
+      nav.keys = K(['Cancel', 'Up next', 'Set', ['Play', false]]);
+    } else if (navKind === 'scenes') {
+      nav.path = 'Lights › ' + A.name + ' › Scenes'; const si = Math.min(S.sceneI, SC.length - 1);
+      nav.rows = SC.map((sc2, j) => { const d = j - si, a = Math.abs(d), running = j === S.scene && !S.custom && A.on;
+        return { tf: 'translateY(' + (d * 38) + 'px)', op: a > 2 ? 0 : a === 0 ? 1 : 0.8 - a * 0.15, n: String(j + 1), t: sc2.n, s: '', tc: '#fff', tag: running ? 'Running' : sc2.k, tagc: running ? '#7EE0A2' : 'rgba(255,255,255,0.55)' }; });
+      nav.plateOp = 1; if (!nav.st) nav.st = 'Press 4 to run · ' + SC[si].b + '% · ' + SC[si].t + ' K';
+      nav.keys = K(['Back', ['', false], ['', false], 'Run']);
+    }
+    const qd = S.queued && now < S.queued.until ? S.queued.key : null;
+    if (qd && qd === S.src + S.ai) xCur.m = 'Queued · plays after this song';
+
+    // companion settings
+    const H0 = S.ha, areaL = S.areas[H0.area] || [], areaSc = AREA_SCENES[H0.area] || [];
+    const set = {
+      strip: [
+        { name: 'Knob', state: 'Connected', detail: 'Nano_D++ · USB · firmware 3.1.0', mark: '#6ED996' },
+        { name: 'Sonos', state: 'Demo', detail: 'Playing from the Sonos queue · speaker.local', mark: '#6ED996' },
+        { name: 'Apple Music', state: 'Signed in', detail: 'Library and likes available', mark: '#6ED996' },
+        S.haLinked ? { name: 'Home Assistant', state: 'Connected', detail: `${S.area} · ${lightsWord(A.cnt)} · ${(AREA_SCENES[S.area] || []).length} scenes`, mark: '#6ED996' } : { name: 'Home Assistant', state: 'Not connected', detail: 'Add your address and token below', mark: '#FF7A66' }
+      ],
+      addr: H0.addr, token: H0.token, tokType: H0.show ? 'text' : 'password', showLabel: H0.show ? 'Hide' : 'Show',
+      area: H0.area, areaOpts: Object.keys(AREAS0()).map(k => ({ v: k, l: k })),
+      onAddr: e => this.haSet({ addr: e.target.value, status: 'idle', err: '' }),
+      onToken: e => this.haSet({ token: e.target.value, status: 'idle', err: '' }),
+      onShow: () => this.haSet({ show: !H0.show }),
+      onArea: e => this.haSet({ area: e.target.value }),
+      onTest: () => this.haTest(), onSave: () => this.haSave(), onCancel: () => this.setState(s => ({ ha: Object.assign({}, s.ha, { area: s.area }) })),
+      testLabel: H0.status === 'testing' ? 'Testing…' : 'Test connection',
+      stText: ({ idle: 'Not tested since the last change', testing: 'Connecting to ' + H0.addr + '…', ok: 'Connected · Home Assistant 2026.9 · token valid', error: H0.err })[H0.status],
+      stMark: ({ idle: '#9B9797', testing: '#FFBE69', ok: '#6ED996', error: '#FF7A66' })[H0.status],
+      isOk: H0.status === 'ok', notOk: H0.status !== 'ok',
+      placeholder: H0.status === 'error' ? 'Fix the connection to see what’s in ' + H0.area + '.' : 'Test the connection to see the lights and scenes in ' + H0.area + '.',
+      lightsHead: 'Lights in ' + H0.area + ' · ' + areaL.length, scenesHead: 'Scenes, scripts and automations · ' + areaSc.length,
+      lights: areaL.map(l => ({ n: l.n, v: !l.ok ? 'Unavailable' : l.on ? l.b + '% · ' + l.t + ' K' : 'Off', c: !l.ok ? '#FF7A66' : '#BAB6B6', dot: !l.ok ? '#FF7A66' : l.on ? '#6ED996' : '#444141' })),
+      scenes: areaSc.map(x => ({ n: x.n, k: x.k })),
+      noLights: areaL.length === 0, hasLights: areaL.length > 0, noScenes: areaSc.length === 0, hasScenes: areaSc.length > 0,
+      emptyLights: 'No lights in ' + H0.area + ' yet. Assign lights to this area in Home Assistant and they appear here and on the knob automatically.',
+      saveOp: H0.status === 'ok' ? 1 : 0.45, savedText: H0.saved && now - H0.saved < 2500 ? 'Saved · the knob now controls ' + S.area : ''
+    };
+    const sel = (list, curV, fn) => list.map(([v2, l]) => ({ label: l, bg: curV === v2 ? 'var(--color-text)' : 'var(--color-bg)', fg: curV === v2 ? 'var(--color-bg)' : 'var(--color-text)', pick: () => fn(v2) }));
+    const musicState = !S.loaded ? 'none' : S.playing ? 'play' : 'pause';
+    const DENERR = 'Token rejected (401). Create a long-lived access token in your Home Assistant profile.';
+
+    return {
+      devRef: this.devRef, monRef: this.monRef, onKnobDown: e => this.onKnobDown(e),
+      reset: () => { clearTimeout(this._hold4); clearTimeout(this._haT); this.setState(this.initial({ navMode: S.navMode, mw: S.mw })); },
+      homeOpts: sel([['play', 'Playing'], ['pause', 'Paused'], ['none', 'Nothing loaded']], musicState, k => this.setState({ loaded: k !== 'none', playing: k === 'play', pausedAt: Date.now(), lastAct: Date.now() })),
+      lightOpts: sel([['all', 'All on'], ['mixed', 'Mixed'], ['unavail', 'Unavailable'], ['none', 'No lights'], ['nc', 'Not connected']], S.haLinked ? (S.area === 'Demo' ? S.demoScn : '') : 'nc',
+        k => k === 'nc' ? this.setState({ haLinked: false, ha: Object.assign({}, S.ha, { status: 'error', err: DENERR }), lastAct: Date.now() })
+          : this.setState({ haLinked: true, area: 'Demo', demoScn: k, areas: Object.assign({}, S.areas, { Demo: DEMO[k]() }), scene: 0, custom: k === 'mixed', snap: null, ha: Object.assign({}, S.ha, { status: 'ok', err: '', area: 'Demo' }), lastAct: Date.now() })),
+      nav, navOpts: sel([['auto', 'Auto-hide'], ['pinned', 'Pinned'], ['off', 'Off']], S.navMode, k => this.setState({ navMode: k, lastAct: Date.now() })),
+      arcEl: React.createElement('svg', { width: 240, height: 240, viewBox: '0 0 240 240', style: { position: 'absolute', left: 0, top: 0 } },
+        React.createElement('defs', null, React.createElement('path', { id: 'nanoCrumbArc', d: 'M 26 120 A 94 94 0 0 1 214 120', fill: 'none' })),
+        React.createElement('text', { fontFamily: 'Montserrat, sans-serif', fontSize: 12, fontWeight: 500, letterSpacing: 0.96 },
+          React.createElement('textPath', { href: '#nanoCrumbArc', startOffset: '50%', textAnchor: 'middle' },
+            React.createElement('tspan', { fill: '#7C7C7C' }, arcA), React.createElement('tspan', { fill: '#E6E6E6' }, arcC)))),
+      arcOp: arcOn && arcC && !(idle && S.space === 'home') ? 1 : 0, labelOp: arcOn ? 0 : 1,
+      pips, pipsOp: showPips && CR[0] && !idle ? 1 : 0,
+      xPath: 'Music › ' + (isRec ? 'Recently Added' : 'Playlists') + ' › Explorer',
+      segs: (() => { const sw = S.sweepUntil > now; let rr = ring; if (S.wallPh === 1) { const end = S.wallDir > 0 ? 44 : 0; rr = rr.map((sg, i) => { const k = arcK(i); return k >= 0 && Math.abs(k - end) <= 2 ? Object.assign({}, sg, seg('255,232,205', 0.9)) : sg; }); } return rr.map((sg, i) => Object.assign({}, sg, { dl: sw ? Math.round(i * 8.7) + 'ms' : '0ms' })); })(),
+      hf, stOp: S.stIn ? 0 : ly.st.op, stY: S.stIn ? 10 : 0, stTr: S.stIn ? 'none' : `opacity 240ms ${OUT}, ` + TR('transform', SPRING.soft),
+      tour: () => this.runTour(), tourLabel: S.touring ? 'Stop tour · ' + (S.tourStep || '…') : 'Play motion tour',
+      toggleSound: () => this.setState({ sound: !S.sound }), sdLabel: S.sound ? 'Sound proxy: on' : 'Sound proxy: off', sdBg: S.sound ? 'var(--color-text)' : 'transparent', sdFg: S.sound ? 'var(--color-bg)' : 'var(--color-text)',
+      btns, foot, center, ly, v, where, map: map.map(m => Object.assign({ op: 1 }, m)),
+      lcdArt: art ? (typeof art === 'string' ? cov(art) : mos(art)) : 'none', lcdArtOp: art ? (!S.playing && (S.space === 'home' || S.space === 'music') ? 0.45 : 0.8) : 0, lcdScrimOp: art ? 1 : 0,
+      holdTickOp: this.hasHold4() && !idle ? 1 : 0,
+      hint: 'Hold 4 for 1 s: on Home it swaps the knob between volume and brightness; in Recently Added, Playlists, the explorer and Up next it queues the item. Tap 4 acts on release. Use Music state and Demo area above to try paused, empty, mixed and disconnected states.',
+      knobTf: `rotate(${S.rot}deg)`,
+      cOp: S.ent ? 0 : 1, cTf: S.ent ? `translate(${S.ent * 28}px, 0) scale(0.97)` : `translate(0, ${S.wallPh === 1 ? -9 * S.wallDir : 0}px)`, cTr: !S.anim || S.ent ? 'none' : S.wallPh === 1 ? `opacity 220ms ${OUT}, transform 90ms ${OUT}` : S.wallPh === 2 ? `opacity 220ms ${OUT}, ` + TR('transform', SPRING.wall) : `opacity 240ms ${OUT}, ` + TR('transform', SPRING.snap),
+      monH: Math.round(720 * sc) + 'px', monTf: `scale(${sc})`, monLabel,
+      deskWins, taskIcons,
+      pOp: pickerOn ? 1 : 0, pCards, pCur: { app: pw.app, title: pw.title }, slots, pHints: H([['1', 'Home'], ['2', 'Snap left'], ['3', 'Snap right'], ['4', 'Switch']]),
+      xOp: xOn ? 1 : 0, xCards, xCur, xAmb: amb(itemCol(cur)),
+      xTabs: [{ k: '2', l: 'Recently Added', op: isRec ? 1 : 0.55, sx: isRec ? 1 : 0 }, { k: '3', l: 'Favourite playlists', op: isRec ? 0.55 : 1, sx: isRec ? 0 : 1 }],
+      xHints: H([['1', 'Back'], ['2', 'Recently Added'], ['3', 'Playlists'], ['4', 'Play · hold to queue']]),
+      qOp: qOn ? 1 : 0, qRows, qArt: cov(alb.f), qAmb: amb(alb.c),
+      qCtx: { t: alb.t, a: alb.a, sh: qd === 'q' + S.qI ? 'Plays next · ' + alb.tr[S.qI] : S.shuffle ? 'Shuffle on' : 'Shuffle off', shc: qd === 'q' + S.qI ? '#9CF0BC' : S.shuffle ? '#FFBE69' : 'rgba(255,255,255,0.7)' },
+      qHints: H([['1', 'Back'], ['2', 'Shuffle'], ['3', 'Like'], ['4', 'Play · hold for next']]),
+      set
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1305,7 +1305,7 @@ Every snapshot excludes our own visible windows (§2.6).
 
 **Purpose.** Settle the rendering approach on the user's screen with numbers before WP8 writes `scene_music.py` (00 G1 as redirected by RF0 §5 step 2; 00 §4.3 critical path). It replaces 00 G1's thumbnail-sprite spike.
 
-**Needs the user's go-ahead**, like the v6 spike. It shows full-screen windows on the user's monitor for about 15 minutes of their time. It does **not** touch the knob, any serial port, Sonos, Apple Music or any of the user's windows (no window is moved), and it does not run or install the companion. It is a standalone script in the session scratchpad, `stage-spike\spike_stage.py`, run with the project venv (`.venv\Scripts\python.exe -I`). Its artwork is the prototype's own covers (`HO\prototypes\assets\covers`, repeated to 24 items as r2.1 does, CH r2.1).
+**Needs the user's go-ahead**, like the v6 spike. It shows full-screen windows on the user's monitor for about 15 minutes of their time. It does **not** touch the knob, any serial port, Sonos, Apple Music or any of the user's windows (no window is moved), and it does not run or install the companion. It is a standalone script in a scratch folder, `stage-spike\spike_stage.py`, run with the project venv (`.venv\Scripts\python.exe -I`). Its artwork is the prototype's own covers (`HO\prototypes\assets\covers`, repeated to 24 items as r2.1 does, CH r2.1).
 
 **Safety:** every phase ends by itself within 60 s; a watchdog ends the script after 5 min; the global hotkey **Ctrl+Alt+F12** (`RegisterHotKey`) aborts at once. The windows are non-activating, so they cannot take the keyboard. The script creates windows only on the primary monitor and restores nothing, because it changes nothing.
 
@@ -1495,7 +1495,7 @@ Recorded from the phase-3 build, review and gate reports (WP7c, WP8-trim, WP6-gi
 | **KE-1** | H9 corrected in the errata sections (21.4 E-i, K2 12.6) rather than in §6.6's row | §6.6 H9 | accepted; the row and §11.4's Test bullet were then tagged in place (review KE-R6) |
 | **KE-2** | the WP3b acceptance recorded in K1 16.8 E-l, with K3 E-l4 pointing to it | 21.4 (R-l) | accepted |
 | **KE-3** | K-errata left the rename rows of K1, K3 and K4 to the rename package | the rename plan (`rename-desk-dial.md` 6) | accepted; the rename package applied them (K1 16.8 E-r, VOC-R32) |
-| **KE-4** | one read-only `python -I` run with the session scratchpad as its working directory (nothing written outside the scratchpad) | the phase's working rule | accepted as recorded (a process slip, not a contract change) |
+| **KE-4** | one read-only `python -I` run with a scratch folder as its working directory (nothing written outside a scratch folder) | the phase's working rule | accepted as recorded (a process slip, not a contract change) |
 
 ---
 
@@ -1620,3 +1620,102 @@ Those run with the user's go-ahead before S1 accepts WP8, and §19.2's fallbacks
 10. **G1-10, close the spike-to-contract gap before WP8 relies on it.**
     - The spike paced on a layered, click-through host (`0x082800A8`, §19.2's P1 fallback) and animated opacity through an `IDCompositionEffectGroup`.
     - WP7a's first supervised on-screen check repeats one normal pacing pass, with the witness, on §2.1's click-eating host (`0x08200088`) with `IDCompositionVisual3::SetOpacity`, or else adopts the spike's proven pair.
+
+
+---
+
+## 24. The r3 Navigator (`navigator`)
+
+Sources: r3 handoff README §5 (Navigator), §4 (motion), §1.2 / §2.2 (content per state), §9 (tokens); the prototype `Knob IA Prototype.dc.html` L79–170 (markup) and L790–837 (logic); the design checklist `design-reference/r3-design-spec-checklist.md` NV-1…NV-24, MO-7…MO-9. Written 2026-09-29 with the build; nothing was shown on screen for it (headless renders and a never-shown native check only).
+
+### 24.1 What it is and when it replaces the floating knob
+
+- A compact liquid-glass card on the **primary monitor's left edge** that shows where the knob is (path row), what it controls (per-state content) and what buttons 1–4 do now (keys grid). It **replaces the floating knob** (§11) for an r3 knob: `runtime.presentation_level >= 6` (`navigator_model.applies`). A knob below presentation 6 keeps the floating knob, unchanged.
+- While it stands in, `ui.ControlCenterApp._render_overlay` holds the floating knob with the suppression reason **`navigator`** (`overlay.SUPPRESS_NAVIGATOR`, §17.1) and draws no LCD scene for it; the knob's ALIVE engine still receives its frames.
+- A Navigator that cannot start (no thread, no device) leaves every knob on the floating knob (`Navigator.available` False, `update()` returns False).
+
+### 24.2 Files and threads
+
+| Piece | Where | Thread |
+|---|---|---|
+| Content + visibility rules (pure) | `control_center/navigator_model.py` | Tk |
+| Recently Added covers (bounded LRU over the explorer's art pipeline) | `control_center/stage/scenes/navigator_covers.py` | Tk (asks) / `NanoD-art-*` (fetch, decode) |
+| Tk facade `Navigator` (never imports the stage) | `control_center/navigator.py` | Tk |
+| Engine `NavigatorEngine`, Win32 loop `NavigatorThread`, backdrop `CaptureWorker` | `control_center/stage/scenes/navigator_engine.py` | **`NanoD-navigator`** / **`NanoD-navigator-capture`** |
+| Scene (tree, sprites, motion) | `control_center/stage/scenes/navigator.py` | `NanoD-navigator` |
+| Headless rig, reference renderer, design states, contact sheet | `control_center/stage/scenes/navigator_render.py` | tests / tools |
+| Wiring | `standalone.py`, the one wiring point outside the stage package (WP8-R11): `_navigator_factory` builds the thread and the covers over `stage.art` and hands them to the facade; `start_navigator` after the stage, `close_navigator` in the `finally`; `ui.py` (`ControlCenterApp(navigator=)`, `_render_navigator`, `FastPath.navigator`, Settings row, capture exclusions) | Tk, reader |
+
+`NanoD-navigator` follows §2.2's skeleton: PMv2 per thread, `ABOVE_NORMAL`, `PeekMessageW` then `MsgWaitForMultipleObjectsEx` on an auto-reset event with the engine's next wake; **no frame loop, no timer while idle** (wakes: a posted state, a turn, a backdrop result, the hide one frame after the slide-out, the 2 s backdrop refresh while shown, the 600 s device release).
+
+### 24.3 The data: a read-only adapter
+
+- The controller is never written. Each Tk tick, `Navigator.update(runtime, frame)` calls `navigator_model.read_snapshot(controller, frame)`: a dict of primitives copied from the controller's public state (`screen.mode/index`, `state`, `display_volume`, `lights` + `display_bri/display_kelvin/lights_display_on()`, `lights_mode`, `recent.items`, `screen.seek`) and from the decorated frame the tick already renders (title, meta + tone, buttons with `enabled`/`lit`, the `volume` reveal layout, `artKey`). `build_content(snapshot, pressed)` turns it into a frozen `NavContent`.
+- Tracks rows ±2: the controller's read-only **`queue_titles(rows) -> {row: title}`** (the Tracks neighbour reads, the loaded Up next rows and the playing song); a row it does not know yet shows `—`.
+- Covers: the playing cover (Home, Music, Seek) is the runtime's hi-res cover (`runtime.lcd_media(frame, hires=True)`), handed over once per `artKey`. **Recently Added** covers (the focus and ±2) come from `stage.scenes.navigator_covers.NavigatorCovers`: a bounded LRU (24 decoded covers at 120 units, ≈ 7 MB at k 2) fed by the explorer's own art pipeline — the item's art identity is `scene_music.cover_plan` (Apple `art_template` / `art_max` as the controller's list already carries them, else the Sonos `/getaa` URL, else the Generated sleeve), fetched as `LANE_ART` jobs on `NanoD-art-*` through `ArtService.fetch_decoded` → `artwork.CoverStore.fetch` (its allowlist, bounds, C1 cache, no credentials; URLs never logged), nearest first, newest wins (jobs that left the window and have not started are cancelled), a failed cover retried after 30 s. The Tk tick hands each landed image over once (the Tk side remembers 32, the scene keeps 24). Until a cover lands the item shows its accent tile; the art then **fades in over the tile in 240 ms** (a cover already in when the item appears shows at once). No new controller accessor was needed (`controller.recent.items` carries the art fields).
+- Posting is newest-wins and only on change (content, visible, eligible, reduced motion); a PIL image is never mutated after hand-off.
+
+### 24.4 Visibility (README §5; NV-2…NV-6)
+
+| Rule | Implementation |
+|---|---|
+| Appears on any turn or press | `runtime.touch_seq` on the Tk tick; plus the fast path: `FastPath` calls `note_turn()` (position, limit) and `note_press(slot)` (button) from the reader thread; a turn shows an *eligible* Navigator at once (`post_touch`), the Tk tick confirms. Presses do not show it early (a press may open an overlay). |
+| Auto-hides 4 s after the last input at Home and the space roots | `Visibility.visible`: `now − last_input < 4.0` for non-sticky content (launcher, Music, Lights in brightness mode) |
+| Stays in Recently Added, Tracks (Seek), Scenes, temperature mode | `NavContent.sticky` |
+| Hidden while a full-screen overlay is open | modes `explorer`, `upnext`, `windows` have no content; also `runtime.open_surfaces` and the carousel's open state |
+| Hidden while the knob is away | `runtime.device_connected` |
+| Settings: **Auto-hide** (default) / **Pinned** / **Off** | `settings.json` `navigator` = `auto` / `pinned` / `off`; Settings row "Navigator"; applied at once through `_apply_presentation` → `Navigator.set_mode` |
+| Pressed key fills | the slot of the newest press, for 220 ms (`PRESS_FLASH_S`), crossfaded 120 ms |
+
+### 24.5 Geometry (units; ×k physical px, k = `StageLayout(rcMonitor).k` = 2 on the G93SC)
+
+- Host: a column at the monitor's left edge over the work area, `HOST_W = 20 + 250 + 75` units (the shadow's 3σ reach) × `rcWork` height; **click-through** (`ROLE_CLICK_THROUGH`, ex `0x082800A8`: layered + transparent + no redirection bitmap + no-activate + topmost + tool window, `WM_NCHITTEST` → `HTTRANSPARENT`), shown with `SetWindowPos(HWND_TOPMOST, …, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW)`, hidden with `SW_HIDE` one frame after the slide-out ends. It never covers the whole monitor (fullscreen apps keep independent flip).
+- Card: left 20, **width 250**, height = content, **vertically centred in `rcWork`**, padding 16, gap 14, **radius 26**. Heights follow the prototype's flex: `16 + path (11 × 1.088) + 14 + content + 14 + keys 53 (+ 10 + 14 hold line) + 16`; content = now 64 + 12 + 21.97; lights 166.1; covers 196 + 10 + 54; rows / scenes 190 + 10 + 15; seek 44 + 10 + 40 + 10 + 4.
+
+### 24.6 Liquid glass (NV-8…NV-12)
+
+- **Backdrop.** DirectComposition has no backdrop brush (that is Windows.UI.Composition's `HostBackdropBrush`), so the stage's snapshot recipe is used, as for the explorer's frost (§12): `NanoD-navigator-capture` `BitBlt`s the host column with our windows excluded (`WDA_EXCLUDEFROMCAPTURE` for the grab only; the floating knob's window too), reduces it to 1/4, `GaussianBlur` σ = 14·k/4, `saturate(1.8)` (Rec.709 matrix), `brightness(1.06)`. A show whose backdrop is older than 1.5 s waits for a fresh one (≤ 120 ms, else shows with the previous one). **While shown it refreshes every 2 s**; a changed desktop (mean 8-bit difference ≥ 1.5 at 1/16) crossfades in over 250 ms on a second glass visual, an unchanged one costs nothing.
+- **Glass sprite** (one opaque premultiplied sprite per card height and backdrop, cached): the backdrop cropped to the card and upscaled (bilinear), `rgba(18,18,22,.30)`, the 160° white gradient .18 / .05 @ 42 % / .09, the specular (radial white .22 → 0, 220 × 160 at (−40, −60), `closest-side`), the four inset rims (`0 1px` .6, `0 −1px` .14, `1px 0` .22, `−1px 0` .10, 1 unit = k px, following the corner curve), cut to the antialiased 26-unit radius. No tint, no ambient fill.
+- **Drop shadow** `0 18px 50px rgba(0,0,0,.35)` of the rounded card, built at 1/4 and stretched (LINEAR). **Text shadow** `0 1px 2px rgba(0,0,0,.35)` on every text except the key digits.
+
+### 24.7 Content and type (NV-13…NV-24)
+
+Archivo (bundled variable font, exact weights), caps labels 11/600/0.12 em/white 75 %, titles 15/19 600, secondary 12/16 85 %, meta 11/15 70 %; digits are tabular in Archivo. Paths: `Home`, `Music`, `Music › Recently Added`, `Music › Tracks`, `Music › Tracks › Seek`, `Lights`, `Lights › Scenes`.
+
+| Kind (modes) | Content |
+|---|---|
+| now (`launcher`, `home`) | 64 cover (r 8, `0 8px 20px .35`, 1 px white .2 ring) + title / artist / `Playing · m:ss of m:ss` or `Paused` or the frame's status in its tone; Volume caps row + 4 px bar (track .2, fill white, 120 ms linear), the row 60 % at rest, 100 % while the frame shows the volume reveal (200 ms) |
+| lights | caption + 44 px number (46 line, −0.03 em) + 16 px unit at 80 % (`Brightness 62 %`, `Colour temperature 4100 K`, `Lights Off`); Brightness bar (track .18, fill in the Kelvin colour, 0 when off); Temperature bar (gradient 2200 → 3400 → 6500 K, white 4 × 12 marker with a 1 px black .4 ring at (K − 2200)/4300); Scene row (rule .2, `{scene}` or `{scene} · adjusted`). The row the knob changes 100 %, the other 50 %. No status line (B14). |
+| covers (`recent`) | 196-unit clipped carousel: 120 covers (r 8, `0 10px 24px .4`), ±86 @ 0.55, ±132 @ 0.38 (±170 @ 0.30 hidden), opacity 1 / .55 / .25, z by distance (reordered at the detent); title, artist, `{i} / {n} · {year}` |
+| rows (`tracks`) | 5 × 38 rows around the playing song, wrapping; number 11 px 70 % (♪ playing), title 13/17 600 (`#9CF0BC` playing), tag 10 px caps (`Now` .6; `Skip to` / `Back to` `#6ED996` on the target); plate `rgba(255,255,255,.16)` r 10 + inset top .35 at the target; status `Turn for previous or next` / `Press 4 to skip` (a message in its tone replaces it) |
+| seek | 44 cover (r 6) + title 14/18; 36 px `m:ss` (40 line, −0.02 em) + 12 px `of m:ss`; 4 px `#FFBE69` bar |
+| scenes | the rows list: number, name, `Running` `#7EE0A2` on the running unadjusted scene; plate fixed at the centre; `Press 4 to run` |
+| keys (all) | 2 × 2 under a .18 rule; 16 box (r 4, 1 px white .55), digit 10/700, label 11 white .9; unavailable / empty 40 %; the prototype's words per mode (`Back · Full screen · Play next · Play`, `Exit seek · Up next · Set · Skip`, …) with availability from the frame; `Hold 1 for Home` (11/14, 70 %, margin −4) when depth ≥ 2 |
+
+### 24.8 Tree and motion (MO-7…MO-9)
+
+```
+root (LINEAR, SOFT, LAYER)
+└ card (opacity, offset X / Y)        show/hide: opacity 280 ms, X −24 → 0 u 420 ms, OUT
+  ├ shadow (1/4 sprite, ×4)
+  ├ glass0, glass1 (opacity)          backdrop crossfade 250 ms EASE
+  ├ path
+  ├ content (opacity, offset X)       swap: from ±20 u, opacity 220 ms / X 380 ms OUT (deeper = from the right)
+  │   └ the kind's visuals            one Tree per kind; each row / cover its own Tree (released when it leaves)
+  │       rows / covers: Y (and scale) 380 ms OUT, opacity 280 ms EASE; plate 320 ms OUT
+  │       bars 120 ms LINEAR (ScaleX about the left edge); dimmed rows 200 ms EASE; marker X 120 ms LINEAR
+  ├ keys: line, labels, 4 × (box, pressed box (opacity 120 ms EASE))
+  └ hold line (opacity)
+```
+
+- Every change is one `animation.Batch` per event (one Commit), compositor-run and sampled by DWM at the display rate: **240 Hz-capable with zero Python per frame**, as the stage (§1). Content swaps and height changes are instant (the prototype's flex), under the content slide.
+- **Reduced motion** (`runtime.reduced_motion`): no slides (offsets jump), show/hide is a 200 ms fade, row fades kept.
+- Leaving items and swapped kinds release their visuals, animations and surfaces (a 4-round swap test keeps the device's live objects flat).
+
+### 24.9 Measurements, tests and open points
+
+- **Headless** (`tests/test_r3_navigator_model.py`, `tests/test_r3_navigator_scene.py`, 55 tests; with the covers suite 69): content per state from a real controller (R3Fixture), keys, visibility and the Tk facade, the FastPath hook, the Settings value, the `navigator` suppression for an r3 knob and not for r2.2; every design state rendered on the fake device with no violations, opaque rounded glass, the prototype comparison (mean difference < 6/255 per channel; measured 1.3–2.9), motion durations/curves/directions, hide → host hidden, backdrop refresh only on change, display change / lock, touch-show only when eligible, device release after 600 s, facade + engine end to end (auto-hide after 4 s).
+- **Contact sheet**: `design-reference/r3-navigator-sheet.png` (prototype left, ours right, 14 states + motion samples); per-state PNGs in `design-reference/r3-navigator/`, the prototype's in `design-reference/r3-navigator-prototype/` (regenerate: `make_prototype_reference.py` there, headless Chrome, offscreen).
+- **Native, never shown** (a hidden click-through host, a real D3D11 + DComp device): the scene builds and commits every state with no COM error; a volume detent costs 0.9 ms p50 / 1.3 ms p95 on `NanoD-navigator` (build + Commit); a first show with the glass ≈ 20 ms; the backdrop build 0.4 ms at 1/4, the glass rebuild 2.4 ms; the column `BitBlt` took ~100 ms in the headless session (GIL released, on the capture thread).
+- Covers (`tests/test_r3_navigator_covers.py`, 14 tests): the explorer's art identity, the ±2 window nearest first, fetches only through `CoverStore.fetch` with no extra arguments, cancellation of what left the window, no refetch of landed covers, the LRU bound, the Generated sleeve without network, a failing fetch keeps the tile and backs off 30 s, no `ArtService` = tiles, the Tk hand-over once, the 240 ms fade-in and its absence for a cover already in, the scene's image bound.
+- Open: (1) the Recently Added covers need the stage's `ArtService` (`standalone` passes `stage.art`); without the stage they stay tiles; (2) the backdrop is a 2 s snapshot, not live — a moving window behind a pinned card lags up to 2 s; the live path is Windows.UI.Composition `HostBackdropBrush` interop; (3) the Scenes 1d pending state (`Runs in 1 s`) is not shown (1e only, as the controller).

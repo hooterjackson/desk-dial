@@ -1,0 +1,47 @@
+# Secrets and personal data: never commit
+local/
+backups/
+diagnostics/
+credentials*.bin
+settings.json
+*.p8
+*.pem
+*.key
+.env
+.env.*
+*.log
+*.jsonl
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+build/
+dist/
+vendor/
+*.spec
+
+# Build and install outputs (Build-Desktop.ps1 recreates them; kept on disk for rollbackFolders)
+desktop-build*/
+desktop-dist*/
+previews/
+
+# Firmware artifacts: only the rollback ladder's accepted images are tracked
+firmware/**/*.bin
+firmware/**/*.zip
+firmware/**/*.elf
+firmware/**/*.map
+firmware/**/*.superseded-*
+!firmware/nanod-control-center-1.0.0-cc5.6-F.bin
+!firmware/nanod-control-center-1.0.0-cc5.7-F.bin
+!firmware/nanod-control-center-1.0.0-cc5.7-D.bin
+!firmware/nanod-control-center-1.0.0-cc5.8-F.bin
+!firmware/nanod-control-center-1.0.0-cc5.8-D.bin
+
+# Stray and OS
+/x
+Thumbs.db
+desktop.ini
+.DS_Store

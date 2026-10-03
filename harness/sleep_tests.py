@@ -20,10 +20,16 @@
    * host lines never touch the timer: cc_sleep_input() is called only from hmi_thread.cpp (buttons)
      and foc_thread.cpp (rotation); the diag reply carries sleepState / idleMs.
 
+4. FW-BUG-016: compiles the firmware's pinned LVGL with the firmware lv_conf.h (cached under
+   build/sleep-tests/lvgl) and runs sleep_lvgl_tests.cpp: the firmware's src/cc_sleep_lcd.h against a real
+   LVGL display; 10 s asleep with the host animating must flush nothing, the wake pass must flush the whole
+   screen with the latest frame (the old one-shot timer pause is run as a control and must be caught).
+
 Exit status is non-zero on any failure.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -60,6 +66,73 @@ def compile_runner() -> Path:
     return exe
 
 
+LVGL = firmware / '.pio' / 'libdeps' / 'nanofoc_d' / 'lvgl'
+lvgl_dir = out_dir / 'lvgl'
+
+
+def build_lvgl() -> Path:
+    """LVGL (the firmware's pinned copy) compiled with the firmware lv_conf.h into lvgl_dir/lvgl.lib; reused while
+    lv_conf.h and the source list are unchanged. Host override as build.py: LV_USE_TFT_ESPI 1 -> 0."""
+    cl, env = msvc_env()
+    conf = (firmware / 'include' / 'lv_conf.h').read_bytes()
+    conf, n = re.subn(rb'^([ \t]*#define[ \t]+LV_USE_TFT_ESPI[ \t]+)1\b', rb'\g<1>0', conf, flags=re.M)
+    if n != 1:
+        raise SystemExit('FAIL: firmware lv_conf.h: expected one "#define LV_USE_TFT_ESPI 1"')
+    conf_dir = lvgl_dir / 'conf'
+    obj_dir = lvgl_dir / 'obj'
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    obj_dir.mkdir(parents=True, exist_ok=True)
+    sources = sorted(str(p) for p in (LVGL / 'src').rglob('*.c'))
+    stamp = hashlib.sha256(conf + '\n'.join(sources).encode()).hexdigest()
+    lib = lvgl_dir / 'lvgl.lib'
+    stamp_file = lvgl_dir / 'stamp.txt'
+    if lib.exists() and stamp_file.exists() and stamp_file.read_text() == stamp:
+        return conf_dir
+    (conf_dir / 'lv_conf.h').write_bytes(conf)
+    for old in obj_dir.rglob('*.obj'):
+        old.unlink()
+    lines = ['/nologo', '/c', '/O2', '/W0', '/MP', '/DLV_CONF_INCLUDE_SIMPLE', '/DLV_LVGL_H_INCLUDE_SIMPLE',
+             '/D_CRT_SECURE_NO_WARNINGS', f'/I"{conf_dir}"', f'/I"{LVGL}"']
+    # /MP with one /Fo directory needs unique basenames; compile groups of unique names.
+    groups: list[list[str]] = []
+    for s in sources:
+        name = Path(s).stem
+        for group in groups:
+            if all(Path(o).stem != name for o in group):
+                group.append(s)
+                break
+        else:
+            groups.append([s])
+    objs = []
+    for gi, group in enumerate(groups):
+        gdir = obj_dir / f'g{gi}'
+        gdir.mkdir(exist_ok=True)
+        grsp = lvgl_dir / f'lvgl{gi}.rsp'
+        grsp.write_text('\n'.join(lines + [f'/Fo"{gdir}\\\\"'] + [f'"{s}"' for s in group]) + '\n', encoding='utf-8')
+        subprocess.run([str(cl), f'@{grsp}'], cwd=lvgl_dir, env=env, check=True, stdout=subprocess.DEVNULL)
+        objs += [str(gdir / (Path(s).stem + '.obj')) for s in group]
+    lib_exe = cl.parent / 'lib.exe'
+    lrsp = lvgl_dir / 'lib.rsp'
+    lrsp.write_text('\n'.join(['/nologo', f'/OUT:"{lib}"'] + [f'"{o}"' for o in objs]) + '\n', encoding='utf-8')
+    subprocess.run([str(lib_exe), f'@{lrsp}'], cwd=lvgl_dir, env=env, check=True)
+    stamp_file.write_text(stamp)
+    return conf_dir
+
+
+def compile_lvgl_runner() -> Path:
+    """sleep_lvgl_tests.cpp + the firmware's src/cc_sleep_lcd.h against a real LVGL display (FW-BUG-016)."""
+    conf_dir = build_lvgl()
+    cl, env = msvc_env()
+    exe = out_dir / 'sleep_lvgl_tests.exe'
+    subprocess.run([
+        str(cl), '/nologo', '/EHsc', '/std:c++14', '/W4', '/WX', '/O2', '/D_CRT_SECURE_NO_WARNINGS',
+        '/DLV_CONF_INCLUDE_SIMPLE', '/DLV_LVGL_H_INCLUDE_SIMPLE', '/external:W0',
+        f'/external:I{conf_dir}', f'/external:I{LVGL}', f'/I{src}', str(root / 'sleep_lvgl_tests.cpp'),
+        f'/Fo{out_dir}\\', f'/Fe{exe}', '/link', str(lvgl_dir / 'lvgl.lib'),
+    ], cwd=out_dir, env=env, check=True)
+    return exe
+
+
 def code(text: str) -> str:
     """C/C++ source without comments (block and line), whitespace collapsed."""
     text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
@@ -83,11 +156,51 @@ def pins() -> int:
     lcd, hmi, foc, diag = read('lcd_thread.cpp'), read('hmi_thread.cpp'), read('foc_thread.cpp'), read('cc_diag.cpp')
     haptic = read('haptic.cpp')
     # Backlight.
-    if lcd.count('ledcWrite(') != 1:
+    # FW-BUG-017: the one write outside the gate is cc_lvgl_layout_halt()'s full backlight for the mixed lv_conf.h
+    # error screen, which runs before any sleep state and never returns (lcd_thread_tests.py pins its body).
+    halt = re.search(r'static void cc_lvgl_layout_halt\(\) \{[^{}]*?ledcWrite\(LEDC_CH_LCD_BKL, LEDC_MAX_BLK\); '
+                     r'while \(1\) \{ cc_wdt_feed\(\); vTaskDelay\(1000 / portTICK_PERIOD_MS\); \} \}', lcd)
+    if not halt:
+        raise SystemExit('FAIL: lcd_thread.cpp: cc_lvgl_layout_halt() holds the backlight on and never returns')
+    gated = lcd[:halt.start()] + lcd[halt.end():]
+    if gated.count('ledcWrite(') != 1:
         raise SystemExit('FAIL: lcd_thread.cpp: every backlight write must go through lcd_backlight_apply()')
-    need(lcd, r'static void lcd_backlight_apply\(\) \{ const uint16_t duty = cc_sleep_duty\(cc_sleep_state\(\), '
-              r'blk_wanted\); if \(static_cast<int32_t>\(duty\) != blk_written\) \{ ledcWrite\(LEDC_CH_LCD_BKL, duty\);',
-         'lcd_thread.cpp: the one backlight write is cc_sleep_duty() of the wanted duty')
+    count += 1
+    need(lcd, r'static void lcd_backlight_apply\(\) \{ const uint16_t duty = cc_sleep_duty\(lcd_sleep_gate\.backlightState\('
+              r'cc_sleep_state\(\)\), blk_wanted\); if \(static_cast<int32_t>\(duty\) != blk_written\) \{ '
+              r'ledcWrite\(LEDC_CH_LCD_BKL, duty\);',
+         'lcd_thread.cpp: the one backlight write is cc_sleep_duty() of the wanted duty, dark until the wake refresh')
+    # FW-BUG-016: nothing drawn while asleep. Every immediate refresh goes through lcd_refr_now() (a no-op while
+    # dark), except the one wake refresh; the refresh timer is paused on sleep and resumed on the wake, and the
+    # wake refresh (whole screen, on glass) runs after the pass's render and before the backlight returns.
+    need(lcd, r'static void lcd_refr_now\(\) \{ if \(!lcd_sleep_gate\.dark\(\)\) lv_refr_now\(nullptr\); \}',
+         'lcd_thread.cpp: lcd_refr_now() draws nothing while dark')
+    if lcd.count('lv_refr_now(') != 2:
+        raise SystemExit('FAIL: lcd_thread.cpp: every lv_refr_now() goes through lcd_refr_now() but the wake refresh')
+    # FW-BUG-016 review: LVGL resumes the refresh timer on every invalidation, so the dark handling lives in
+    # cc_sleep_lcd.h (invalidation off + the timer held paused while dark), proven against a real LVGL display by
+    # sleep_lvgl_tests.cpp; here the loop must use exactly that code and nothing else may touch the timer.
+    need(lcd, r'const uint8_t lcdSleepStep = cc_sleep_lcd_step\(lcd_sleep_lvgl, cc_sleep_state\(\)\); '
+              r'cc_crumb_lcd\(CC_LCD_STEP_HOST\); render_host_frame\(\); if \(lcdSleepStep == CC_SLEEP_LCD_RESUME\) \{ '
+              r'cc_sleep_lcd_dark\(lcd_sleep_lvgl, false\); if \(!app_on\) \{ cc_crumb_lcd\(CC_LCD_STEP_REFRESH\); '
+              r'lv_obj_invalidate\(lv_screen_active\(\)\); lv_refr_now\(nullptr\); cc_panel_wait\(\); \} '
+              r'lcd_sleep_gate\.refreshed\(\); \}.*?lv_timer_handler\(\); lcd_backlight_apply\(\);',
+         'lcd_thread.cpp: dark for LVGL on sleep; on the wake render, refresh the whole screen, then the backlight')
+    need(lcd, r'lv_display_t \* disp = lv_display_create\(TFT_WIDTH, TFT_HEIGHT\);.*?'
+              r'cc_sleep_lcd_attach\(lcd_sleep_lvgl, disp, lcd_sleep_gate\);.*?while \(1\)',
+         'lcd_thread.cpp: the REFR_REQUEST hold is attached after lv_display_create(), before the loop')
+    for banned in ('lv_timer_pause(lv_display_get_refr_timer', 'lv_timer_resume(lv_display_get_refr_timer',
+                   'lv_display_enable_invalidation('):
+        if banned in lcd:
+            raise SystemExit(f'FAIL: lcd_thread.cpp: {banned} outside cc_sleep_lcd.h')
+    sleep_lcd = read('cc_sleep_lcd.h')
+    need(sleep_lcd, r'if \(s->gate->dark\(\)\) lv_timer_pause\(lv_display_get_refr_timer\(s->disp\)\);',
+         'cc_sleep_lcd.h: a refresh request while dark pauses the refresh timer again')
+    need(sleep_lcd, r'lv_display_add_event_cb\(disp, cc_sleep_lcd_refr_request, LV_EVENT_REFR_REQUEST, &s\);',
+         'cc_sleep_lcd.h: the hold is a REFR_REQUEST handler')
+    need(sleep_lcd, r'if \(step == CC_SLEEP_LCD_PAUSE\) cc_sleep_lcd_dark\(s, true\);',
+         'cc_sleep_lcd.h: the sleep edge turns LVGL dark')
+    count += 2
     need(lcd, r'timed_render\(frame, cc_art_pixels\(frame\.artKey\)\);.*?lcd_backlight\(LEDC_MAX_BLK\);',
          'lcd_thread.cpp: the PC-driven render asks for LEDC_MAX_BLK through lcd_backlight() (clamped)')
     need(lcd, r'lv_timer_handler\(\); lcd_backlight_apply\(\);', 'lcd_thread.cpp: the state is applied every pass')
@@ -120,9 +233,10 @@ def pins() -> int:
                              'rotation) may reset the timer')
     count += 2
     need(foc, r'if \(sleepStep\.input\) cc_sleep_input\(\); if \(sleepStep\.action == CC_SLEEP_MOTOR_DISABLE\) '
-              r'motor\.disable\(\); else if \(sleepStep\.action == CC_SLEEP_MOTOR_ENABLE\) \{ motor\.enable\(\); '
+              r'motor\.disable\(\); else if \(sleepStep\.action == CC_SLEEP_MOTOR_ENABLE\) \{ '
+              r'if \(cc_motor_wake_enable\(motor\.motor_status == FOCMotorStatus::motor_ready\)\) motor\.enable\(\); '
               r'haptic\.reanchor\(\);',
-         'foc_thread.cpp: disable / enable + re-anchor from CCSleepFoc on the FOC task')
+         'foc_thread.cpp: disable / enable (a calibrated motor only, FW-BUG-030) + re-anchor from CCSleepFoc on the FOC task')
     need(foc, r'if \(sleep_foc\.motorOff\(\) \|\| \(cc_claimed\(\) && cc_input_id\(\) != runtime_id\)\) '
               r'\{ motor\.loopFOC\(\); motor\.move\(0\); \} else haptic\.haptic_loop\(\);',
          'foc_thread.cpp: no haptic loop (no position change) while the motor is off')
@@ -145,6 +259,8 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     exe = compile_runner()
     subprocess.run([str(exe)], check=True)
+    lvgl_exe = compile_lvgl_runner()
+    subprocess.run([str(lvgl_exe)], check=True)
     print(f'PASS: inactivity dim / sleep logic (cc_sleep.h) and {pinned} firmware wiring pin(s) '
           f'[{time.time() - started:.1f} s]')
     return 0

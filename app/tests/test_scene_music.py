@@ -171,11 +171,11 @@ class ArtRuleTests(unittest.TestCase):
 
     def test_gen_hash_matches_bs_genof(self):
         """§13.6 / H8: samples computed by BS ``genOf`` (BS:537) in Node, verbatim."""
-        bs = [["Hounds of Love", "Kate Bush", 7], ["Promises", "Floating Points, Pharoah Sanders & LSO", 4],
-              ["Tropicália ou Panis et Circencis", "Various artists", 0],
-              ["Elis & Tom", "Elis Regina & Antônio Carlos Jobim", 3], ["Late Night Drive", "", 4],
+        bs = [["Paper Lanterns", "Mira Vale", 1], ["Promises", "Harbour Signals, Sodium Coast & LSO", 4],
+              ["Copper Sun Sessions", "Various artists", 0],
+              ["Lua & Mar", "Lua Serena & Antônio Carlos Jobim", 2], ["Late Night Channel", "", 6],
               ["Favorite Songs", "", 1], ["PAPER LANTERN Ep. 1", "", 5], ["😀 Smile 🎶", "Émilie", 3], ["", "", 5],
-              ["Kind of Blue", "Miles Davis", 6], ["Águas de Março", "Elis Regina", 6], ["𝄞 Clef", "Bach", 6]]
+              ["Tidal Glass", "Oskar Lind Trio", 4], ["Águas de Março", "Lua Serena", 7], ["𝄞 Clef", "Bach", 6]]
         from control_center import artwork
         for title, artist, want in bs:
             self.assertEqual(SM.gen_index(title, artist), want, title)
@@ -206,14 +206,14 @@ class ArtRuleTests(unittest.TestCase):
 # =========================================================================== the pure model
 class ModelTests(unittest.TestCase):
     def test_explorer_labels(self):
-        self.assertEqual(SM.explorer_label({"title": "Hounds of Love", "artist": "Kate Bush", "year": 1985,
+        self.assertEqual(SM.explorer_label({"title": "Paper Lanterns", "artist": "Mira Vale", "year": 1985,
                                             "track_count": 12}, "recent"),
-                         ("Hounds of Love", "Kate Bush", "1985 · 12 tracks"))
+                         ("Paper Lanterns", "Mira Vale", "1985 · 12 tracks"))
         self.assertEqual(SM.explorer_label({"title": "X", "artist": "Y", "track_count": 1}, "recent")[2], "1 track")
         self.assertEqual(SM.explorer_label({"title": "Favorite Songs", "auto": True, "count": 12,
                                             "duration_ms": 48 * 60000}, "favourites"),
                          ("Favorite Songs", "Favourite playlist · made by Apple Music", "12 songs · 48 min"))
-        self.assertEqual(SM.explorer_label({"title": "Late Night Drive", "count": 48, "duration_ms": 192 * 60000},
+        self.assertEqual(SM.explorer_label({"title": "Late Night Channel", "count": 48, "duration_ms": 192 * 60000},
                                            "favourites")[1:], ("Favourite playlist", "48 songs · 3 h 12 min"))
         self.assertEqual(SM.explorer_label({"title": "", "kind": "playlist"}, "favourites")[0], "Untitled playlist")
         self.assertEqual(SM.explorer_label(None, "recent"), ("", "", ""))
@@ -246,16 +246,16 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(SM.HEART_LOOKS["liked"], (0.0, 0.0, 1.0))
 
     def test_rows(self):
-        ctx = {"kind": "album", "title": "Hounds of Love", "sub": "Kate Bush · 1985"}
-        base = {"title": "Cloudbusting", "artist": "Kate Bush", "album": "Hounds of Love", "segment": "base",
+        ctx = {"kind": "album", "title": "Paper Lanterns", "sub": "Mira Vale · 1985"}
+        base = {"title": "Pressure Front", "artist": "Mira Vale", "album": "Paper Lanterns", "segment": "base",
                 "track_number": 5, "catalog": True}
-        pn = dict(base, album="Blue Lines", artist="Massive Attack", segment="playnext")
+        pn = dict(base, album="Neon Littoral", artist="Lumen Park", segment="playnext")
         self.assertEqual(SM.row_lead(base, ctx), "number")
         self.assertEqual(SM.row_number(base), "05")
-        self.assertEqual(SM.row_texts(base, ctx), ("Cloudbusting", "Kate Bush"))
+        self.assertEqual(SM.row_texts(base, ctx), ("Pressure Front", "Mira Vale"))
         self.assertEqual(SM.row_lead(pn, ctx), "art")
-        self.assertEqual(SM.row_texts(pn, ctx)[1], "Massive Attack · Blue Lines")
-        self.assertEqual(SM.row_texts(dict(pn, catalog=False), ctx)[1], "Massive Attack · Blue Lines · not in Apple Music")
+        self.assertEqual(SM.row_texts(pn, ctx)[1], "Lumen Park · Neon Littoral")
+        self.assertEqual(SM.row_texts(dict(pn, catalog=False), ctx)[1], "Lumen Park · Neon Littoral · not in Apple Music")
         self.assertEqual(SM.row_lead(base, {"kind": "playlist"}), "art")
         self.assertEqual(SM.row_lead(None, ctx, placeholder=True), "placeholder")
         self.assertEqual(SM.row_tag(3, 3)[0], "overlay.upnext.tag_now")
@@ -275,9 +275,9 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(SM.EXPLORER_HINTS[2], ("3", "Playlists"))
 
     def test_big_cover_row(self):
-        ctx = {"kind": "album", "title": "Hounds of Love"}
-        rows = {0: {"album": "Hounds of Love", "segment": "base", "title": "a"},
-                5: {"album": "Blue Lines", "segment": "playnext", "title": "b"}}
+        ctx = {"kind": "album", "title": "Paper Lanterns"}
+        rows = {0: {"album": "Paper Lanterns", "segment": "base", "title": "a"},
+                5: {"album": "Neon Littoral", "segment": "playnext", "title": "b"}}
         self.assertEqual(SM.big_cover_row(rows, 5, 0, ctx)["title"], "a")        # the album's cover stays still
         self.assertEqual(SM.big_cover_row(rows, 5, 0, {"kind": "playlist"})["title"], "b")
 
@@ -1947,7 +1947,7 @@ class ArtServiceTests(unittest.TestCase):
 
     def test_elements_and_the_c2_cache(self):
         art, clk = self.service()
-        plan = SM.cover_plan({"title": "Heligoland", "art_template": "simulation://art/a2/{w}x{h}bb.jpg",
+        plan = SM.cover_plan({"title": "Glass Weather", "art_template": "simulation://art/a2/{w}x{h}bb.jpg",
                               "art_max": 1200, "art_bg": 0xFF781E, "art_ink": 0xF2F2F2})
         img = art.element(plan, 680, units=340, need0=680)
         self.assertEqual(img.size, (680, 680))
@@ -1955,7 +1955,7 @@ class ArtServiceTests(unittest.TestCase):
         self.assertEqual(art.stats["c2_hits"], 1)
         self.assertEqual(again.size, (680, 680))
         self.assertIsNotNone(art.thumb(plan.key))
-        small = SM.cover_plan({"title": "Heligoland", "art_template": "simulation://art/a3/{w}x{h}bb.jpg",
+        small = SM.cover_plan({"title": "Glass Weather", "art_template": "simulation://art/a3/{w}x{h}bb.jpg",
                                "art_max": 400, "art_bg": 0xFF781E})
         ext = art.element(small, 680, units=340, need0=680)
         plain = art.simulated.draw("simulation://art/a3/{w}x{h}bb.jpg", 1200, 400, {"art_bg": 0xFF781E})
@@ -1972,7 +1972,7 @@ class ArtServiceTests(unittest.TestCase):
         art, clk = self.service()
         self.assertIsNone(art.element(SM.cover_plan({"title": "x", "art_template": "simulation://loading/q/{w}x{h}bb.jpg"}),
                                       340, units=340, need0=680))
-        gen = art.element(SM.cover_plan({"title": "Hounds of Love", "artist": "Kate Bush"}), 340, units=340, need0=680)
+        gen = art.element(SM.cover_plan({"title": "Paper Lanterns", "artist": "Mira Vale"}), 340, units=340, need0=680)
         self.assertEqual(gen.size, (340, 340))
 
     def test_real_templates_without_a_cover_store_never_fetch(self):

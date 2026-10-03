@@ -103,7 +103,9 @@ CAPS_V4 = {"presentation": 4, "glyphs": "latin-ext-a"}
 CAPS_V5 = {"presentation": 5, "glyphs": "latin-ext-a", "alive": {"version": 1, "fps": 60, "drive": 150}}
 V5_LAYOUTS = ("seek", "explorer", "upnext")
 V5_ICONS = ("expand", "clock", "playlists", "playnext", "seek", "shuffle", "heart", "snapleft", "snapright")
-FLASH_CODE = {None: 0, "ok": 1, "err": 2}
+FLASH_CODE = {None: 0, "ok": 1, "err": 2, "wash": 3,   # [r3] wash = CC_FLASH_WASH (ALIVE.md 15.5)
+              "refused": 4, "home": 5,                  # [r3] 15.7: CC_FLASH_REFUSED, CC_FLASH_HOME
+              "land": 6, "queue": 7}                    # [r3.1] 15.8: CC_FLASH_LAND, CC_FLASH_QUEUE
 TICK_TIE_MARGIN = 5e-5          # |frac(x) - 0.5| of the tick length's biased pre-round value x
 ANIMATING_MARGIN = 5e-5         # |residue - 1/1024| and |tint - 1/1024| where animating is recorded
 SCATTER_MARGIN = 1e-4           # |frac(p +- 2.4)| of every scatter spark position (addG's floor/ceil)
@@ -195,7 +197,7 @@ def moment(seq, name, color=None, side=None):
 
 
 def _base(control_id, mode, layout, activity, led, buttons, ring, feedback=None, **extra):
-    frame = {"id": control_id, "mode": mode, "target": "Den", "value": "", "detail": "", "status": "",
+    frame = {"id": control_id, "mode": mode, "target": "Hall", "value": "", "detail": "", "status": "",
              "activity": activity, "layout": layout, "ledStyle": led, "buttons": buttons, "ring": ring}
     frame.update(extra)
     if feedback:
@@ -369,6 +371,8 @@ def _apply(seq, op, now, lims):
         lights.limit(t, op["dir"])
     elif kind == "press":
         lights.press(t, op["slot"])
+    elif kind == "keyup":                                   # [r3] 15.7: a release (the hold-1 ring)
+        lights.key_up(t, op["slot"])
     elif kind == "clock":
         lights.set_clock(t, op["minute"])
     elif kind == "progress":
@@ -425,10 +429,14 @@ def _animating(lights):
     if tg.pending or tg.tint is not None or tg.asleep or tg.offline or embers or paused \
             or lights.song_prog is not None:
         return True, True
+    if lights._wall is not None or lights._sweep_at is not None:   # r4: a wall glow / domain sweep runs
+        return True, True
     tint = max(abs(x) for x in animator.tint)
     residue = animator.residue
-    decidable = abs(residue - al.RESIDUE) > ANIMATING_MARGIN and abs(tint - al.RESIDUE) > ANIMATING_MARGIN
-    return residue > al.RESIDUE or tint > al.RESIDUE, decidable
+    ease = lights.ease_residue                                     # r4: the 50 ms output easer (ALIVE.md 16)
+    decidable = (abs(residue - al.RESIDUE) > ANIMATING_MARGIN and abs(tint - al.RESIDUE) > ANIMATING_MARGIN
+                 and abs(ease - al.RESIDUE) > ANIMATING_MARGIN)
+    return residue > al.RESIDUE or tint > al.RESIDUE or ease > al.RESIDUE, decidable
 
 
 class Seq:
@@ -1624,6 +1632,308 @@ def endstop_sequences():
     return [s]
 
 
+# ------------------------------------------------------------- [r3] presentation 6 (ALIVE.md 15)
+# The r3 frames are the presentation-6 host's (Desk Dial r3 release 1). device._frame belongs to the Desk Dial
+# job and does not know presentation 6 yet, so they are fed as Raw: both engines see the dict, the C++ side
+# through its own cc_parse_frame (the frames are valid presentation-6 frames; parse_tests.py holds the parser
+# to lcd_preview.v6_parse over harness/fixtures/frames_v6.json).
+LIGHTS_BUTTONS = _buttons(("Home", True, "house"), ("Scenes", True, "wand"), ("Temp", True, "thermo"),
+                          ("All off", True, "power"))
+SCENES_BUTTONS = _buttons(("Back", True, "back"), ("", False, ""), ("", False, ""), ("Run", True, "switch"))
+HOME_R3_BUTTONS = _buttons(("Music", True, "list"), ("Windows", True, "win"), ("Lights", True, "bulb"),
+                           ("Pause", True, "pause"))
+
+
+def lights5(bri, kelvin, layout="lights", style="bri", temp=False, on=True, feedback=None, led="color",
+            ctemp=None, control_id=7, activity="idle"):
+    """[r3] a Lights frame: bri (value = brightness) or ctemp (value = the position of ``kelvin``) ring, or
+    the ring off with the lights off; ``temp`` lights button 3 (lit on)."""
+    buttons = [dict(b) for b in LIGHTS_BUTTONS]
+    if temp:
+        buttons[2]["lit"] = "on"
+    if not on:
+        ring = {"style": "off", "value": 0, "index": 0, "count": 0}
+    elif style == "ctemp":
+        value = ctemp if ctemp is not None else round((kelvin - 2200) / 43)
+        ring = {"style": "ctemp", "value": value, "index": 0, "count": 0, "kelvin": kelvin}
+    else:
+        ring = {"style": "bri", "value": bri, "index": 0, "count": 0, "kelvin": kelvin}
+    extra = {"heading": "LIGHTS", "title": "Focus" if on else "Lights off",
+             "subtitle": f"{bri}% \u00b7 {kelvin} K" if on else "Tap 4 to turn on"}
+    if layout == "lightsbig":
+        extra.update(volumeCaption="Colour temperature" if style == "ctemp" else "Brightness",
+                     value=str(kelvin if style == "ctemp" else bri), valueUnit="K" if style == "ctemp" else "%")
+    return Raw(_base(control_id, "LIGHTS", layout, activity, led, buttons, ring, feedback, **extra))
+
+
+def scenes5(count, index, feedback=None, control_id=8, activity="idle"):
+    """[r3] the scenes list: a clusters ring."""
+    ring = {"style": "clusters", "value": 0, "index": index, "count": count}
+    return Raw(_base(control_id, "SCENES", "scenes", activity, "color", [dict(b) for b in SCENES_BUTTONS], ring,
+                     feedback, heading="SCENES", title=f"Scene {index + 1}", meta=f"{index + 1} / {count}",
+                     prevTitle=f"Scene {index}" if index else "",
+                     nextTitle=f"Scene {index + 2}" if index + 1 < count else ""))
+
+
+def home_r3(v, playing=True):
+    return home(v, playing=playing, buttons=HOME_R3_BUTTONS, layout="nowPlaying")
+
+
+def r3_sequences():
+    out = []
+    s = Seq("r3-lights-bri", "[r3] 15.2 bri: Home -> Lights (MODE reveal, family lights), the arc at rest L 0.34 in "
+                             "the Kelvin colour, the unfilled arc off [user 2026-09-29], a local spin on the brightness profile (max 100, "
+                             "lightsbig: class 3), the reveal ends, rest: L/F at 0.34 WARM; 2200 / 6500 K")
+    s.op("claim").step(0, home_r3(40))
+    s.run(1500, home_r3(40), every=25)
+    s.run(900, lights5(62, 3200), (62, 100), every=25)
+    s.turn(lambda p: lights5(p, 3200, layout="lightsbig"), 100, list(range(62, 71)), 60)
+    s.turn(lambda p: lights5(p, 3200, layout="lightsbig"), 100, list(range(70, 58, -2)), 45, delta=-2)
+    s.run(1400, lights5(58, 3200, layout="lightsbig"), (58, 100), every=25)
+    s.run(900, lights5(58, 3200), (58, 100), every=25)
+    s.rest(6000, lights5(58, 3200), (58, 100))
+    s.run(600, lights5(1, 2200), (1, 100), every=30)            # an external change: 1 %, 2200 K
+    s.run(600, lights5(100, 6500, layout="lightsbig"), (100, 100), every=30)
+    s.run(600, lights5(0, 2750), None, every=30)                # value 0: the whole track
+    out.append(s)
+
+    s = Seq("r3-lights-ctemp", "[r3] 15.2 ctemp: Temperature on (button 3 lit on = active 0.90), the whole arc in the "
+                               "selected Kelvin colour, marker 1.0, filled F 0.50 / 1.0 turning, remainder off [user 2026-09-29]; the knob "
+                               "position never drives it (host frames only); rest; back to brightness")
+    s.op("claim").step(0, lights5(48, 2700))
+    s.run(1200, lights5(48, 2700), (48, 100), every=25)
+    s.run(600, lights5(48, 2700, style="ctemp", temp=True), (5, 43), every=25)
+    for k in range(2700, 3500, 100):
+        s.op("detent", at=40, delta=1)
+        s.step(45, lights5(48, k, layout="lightsbig", style="ctemp", temp=True), ((k - 2200) // 100, 43))
+    s.run(1400, lights5(48, 3400, layout="lightsbig", style="ctemp", temp=True), (12, 43), every=25)
+    s.run(600, lights5(48, 3400, style="ctemp", temp=True), (12, 43), every=25)
+    s.rest(6000, lights5(48, 3400, style="ctemp", temp=True))
+    s.op("press", slot=2).step(20, lights5(48, 3400))           # Temperature off: brightness again
+    s.run(600, lights5(48, 6500, style="ctemp", temp=True, ctemp=100), every=30)
+    s.run(600, lights5(48, 2200, style="ctemp", temp=True, ctemp=0), every=30)
+    out.append(s)
+
+    s = Seq("r3-scenes-clusters", "[r3] 15.2 clusters and 15.5 the wash: 5 scenes turned locally (max 4), Run = a plain "
+                                  "ok -> the whole ring GREEN 0.68 for 700 ms with no bloom, frameless end of the wash, "
+                                  "an err -> fail + the red flash, 1 and 20 scenes, rest (O dark), back to Lights (MODE)")
+    s.op("claim").step(0, lights5(62, 3200))
+    s.run(1200, lights5(62, 3200), (62, 100), every=25)
+    s.op("press", slot=1).step(20, scenes5(5, 0), (0, 4))
+    s.run(600, scenes5(5, 0), (0, 4), every=25)
+    s.turn(lambda p: scenes5(5, max(0, p - 1)), 4, [0, 1, 2, 3, 4], 90)
+    s.run(400, scenes5(5, 4), (4, 4), every=25)
+    s.op("press", slot=3).step(20, scenes5(5, 4, feedback=("ok", 11)), (4, 4))
+    s.run(900, scenes5(5, 4, feedback=("ok", 11)), (4, 4), every=25)   # the wash ends at 700 ms
+    s.step(20, scenes5(5, 4, feedback=("ok", 12)), (4, 4))
+    s.run(760, every=20)                                        # frameless: the wash still ends
+    s.run(600, scenes5(5, 4, feedback=("err", 13)), (4, 4), every=25)
+    s.run(800, scenes5(5, 2, feedback=("err", 13)), (2, 4), every=25)
+    s.run(600, scenes5(1, 0), (0, 0), every=30)
+    s.run(600, scenes5(20, 13), (13, 19), every=30)
+    s.turn(lambda p: scenes5(20, p), 19, [13, 14, 15, 16], 70)
+    s.rest(6000, scenes5(20, 16), (16, 19))
+    s.run(600, lights5(62, 3200, feedback=("ok", 14)), (62, 100), every=25)   # ok on Lights: the wash too
+    s.run(600, lights5(62, 3200, feedback=("ok", 14)), (62, 100), every=25)
+    out.append(s)
+
+    s = Seq("r3-lights-off", "[r3] 15.2 lights off: the ring off, the power button nav (never red), Home <-> Lights MODE "
+                             "reveals, white LEDs (ledStyle white) keep the Kelvin arc (no sat, no WARM fallback), release")
+    s.op("claim").step(0, lights5(30, 4000, on=False))
+    s.run(1500, lights5(30, 4000, on=False), every=25)
+    s.run(600, lights5(30, 4000, led="white"), (30, 100), every=25)
+    s.run(600, home_r3(30), (30, 100), every=25)
+    s.run(600, lights5(30, 5000, activity="pending"), (30, 100), every=25)
+    s.op("release").step(20, lights5(30, 5000))
+    s.run(600, every=30)
+    out.append(s)
+    out.extend(r3_nav_sequences())
+    return out
+
+
+def crumbed(frame, crumb, **extra):
+    """[r3] 15.7: a wire frame with the presentation-6 `crumb` (and any other raw field)."""
+    base = frame.frame if isinstance(frame, Raw) else wire(frame)
+    return Raw({**base, "crumb": crumb, **extra})
+
+
+def windows_r3(count, index, feedback=None):
+    """[r3] 15.7 the r3 Windows knob screen: the marker ring, button 1 = Home (house)."""
+    buttons = _v5_buttons(("Home", True, "house"), ("Snap left", True, "snapleft"), ("Snap right", True, "snapright"),
+                          ("Switch", True, "switch"))
+    return Raw(_base(1, "WINDOWS", "windows", "idle", "color", buttons,
+                     {"style": "marker", "value": 0, "index": index, "count": count}, feedback,
+                     title=f"Window {index + 1}", crumb="windows"))
+
+
+def held(frame, **extra):
+    """[r3.1] 15.8: a wire frame with holdMarker (button 4 has a hold action here) and any other raw field."""
+    base = frame.frame if isinstance(frame, Raw) else wire(frame)
+    return Raw({**base, "holdMarker": True, **extra})
+
+
+def queue5(count, index, now, first=None, colours=True, activity="idle", layout="tracks", led="color"):
+    """[r3.1] 15.9 the queue ring: whole-queue Tracks (or Up next); ``now`` the playing row (-1: none sent)."""
+    ring = {"style": "queue", "value": 0, "index": index, "count": count}
+    if now >= 0:
+        ring["now"] = now
+    start = 0
+    if count > P.RING_WINDOW:
+        start = first if first is not None else v5_first(count, index)
+        ring["first"] = start
+    if colours and led == "color":
+        ring["colors"] = [accent(start + k) for k in range(min(P.RING_WINDOW, count - start))]
+    if layout == "upnext":
+        buttons = _v5_buttons(("Back", True, "back"), ("Shuffle", True, "shuffle", {"lit": "off"}),
+                              ("Like", True, "heart"), ("Play", index != now, "play"))
+        return Raw(_base(1, "UP NEXT", "upnext", activity, led, buttons, ring, None, heading="UP NEXT",
+                         title=f"Song {index + 1}", crumb="upnext", holdMarker=True))
+    buttons = _v5_buttons(("Back", True, "back"), ("Up next", True, "expand"), ("Seek", True, "seek"),
+                          ("Play", index != now, "play"))
+    return Raw(_base(1, "TRACKS", "tracks", activity, led, buttons, ring, None, heading="TRACKS",
+                     title=f"Song {index + 1}", meta=f"{index + 1} / {count}", crumb="tracks"))
+
+
+def r3_nav_sequences():
+    out = []
+    s = Seq("r3-hold-ring", "[r3] 15.7 the hold-1 progress ring: button 1 held on Music (a crumb) fills the r3 arc WARM "
+                            "from 12 % of 600 ms, then the WARM home flash 0.68 for 400 ms once; a short tap shows a few "
+                            "segments and ends on the release; on the launcher (no crumb) a hold draws nothing")
+    music = crumbed(home_r3(40), "music")
+    s.op("claim").step(0, music)
+    s.run(1500, music, every=25)
+    s.op("press", slot=0)
+    s.run(760, music, every=20)                                 # 0 .. 600: the fill; 600: the home flash
+    s.op("keyup", slot=0)
+    s.run(500, home_r3(40), every=25)                           # the host went Home: no crumb, flash ends
+    s.op("press", slot=0).run(160, music, every=20)             # a short tap on Music
+    s.op("keyup", slot=0).run(400, music, every=25)
+    s.op("press", slot=0).run(700, home_r3(40), every=25)       # the launcher: no ring, no flash
+    s.op("keyup", slot=0).run(300, home_r3(40), every=25)
+    s.op("press", slot=0).run(300, music, every=25)             # held, then a release before 600 ms
+    s.op("keyup", slot=0).run(800, music, every=25)
+    out.append(s)
+
+    s = Seq("r3-hold4-ring", "[r3.1] ALIVE.md 15.8 the button-4 hold ring on frames with holdMarker: held on the "
+                             "launcher Home (no crumb needed) it fills the r3 arc WARM from 15 % of 1000 ms, then the "
+                             "full arc waits for the host; the host's plain ok lands it (land: the whole ring 0.68 for "
+                             "450 ms, in the Kelvin colour of the lights-domain frame, WARM back to music), ok + queued "
+                             "lands green (queue: 600 ms, no sweep); no feedback: the full arc ends after 600 ms; a "
+                             "feedback after the 1500 ms window or an err lands as usual; taps and early releases "
+                             "cancel; no holdMarker (Tracks) draws nothing; while button 1 is also held on a crumb "
+                             "screen only the hold-1 ring and flash draw; a session release ends the hold")
+    home = held(home_r3(40))
+    lights_home = held(lights5(62, 3200, control_id=1))            # the Home lights domain (bri ring)
+    recent = held(crumbed(recent5(12, 3), "recent"))
+    playlists = held(crumbed(recent5(12, 5), "playlists"))
+    no_hold = crumbed(tracks5(1), "tracks")                     # Tracks: no hold 4 (no holdMarker)
+    s.op("claim").step(0, home)
+    s.run(1500, home, every=25)
+    s.op("press", slot=3)
+    s.run(1060, home, every=20)                                 # 0 .. 1000: the fill; 1000: the full arc waits
+    s.step(20, held(lights5(62, 3200, control_id=1, feedback={"kind": "ok", "seq": 21})))   # land: Kelvin 450 ms
+    s.run(300, held(lights5(62, 3200, control_id=1, feedback={"kind": "ok", "seq": 21})), every=20)
+    s.op("keyup", slot=3).run(500, lights_home, every=25)
+    s.op("press", slot=3).run(1040, lights_home, every=20)      # and back to music: land WARM
+    s.step(20, held(home_r3(40), feedback={"kind": "ok", "seq": 22}))
+    s.op("keyup", slot=3).run(600, held(home_r3(40), feedback={"kind": "ok", "seq": 22}), every=25)
+    s.op("press", slot=3).run(100, home, every=20)              # a tap: under 15 %, nothing
+    s.op("keyup", slot=3).run(300, home, every=25)
+    s.op("press", slot=3).run(240, home, every=20)              # a slower tap: a few segments
+    s.op("keyup", slot=3).run(300, home, every=25)
+    s.op("press", slot=3).run(700, home, every=25)              # held, then a release before 1000 ms
+    s.op("keyup", slot=3).run(600, home, every=25)
+    s.op("press", slot=3).run(1800, home, every=25)             # held, no feedback: the full arc ends at 1600
+    s.op("keyup", slot=3).run(400, home, every=25)
+    s.run(600, recent, (3, 11), every=25)
+    s.op("press", slot=3).run(1050, recent, (3, 11), every=25)  # Recently Added: hold 4 = queue
+    queued = held(crumbed(recent5(12, 3), "recent"), feedback={"kind": "ok", "seq": 23, "moment": "queued"})
+    s.step(20, queued, (3, 11))
+    s.op("keyup", slot=3).run(800, queued, (3, 11), every=25)   # green 600 ms, no sweep
+    s.run(400, playlists, (5, 11), every=25)
+    s.op("press", slot=3).run(1100, playlists, (5, 11), every=25)
+    s.op("keyup", slot=3).run(1500, playlists, (5, 11), every=25)   # the window closes (1500 ms)
+    late = held(crumbed(recent5(12, 5), "playlists"), feedback={"kind": "ok", "seq": 24, "moment": "queued"})
+    s.run(800, late, (5, 11), every=25)                         # too late: the usual queued sweep
+    s.op("press", slot=3).run(1050, playlists, (5, 11), every=25)
+    refused = held(crumbed(recent5(12, 5), "playlists"), feedback={"kind": "err", "seq": 25, "moment": "refused"})
+    s.op("keyup", slot=3).run(600, refused, (5, 11), every=25)  # an err lands as usual (the refused flash)
+    s.run(400, no_hold, (1, 2), every=25)
+    s.op("press", slot=3).run(1200, no_hold, (1, 2), every=25)  # no holdMarker: no ring, no landing
+    s.op("keyup", slot=3).run(300, no_hold, (1, 2), every=25)
+    music = held(crumbed(home_r3(40), "music"))
+    s.run(400, music, every=25)
+    s.op("press", slot=3).step(20, music)                       # both held: only hold 1's ring and flash
+    s.op("press", slot=0).run(1300, music, every=25)
+    s.op("keyup", slot=0).run(300, music, every=25)             # button 4 still held, now alone: no restart
+    s.op("keyup", slot=3).run(500, music, every=25)
+    s.op("press", slot=3).run(400, home, every=25)              # a release of the session mid-hold
+    s.op("release").step(20, home)
+    s.run(300, every=30)
+    s.op("claim").step(0, home)
+    s.run(1400, home, every=25)                                 # re-claimed: the old press is gone
+    out.append(s)
+
+    s = Seq("a2-app-no-hold-rings", "1.0.0-cc5.6 (A2): on the app canvas (a frame with `app`: Onshape, where 1 is ZOOM "
+                                    "and 4 PAN, Desk Dial's Home is all four held 1 s) neither the hold-1 ring / home "
+                                    "flash nor the hold-4 ring / landing draws, even with a crumb and holdMarker; the "
+                                    "same frame without `app` draws both again")
+    onshape = held(crumbed(home_r3(40), "music"), app={"id": "onshape", "slot": "zoom"})
+    plain = held(crumbed(home_r3(40), "music"))
+    s.op("claim").step(0, onshape)
+    s.run(1200, onshape, every=25)
+    s.op("press", slot=0).run(800, onshape, every=20)           # past 600 ms: no fill, no WARM home flash
+    s.op("press", slot=3).run(1300, onshape, every=20)          # all held past 1000 ms: no fill, no landing
+    s.step(20, held(crumbed(home_r3(40), "music"), app={"id": "onshape", "slot": "zoom"},
+                    feedback={"kind": "ok", "seq": 31}))        # a plain ok: the usual flash, never a landing
+    s.op("keyup", slot=0).op("keyup", slot=3).run(600, onshape, every=25)
+    s.op("press", slot=0).run(760, plain, every=20)             # without app: the hold-1 ring and flash again
+    s.op("keyup", slot=0).run(500, plain, every=25)
+    out.append(s)
+
+    s = Seq("r31-queue-ring", "[r3.1] ALIVE.md 15.9 the queue ring (whole-queue Tracks and Up next): row j at "
+                              "round(44 j / (count - 1)) on the r3 arc; the playing row one warm-white segment (class W "
+                              "0.60), the focus +-1 in its album colour (sat(), WARM without) at class 3, the rest OFF; "
+                              "a local turn moves the focus (max count - 1); the window colours (first); now absent; "
+                              "count 1 and 2; Up next on the queue ring (tint); pending keeps the frame; rest 0.34")
+    s.op("claim").step(0, queue5(24, 6, 6))
+    s.run(1200, queue5(24, 6, 6), (6, 23), every=25)
+    s.turn(lambda p: queue5(24, 6, 6), 23, list(range(6, 15)), 70)   # local focus ahead of the host
+    s.run(300, queue5(24, 14, 6), (14, 23), every=25)
+    s.run(300, queue5(24, 23, 6, first=4), (23, 23), every=25)       # the last row; the window from 4
+    s.run(300, queue5(24, 2, 6, colours=False), (2, 23), every=25)   # no colours: WARM focus
+    s.run(300, queue5(24, 0, -1), (0, 23), every=25)                 # nothing playing
+    s.run(300, queue5(1, 0, 0), (0, 0), every=25)
+    s.run(300, queue5(2, 1, 0), (1, 1), every=25)
+    s.run(300, queue5(24, 9, 6, activity="pending"), (9, 23), every=25)
+    s.run(400, queue5(12, 4, 3, layout="upnext"), (4, 11), every=25)
+    s.turn(lambda p: queue5(12, 4, 3, layout="upnext"), 11, [4, 5, 6, 7], 90)
+    s.rest(6500, queue5(12, 7, 3, layout="upnext"), (7, 11))
+    s.run(300, queue5(12, 7, 3, layout="upnext", led="white"), (7, 11), every=25)
+    out.append(s)
+
+    s = Seq("r3-refused-marker", "[r3] 15.7 an unavailable press (feedback err + moment refused): bottom segments 26..34 "
+                                 "RED 0.9 for 320 ms and no fail shake; a plain err still shakes; the marker ring of the r3 "
+                                 "Windows screen (white +-1 on the arc, the rest off [user 2026-10-03], local index, no tint, rest), "
+                                 "and a lit-on button on an r3 screen (warm 0.90)")
+    tracks = crumbed(tracks5(1), "tracks")
+    s.op("claim").step(0, tracks)
+    s.run(1200, tracks, (1, 2), every=25)
+    s.op("press", slot=3).step(20, crumbed(tracks5(1), "tracks", feedback={"kind": "err", "seq": 5, "moment": "refused"}),
+                                (1, 2))
+    s.run(500, crumbed(tracks5(1), "tracks", feedback={"kind": "err", "seq": 5, "moment": "refused"}), (1, 2), every=20)
+    s.run(1100, crumbed(tracks5(1), "tracks", feedback={"kind": "err", "seq": 6}), (1, 2), every=25)
+    s.run(600, windows_r3(8, 0), (0, 7), every=25)
+    s.turn(lambda p: windows_r3(8, p), 7, [0, 1, 2, 3, 4, 5, 6, 7], 70)
+    s.run(400, windows_r3(8, 7), (7, 7), every=25)
+    s.run(400, windows_r3(1, 0), (0, 0), every=25)
+    s.run(400, windows_r3(24, 11), (11, 23), every=25)
+    s.rest(6000, windows_r3(24, 11), (11, 23))
+    s.run(600, crumbed(seek5(120, 300), "tracks"), every=25)    # Seek lit on (Set) on an r3 screen: 0.90
+    out.append(s)
+    return out
+
+
 def sequences():
     return (offline_sequences() + claim_sequences() + sleep_sequences() + turning_sequences()
             + local_cursor_sequences() + feedback_sequences() + play_sequences() + ext_sequences()
@@ -1631,7 +1941,7 @@ def sequences():
             + release_sequences() + style_sequences() + wrap_sequences() + golden_sequences()
             + moment_sequences() + mode_v5_sequences() + reduced_motion_sequences() + recentre_sequences()
             + hold_sequences() + tuning_sequences() + card_sequences() + loading_sequences() + endstop_sequences()
-            + liked_sequences() + seek_pending_sequences())
+            + liked_sequences() + seek_pending_sequences() + r3_sequences())
 
 
 # ---------------------------------------------------------------- output

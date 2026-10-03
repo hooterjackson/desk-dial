@@ -13,10 +13,16 @@
 // the stall. A disconnected port (DTR low) drops at once, as the core does.
 // A reply cut after part of it went out is ended with '\n' at once when the
 // FIFO has room, otherwise the next reply starts with '\n': the host loses
-// only the cut reply, never the one after it.
+// only the cut reply, never the one after it. After a cut (FW-BUG-004) every following reply is
+// dropped at once, counted, until the FIFO has room again: a pass costs one stall, not one per line.
 //
 // COM thread only: one static serialisation buffer, no locking.
 void cc_send_json(const JsonDocument& doc);   // serializeJson + "\r\n", like serializeJson(doc, Serial); Serial.println()
 void cc_send_line(const char* text);          // text + "\r\n", like Serial.println(text)
+// Best-effort diagnostic text line (FW-BUG-001): written whole only when the FIFO has room
+// for all of it now (and no cut reply's line is open), otherwise dropped uncounted. Never
+// waits, so it is safe where the task watchdog is off (the SPIFFS save and load) and from
+// code the COM task calls (DeviceSettings, HapticProfileManager). Not for protocol replies.
+void cc_send_note(const char* text);
 uint32_t cc_tx_stalls();                      // replies cut short by the 250 ms stall limit
 uint32_t cc_tx_dropped_bytes();               // bytes those replies lost

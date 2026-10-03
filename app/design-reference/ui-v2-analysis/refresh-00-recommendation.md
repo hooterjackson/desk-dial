@@ -22,7 +22,7 @@ The user's request, verbatim:
 | `FW/` | `firmware/` |
 | `HO/` | `ND/design-reference/design_handoff_nano_d_master/` |
 | `BS` | `HO/prototypes/Browse and Snap.dc.html` |
-| `SCR/` | `<scratchpad>\refresh-study\` |
+| `SCR/` | `<scratch>` |
 
 ---
 

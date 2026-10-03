@@ -103,8 +103,8 @@ class DiagKnob:
 
 
 def home_frame():
-    return {"mode": "HOME", "target": "Den", "value": "28%", "detail": "", "status": "", "layout": "nowPlaying",
-            "title": "Cloudbusting", "subtitle": "Kate Bush",
+    return {"mode": "HOME", "target": "Hall", "value": "28%", "detail": "", "status": "", "layout": "nowPlaying",
+            "title": "Pressure Front", "subtitle": "Mira Vale",
             "buttons": [{"label": "Pause", "enabled": True, "icon": "pause"},
                         {"label": "Browse", "enabled": True, "icon": "list"},
                         {"label": "Tracks", "enabled": True, "icon": "tracks"},

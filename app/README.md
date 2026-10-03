@@ -16,7 +16,7 @@ to stop it. See [standalone app instructions](DESKTOP.md).
 The knob now has the corrected ring direction, raised and evenly spaced icon
 footer, and white LEDs except for available cancel/confirm actions. The complete
 flash verification and preservation of all ten saved profiles passed. The
-standalone executable is running in live mode with the knob and Den connected.
+standalone executable is running in live mode with the knob and the Sonos speaker connected.
 Physical appearance and full live-feature acceptance remain separate from these
 software and protocol checks. See [ACCEPTANCE.md](ACCEPTANCE.md).
 
@@ -31,7 +31,7 @@ overlays on its own compositor thread, adds the Settings status strip and the
 Motion setting, and sends knob turns to the floating knob straight from the USB
 reader. Desktop v7 also works with a knob still on cc5.3 (presentation-4 frames).
 
-- Bundle: `desktop-dist-v7` (`Build-Desktop.ps1`; its frozen
+- Bundle: `desktop-dist-v7-l` (`Build-Desktop.ps1`; its frozen
   `--smoke-test --headless` passes). Desktop rollback: `desktop-dist-v6`, from a
   knob on cc5.4 only after the firmware rollback to cc5.3 (cc5.4 names Desk Dial on
   the knob; `firmware/BUILD-cc5.4.md`).
@@ -50,7 +50,7 @@ reader. Desktop v7 also works with a knob still on cc5.3 (presentation-4 frames)
 - Double-click **Launch.cmd** for the complete simulator. It sends no speaker or
   desktop actions. Use the mouse wheel or arrow keys to turn, and click the four
   buttons below the dial.
-- Double-click **Launch-Live.cmd** to use Den, your authorized Apple Music library,
+- Double-click **Launch-Live.cmd** to use your configured Sonos speaker, your authorized Apple Music library,
   and real Windows windows. It does not automatically connect the knob. The same
   on-screen controls perform real actions in this mode.
 - **Setup** contains the speaker IP, USB port, physical button calibration, and
@@ -93,13 +93,17 @@ transport capability. No long presses, double taps, knob presses, or hidden chor
 
 ## Current local setup
 
-- Sonos: **Den**, seeded from `192.168.1.50`, pinned by its verified room UID.
-  The other stereo speaker is `.88`; `.90` is the Sub. Group scope is resolved
-  from Sonos before commands. This initial setup targets Victoria only.
+- Sonos: the configured speaker, seeded from its IP address in Setup and pinned by its
+  verified room UID. Group scope (stereo pair and Sub) is resolved from Sonos before
+  commands.
 - Apple: dedicated **NanoD Control Center** MusicKit credentials are configured
   and user authorization has completed. Live Recently Added and exact catalog
   resolution were verified. Credentials are encrypted with Windows DPAPI in
   `local/credentials.bin`, under the Windows user who authorized the application.
+- Home Assistant (Lights): the address in Settings can be `https://` (the certificate
+  is verified, and the live connection then uses `wss://`). With `http://`, the
+  long-lived access token travels unencrypted on your network unless Home Assistant
+  runs on the same PC; Settings shows a note under the address in that case.
 - Knob: firmware `1.0.0-cc1` installed on 22 September 2026. The application
   returned on COM8 and reported host-control capability; all ten installed
   profiles were unchanged, with GRASSY HOPPER restored as the native selection.

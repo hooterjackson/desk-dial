@@ -296,7 +296,7 @@ add('pending', 'pend-wi-codex', 'Windows · switch to Codex pending', 'untinted 
 add('flash', 'flash-ok-tracks', 'Tracks · skipped, green flash', 'tr-done with its flash', M.mk(flashSt({ mode: 'tracks', qi: 2, tracks: { pos: 0, status: 'done' } }, 'ok', 1)));
 add('flash', 'flash-err-ra-part', 'Recently Added · partial, red flash', 'ra-part with its flash', M.mk(flashSt(R_(0, 2, 'partial'), 'err', 2)));
 add('flash', 'flash-err-wi-fail', 'Windows · failed, red flash', 'wi-fail with its flash', M.mk(flashSt({ mode: 'windows', win: { idx: 2, status: 'failed' } }, 'err', 3)));
-add('flash', 'flash-ok-home', 'Volume · played, green flash', 'Recent play completion lands on Home', M.mk(flashSt({ np: { t: 'Night Drive', a: 'Chromatics' } }, 'ok', 4)));
+add('flash', 'flash-ok-home', 'Volume · played, green flash', 'Recent play completion lands on Home', M.mk(flashSt({ np: { t: 'Night Channel', a: 'Velvet Circuit' } }, 'ok', 4)));
 add('flash', 'flash-ok-home-61', 'Volume 61 % · green flash', 'flash overwrites the odd-v shoulder', M.mk(flashSt({ vol: 61, volConf: 61 }, 'ok', 5)));
 add('flash', 'flash-ok-home-0', 'Volume 0 % · green flash', 'cursor-1 is segment 34', M.mk(flashSt({ vol: 0, volConf: 0 }, 'ok', 6)));
 add('flash', 'flash-err-home-96', 'Volume 96 % · red flash', 'embers on the red flash too', M.mk(flashSt({ vol: 96, volConf: 96 }, 'err', 7)));
@@ -307,11 +307,11 @@ add('lists', 'ra-load-p2', 'Recently Added · loading page 2', 'requested page',
 add('lists', 'ra-load-p3', 'Recently Added · loading page 3', 'requested page', M.mk(R_(2, 0, 'loading')));
 add('lists', 'ra-more-p2', 'Recently Added P2 · More', '', M.mk(R_(1, 10)));
 add('lists', 'ra-na-p2', 'Recently Added P2 · unavailable', '', M.mk(R_(1, 4)));
-add('lists', 'ra-item-p2', 'Recently Added P2 · Kind of Blue', 'cover without an accent: warm', M.mk(R_(1, 2)));
-add('lists', 'ra-item-p2-heligoland', 'Recently Added P2 · Heligoland', '', M.mk(R_(1, 5)));
+add('lists', 'ra-item-p2', 'Recently Added P2 · Tidal Glass', 'cover without an accent: warm', M.mk(R_(1, 2)));
+add('lists', 'ra-item-p2-glass weather', 'Recently Added P2 · Glass Weather', '', M.mk(R_(1, 5)));
 add('lists', 'ra-last-p3', 'Recently Added P3 · last item (no More)', '', M.mk(R_(2, 2)));
-add('lists', 'ra-night-drive', 'Recently Added · Night Drive', '', M.mk(R_(0, 2)));
-add('lists', 'ra-hounds', 'Recently Added · Hounds of Love', '', M.mk(R_(0, 9)));
+add('lists', 'ra-night-drive', 'Recently Added · Night Channel', '', M.mk(R_(0, 2)));
+add('lists', 'ra-hounds', 'Recently Added · Paper Lanterns', '', M.mk(R_(0, 9)));
 add('lists', 'ra-sonos-off', 'Recently Added · Sonos down', 'landmarks kept, Play dim', M.mk(R_(0, 2, 'ready', { sonos: 'off' })));
 add('lists', 'wi-closed-claude', 'Windows · Claude closed', 'closed cursor keeps the app colour', M.mk({ mode: 'windows', win: { idx: 1, closed: [1] } }));
 add('lists', 'wi-closed-multi', 'Windows · two closed slots', '', M.mk({ mode: 'windows', win: { idx: 3, closed: [2, 4] } }));

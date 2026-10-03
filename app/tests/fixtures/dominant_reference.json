@@ -13,7 +13,7 @@
       "rgb": null,
       "hex": null
     },
-    "covers/heligoland-album-.png": {
+    "covers/glass weather-album-.png": {
       "value": 16750356,
       "rgb": "255,151,20",
       "hex": "#FF9714"
@@ -33,7 +33,7 @@
       "rgb": null,
       "hex": null
     },
-    "covers/night-drive-chromatics-album-.jpg": {
+    "covers/night-drive-velvet circuit-album-.jpg": {
       "value": 16741391,
       "rgb": "255,116,15",
       "hex": "#FF740F"
@@ -75,15 +75,15 @@
     }
   },
   "colors": {
-    "al:Blue Lines": "255,214,159",
-    "al:Elis & Tom": null,
-    "al:Heligoland": "255,151,20",
-    "al:Hounds of Love": "219,167,255",
-    "al:Kind of Blue": null,
-    "al:Moon Safari": null,
-    "al:Night Drive": "255,116,15",
+    "al:Neon Littoral": "255,214,159",
+    "al:Lua & Mar": null,
+    "al:Glass Weather": "255,151,20",
+    "al:Paper Lanterns": "219,167,255",
+    "al:Tidal Glass": null,
+    "al:Midnight Arcade": null,
+    "al:Night Channel": "255,116,15",
     "al:Promises": null,
-    "al:Tropicália ou Panis et Circencis": "184,255,130",
+    "al:Copper Sun Sessions": "184,255,130",
     "app:ChatGPT": null,
     "app:Chrome": "29,126,255",
     "app:Claude": "255,140,102",
@@ -92,15 +92,15 @@
     "app:Terminal": "255,175,76"
   },
   "sources": {
-    "al:Blue Lines": "assets/covers/blue-lines.jpg",
-    "al:Elis & Tom": "assets/covers/elis-tom.jpg",
-    "al:Heligoland": "assets/covers/heligoland-album-.png",
-    "al:Hounds of Love": "assets/covers/hounds-of-love.png",
-    "al:Kind of Blue": "assets/covers/kind-of-blue.jpg",
-    "al:Moon Safari": "assets/covers/moon-safari.png",
-    "al:Night Drive": "assets/covers/night-drive-chromatics-album-.jpg",
+    "al:Neon Littoral": "assets/covers/blue-lines.jpg",
+    "al:Lua & Mar": "assets/covers/elis-tom.jpg",
+    "al:Glass Weather": "assets/covers/glass weather-album-.png",
+    "al:Paper Lanterns": "assets/covers/hounds-of-love.png",
+    "al:Tidal Glass": "assets/covers/kind-of-blue.jpg",
+    "al:Midnight Arcade": "assets/covers/moon-safari.png",
+    "al:Night Channel": "assets/covers/night-drive-velvet circuit-album-.jpg",
     "al:Promises": "assets/covers/promises-floating-points-pharoah-sanders.png",
-    "al:Tropicália ou Panis et Circencis": "assets/covers/tropic-lia-ou-panis-et-circencis.jpg",
+    "al:Copper Sun Sessions": "assets/covers/tropic-lia-ou-panis-et-circencis.jpg",
     "app:ChatGPT": "assets/apps/chatgpt.png",
     "app:Chrome": "assets/apps/chrome.png",
     "app:Claude": "assets/apps/claude.png",

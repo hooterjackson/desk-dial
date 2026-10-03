@@ -4,7 +4,7 @@ WP7a WROTE THIS SCRIPT BUT NEVER RAN IT. It shows a full-screen overlay: run it 
 session, with the user's explicit go-ahead, the user at the PC:
 
     cd app
-    .venv\\Scripts\\python.exe -I ..\\tools\\stage_checks\\stage_pacing_check.py --run --i-have-go-ahead [--no-capture]
+    .venv\\Scripts\\python.exe -I ..\\..\\tools\\stage_checks\\stage_pacing_check.py --run --i-have-go-ahead [--no-capture]
 
 ``--run`` first runs this file's own headless ``--selftest`` in a child process (hidden host, never
 shown; the watchdogs are proven on throw-away children) and starts the on-screen child only when

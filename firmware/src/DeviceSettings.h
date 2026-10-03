@@ -53,7 +53,12 @@ public:
     void storeCurrentProfile(String profile);
     String loadCurrentProfile();
     MotorCalibration loadCalibration();
-    void storeCalibration(MotorCalibration& cal);
+    // FW-BUG-028: one checked NVS entry; false when it was not stored (the previous calibration stays).
+    bool storeCalibration(const MotorCalibration& cal);
+    // FW-BUG-013: a Desk Dial host has claimed a control on this knob at least once (NVS "host_seen").
+    // Until then the offline system volume never arms and the native profile keeps the knob and keys.
+    bool loadHostSeen();
+    void storeHostSeen();
     bool init();
 
     bool dirty;
@@ -67,9 +72,7 @@ public:
     midiSettings midiUsb;
     midiSettings midi2;
     uint8_t midi_sysex_id;
-    String wifiSsid;
-    String wifiPassword;
-    bool wifiEnabled;
+    bool wifiEnabled;   // FW-SEC-003: no Wi-Fi; SSID and password are never kept or reported
     uint32_t idleTimeout;
 
     // read-only settings

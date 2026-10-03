@@ -1,12 +1,15 @@
 #include "control_center.h"
 #include "HapticProfileManager.h"
 #include "cc_alive.h"
+#include "cc_app_store.h"   // app profiles: the capability values (macros only)
 #include "cc_artwork.h"
 #include "cc_diag.h"
 #include "cc_frame_parse.h"
 #include "cc_media.h"
 #include "cc_serial_out.h"
 #include "foc_thread.h"
+#include "cc_haptic_fx.h"
+#include "audio/cc_sound.h"   // cc_sound_volume_of_level() (soundVolume, 2026-09-30)
 #include <esp_heap_caps.h>
 #include <cmath>
 #include <cstring>
@@ -47,6 +50,10 @@ CCFrame incoming;
 // Whenever the active ID (entering/ready, else 0) differs, the upload is cancelled: a new
 // control, a release and a lease expiry (which the FOC thread starts) all end it.
 uint32_t mediaBoundId = 0;
+// r4 FEEL (1.0.0-cc5.7; HAPTICS.md "Events"), COM only: the `haptic` seq of the newest accepted frame. A claim seeds
+// it without playing (a reconnecting host's old event never replays); any later accepted control or frame whose seq
+// differs plays its effect once (cc_fx_post, taken by the FOC task).
+uint32_t hapticSeen = 0;
 
 // Resource margins for {"diag":"?"}. LVGL is not thread-safe, so the LCD
 // thread samples its heap and its own stack; the HMI thread publishes its
@@ -75,6 +82,10 @@ bool limitSent = false;          // COM: one was sent since boot
 // Presentation 5 input (PRESENTATION_V5 section 11; 1.0.0-cc5.4). The HMI publishes its key state
 // on every change (cc_publish_key_state()); the ready line reads it as "ks" (11.3). One byte: atomic.
 volatile uint8_t hmiKeyState = 0;
+// COM only (1.0.0-cc5.5, F1): the raw key mask the host was last told, i.e. the `ks` of the last line
+// sent that carried one (a key line, a ready line, a deferred kh, a position line). Position lines
+// carry `ks` = reportedKs & the live mask (cc_position_key_state()), so they can only clear bits.
+uint8_t reportedKs = 0;
 // COM only: the one deferred-hold slot (11.2 step 5; -1 = empty) and the diag counters (12.3):
 // holdEvents = kh lines sent, holdDeferred = of which sent after a ready line.
 int8_t pendingHold = -1;
@@ -126,6 +137,7 @@ void send_deferred_hold(uint32_t controlId, uint8_t mask, uint8_t raw) {
     JsonDocument out;
     out["id"] = controlId; out["ks"] = mask; out["kh"] = raw;
     cc_send_json(out);
+    reportedKs = static_cast<uint8_t>(mask & 0x0F);
     ++holdEvents; ++holdDeferred;
 }
 
@@ -168,6 +180,22 @@ const char* phase_name(uint8_t value) {
     static constexpr const char* kPhases[] = {"idle", "entering", "ready", "releasing"};
     return value < 4 ? kPhases[value] : "?";
 }
+// FW-BUG-029: a recalibration owns the motor for 5-6 s (FocThread::recalibrate()). A control accepted meanwhile sat
+// in "entering" while the motor swept under the user's hand, and its lease could expire before it was ever applied.
+// Busy from the request (cc_cal_requested(), COM task) until the FOC task reports the run finished (calResult moves),
+// and whenever the FOC task says it is calibrating. COM task only.
+uint32_t calAwaitResult = 0;
+bool calAwaiting = false;
+bool calibration_busy() {
+    const cc_haptic_detail::Shared& s = cc_haptic_detail::shared();
+    if (calAwaiting && s.calResult != calAwaitResult) calAwaiting = false;
+    return calAwaiting || s.calState != CC_CAL_IDLE;
+}
+}
+
+void cc_cal_requested() {
+    calAwaitResult = cc_haptic_detail::shared().calResult;
+    calAwaiting = true;
 }
 
 bool cc_handle_command(JsonDocument& doc) {
@@ -182,9 +210,31 @@ bool cc_handle_command(JsonDocument& doc) {
         // frame fields and tokens, kh, ks in ready, hid on kd, the F24 icon gate and reducedMotion,
         // with no further key (no keyHoldMs, VOC-R17). A presentation-4 host (v6, tests >= 4) keeps
         // working: every presentation-4 frame is still accepted (2.3).
-        c["presentation"] = 5;
+        // Presentation 6 (PRESENTATION_V5.md section 19, Desk Dial r3 release 1): additionally the layouts
+        // lights / lightsbig / scenes, the ring styles bri / ctemp / clusters (+ ring.kelvin), valueUnit,
+        // prevTitle / nextTitle and six icons, all append-only; every presentation-5 frame is accepted and drawn
+        // exactly as before, so a presentation-5 host keeps working unchanged.
+        c["presentation"] = 6;
         c["glyphs"] = "latin-ext-a";
-        // 1.0.0-cc5.4 (ALIVE.md section 1): the "Warm · alive" LED engine; every other key is
+        // A2 (1.0.0-cc5.6, CONTROL_CENTER.md "App canvas"): the frame's optional `app` object (the Onshape app UI
+        // drawn on the knob). Additive: a host that never sends `app` sees no change.
+        c["appCanvas"] = 1;
+        // r4 FEEL + SOUND (1.0.0-cc5.7, plan F2/F3; HAPTICS.md, CONTROL_CENTER.md "Feel and sound"), all additive: a
+        // host that sends none of these fields gets the 1.0.0-cc5.6 feel and a silent knob.
+        //   feel 1: control `feel` (a token) and `reducedHaptics`; the knob runs feel.fade, hold.tension, r4 walls.
+        //   hapticFx 1: the frame's `haptic` event {token, seq}.
+        //   knobSound 1: control `sound` 0..3 (off, Low, Medium, High), per claim, never stored.
+        //   offlineVolume 1: with no host on the port for 2 s the knob is the PC's volume (HID Consumer, report 4).
+        //   recalibration 1: {"recalibrate":true|{"acceptDirection":true}} answers calibrating / calibrated lines.
+        c["feel"] = 1; c["hapticFx"] = 1; c["knobSound"] = 1; c["offlineVolume"] = 1; c["recalibration"] = 1;
+        //   knobVolume 1 (2026-09-30): control `soundVolume` 0..100, the master volume percent (overrides `sound`).
+        c["knobVolume"] = 1;
+        // App profiles (plan §1c, APP_PROFILES.md section 7): the appProfile upload into the RAM-only store of 4 decoded
+        // profiles, wire profiles up to 32768 B, and the feature bits this knob draws (section 4, all five). The frame's
+        // `app.id` may then name any uploaded profile (section 8). Additive, after knobVolume.
+        c["appProfiles"] = 1; c["appProfileSlots"] = CC_APP_STORE_SLOTS; c["appProfileMaxBytes"] = CC_APP_WIRE_MAX_BYTES;
+        c["appProfileFeatures"] = CC_APP_FEATURES_SUPPORTED;
+// 1.0.0-cc5.4 (ALIVE.md section 1): the "Warm · alive" LED engine; every other key is
         // unchanged (artwork2 stays right after artwork and right before diag). drive: the drive
         // the engine uses without a latched ledDrive, min(150, ledMaxBrightness) (section 9).
         auto alive = c["alive"].to<JsonObject>();
@@ -289,6 +339,27 @@ bool cc_handle_command(JsonDocument& doc) {
                 order[i] = raw; seen |= 1 << raw;
             }
         }
+        // r4 FEEL + SOUND (1.0.0-cc5.7): optional feel (a CCFeel token), reducedHaptics (bool) and sound (int 0..3);
+        // a present invalid value rejects the control (the strict rule).
+        uint8_t feel = CC_FEEL_LEGACY;
+        uint32_t sound = 0;
+        bool reducedHaptics = false;
+        // FW-RES-007: length-aware (cc_json_token): "detent.value\u0000zz" is not "detent.value".
+        if (!c["feel"].isNull() && !cc_feel_parse(cc_json_token(c["feel"]), feel)) {
+            reply_error("Invalid feel token"); return true;
+        }
+        if (!c["reducedHaptics"].isNull()) {
+            if (!c["reducedHaptics"].is<bool>()) { reply_error("Reduced haptics must be a boolean"); return true; }
+            reducedHaptics = c["reducedHaptics"].as<bool>();
+        }
+        if (!c["sound"].isNull() && !cc_json_uint(c["sound"], 0, CC_SOUND_MASTER_LEVEL_MAX, sound)) {
+            reply_error("Invalid sound level"); return true;
+        }
+        // 2026-09-30 (capability knobVolume 1): `soundVolume` 0..100, the master volume percent, overrides `sound`.
+        uint32_t volume = cc_sound_volume_of_level(sound);
+        if (!c["soundVolume"].isNull() && !cc_json_uint(c["soundVolume"], 0, CC_SOUND_VOLUME_MAX, volume)) {
+            reply_error("Invalid sound volume"); return true;
+        }
         const char* name = c["profile"] | "";
         HapticProfile* preset = HapticProfileManager::getInstance()[String(name)];
         if (!cc_json_uint(c["id"],1,0x7FFFFFFF,newId) || !cc_json_uint(c["min"],0,0,lo) ||
@@ -300,6 +371,7 @@ bool cc_handle_command(JsonDocument& doc) {
             reply_error("Control center requires an existing regular non-progressive preset"); return true;
         }
         selected.start_pos = lo; selected.end_pos = hi;
+        if (calibration_busy()) { reply_error("Recalibrating; wait for calibrated"); return true; }   // FW-BUG-029
         portENTER_CRITICAL(&lock);
         bool busy = phase == 3 || (phase && newId <= id);
         const bool claim = phase == 0;         // unclaimed -> claimed (not a re-entry)
@@ -311,9 +383,16 @@ bool cc_handle_command(JsonDocument& doc) {
             latch_locked(incoming, lease, claim);   // ALIVE.md section 3: latched on acceptance
             apply_latched_locked();
             request.release = false; request.id = id; request.profile = selected; request.position = pos; requestPending = true;
+            request.feel = feel; request.reducedHaptics = reducedHaptics; request.sound = static_cast<uint8_t>(volume);
         }
         portEXIT_CRITICAL(&lock);
         if (busy) { reply_error("Control ID must advance; wait for release before reconnecting"); return true; }
+        // The haptic event of this control's frame: a claim seeds the seq, a re-entry plays a new one.
+        if (claim) hapticSeen = incoming.hapticSeq;
+        else if (incoming.hapticSeq && incoming.hapticSeq != hapticSeen) {
+            hapticSeen = incoming.hapticSeq;
+            cc_fx_post(incoming.hapticFx);
+        }
         enterAt = millis();                  // PRESENTATION_V5 12.3 enterMs: accepted -> ready sent
         if (claim) pendingHold = -1;         // a new claim clears a deferred hold (11.2 step 5)
         // artwork2: a new control ends any media upload, and its frame's keys pin their slots.
@@ -336,6 +415,10 @@ bool cc_handle_command(JsonDocument& doc) {
         }
         portEXIT_CRITICAL(&lock);
         if (!accepted) { reply_error("Stale control frame"); return true; }
+        if (incoming.hapticSeq && incoming.hapticSeq != hapticSeen) {   // r4 FEEL: a new haptic event plays once
+            hapticSeen = incoming.hapticSeq;
+            cc_fx_post(incoming.hapticFx);
+        }
         cc_media_frame_keys(incoming.artKey, incoming.iconKey);   // artwork2 pins (ARTWORK2.md 4.4)
         return true;
     }
@@ -430,6 +513,7 @@ void cc_service() {
         // PRESENTATION_V5 11.1 / 11.3: "ks", the raw buttons down as the line is built.
         const uint8_t mask = hmiKeyState;
         JsonDocument out; out["ready"] = ready; out["p"] = position; out["ks"] = mask; cc_send_json(out);
+        reportedKs = static_cast<uint8_t>(mask & 0x0F);
         const uint32_t took = static_cast<uint32_t>(millis() - enterAt);       // 12.3 enterMs
         enterMsLast = took;
         if (took > enterMsMax) enterMsMax = took;
@@ -498,5 +582,14 @@ void cc_hold_deferred(uint8_t raw) {
 }
 void cc_hold_key_up(uint8_t raw) { if (pendingHold == static_cast<int8_t>(raw)) pendingHold = -1; }
 void cc_hold_sent() { ++holdEvents; }
+void cc_key_line_sent(uint8_t mask) { reportedKs = static_cast<uint8_t>(mask & 0x0F); }
+uint8_t cc_live_key_state() { return static_cast<uint8_t>(hmiKeyState & 0x0F); }
+uint8_t cc_position_key_state(uint8_t live, bool keyEventsPending) {
+    // A cleared live bit whose key-up is still queued (keyEventsPending) is not reported yet: its ku line
+    // tells the host. With no event pending, a bit the host holds but the HMI no longer does is a key-up
+    // that was lost (the key queue was full), and this line clears it. Never a set bit.
+    if (!keyEventsPending) reportedKs = static_cast<uint8_t>(reportedKs & live & 0x0F);
+    return reportedKs;
+}
 void cc_native_button_edge() { nativeButtonSeq = nativeButtonSeq + 1u; }   // single writer (HMI)
 uint32_t cc_native_button_seq() { return nativeButtonSeq; }

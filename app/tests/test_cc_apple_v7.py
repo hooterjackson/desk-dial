@@ -23,7 +23,7 @@ from test_cc_music import FakeClock  # noqa: E402
 
 API = AppleMusicClient.API
 CREDENTIALS = {"developer_token": "dev", "music_user_token": "user"}
-SONG = "1000000001"
+SONG = "1445981467"
 FAVOURITE = f"/v1/me/favorites?ids[songs]={SONG}"
 
 

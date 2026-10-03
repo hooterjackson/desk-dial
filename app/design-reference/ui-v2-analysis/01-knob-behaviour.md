@@ -386,7 +386,7 @@ The consequence copy is **dropped**. S03 had "{i}/{n} · Replaces queue" and "·
 - **Play (4):**
   - → **Home**, flip −1.
   - Wash in the album colour, plus Reveal.
-  - Toast `Playing {album} · Den` (BS:766–774).
+  - Toast `Playing {album} · Hall` (BS:766–774).
   - The queue is replaced, shuffle turns off, Seek turns off, and Tracks returns to Neutral (BS:769).
 - **Open on screen (2):** → Explorer on the Recently Added tab at the same album (BS:793–798).
 - **Back (1):** → Home, flip −1 (BS:739).
@@ -426,7 +426,7 @@ The consequence copy is **dropped**. S03 had "{i}/{n} · Replaces queue" and "·
 - **Opening** always lands on the Recently Added tab, at the knob's album (BS:795).
 - **Back (1):** → Recently Added on the knob, flip −1. `rIdx` takes the explorer's recent index **only if the recent tab is active** (BS:801); see artefact 13.
 - **Play (4):**
-  - The centre card grows. At **380 ms** the overlay closes and `playItem` runs: → **Home**, flip −1, Wash, toast `Playing {name} · Den` (BS:810–815).
+  - The centre card grows. At **380 ms** the overlay closes and `playItem` runs: → **Home**, flip −1, Wash, toast `Playing {name} · Hall` (BS:810–815).
   - Cleanup happens at 760 ms.
 - The overlay clears any toast when it opens (BS:794).
 
@@ -620,11 +620,11 @@ There is no position row and no meta line.
 | 7 | Recently Added | 1 | not pending | Home | flip −1 | Reveal | — | — | BS:739 |
 | 8 | Recently Added | 2 | — | Explorer, Recently Added tab, same album | flip +1 | Reveal | cleared | open the explorer overlay | BS:793–798 |
 | 9 | Recently Added | 3 | — | Recently Added | meta "Queued next" for 1.5 s | Sweep clockwise from segment 0 | `Queued next · {album}` | AddURIToQueue EnqueueAsNext=1 | BS:776–784; R:224 |
-| 10 | Recently Added | 4 | enabled | Home | flip −1 | Wash (album) + Reveal | `Playing {album} · Den` | replace the queue, play | BS:766–774 |
+| 10 | Recently Added | 4 | enabled | Home | flip −1 | Wash (album) + Reveal | `Playing {album} · Hall` | replace the queue, play | BS:766–774 |
 | 11 | Explorer | turn | not fading or playing | Explorer | item | tick / End stop + 14 px bump | — | — | BS:705–709 |
 | 12 | Explorer | 1 | — | Recently Added | flip −1 | Reveal | — | close the overlay | BS:799–804 |
 | 13 | Explorer | 2 / 3 | another tab, not fading | Explorer | at 190 ms, flip +1 (playlists) or −1 (recent) | the ring swaps lists | — | tab switch | BS:805–809 |
-| 14 | Explorer | 4 | — | Home, at 380 ms | flip −1 | Wash + Reveal | `Playing {name} · Den` | play | BS:810–815 |
+| 14 | Explorer | 4 | — | Home, at 380 ms | flip −1 | Wash + Reveal | `Playing {name} · Hall` | play | BS:810–815 |
 | 15 | Tracks | turn ±1 | within −1…1 | Tracks | position | tick / End stop | — | — | BS:717 |
 | 16 | Tracks | 1 | not seeking | Home | flip −1 | Reveal | — | — | BS:749 |
 | 17 | Tracks | 2 | — | Up next (focus = now playing) | flip +1 | Reveal | cleared | open the Up next overlay | BS:680, 750 |

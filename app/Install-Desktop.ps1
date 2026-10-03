@@ -1,5 +1,6 @@
 param(
-    # Bundle folder under this directory. desktop-dist-v7 is the desktop half of the combined
+    # Bundle folder under this directory. The default is Build-Desktop.ps1's $Dist, the bundle the build
+    # just made (DD-BUG-041; a test keeps the two equal). desktop-dist-v7 was the desktop half of the combined
     # release with firmware 1.0.0-cc5.4 (the alive floating knob, the NanoD-stage music overlays,
     # the Settings status strip and Motion) and the first bundle named Desk Dial
     # (DeskDial\DeskDial.exe; design-reference\ui-v2-analysis\rename-desk-dial.md). It also runs
@@ -26,19 +27,19 @@ param(
     # not carried back (no option does it; copy them by hand with the user if wanted), and
     # %LOCALAPPDATA%\DeskDial\ stays for a later return (no second migration).
     # Install (the desktop step of the cc5.4 window, or on its own): quit the app from the tray; run
-    # the new bundle's frozen smoke test (desktop-dist-v7\DeskDial\DeskDial.exe --smoke-test, or
+    # the new bundle's frozen smoke test (desktop-dist-v7-l\DeskDial\DeskDial.exe --smoke-test, or
     # --smoke-test --headless, which never creates a window) and check that
     # %LOCALAPPDATA%\DeskDial\logs\smoke-test.json says passed: true;
     # back up the program folder and hash the user data; review the plan of
-    # Install-Desktop.ps1 -Bundle desktop-dist-v7 -Mirror -DryRun (diagnostics\desktop-install-plan.json); run
-    # Install-Desktop.ps1 -Bundle desktop-dist-v7 -Mirror; confirm the old home's hashes are
+    # Install-Desktop.ps1 -Bundle desktop-dist-v7-l -Mirror -DryRun (diagnostics\desktop-install-plan.json); run
+    # Install-Desktop.ps1 -Bundle desktop-dist-v7-l -Mirror; confirm the old home's hashes are
     # unchanged and the migrated copies equal them, then start the task and verify. A bundle that is not a recorded rollback is
     # refused unless that report is a pass of this bundle's exe, newer than the exe.
-    [string]$Bundle = 'desktop-dist-v7',
+    [string]$Bundle = 'desktop-dist-v7-l',
     # Remove program files that are not part of the bundle (never touches user data). Recommended for
     # the forward install as well (Install-Desktop.ps1 -Mirror): it clears program files left over from
     # the previous bundle of the same name that this one no longer ships, so the installed folder
-    # matches the bundle exactly. The other name's program folder is moved to backups\ as a whole
+    # matches the bundle exactly. The other name's program folder is moved to %LOCALAPPDATA%\<home>\backups\ as a whole
     # (never deleted). Copy the installed program folder to backups\ yourself first (the release
     # runbook's desktop step, firmware\BUILD-cc5.4.md step 9b).
     [switch]$Mirror,
@@ -58,7 +59,7 @@ $pinnedBundles = @{ 'desktop-dist-v2' = '95909AAE4AA4852F5E4954EEED329E513FC474B
 # NanoD Control Center: its exe, program folder, data home, sign-in task and Start-menu shortcut. Every
 # other bundle is Desk Dial. The single-instance mutex and event names are shared (H9), so the two never
 # run at once. Installing one retires the other only after the new install and its data step verified:
-# its task is unregistered, its shortcut removed and its program folder moved to backups\ (never
+# its task is unregistered, its program folder moved to <home>\backups\ and its shortcut removed (never
 # deleted). Neither data home is ever deleted.
 $identities = @{
     'DeskDial' = @{ name = 'DeskDial'; exe = 'DeskDial.exe'; program = 'Programs\DeskDial'; home = 'DeskDial';
@@ -117,8 +118,13 @@ $otherShortcut = Join-Path $programsMenu $other.shortcut
 $migrateFrom = $null
 if ($id.name -eq 'DeskDial') { $migrateFrom = Join-Path $env:LOCALAPPDATA $other.home }
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
-$programBackup = Join-Path $PSScriptRoot "backups\desktop-program-$($other.name)-$stamp"
+# The other name's program folder is moved (renamed) into this identity's home, on the same volume as
+# %LOCALAPPDATA%\Programs: a directory cannot be moved across volumes, and the repository may sit on another drive.
+$programBackup = Join-Path $homeDir "backups\program-$($other.name)-$stamp"
 $diagnostics = Join-Path $PSScriptRoot 'diagnostics'
+# diagnostics\ is not in the repository (.gitignore): created before any check, so the dry run's plan and every
+# report below (the task-context step's included) can be written on a fresh checkout.
+New-Item -ItemType Directory -Path $diagnostics -Force | Out-Null
 $staging = Join-Path $PSScriptRoot 'local\desktop-install-data'
 $seedNames = @('settings.json', 'credentials.bin')
 
@@ -195,21 +201,49 @@ if ($DryRun) {
     exit 0
 }
 
-New-Item -ItemType Directory -Path $install -Force | Out-Null
-if ($Mirror -and (Test-Path -LiteralPath $install)) {
-    # Program folder only: user data lives in the home folder (%LOCALAPPDATA%\DeskDial or, for a rollback bundle, NanoDControlCenter).
-    foreach ($stale in (Get-ChildItem -LiteralPath $install -File -Recurse)) {
-        $relative = $stale.FullName.Substring($install.Length).TrimStart('\')
-        if (-not (Test-Path -LiteralPath (Join-Path $bundle $relative))) { Remove-Item -LiteralPath $stale.FullName -Force }
+function Install-ProgramFolder([string]$Source, [string]$Target, [bool]$MirrorBundle) {
+    # DD-BUG-043: staged, so a failed copy or hash check never leaves a half-upgraded program that the sign-in
+    # task would start. The bundle (and, without -Mirror, the installed files it does not replace) is copied
+    # into the sibling folder <program>.new and verified there; only then is the live folder renamed to
+    # <program>.old and .new renamed into its place. Any failure removes .new and leaves or puts .old back.
+    # Program folder only: user data lives in the home folder (%LOCALAPPDATA%\DeskDial or, for a rollback
+    # bundle, NanoDControlCenter).
+    $staged = "$Target.new"
+    $previous = "$Target.old"
+    # A run stopped between the two renames left the previous program only in .old: it goes back first.
+    if ((Test-Path -LiteralPath $previous) -and -not (Test-Path -LiteralPath $Target)) { Move-Item -LiteralPath $previous -Destination $Target }
+    foreach ($leftover in @($staged, $previous)) {
+        if (Test-Path -LiteralPath $leftover) { Remove-Item -LiteralPath $leftover -Recurse -Force }
     }
-}
-Get-ChildItem -LiteralPath $bundle | Copy-Item -Destination $install -Recurse -Force
-foreach ($file in (Get-ChildItem -LiteralPath $bundle -File -Recurse)) {
-    $relative = $file.FullName.Substring($bundle.Length).TrimStart('\')
-    if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $install $relative)).Hash) {
-        throw "Bundle verification failed: $relative"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Target) -Force | Out-Null
+    $hadProgram = Test-Path -LiteralPath $Target
+    try {
+        if ($hadProgram -and -not $MirrorBundle) { Copy-Item -LiteralPath $Target -Destination $staged -Recurse }
+        else { New-Item -ItemType Directory -Path $staged | Out-Null }
+        Get-ChildItem -LiteralPath $Source | Copy-Item -Destination $staged -Recurse -Force
+        foreach ($file in (Get-ChildItem -LiteralPath $Source -File -Recurse)) {
+            $relative = $file.FullName.Substring($Source.Length).TrimStart('\')
+            if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $staged $relative)).Hash) {
+                throw "Bundle verification failed: $relative"
+            }
+        }
+    } catch {
+        if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Recurse -Force }
+        throw
     }
+    try {
+        if ($hadProgram) { Move-Item -LiteralPath $Target -Destination $previous }
+        Move-Item -LiteralPath $staged -Destination $Target
+    } catch {
+        if ($hadProgram -and (Test-Path -LiteralPath $previous) -and -not (Test-Path -LiteralPath $Target)) { Move-Item -LiteralPath $previous -Destination $Target }
+        if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Recurse -Force }
+        throw
+    }
+    # The new program is in place; a .old that cannot be removed now goes at the next install.
+    if ($hadProgram) { Remove-Item -LiteralPath $previous -Recurse -Force -ErrorAction SilentlyContinue }
 }
+
+Install-ProgramFolder -Source $bundle -Target $install -MirrorBundle ([bool]$Mirror)
 # A packaged launcher can redirect AppData into its own private LocalCache (rename-desk-dial.md 11.4).
 # The seeds (14.3: local\settings.json and local\credentials.bin, already encrypted) are staged outside
 # AppData only, never written into a data folder here; the per-user work (the program check as the
@@ -265,11 +299,13 @@ $action = New-ScheduledTaskAction -Execute $exe -Argument '--background' -Workin
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userName
 $trigger.Delay = 'PT10S'
 $principal = New-ScheduledTaskPrincipal -UserId $userName -LogonType Interactive -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval ([TimeSpan]::FromMinutes(1)) -MultipleInstances IgnoreNew
+# -Priority 4 = NORMAL_PRIORITY_CLASS: without it Task Scheduler starts the task at its default 7 (below normal),
+# so a sign-in launch would run the knob's reader and the overlay threads below a Start-menu launch.
+$settings = New-ScheduledTaskSettingsSet -Priority 4 -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval ([TimeSpan]::FromMinutes(1)) -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $id.task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description $id.taskDescription -Force | Out-Null
 Export-ScheduledTask -TaskName $id.task | Set-Content -LiteralPath (Join-Path $diagnostics 'desktop-startup-task.xml') -Encoding UTF8
 # 3. Retire the other name, now that the new install verified: two sign-in tasks would start two
-#    companions (rename-desk-dial.md 11.2). Its shortcut goes and its program folder moves to backups\.
+#    companions (rename-desk-dial.md 11.2). Its program folder moves to <home>\backups\, then its shortcut goes.
 $otherTaskFound = [bool](Get-ScheduledTask -TaskName $other.task -ErrorAction SilentlyContinue)
 if ($otherTaskFound) { Unregister-ScheduledTask -TaskName $other.task -Confirm:$false }
 $cleanupError = $null

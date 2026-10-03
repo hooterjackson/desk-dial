@@ -35,7 +35,7 @@ class Clock:
 
 def state(volume=28, group="group-a", **extra):
     """A v6-shaped Sonos state (no section 9.1 queue fields)."""
-    result = dict(online=True, volume=volume, group_revision=group, group_label="Den",
+    result = dict(online=True, volume=volume, group_revision=group, group_label="Hall",
                   title="Current track", artist="Artist", can_next=True,
                   can_previous=True, track_id="track-1")
     result.update(extra)
@@ -44,8 +44,8 @@ def state(volume=28, group="group-a", **extra):
 
 def queue_state(P=5, T=12, volume=28, group="group-a", **extra):
     """A full K3 section 9.1 state: the Sonos queue, PLAYING row P of T."""
-    result = dict(online=True, volume=volume, group_revision=group, group_label="Den", room_label="Den",
-                  title="Cloudbusting", artist="Kate Bush", can_next=True, can_previous=True,
+    result = dict(online=True, volume=volume, group_revision=group, group_label="Hall", room_label="Hall",
+                  title="Pressure Front", artist="Mira Vale", can_next=True, can_previous=True,
                   can_play=False, can_pause=True, playback="PLAYING", track_id=f"track-{P}",
                   queue_revision="rev-1", queue_length=T, playlist_position=P, source="queue",
                   position_s=74, duration_s=210, can_seek=True, shuffle=False, repeat="off",

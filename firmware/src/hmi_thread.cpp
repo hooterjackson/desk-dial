@@ -11,6 +11,7 @@
 #include "cc_diag.h"
 #include "cc_led_rmt.h"
 #include "cc_sleep.h"
+#include "cc_haptic_fx.h"
 
 // TinyUSB (Arduino-ESP32 core): the DTR test USBCDC::write() itself uses.
 extern "C" bool tud_cdc_n_connected(uint8_t itf);
@@ -61,6 +62,10 @@ CCAliveLatch alive_latch;
 uint32_t latch_seen = 0, latch_clock = 0, latch_progress = 0, latch_motion = 0, latch_tuning = 0;
 // PRESENTATION_V5 11.2 (VOC 2.5 hold_ms): AceButton's long-press delay, the firmware-only hold timer.
 constexpr uint16_t kHoldMs = 600;
+// Desk Dial r3.1: every other physical slot's hold (kh) matures after 1000 ms (hold 4 = the secondary action;
+// buttons 2 and 3 alike). Each raw's delay is set from its physical slot at its press (the buttonOrder in force
+// then), so slot 0 keeps kHoldMs.
+constexpr uint16_t kHoldOtherMs = 1000;
 // Host-frame snapshot for updateLeds()/updateKeyLeds(). Both run only on the
 // HMI thread and never nest.
 CCFrame cc_hmi_frame;
@@ -68,6 +73,46 @@ uint32_t cc_hmi_frame_id = 0;
 // Inactivity sleep (cc_sleep.h): the presses that woke the knob, swallowed with their long press
 // and release. HMI thread only (AceButton calls the handlers from check() on this thread).
 CCSleepButtons sleep_buttons;
+// r4 hold.tension (1.0.0-cc5.7, plan F2; cc_haptic_fx.h): the raw whose press started the tension (-1 = none).
+int8_t hold_tension_raw = -1;
+// r4 offline system volume (1.0.0-cc5.7, plan F3; HAPTICS.md "Offline volume"): the CDC port's state and since
+// when it has been closed, the FOC step count already reported, and a Consumer usage down that needs its release.
+bool cdc_primed = false, cdc_was_open = false;
+uint32_t cdc_closed_at = 0;
+int32_t offline_steps_seen = 0;
+bool consumer_down = false;
+constexpr uint32_t kOfflineAfterMs = 2000;     // "active only after the CDC port has been closed >= 2 s"
+constexpr int32_t kOfflinePendingMax = 20;      // steps queued beyond this are dropped (a stalled host poll)
+constexpr uint16_t kUsageVolumeUp = 0x00E9, kUsageVolumeDown = 0x00EA;   // HID Consumer page
+bool offline_now = false;                       // the mode as the HMI last decided it (key / value suppression)
+// FW-BUG-013: the offline volume arms only on a knob a Desk Dial host has claimed at least once (NVS "host_seen",
+// loaded in init(), set at the first claim). Until then the native profile (MIDI CC, keys) keeps the knob and the
+// buttons with the port closed, exactly as before the offline volume existed.
+bool offline_armed = false;
+
+// Every HMI pass: the offline volume mode is wanted while no host has the CDC port open (DTR) for 2 s and no
+// control is claimed, on an armed knob; the FOC task switches its profile, this task sends the Consumer reports
+// (handleHid()).
+void offline_update(uint32_t now) {
+    const bool open = tud_cdc_n_connected(0);
+    if (!cdc_primed || open != cdc_was_open) {
+        cdc_primed = true; cdc_was_open = open;
+        if (!open) cdc_closed_at = now;
+    }
+    const bool wanted = CC_OFFLINE_VOLUME && offline_armed && !open && !cc_claimed() &&
+                        static_cast<uint32_t>(now - cdc_closed_at) >= kOfflineAfterMs;
+    if (wanted && !offline_now) offline_steps_seen = cc_offline_steps();   // nothing from before counts
+    offline_now = wanted;
+    cc_offline_wanted_set(wanted);
+}
+
+// FW-BUG-013: a claim proves a Desk Dial host; the first one on this knob arms the offline volume for good (one
+// NVS write per knob, never again once the flag is set).
+void offline_arm_on_claim() {
+    if (offline_armed) return;
+    offline_armed = true;
+    DeviceSettings::getInstance().storeHostSeen();
+}
 
 // Refreshes cc_hmi_frame only when the presentation state moved (1.0.0-cc5.2), exactly
 // like the LCD thread's render_host_frame(): the counter changes with every frame, control
@@ -150,6 +195,15 @@ void hmi_note(const char* text) {
 }
 }
 
+// FW-DES-007: the native value screen's PC volume view (cc_display.cpp cc_native_pc_volume_attach(), bound by
+// ui_valueScreen.c) polls this from the LCD thread: the offline volume mode as this task last decided it (the
+// cross-task word offline_update() writes) and the FOC's running step count (+ up / - down), both single-writer
+// 32-bit words, so the LCD thread reads them without a lock.
+extern "C" bool hmi_pc_volume_source(int32_t* steps) {
+    *steps = cc_offline_steps();
+    return cc_offline_wanted();
+}
+
 using namespace ace_button;
 
 Adafruit_USBD_MIDI usb_midi(1);
@@ -161,13 +215,17 @@ enum {
   RID_KEYBOARD = 1,
   RID_MOUSE = 2,
   RID_GAMEPAD = 3,
+  RID_CONSUMER = 4,   // 1.0.0-cc5.7 (plan F3): the offline system volume, appended (report IDs 1..3 unchanged)
 };
 
 
 uint8_t const desc_hid_report[] = {
   TUD_HID_REPORT_DESC_KEYBOARD( HID_REPORT_ID(RID_KEYBOARD) ),
   TUD_HID_REPORT_DESC_MOUSE   ( HID_REPORT_ID(RID_MOUSE) ),
-  TUD_HID_REPORT_DESC_GAMEPAD( HID_REPORT_ID(RID_GAMEPAD) )
+  TUD_HID_REPORT_DESC_GAMEPAD( HID_REPORT_ID(RID_GAMEPAD) ),
+#if CC_OFFLINE_VOLUME
+  TUD_HID_REPORT_DESC_CONSUMER( HID_REPORT_ID(RID_CONSUMER) )
+#endif
 };
 
 // USB HID object
@@ -181,7 +239,10 @@ HmiThread::HmiThread(const uint8_t task_core ) : Thread("HMI", kHmiStackBytes, 1
     _q_config_in = xQueueCreate(2, sizeof( ledConfig ));
     _hmi_config_mutex = xSemaphoreCreateMutex();
     _q_settings_in = xQueueCreate(2, sizeof( HmiDeviceSettings ));
-    _q_keyevt_out = xQueueCreate(5, sizeof( KeyEvt ));
+    // 1.0.0-cc5.5 (F1): 16 key events (was 5), so a burst of presses, releases and holds while the COM
+    // task is busy (a media upload, a flash write) is not dropped. A dropped key-up is still healed on the
+    // host by the clear-only `ks` of the next position line (com_thread.cpp handleEvents()).
+    _q_keyevt_out = xQueueCreate(16, sizeof( KeyEvt ));
 }
 
 HmiThread::~HmiThread() {}
@@ -194,17 +255,21 @@ void midi_sysex_handler(byte* array, unsigned size) {
 
 
 // init_usb() must be called before the thread is started
+// 1.0.0-cc5.5 (F1, after Karl Malota's idf_upgrade branch): the MIDI and HID interfaces report whether
+// TinyUSB accepted them. A refusal is recorded for {"diag":"?"} (usbMidiOk / usbHidOk, cc_diag.h) and
+// boot continues: nothing here retries or waits, so a USB setup failure never hangs setup().
 void HmiThread::init_usb() {
   usb_midi.setStringDescriptor("Nano_D MIDI");
   midiu.setHandleSystemExclusive(midi_sysex_handler);
-  usb_midi.begin();
+  const bool midiOk = usb_midi.begin();
   midiu.begin();
 
   usb_hid.setBootProtocol(HID_ITF_PROTOCOL_NONE);
   usb_hid.setPollInterval(2);
   usb_hid.setReportDescriptor(desc_hid_report, sizeof(desc_hid_report));
   usb_hid.setStringDescriptor("Nano_D HID");
-  usb_hid.begin();
+  const bool hidOk = usb_hid.begin();
+  cc_boot_usb(midiOk, hidOk);
 };
 
 
@@ -216,6 +281,7 @@ void HmiThread::init(ledConfig& initial_led_config, hmiConfig& initial_hmi_confi
     uint8_t b = min(led_max_brightness, led_config.led_brightness);
     FastLED.setBrightness(b);
     midi_sysex_id = DeviceSettings::getInstance().midi_sysex_id;
+    offline_armed = DeviceSettings::getInstance().loadHostSeen();   // FW-BUG-013 (setup(), before the threads)
     midiUsbSettings = DeviceSettings::getInstance().midiUsb;
     midi2Settings = DeviceSettings::getInstance().midi2;
     Serial2.begin(31250, SERIAL_8N1, PIN_SERIAL2_RX, PIN_SERIAL2_TX);
@@ -273,11 +339,16 @@ void HmiThread::receiveLedConfig() {
 // Never waits: if COM holds the mutex mid-copy, the next pass takes the config.
 void HmiThread::receiveHmiConfig() {
     if (xSemaphoreTake(_hmi_config_mutex, 0) != pdTRUE) return;
-    if (_hmi_config_pending) {
+    const bool taken = _hmi_config_pending;
+    if (taken) {
         hmi_config = _pending_hmi_config;
         _hmi_config_pending = false;
     }
     xSemaphoreGive(_hmi_config_mutex);
+    // FW-BUG-015: a button's release walks the NEW config's actions, which never remove what the old config's press
+    // added (hold B = Backspace, tap A = next profile, let go of B: Backspace stays down and the PC auto-repeats it).
+    // Whatever the old config holds down is let go now; the new one starts with nothing pressed.
+    if (taken) releaseHeldHid();
 };
 
 
@@ -333,8 +404,8 @@ void HmiThread::run() {
         buttons[i]->getButtonConfig()->clearFeature(ButtonConfig::kFeatureDoubleClick);
         // 1.0.0-cc5.4, PRESENTATION_V5 11.2 step 1: kEventLongPressed 600 ms after the debounced press,
         // once per press. No suppression (kEventReleased still follows, so keyState stays right)
-        // and no repeat. The claimed branch turns it into a kh for physical slot 0 only; the
-        // native branch ignores it.
+        // and no repeat. The claimed branch turns it into a kh; the native branch ignores it.
+        // [r3.1] handleEvent re-sets the delay at every press: kHoldMs on physical slot 0, else kHoldOtherMs.
         buttons[i]->getButtonConfig()->setFeature(ButtonConfig::kFeatureLongPress);
         buttons[i]->getButtonConfig()->setLongPressDelay(kHoldMs);
     }
@@ -350,16 +421,17 @@ void HmiThread::run() {
     unsigned long updates = 0;
     unsigned long ts = micros();
 
-    audioPlayer.play_audio(chime_wav, 80);
+    // 1.0.0-cc5.7 (plan F3): no boot chime (the knob is silent until a host asks for sounds).
     while (1) {
         cc_crumb_hmi(CC_HMI_STEP_CONFIG);
         handleSettings();
         handleConfig();
         cc_sleep_tick();                  // inactivity timer: awake -> dim -> asleep (cc_sleep.h)
+        offlineTick(static_cast<uint32_t>(millis()));   // r4: the offline system volume mode (plan F3)
         bool claimed = cc_claimed();
         if (claimed != cc_was_claimed) {
-            num_key_codes = 0; memset(current_key_codes, 0, sizeof(current_key_codes));
-            current_mouse_buttons = 0; current_pad_buttons = 0; cc_f24_release_at = 0;
+            releaseHeldHid();
+            if (claimed) offline_arm_on_claim();   // FW-BUG-013: a Desk Dial host has run on this knob
             // 1.0.0-cc5.4: FastLED's dither mode is chosen per frame below (engine frames:
             // DISABLE_DITHER; native frames: BINARY_DITHER as before).
             cc_was_claimed = claimed;
@@ -368,7 +440,7 @@ void HmiThread::run() {
         cc_crumb_hmi(CC_HMI_STEP_BUTTONS);
         for (int i = 0; i < 4; i++)
             buttons[i]->check();
-        if (!claimed) updateValue();
+        if (!claimed && !offline_now) updateValue();   // r4 offline volume: the profile's knob value is suppressed
         cc_crumb_hmi(CC_HMI_STEP_HID);
         if (cc_f24_release_at && (int32_t)(millis() - cc_f24_release_at) >= 0) {
             num_key_codes = 0; memset(current_key_codes,0,sizeof(current_key_codes)); cc_f24_release_at = 0;
@@ -427,13 +499,15 @@ void HmiThread::run() {
         }
         #ifdef AUDIO_EN
         audioPlayer.audio_loop();
-         #endif
+        #endif
         cc_crumb_hmi(CC_HMI_STEP_WAIT);   // also the uptime heartbeat
         cc_wdt_feed();                    // one full pass completed
         // ALIVE.md 10.1: sleep until the next frame is due, at least 1 and at most 10 ms.
         int32_t waitMs = static_cast<int32_t>(alive_next_show - static_cast<uint32_t>(millis()));
         if (waitMs < 1) waitMs = 1;
         if (waitMs > static_cast<int32_t>(kLoopDelayMaxMs)) waitMs = static_cast<int32_t>(kLoopDelayMaxMs);
+        // 1.0.0-cc5.7 (plan F3): while a click plays, pass at least every 3 ms so its 14.5 ms of writable DMA (5 x 64 frames) never runs dry.
+        if (audioPlayer.playing() && waitMs > 3) waitMs = 3;
         const TickType_t waitTicks = pdMS_TO_TICKS(static_cast<uint32_t>(waitMs));
         vTaskDelay(waitTicks ? waitTicks : 1);
     }
@@ -459,19 +533,38 @@ void HmiThreadButtonHandler::handleEvent(AceButton* button, uint8_t eventType, u
                              woke)) return;
     if (cc_claimed()) {
         if (eventType == AceButton::kEventLongPressed) {
-            // PRESENTATION_V5 11.2 step 2 (VOC 2.5): a hold only for the raw at physical slot 0 (the
-            // buttonOrder in force now); the other raws' long presses are ignored. It changes no key
-            // state and plays nothing on the LEDs (ALIVE.md 6.2). While the session is entering its
-            // KeyEvt carries id 0 and the COM task defers it to just after the ready line (step 5).
-            if (cc_physical_button(index) != 0) return;
+            // PRESENTATION_V5 11.2 step 2 (VOC 2.5), [r3.1] every raw: a kh when its press's delay matured
+            // (600 ms at physical slot 0, 1000 ms elsewhere; one per press). It changes no key state and
+            // plays nothing on the LEDs (ALIVE.md 6.2; the hold rings are the engine's, from press/keyUp).
+            // While the session is entering its KeyEvt carries id 0 and the COM task defers it to just
+            // after the ready line (step 5).
             KeyEvt evt = {kKeyEvtHold, index, hmi_thread.keyState, cc_input_id()};
             xQueueSend(hmi_thread._q_keyevt_out, &evt, (TickType_t)0);
+            // r4 hold.tension: the hold landed (the host thump follows); the knob relaxes now.
+            if (hold_tension_raw == static_cast<int8_t>(index)) { hold_tension_raw = -1; cc_hold_tension_post(0, 0); }
             return;
         }
         bool hid = false;
         if (eventType == AceButton::kEventPressed) {
+            // [r3.1] this press's hold delay (AceButton reads it on every later check of this press): the
+            // raw at physical slot 0 keeps kHoldMs (600 ms), every other raw kHoldOtherMs (1000 ms).
+            button->getButtonConfig()->setLongPressDelay(cc_physical_button(index) == 0 ? kHoldMs : kHoldOtherMs);
             hmi_thread.keyState |= (1 << index);
             alive.press(millis(), cc_physical_button(index));   // ALIVE.md 6.2: press on that slot
+            // r4 hold.tension (plan F2): button 1 on a crumb screen (hold = Home, 600 ms) or button 4 on a screen
+            // with holdMarker (1000 ms), never the app canvas; hold 1 wins over a held button 4.
+            {
+                uint32_t frameId = 0;
+                const bool framed = hmi_snapshot(frameId);
+                const uint8_t slot = cc_physical_button(index);
+                const uint32_t ms = framed ? cc_hold_tension_ms(slot, cc_hmi_frame.crumb != CC_CRUMB_NONE,
+                                                                cc_hmi_frame.holdMarker, cc_app_present(cc_hmi_frame.app)) : 0u;
+                const bool held1 = hold_tension_raw >= 0 && cc_physical_button(static_cast<uint8_t>(hold_tension_raw)) == 0;
+                if (ms && !(held1 && slot != 0)) {
+                    hold_tension_raw = static_cast<int8_t>(index);
+                    cc_hold_tension_post(static_cast<uint32_t>(millis()), ms);
+                }
+            }
             // PRESENTATION_V5 11.4: F24 only for the raw at windowsButton while its slot shows an
             // enabled `win` on a ready control; that press's kd is tagged "hid":1.
             hid = cc_is_windows_button(index);
@@ -480,11 +573,20 @@ void HmiThreadButtonHandler::handleEvent(AceButton* button, uint8_t eventType, u
                 hmi_thread.num_key_codes = 1;
                 hmi_thread.cc_f24_release_at = millis() + 60;
             }
-        } else if (eventType == AceButton::kEventReleased) hmi_thread.keyState &= ~(1 << index);
-        else return;
-        cc_publish_key_state(hmi_thread.keyState);          // 11.3: ks in ready
+        } else if (eventType == AceButton::kEventReleased) {
+            hmi_thread.keyState &= ~(1 << index);
+            alive.keyUp(millis(), cc_physical_button(index));   // ALIVE.md 15.7: ends the hold-1 progress ring
+            // r4 hold.tension: released early, the knob relaxes with no event.
+            if (hold_tension_raw == static_cast<int8_t>(index)) { hold_tension_raw = -1; cc_hold_tension_post(0, 0); }
+        } else return;
+        // 11.3: ks in ready. 1.0.0-cc5.5 (F1): a press is published before its kd is queued (as before); a
+        // release only after its ku is queued, so the COM task never sees a cleared bit in the live mask
+        // while that ku is still on its way to the queue (the clear-only `ks` of position lines).
+        const bool press = eventType == AceButton::kEventPressed;
+        if (press) cc_publish_key_state(hmi_thread.keyState);
         KeyEvt evt = {static_cast<uint8_t>(eventType | (hid ? kKeyEvtHid : 0)), index, hmi_thread.keyState, cc_input_id()};
         xQueueSend(hmi_thread._q_keyevt_out, &evt, (TickType_t)0);
+        if (!press) cc_publish_key_state(hmi_thread.keyState);
         hmi_thread.updateKeyLeds();
         return;
     }
@@ -498,27 +600,35 @@ void HmiThreadButtonHandler::handleEvent(AceButton* button, uint8_t eventType, u
         cc_native_button_edge();
     }
     switch (eventType) {
+        // 1.0.0-cc5.7: no key clack (plan F3), and while the offline system volume runs (plan F3) the profile's own
+        // key actions are suppressed: the knob is only the PC's volume then.
         case AceButton::kEventPressed:
             hmi_thread.keyState |= (1<<index);
-            for (int i=0; i<hmi_thread.hmi_config.keys[index].num_pressed_actions; i++) {
-                hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].pressed[i], eventType);
+            if (!offline_now) {
+                for (int i=0; i<hmi_thread.hmi_config.keys[index].num_pressed_actions; i++) {
+                    hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].pressed[i], eventType);
+                }
             }
-            if (audioPlayer.audio_config.key_audio_file!=nullptr)
-                audioPlayer.play_audio(audioPlayer.audio_config.key_audio_file, audioPlayer.audio_config.audio_feedback_lvl);
         break;
         case AceButton::kEventReleased:
             hmi_thread.keyState &= ~(1<<index);
-            for (int i=0; i<hmi_thread.hmi_config.keys[index].num_pressed_actions; i++) {
-                hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].pressed[i], eventType);
-            }            
-            for (int i=0; i<hmi_thread.hmi_config.keys[index].num_released_actions; i++) {
-                hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].released[i], eventType);
+            if (!offline_now) {
+                for (int i=0; i<hmi_thread.hmi_config.keys[index].num_pressed_actions; i++) {
+                    hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].pressed[i], eventType);
+                }
+                for (int i=0; i<hmi_thread.hmi_config.keys[index].num_released_actions; i++) {
+                    hmi_thread.handleKeyAction(hmi_thread.hmi_config.keys[index].released[i], eventType);
+                }
             }
         break;
     }
-    cc_publish_key_state(hmi_thread.keyState);   // PRESENTATION_V5 11.3: a claim's ready reads it
+    // PRESENTATION_V5 11.3: a claim's ready reads it. 1.0.0-cc5.5 (F1): a release is published only after
+    // its event is queued (the claimed branch above explains why).
+    const bool nativePress = eventType == AceButton::kEventPressed;
+    if (nativePress) cc_publish_key_state(hmi_thread.keyState);
     KeyEvt keyEvt = { .type=eventType, .keyNum=(uint8_t)index, .keyState=hmi_thread.keyState };
     xQueueSend(hmi_thread._q_keyevt_out, &keyEvt, (TickType_t)0);
+    if (!nativePress) cc_publish_key_state(hmi_thread.keyState);
     hmi_thread.lastCheck = millis();
     hmi_thread.isIdle = false;
     hmi_thread.last_pos = -1;
@@ -526,6 +636,22 @@ void HmiThreadButtonHandler::handleEvent(AceButton* button, uint8_t eventType, u
 };
 
 
+
+
+void HmiThread::releaseHeldHid() {
+    num_key_codes = 0; memset(current_key_codes, 0, sizeof(current_key_codes));
+    current_mouse_buttons = 0; current_pad_buttons = 0; cc_f24_release_at = 0;
+}
+
+
+// FW-BUG-014: while the offline volume runs the profile's release actions are skipped, so a key, mouse or gamepad
+// button pressed before it started (port closed with the button held) would stay down on the PC. Entering the
+// mode lets go of all of it, as a claim does.
+void HmiThread::offlineTick(uint32_t now) {
+    const bool was_offline = offline_now;
+    offline_update(now);
+    if (offline_now && !was_offline) releaseHeldHid();
+}
 
 
 void HmiThread::handleKeyAction(keyAction& action, uint8_t eventType) {
@@ -539,20 +665,29 @@ void HmiThread::handleKeyAction(keyAction& action, uint8_t eventType) {
                     midi2.sendControlChange(action.midi.cc, action.midi.val, action.midi.channel);
             }
         break;
-        case keyActionType::KA_KEY:
-            if (num_key_codes<6 && eventType==AceButton::kEventPressed)
-                current_key_codes[num_key_codes++] = action.hid.key_codes[0];
-            else if (num_key_codes>0 && eventType==AceButton::kEventReleased) {
-                for (int i=0; i<num_key_codes; i++) {
-                    if (current_key_codes[i]==action.hid.key_codes[0]) {
-                        for (int j=i; j<num_key_codes-1; j++)
-                            current_key_codes[j] = current_key_codes[j+1];
-                        num_key_codes--;
-                        current_key_codes[num_key_codes] = 0;
-                        break;
+        // FW-BUG-040: the action's own hid.num key codes (a combo presses and releases all of them); an emptied
+        // binding (keyCodes []) has num 0 and sends nothing, never a stale key_codes[0]. Code 0 is "no key".
+        case keyActionType::KA_KEY: {
+            const int codes = action.hid.num < MAX_KEY_KEYCODES ? action.hid.num : MAX_KEY_KEYCODES;
+            for (int k=0; k<codes; k++) {
+                const uint8_t code = action.hid.key_codes[k];
+                if (code==0) continue;
+                if (eventType==AceButton::kEventPressed) {
+                    if (num_key_codes<6) current_key_codes[num_key_codes++] = code;
+                }
+                else if (eventType==AceButton::kEventReleased) {
+                    for (int i=0; i<num_key_codes; i++) {
+                        if (current_key_codes[i]==code) {
+                            for (int j=i; j<num_key_codes-1; j++)
+                                current_key_codes[j] = current_key_codes[j+1];
+                            num_key_codes--;
+                            current_key_codes[num_key_codes] = 0;
+                            break;
+                        }
                     }
                 }
             }
+        }
         break;
         case keyActionType::KA_MOUSE:
             if (eventType==AceButton::kEventPressed)
@@ -613,8 +748,10 @@ void HmiThread::updateValue() {
                 currentValue = foc_thread.pass_cur_pos(); // TODO fix and remove this in future
                 if (currentValue!=lastValue) {
                     if (v.type==knobValueType::KV_MIDI) {
-                        uint8_t midi_value = (uint8_t)(currentValue);
-                        midi_value = _constrain(midi_value, 0, 127);
+                        // FW-BUG-041: clamp to 0..127 before narrowing; a uint8_t cast first wrapped every 256
+                        // positions (VERNIER, wide ranges), so turning up jumped the CC back to 0.
+                        const int32_t raw_value = static_cast<int32_t>(currentValue);
+                        const uint8_t midi_value = static_cast<uint8_t>(_constrain(raw_value, 0, 127));
                         if (midiUsbSettings.nano)
                             midiu.sendControlChange(v.midi.cc, midi_value, v.midi.channel);
                         if (midi2Settings.nano)
@@ -629,45 +766,100 @@ void HmiThread::updateValue() {
 
 
 
+// 1.0.0-cc5.5 (F1, stuck keys): the keyboard, mouse and gamepad reports share the one HID IN endpoint
+// (report IDs 1..3). After one report the endpoint stays busy until the host polls it (every 2 ms), so
+// the old code's second and third sends in the same pass were refused by TinyUSB while their state was
+// already marked sent: a key-up could be lost and the key stayed down on the PC. Now:
+//   * at most one report per pass, and only while the endpoint is ready (keyboard first, then mouse,
+//     then gamepad; a pending one goes out on the next pass, <= 10 ms later);
+//   * a report is marked sent only when TinyUSB accepted it (a refusal is retried next pass and
+//     counted in diag hidRetries);
+//   * the keyboard compares the actual key codes, not only their count (a different key with the same
+//     count used to send nothing).
 void HmiThread::handleHid() {
 
-    bool keys_changed = (num_key_codes!=last_num_key_codes);
-    bool mouse_changed = (current_mouse_buttons!=last_mouse_buttons);
-    bool pad_changed = (current_pad_buttons!=last_pad_buttons);
+    const bool keys_changed = num_key_codes != last_num_key_codes ||
+                              memcmp(current_key_codes, last_key_codes, sizeof(current_key_codes)) != 0;
+    const bool mouse_changed = (current_mouse_buttons!=last_mouse_buttons);
+    const bool pad_changed = (current_pad_buttons!=last_pad_buttons);
+    if (!(keys_changed || mouse_changed || pad_changed)) {
+        handleConsumer();   // r4 offline volume: only when no keyboard / mouse / gamepad report is due
+        return;
+    }
 
-    if ( TinyUSBDevice.suspended() && (keys_changed||mouse_changed||pad_changed) ) {
+    if ( TinyUSBDevice.suspended() ) {
         TinyUSBDevice.remoteWakeup();
     }
 
-    if (usb_hid.ready()) {
-        if (keys_changed) {
-            if (num_key_codes>0)
-                usb_hid.keyboardReport(RID_KEYBOARD, 0, current_key_codes);
-            else
-                usb_hid.keyboardRelease(RID_KEYBOARD);
-            last_num_key_codes = num_key_codes;
+    if (!usb_hid.ready()) return;
+    if (keys_changed) {
+        uint8_t codes[sizeof(current_key_codes)];
+        memcpy(codes, current_key_codes, sizeof(codes));
+        const uint8_t count = num_key_codes;
+        const bool sent = count > 0 ? usb_hid.keyboardReport(RID_KEYBOARD, 0, codes)
+                                    : usb_hid.keyboardRelease(RID_KEYBOARD);
+        if (sent) {
+            memcpy(last_key_codes, codes, sizeof(last_key_codes));
+            last_num_key_codes = count;
+        } else {
+            cc_diag_hid_retry();
         }
-        if (mouse_changed) {
-            usb_hid.mouseButtonPress(RID_MOUSE, current_mouse_buttons);
-            last_mouse_buttons = current_mouse_buttons;
-        }
-        if (pad_changed) {
-            hid_gamepad_report_t report = {
-                .x = 0,
-                .y = 0,
-                .z = 0,
-                .rz = 0,
-                .rx = 0,
-                .ry = 0,
-                .hat = 0,
-                .buttons = current_pad_buttons
-            };
-            usb_hid.sendReport(RID_GAMEPAD, &report, sizeof(report));
-            last_pad_buttons = current_pad_buttons;
-        }
+        return;
     }
+    if (mouse_changed) {
+        const uint8_t buttons = current_mouse_buttons;
+        if (usb_hid.mouseButtonPress(RID_MOUSE, buttons)) last_mouse_buttons = buttons;
+        else cc_diag_hid_retry();
+        return;
+    }
+    // pad_changed
+    const uint8_t pad = current_pad_buttons;
+    hid_gamepad_report_t report = {
+        .x = 0,
+        .y = 0,
+        .z = 0,
+        .rz = 0,
+        .rx = 0,
+        .ry = 0,
+        .hat = 0,
+        .buttons = pad
+    };
+    if (usb_hid.sendReport(RID_GAMEPAD, &report, sizeof(report))) last_pad_buttons = pad;
+    else cc_diag_hid_retry();
 };
 
+
+
+// 1.0.0-cc5.7 (plan F3; HAPTICS.md "Offline volume"): the FOC task's volume steps as HID Consumer Control usages
+// (report ID 4): one Volume Increment / Decrement press, then its release, one report per pass like the others.
+// Consumer usages never wake the PC: while the bus is suspended every pending step is dropped.
+// FW-TST-012: a press already sent keeps consumer_down across the suspend, so its 0 report is the first thing sent
+// after the resume (the host's last Consumer report is never left at Volume Up / Down).
+void HmiThread::handleConsumer() {
+#if CC_OFFLINE_VOLUME
+    const int32_t steps = cc_offline_steps();
+    int32_t pending = steps - offline_steps_seen;
+    if (!offline_now && !consumer_down) { offline_steps_seen = steps; return; }
+    if (TinyUSBDevice.suspended()) { offline_steps_seen = steps; return; }
+    if (pending > kOfflinePendingMax || pending < -kOfflinePendingMax) {
+        offline_steps_seen = steps - (pending > 0 ? kOfflinePendingMax : -kOfflinePendingMax);
+        pending = steps - offline_steps_seen;
+    }
+    if (!usb_hid.ready()) return;
+    if (consumer_down) {
+        if (usb_hid.sendReport16(RID_CONSUMER, 0)) consumer_down = false;
+        else cc_diag_hid_retry();
+        return;
+    }
+    if (pending == 0) return;
+    if (usb_hid.sendReport16(RID_CONSUMER, pending > 0 ? kUsageVolumeUp : kUsageVolumeDown)) {
+        offline_steps_seen += pending > 0 ? 1 : -1;
+        consumer_down = true;
+    } else {
+        cc_diag_hid_retry();
+    }
+#endif
+}
 
 
 void HmiThread::handleMidi() {
@@ -742,8 +934,10 @@ void HmiThread::nativeKeyLeds() {
         {led_config.button_D_col_press, led_config.button_D_col_idle}
     };
 
+    // FW-BUG-039: the profile's ledEnable:false keeps the native button LEDs dark.
     for (int i = 0; i < 4; i++) {
-        CRGB color = (keyState & kKeyBits[i]) ? colors[i][0] : colors[i][1];
+        CRGB color = !led_config.led_enable ? CRGB(CRGB::Black)
+                     : (keyState & kKeyBits[i]) ? colors[i][0] : colors[i][1];
         ledsp[kKeyLedPairs[i][0]] = color;
         ledsp[kKeyLedPairs[i][1]] = color;
     }
@@ -865,14 +1059,23 @@ void HmiThread::nativeLeds() {
     uint16_t end = end_pos == start_pos ? point : 0;
 
 
+    // FW-BUG-039: the profile's ledEnable:false keeps the native ring and button LEDs dark.
+    if (!led_config.led_enable) {
+        for (int i = 0; i < NANO_LED_A_NUM; i++) leds[i] = CRGB::Black;
+        nativeKeyLeds();
+        return;
+    }
+
+    // FW-BUG-012: every native brightness is clamped by ledMaxBrightness, read every pass, so a settings-only change
+    // (lower limit, same profile) applies on the next pass and a limit of 0 keeps the idle animation dark too.
      if (com_thread.global_sleep_flag) {
         hmi_thread.IdleLeds(25, CRGB::Red, CRGB::Green, CRGB::Blue);
-        FastLED.setBrightness(25);
+        FastLED.setBrightness(min(led_max_brightness, static_cast<uint8_t>(25)));
     } else {
         halvesPointer(point, start, end, led_orientation, (led_config.pointer_col), CRGB(led_config.primary_col), CRGB(led_config.secondary_col));
         // Direct, not updateKeyLeds() (which returns early while claimed).
         nativeKeyLeds();
-        FastLED.setBrightness(led_config.led_brightness);
+        FastLED.setBrightness(min(led_max_brightness, led_config.led_brightness));
     }
 };
 
@@ -926,6 +1129,46 @@ void HmiThread::IdleLeds(int fps, const struct CRGB& idleColStart, const struct 
 
 STUSB4500 usb_pd;
 
+namespace {
+// 1.0.0-cc5.5 (F1): read-only STUSB4500 register reads for the PD contract (init_pd() below).
+constexpr uint8_t kStusbAddress = 0x28;
+constexpr uint8_t kStusbRdoStatus = 0x91;      // RDO_STATUS, 4 bytes
+constexpr uint8_t kStusbSinkPdo1 = 0x85;       // DPM_SNK_PDO1; PDO2 0x89, PDO3 0x8D (4 bytes each)
+// Four bytes at `reg`, least significant first; at most three tries, false on a bus error or short read.
+bool stusb_read32(uint8_t reg, uint32_t& value) {
+  for (uint8_t attempt = 0; attempt < 3; ++attempt) {
+    Wire.beginTransmission(kStusbAddress);
+    Wire.write(reg);
+    bool ok = false;
+    if (Wire.endTransmission(false) == 0 && Wire.requestFrom(kStusbAddress, static_cast<uint8_t>(4)) == 4) {
+      uint8_t bytes[4] = {0, 0, 0, 0};
+      uint8_t got = 0;
+      while (got < 4 && Wire.available()) bytes[got++] = static_cast<uint8_t>(Wire.read());
+      if (got == 4) {
+        value = static_cast<uint32_t>(bytes[0]) | (static_cast<uint32_t>(bytes[1]) << 8) |
+                (static_cast<uint32_t>(bytes[2]) << 16) | (static_cast<uint32_t>(bytes[3]) << 24);
+        ok = true;
+      }
+    }
+    while (Wire.available()) Wire.read();   // never leave bytes of a short or failed read behind
+    if (ok) return true;
+    delay(2);
+  }
+  return false;
+}
+// FW-BUG-022: the sink PDO table init_pd() programs, as the chip reports it: two PDOs, PDO1 5 V, PDO2 and PDO3
+// 9 V (DPM_SNK_PDOn bits 19:10, 50 mV units). Only this exact table skips the NVM write; the count alone does not.
+// cc_supply_volts() (cc_haptic_fx.h) relies on it: its 9 V fallback for a failed contract read is safe only
+// because any other table (a foreign 5 / 20 V one included) always makes a rewrite boot.
+constexpr uint32_t kSinkPdo1Units = 5000u / 50u;
+constexpr uint32_t kSinkPdo2Units = 9000u / 50u;
+constexpr uint32_t kSinkPdo3Units = 9000u / 50u;
+bool stusb_sink_table_ours(uint8_t pdoCount, uint32_t pdo1, uint32_t pdo2, uint32_t pdo3) {
+  return pdoCount == 2u && ((pdo1 >> 10) & 0x3FFu) == kSinkPdo1Units && ((pdo2 >> 10) & 0x3FFu) == kSinkPdo2Units &&
+         ((pdo3 >> 10) & 0x3FFu) == kSinkPdo3Units;
+}
+}
+
 PowerType HmiThread::init_pd() {
   Wire.begin(PIN_NANO_I2C_SDA, PIN_NANO_I2C_SCL);
   if (!usb_pd.begin()) {
@@ -933,7 +1176,27 @@ PowerType HmiThread::init_pd() {
   } else {
     Serial.println("STUSB4500 found");
   }
-  if (usb_pd.getPdoNumber()!=2) {
+  // FW-BUG-022: the live sink table and the contract are read FIRST, before any rewrite: SparkFun setVoltage()
+  // writes the volatile DPM_SNK_PDO registers directly, so a read after it would report the new table, not the
+  // one the running contract was negotiated against (that holds until a power cycle).
+  uint32_t sinkPdo[3] = {0, 0, 0};
+  bool sinkPdoOk[3] = {false, false, false};
+  for (uint8_t i = 0; i < 3u; ++i)
+    sinkPdoOk[i] = stusb_read32(static_cast<uint8_t>(kStusbSinkPdo1 + 4u * i), sinkPdo[i]);
+  // The negotiated PD contract (see the block comment below for the registers).
+  uint32_t rdo = 0;
+  const bool rdoOk = stusb_read32(kStusbRdoStatus, rdo);
+  const uint8_t position = rdoOk ? static_cast<uint8_t>((rdo >> 28) & 0x7u) : 0;
+  uint32_t millivolts = 0;
+  if (position >= 1 && position <= 3 && sinkPdoOk[position - 1u])
+    millivolts = ((sinkPdo[position - 1u] >> 10) & 0x3FFu) * 50u;
+  // Skip the NVM write only when the live sink table is ours (count AND the three voltages); a failed read
+  // rewrites it. After a rewrite the contract still follows the old table until a power cycle, so the FOC task
+  // is told (cc_boot_pd_nvm_rewritten(), before cc_boot_pd() below) and assumes the high supply until then.
+  const bool sinkTableOurs = sinkPdoOk[0] && sinkPdoOk[1] && sinkPdoOk[2] &&
+                             stusb_sink_table_ours(usb_pd.getPdoNumber(), sinkPdo[0], sinkPdo[1], sinkPdo[2]);
+  const bool nvmRewritten = !sinkTableOurs;
+  if (nvmRewritten) {
     Serial.println("Setting USB profiles to NVM");
     usb_pd.setUsbCommCapable(true);
     usb_pd.setVoltage(1,5.0);
@@ -949,10 +1212,29 @@ PowerType HmiThread::init_pd() {
     usb_pd.setLowerVoltageLimit(3,20);
     usb_pd.setUpperVoltageLimit(3,10);
     usb_pd.setPdoNumber(2);
-    usb_pd.write();  
+    usb_pd.write();
   }
 
-    // TODO: read status register to determine selected PDO
+  // 1.0.0-cc5.5 (F1, after Karl Malota's idf_upgrade branch): the negotiated PD contract, read once (setup(),
+  // before any thread starts, so nothing else uses the I2C bus), at the top of init_pd() BEFORE the NVM
+  // programming (FW-BUG-022: the 1.0.0-cc5.4 table, its skip check now covers the voltages). Read only.
+  //   * RDO_STATUS (register 0x91..0x94, four bytes, least significant first): bits 30:28 are the object
+  //     position of the source PDO the STUSB4500 requested (1..7; 0 = no explicit contract, i.e. a plain
+  //     Type-C / USB port at the default 5 V).
+  //   * the sink PDO table (DPM_SNK_PDO1..3, registers 0x85 / 0x89 / 0x8D, four bytes each, LSB first):
+  //     the voltage of sink PDO n is bits 19:10 x 50 mV. As programmed above: PDO1 5 V, PDO2 and PDO3 9 V
+  //     (read before that programming, so the voltage is the one the running contract was made against).
+  // pdVolts is the sink PDO at the RDO's object position, rounded to whole volts. The object position
+  // indexes the SOURCE's capabilities; PD sources list their fixed supplies in ascending voltage from
+  // 5 V, so for a charger that offers 9 V the position of our 9 V request is 2, matching the table. It is
+  // 0 (unknown) without a contract, for a position past the three sink PDOs, or when a read failed.
+  // The motor driver's supply (STSPIN233 VS) is VBUS through a load switch: on a 9 V contract the motor
+  // runs from 9 V; foc_thread.cpp scales voltage_power_supply with this read (cc_supply_volts(), FW-BUG-022).
+  // Every transfer is tried at most three times; a failure is recorded, never waited on.
+  // FW-BUG-022: the store gets the pre-rewrite read (status, RDO word = position, sink PDO millivolts) and the
+  // rewrite flag; the flag is set first so cc_boot_pd_contract() never sees a read without it.
+  if (nvmRewritten) cc_boot_pd_nvm_rewritten();
+  cc_boot_pd(rdoOk, rdo, millivolts);
 
   return POWER_5V_USB;
 }

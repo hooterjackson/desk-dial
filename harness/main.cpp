@@ -1,6 +1,6 @@
 // cc5.4 LCD harness (PRESENTATION_V5.md section 15.3, gate A4): the firmware's own renderer
 // (src/cc_display.cpp), frame parser (src/cc_frame_parse.cpp), icons and generated fonts on the
-// firmware lv_conf.h (LVGL 9.0.0, 64 KB heap, PARTIAL 11,520 B draw buffer).
+// firmware lv_conf.h (LVGL 9.0.0, 80 KB heap, PARTIAL 11,520 B draw buffer).
 //
 // 1. Cases: every case of app/tests/fixtures/cc5_frames.json (presentation-4
 //    wire frames, drawn with the v5 geometry: section 2.3), every input of tests/fixtures/
@@ -24,9 +24,15 @@
 //    A's 16 ms period and a 1 ms loop over the v5 tweens, next to the flush-to-flush metric it
 //    replaced; offline_input: cc_offline_input_update() (section 8.10 first native input).
 // 4. copy: every knob string of cc54_copy.json rendered in its element (layout dumps only).
+// 4b. Presentation 6 (PRESENTATION_V5.md section 19, Desk Dial r3 release 1): every accepted case of
+//    fixtures/frames_v6.json (group "v6") and every screen of r3-handoff/r3_screens.json (group "r3",
+//    cases/r3.<id>; r3_sheet.py builds r3-handoff/contact-sheet-r3.png from them).
 // 5. vectors: the frames_v5.json shared vectors (mmss, accent_ink, the 5.2 tone table) through
 //    cc_presentation.h, and an accent/sat grid for the Python parity check.
 // 6. LVGL heap peak/fragmentation and the host-frame redraw latency.
+// 4c. r4 motion (design_handoff_nano_d_r4 README 3.2, MOTION.md): timelines r4-moments / r4-reduced (M1-M15 with the
+//    input moments driven through cc_display_input() and cc_display_wall(), as lcd_thread does every pass) and
+//    r4-tour (the README section 8 motion tour on the r3 screens; r4_tour_sheet.py builds the review sheet).
 // --one-buffer <out>: the artwork2 cases, timelines and handback with a single art buffer.
 // The same main.cpp built with CC_DISPLAY_FULL_LAYERS=1 (lcd-preview-full, CMakeLists.txt) renders
 // every animated layer at 240 x 240: cc54_report.py `v5_bounded` compares the two runs.
@@ -37,8 +43,11 @@
 #include <ArduinoJson.h>
 #include "cc_art_decode.h"   // cc_art_decode_result(): the task's result mapping (header only)
 #include "cc_display.h"
+#include "cc_crumbs.h"      // FW-DES-001: the crumb masks for the fit oracle
+#include "src/core/lv_global.h"   // FW-DES-003: the running lv_anim list (anims a render starts)
 #include "cc_frame_parse.h"
 #include "cc_icons.h"
+#include "cc_icon_morph.h"
 #include "fonts/cc_fonts.h"
 #if NANOD_JPEG_FIRMWARE
 #include "cc_jpeg.h"
@@ -297,10 +306,19 @@ static void flush(lv_display_t* disp, const lv_area_t* area, uint8_t* data) {
     lv_display_flush_ready(disp);
 }
 
+static size_t lvglUsedNow() {
+    lv_mem_monitor_t monitor{};
+    lv_mem_monitor(&monitor);
+    return monitor.total_size - monitor.free_size;
+}
+static size_t usedBeforeCreate = 0, usedAfterCreate = 0, usedAfterFirstFrame = 0;   // FW-RES-001: one-time growth vs the soak rounds
+
+static std::string heapWhere, heapContext;   // where the sampled peak happened (timeline id / step, fake ms)
 static void sampleHeap() {
     lv_mem_monitor_t monitor{};
     lv_mem_monitor(&monitor);
     const size_t used = monitor.total_size - monitor.free_size;
+    if (used > peakUsed) heapWhere = heapContext + " @" + std::to_string(fakeNow);
     peakUsed = std::max(peakUsed, used);
 }
 
@@ -316,8 +334,24 @@ static bool offlineLive = false;
 static CCOfflineInput offlineIn = {};
 static uint16_t fakePos = 0;
 static uint32_t fakeKeyEdges = 0;
+// r4: the physical buttons down (cc_display_input() every pass, as lcd_thread's render_host_frame does).
+static uint8_t fakeKeys = 0;
 static uint32_t reRenders = 0;
 static lv_obj_t* hostScreen = nullptr;
+// FW-DES-007: the native value screen's offline PC volume view (cc_display.cpp, C linkage; ui_valueScreen.c binds it
+// to ui_dataScreen / ui_posIndicator / ui_Arc1 with hmi_thread.cpp's hmi_pc_volume_source). Here a stand-in value
+// screen and this fake source: the offline volume mode and the FOC's running step count.
+extern "C" {
+void cc_native_pc_volume_attach(lv_obj_t* group, lv_obj_t* number, lv_obj_t* arc, bool (*source)(int32_t* steps));
+void cc_native_pc_volume_poll(void);
+bool cc_native_pc_volume_shown(void);
+}
+static bool fakePcVolumeActive = false;
+static int32_t fakePcVolumeSteps = 0;
+static bool fakePcVolumeSource(int32_t* steps) {
+    *steps = fakePcVolumeSteps;
+    return fakePcVolumeActive;
+}
 // Which key the art image shows (async runs): logged on every change.
 struct ShownLog { uint32_t at; std::string key; };
 static std::vector<ShownLog> shownLog;
@@ -356,9 +390,10 @@ static void advance(uint32_t ms, uint32_t step = 4) {
             ++reRenders;
         }
         if (offlineLive) cc_display_offline(cc_offline_input_update(offlineIn, fakePos, fakeKeyEdges));
+        else cc_display_input(fakeKeys);
         lv_timer_handler();
         if (cadenceProbe) {
-            cc_anim_cadence_poll(*cadenceProbe);
+            cc_anim_cadence_poll(*cadenceProbe, false);
             const uint32_t run = lv_anim_get_timer()->last_run;
             if (run != cadenceSeenRun && lv_anim_count_running() > 0) ++cadenceRuns;
             cadenceSeenRun = run;
@@ -498,8 +533,12 @@ static const CCFrame* dumpFrame = nullptr;
 static std::map<std::string, int> roleOrdinal;
 
 static bool sourceOf(const std::string& role, int ordinal, const CCFrame& f, std::string& out) {
+    const bool lights = f.layoutId == CC_LAYOUT_LIGHTS || f.layoutId == CC_LAYOUT_LIGHTSBIG;   // presentation 6
     if (role == "home.title" || role == "list.title" || role == "tracks.title" || role == "windows.title" ||
-        role == "seek.caption") out = f.title;
+        role == "seek.caption" || role == "scenes.title") out = f.title;
+    else if (role == "scenes.prev") out = f.prevTitle;
+    else if (role == "scenes.next") out = f.nextTitle;
+    else if (role == "scenes.meta" || (role == "status" && lights)) out = f.meta;
     else if (role == "home.artist" || role == "list.subtitle" || role == "tracks.subtitle" || role == "windows.app")
         out = f.subtitle;
     else if (role == "list.meta" || role == "tracks.meta" || role == "windows.meta" || role == "seek.line") out = f.meta;
@@ -512,6 +551,23 @@ static bool sourceOf(const std::string& role, int ordinal, const CCFrame& f, std
 
 static int32_t measure(const std::string& s, const lv_font_t* font, int32_t letterSpace) {
     return lv_text_get_width(s.c_str(), static_cast<uint32_t>(s.size()), font, letterSpace);
+}
+
+// FW-DES-001 oracle: half-width around x 120 that keeps a centred line 2 px clear of every crumb mask pixel with
+// alpha >= 32 (both parts) over rows [top, bottom]. The list title's first line takes it (cc_display.cpp).
+static int32_t crumbClearOracle(uint8_t crumb, int32_t top, int32_t bottom) {
+    int32_t half = 120;
+    for (int part = 0; part < 2; ++part) {
+        const CCCrumbMask* m = crumb == CC_CRUMB_NONE ? nullptr : cc_crumb_mask(crumb, part == 1);
+        if (!m || !m->w) continue;
+        for (int32_t y = std::max<int32_t>(top, m->y); y <= std::min<int32_t>(bottom, m->y + m->h - 1); ++y)
+            for (int32_t x = 0; x < m->w; ++x) {
+                if (m->data[(y - m->y) * m->w + x] < 32) continue;
+                const int32_t px = m->x + x;
+                half = std::min<int32_t>(half, (px < 120 ? 119 - px : px - 120) - 2);
+            }
+    }
+    return std::max<int32_t>(half, 0);
 }
 
 static int32_t chordHalf(int32_t top, int32_t bottom, int32_t radius) {
@@ -582,7 +638,10 @@ static void dumpFit(JsonObject o, lv_obj_t* obj, const std::string& role) {
     std::vector<int32_t> caps;
     for (int k = 0; k < lines; ++k) {
         const int32_t top = y + k * (font->line_height + lineSpace);
-        caps.push_back(std::max<int32_t>(0, std::min<int32_t>(w, 2 * (chordHalf(top + inkTop, top + inkBottom, 104) - offset))));
+        int32_t cap = std::max<int32_t>(0, std::min<int32_t>(w, 2 * (chordHalf(top + inkTop, top + inkBottom, 104) - offset)));
+        if (k == 0 && role == "list.title")
+            cap = std::min<int32_t>(cap, 2 * crumbClearOracle(dumpFrame->crumb, top + inkTop, top + inkBottom));
+        caps.push_back(cap);
     }
     JsonObject fit = o["fit"].to<JsonObject>();
     fit["source"] = source;
@@ -636,6 +695,8 @@ static void dumpTree(JsonArray out, lv_obj_t* obj, bool hiddenAbove) {
         if (role && std::strcmp(role, "art") == 0) o["art_src"] = artSourceIndex(obj);
         o["recolor"] = hex(rgbOf(lv_obj_get_style_image_recolor(obj, 0)));
         o["image_opa"] = lv_obj_get_style_image_opa(obj, 0);
+        o["scale_x"] = lv_image_get_scale_x(obj);   // r4 M7 / M8 / M11 (256 = 1.0)
+        o["scale_y"] = lv_image_get_scale_y(obj);
     } else {
         o["type"] = "box";
         if (lv_obj_get_style_bg_opa(obj, 0)) o["bg"] = hex(rgbOf(lv_obj_get_style_bg_color(obj, 0)));
@@ -676,6 +737,14 @@ static void dumpStats(JsonObject o, const CCDisplayStats& before) {
     o["art_decode_stale"] = s.artDecodeStale - before.artDecodeStale;
     o["ink_fades"] = s.inkFades - before.inkFades;
     o["line_fades"] = s.lineFades - before.lineFades;
+    o["glides"] = s.glides - before.glides;              // r4 M4 / M5
+    o["track_changes"] = s.trackChanges - before.trackChanges;
+    o["presses"] = s.presses - before.presses;           // M7
+    o["pops"] = s.pops - before.pops;                    // M8
+    o["morphs"] = s.morphs - before.morphs;              // M9
+    o["hold_fills"] = s.holdFills - before.holdFills;    // M10
+    o["landings"] = s.landings - before.landings;
+    o["wall_bounces"] = s.wallBounces - before.wallBounces;   // M13
     o["last_slide"] = s.lastSlide;
     o["screen_change"] = s.lastScreenChange;
     o["changed"] = s.lastChanged;
@@ -764,15 +833,15 @@ static std::string quoted(const std::string& text) {
 }
 
 // v5 frames (a v7 host's shapes; PRESENTATION_V5.md sections 3-8, K3 button maps).
-static const char* const HOME5 = R"({"id":501,"mode":"HOME","target":"Den","value":"54%","detail":"","status":"","layout":"nowPlaying","title":"Cloudbusting","subtitle":"Kate Bush","artKey":"k-den","volumeCaption":"Cloudbusting","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"level","value":54,"index":0,"count":101}})";
-static const char* const IDLE5 = R"({"id":502,"mode":"HOME","target":"Den","value":"54%","detail":"","status":"Paused","layout":"idle","restLayout":"idle","title":"Cloudbusting","subtitle":"Kate Bush","artKey":"k-den","volumeCaption":"Paused · Cloudbusting","buttons":[{"label":"Play","enabled":true,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"level","value":54,"index":0,"count":101}})";
-static const char* const RECENT5 = R"({"id":503,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","layout":"recent","heading":"RECENTLY ADDED","title":"Night Drive","subtitle":"Chromatics","meta":"3 / 24","artKey":"k-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Open","enabled":true,"icon":"expand"},{"label":"Play next","enabled":true,"icon":"playnext"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":2,"count":24,"first":0}})";
-static const char* const EXPLORER5 = R"({"id":504,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","layout":"explorer","heading":"RECENT","page":0,"title":"Homogenic","subtitle":"Björk","meta":"2 / 8","artKey":"k-den","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Recent","enabled":true,"icon":"clock","lit":"on"},{"label":"Playlists","enabled":true,"icon":"playlists","lit":"off"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":1,"count":8}})";
-static const char* const UPNEXT5 = R"({"id":505,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","layout":"upnext","heading":"UP NEXT","title":"All Is Full of Love","subtitle":"Björk","meta":"6 / 12","artKey":"k-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Shuffle","enabled":true,"icon":"shuffle","lit":"off"},{"label":"Like","enabled":true,"icon":"heart"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":5,"count":12,"now":4}})";
-static const char* const TRACKS5 = R"({"id":506,"mode":"TRACKS","target":"Den","value":"","detail":"","status":"","layout":"tracks","heading":"TRACKS","title":"Turn to choose","subtitle":"Now: Cloudbusting","meta":"4 / 12","artKey":"k-den","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Up next","enabled":true,"icon":"expand"},{"label":"Seek","enabled":true,"icon":"seek"},{"label":"Skip","enabled":true,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})";
-static const char* const SEEK5 = R"({"id":507,"mode":"TRACKS","target":"Den","value":"","detail":"","status":"","layout":"seek","heading":"SEEK","title":"Cloudbusting","meta":"of 4:47","artKey":"k-den","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Up next","enabled":true,"icon":"expand"},{"label":"Seek","enabled":true,"icon":"seek","lit":"on"},{"label":"Skip","enabled":false,"icon":"next"}],"ring":{"style":"lap","value":0,"index":74,"count":287}})";
+static const char* const HOME5 = R"({"id":501,"mode":"HOME","target":"Hall","value":"54%","detail":"","status":"","layout":"nowPlaying","title":"Pressure Front","subtitle":"Mira Vale","artKey":"k-hall","volumeCaption":"Pressure Front","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"level","value":54,"index":0,"count":101}})";
+static const char* const IDLE5 = R"({"id":502,"mode":"HOME","target":"Hall","value":"54%","detail":"","status":"Paused","layout":"idle","restLayout":"idle","title":"Pressure Front","subtitle":"Mira Vale","artKey":"k-hall","volumeCaption":"Paused · Pressure Front","buttons":[{"label":"Play","enabled":true,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"level","value":54,"index":0,"count":101}})";
+static const char* const RECENT5 = R"({"id":503,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","layout":"recent","heading":"RECENTLY ADDED","title":"Night Channel","subtitle":"Velvet Circuit","meta":"3 / 24","artKey":"k-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Open","enabled":true,"icon":"expand"},{"label":"Play next","enabled":true,"icon":"playnext"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":2,"count":24,"first":0}})";
+static const char* const EXPLORER5 = R"({"id":504,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","layout":"explorer","heading":"RECENT","page":0,"title":"Slow Orbit","subtitle":"Linnéa Holm","meta":"2 / 8","artKey":"k-hall","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Recent","enabled":true,"icon":"clock","lit":"on"},{"label":"Playlists","enabled":true,"icon":"playlists","lit":"off"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":1,"count":8}})";
+static const char* const UPNEXT5 = R"({"id":505,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","layout":"upnext","heading":"UP NEXT","title":"Satellite Hearts","subtitle":"Linnéa Holm","meta":"6 / 12","artKey":"k-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Shuffle","enabled":true,"icon":"shuffle","lit":"off"},{"label":"Like","enabled":true,"icon":"heart"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":5,"count":12,"now":4}})";
+static const char* const TRACKS5 = R"({"id":506,"mode":"TRACKS","target":"Hall","value":"","detail":"","status":"","layout":"tracks","heading":"TRACKS","title":"Turn to choose","subtitle":"Now: Pressure Front","meta":"4 / 12","artKey":"k-hall","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Up next","enabled":true,"icon":"expand"},{"label":"Seek","enabled":true,"icon":"seek"},{"label":"Skip","enabled":true,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})";
+static const char* const SEEK5 = R"({"id":507,"mode":"TRACKS","target":"Hall","value":"","detail":"","status":"","layout":"seek","heading":"SEEK","title":"Pressure Front","meta":"of 4:47","artKey":"k-hall","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Up next","enabled":true,"icon":"expand"},{"label":"Seek","enabled":true,"icon":"seek","lit":"on"},{"label":"Skip","enabled":false,"icon":"next"}],"ring":{"style":"lap","value":0,"index":74,"count":287}})";
 static const char* const WINDOWS5 = R"({"id":508,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","layout":"windows","title":"Quarterly planning — engineering roadmap review","subtitle":"Microsoft Teams","meta":"","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Left","enabled":true,"icon":"snapleft"},{"label":"Right","enabled":true,"icon":"snapright"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":3,"count":9}})";
-static const char* const NOTICE5 = R"({"id":509,"mode":"HOME","target":"Den","value":"","detail":"","status":"","layout":"notice","title":"Sonos unavailable","subtitle":"Looking for Sonos…","meta":"Windows still works","metaTone":"secondary","buttons":[{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":false,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"off","value":0,"index":0,"count":0}})";
+static const char* const NOTICE5 = R"({"id":509,"mode":"HOME","target":"Hall","value":"","detail":"","status":"","layout":"notice","title":"Sonos unavailable","subtitle":"Looking for Sonos…","meta":"Windows still works","metaTone":"secondary","buttons":[{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":false,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}],"ring":{"style":"off","value":0,"index":0,"count":0}})";
 
 // Harness-only v4 frames (slimmed v4 wire JSON; a v2 legacy frame without layout).
 struct Synthetic { const char* id; const char* name; const char* art; const char* json; };
@@ -780,13 +849,13 @@ static const Synthetic SYNTHETIC[] = {
     {"syn-windows-long-meta", "Windows · long title + error meta (line 2 vs meta)", nullptr,
      R"({"id":900,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"Quarterly planning — engineering roadmap review and follow-ups","subtitle":"Microsoft Teams","layout":"windows","meta":"Didn’t come forward · retry","metaTone":"error","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":3,"count":9}})"},
     {"syn-recent-p12", "Recently Added P12 · heading fallback chain", "art-bright-120",
-     R"({"id":901,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","title":"Ágætis byrjun","subtitle":"Sigur Rós","layout":"recent","heading":"RECENTLY ADDED · P12","meta":"4/11 · Replaces queue","page":11,"artKey":"art-bright-120","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":3,"count":11,"moreIndex":10}})"},
-    {"syn-accents", "Latin Extended-A title, subtitle and meta", "art-den-120",
-     R"({"id":902,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","title":"Łódź · Kraków — Žižek’s “Ďábel” in Ōsaka","subtitle":"Dvořák, Chopin & Ősz Ünnepe","layout":"recent","heading":"RECENTLY ADDED","meta":"7/11 · Ŧest ŀine – ĳ ŉ ſ","artKey":"art-den-120","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":6,"count":11}})"},
+     R"({"id":901,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","title":"Ásæla ljós","subtitle":"North of June","layout":"recent","heading":"RECENTLY ADDED · P12","meta":"4/11 · Replaces queue","page":11,"artKey":"art-bright-120","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":3,"count":11,"moreIndex":10}})"},
+    {"syn-accents", "Latin Extended-A title, subtitle and meta", "art-hall-120",
+     R"({"id":902,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","title":"Łódź · Kraków — Žižek’s “Ďábel” in Ōsaka","subtitle":"Dvořák, Chopin & Ősz Ünnepe","layout":"recent","heading":"RECENTLY ADDED","meta":"7/11 · Ŧest ŀine – ĳ ŉ ſ","artKey":"art-hall-120","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":6,"count":11}})"},
     {"syn-legacy-v2-volume", "Presentation-2 legacy frame (layout derived from mode)", nullptr,
-     R"({"id":903,"mode":"VOLUME","target":"Den","value":"54%","detail":"Colombina","status":"Paused","title":"Colombina","subtitle":"Mari Froes","counter":"","activity":"idle","volumeVisible":false,"buttons":[{"label":"Play","enabled":true,"color":16777215,"icon":"play"},{"label":"Browse","enabled":true,"color":16777215,"icon":"list"},{"label":"Win","enabled":true,"color":16777215,"icon":"win"},{"label":"Tracks","enabled":true,"color":16777215,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+     R"({"id":903,"mode":"VOLUME","target":"Hall","value":"54%","detail":"Varanda","status":"Paused","title":"Varanda","subtitle":"Ana Ribeira","counter":"","activity":"idle","volumeVisible":false,"buttons":[{"label":"Play","enabled":true,"color":16777215,"icon":"play"},{"label":"Browse","enabled":true,"color":16777215,"icon":"list"},{"label":"Win","enabled":true,"color":16777215,"icon":"win"},{"label":"Tracks","enabled":true,"color":16777215,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"syn-win-handoff", "Windows · one over-wide word (file name) fits two lines, no ellipsis", nullptr,
-     R"({"id":904,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"CLAUDE_CODE_HANDOFF.md","subtitle":"Visual Studio Code","layout":"windows","meta":"","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":1,"count":9}})"},
+     R"({"id":904,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"HANDOFF_NOTES.md","subtitle":"Visual Studio Code","layout":"windows","meta":"","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":1,"count":9}})"},
     {"syn-win-diag-log", "Windows · hyphenated over-wide file name + error meta, no ellipsis", nullptr,
      R"({"id":905,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"cc5-stage6-lcd-diagnostics.log","subtitle":"Notepad","layout":"windows","meta":"Didn’t come forward · retry","metaTone":"error","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":2,"count":9}})"},
     {"syn-win-supercal", "Windows · over-wide first word + short words, no ellipsis", nullptr,
@@ -798,7 +867,12 @@ static const Synthetic SYNTHETIC[] = {
     {"syn-win-words-overflow", "Windows · many words that cannot fit two lines: whole words + U+2026", nullptr,
      R"({"id":909,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"Quarterly planning review with the engineering and design teams, follow-ups and notes","subtitle":"Microsoft Teams","layout":"windows","meta":"","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":7,"count":9}})"},
     {"syn-recent-long-word", "Recently Added · 22 px over-wide word fits two lines, no ellipsis", nullptr,
-     R"({"id":910,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","title":"Supercalifragilistic","subtitle":"Mary Poppins Original Cast","layout":"recent","heading":"RECENTLY ADDED","meta":"2/11 · Replaces queue","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":1,"count":11}})"},
+     R"({"id":910,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","title":"Supercalifragilistic","subtitle":"Original Studio Cast","layout":"recent","heading":"RECENTLY ADDED","meta":"2/11 · Replaces queue","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":1,"count":11}})"},
+    // DD-DES-002: a non-Latin title as Desk Dial sends it to a latin-ext-a knob. The source is 5 Hangul syllables,
+    // a space, an emoji and " Mix"; control_center.device._device_text gives one "?" per unsupported character.
+    // cc54_report.py `nonlatin_title` recomputes that title with the Desk Dial code and checks this case draws it.
+    {"syn-nonlatin", "Recently Added · non-Latin title (5 Hangul + emoji -> ????? ? Mix)", nullptr,
+     R"({"id":911,"mode":"RECENTLY ADDED","target":"Room","value":"","detail":"","status":"","title":"????? ? Mix","subtitle":"Various Artists","layout":"recent","heading":"RECENTLY ADDED","meta":"5/11","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":4,"count":11}})"},
 };
 
 // Harness-only v5 states that frames_v5.json does not draw (section 8.6; 5.2/5.3 inks).
@@ -811,13 +885,13 @@ static std::vector<V5Case> v5Cases() {
           {"buttons", R"([{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":false,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}])"}}},
         {"v5-idle-v6-label", "Home idle from a v6 host: Play/Pause label ellipsized (2.3)", nullptr, IDLE5,
          {{"buttons", R"([{"label":"Play/Pause","enabled":true,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}])"}}},
-        {"v5-home-paused", "Home paused: status Paused, slot 0 Play green", "art-den-120", HOME5,
+        {"v5-home-paused", "Home paused: status Paused, slot 0 Play green", "art-hall-120", HOME5,
          {{"status", "\"Paused\""}, {"buttons", R"([{"label":"Play","enabled":true,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}])"}}},
-        {"v5-home-starting", "Home starting: status Starting…, Play/Pause dimmed", "art-den-120", HOME5,
+        {"v5-home-starting", "Home starting: status Starting…, Play/Pause dimmed", "art-hall-120", HOME5,
          {{"status", "\"Starting…\""}, {"buttons", R"([{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}])"}}},
-        {"v5-home-group", "Home status Speaker group changed (error)", "art-den-120", HOME5,
+        {"v5-home-group", "Home status Speaker group changed (error)", "art-hall-120", HOME5,
          {{"status", "\"Speaker group changed\""}, {"statusTone", "\"error\""}}},
-        {"v5-volume", "Volume reveal (Now playing caption)", "art-den-120", HOME5,
+        {"v5-volume", "Volume reveal (Now playing caption)", "art-hall-120", HOME5,
          {{"layout", "\"volume\""}, {"value", "\"100%\""}, {"volumeCaption", "\"Now playing\""}, {"status", "\"Maximum\""}}},
         {"v5-notice", "Notice: Sonos unavailable / Looking for Sonos… / Windows still works", nullptr, NOTICE5, {}},
         {"v5-recent-queueing", "Recently Added: Queueing… 3 of 12", "art-bright-120", RECENT5,
@@ -829,7 +903,7 @@ static std::vector<V5Case> v5Cases() {
         {"v5-recent-na", "Recently Added: unavailable item (muted title, artDim)", "art-bright-120", RECENT5,
          {{"titleTone", "\"muted\""}, {"artDim", "true"}, {"meta", "\"Not available\""},
           {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"Open","enabled":true,"icon":"expand"},{"label":"Play next","enabled":false,"icon":"playnext"},{"label":"Play","enabled":false,"icon":"play"}])"}}},
-        {"v5-explorer-fav", "Explorer FAVOURITES tab (tab 1)", "art-den-120", EXPLORER5,
+        {"v5-explorer-fav", "Explorer FAVOURITES tab (tab 1)", "art-hall-120", EXPLORER5,
          {{"heading", "\"FAVOURITES\""}, {"page", "1"}, {"title", "\"Favorite Songs\""}, {"subtitle", "\"34 songs\""},
           {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"Recent","enabled":true,"icon":"clock","lit":"off"},{"label":"Playlists","enabled":true,"icon":"playlists","lit":"on"},{"label":"Play","enabled":true,"icon":"play"}])"}}},
         {"v5-explorer-empty", "Explorer FAVOURITES empty: No favourites yet / Star one in Music", nullptr, EXPLORER5,
@@ -846,19 +920,19 @@ static std::vector<V5Case> v5Cases() {
         {"v5-upnext-loading", "Up next loading: Loading queue…, ring off", nullptr, UPNEXT5,
          {{"title", "\"\""}, {"subtitle", "\"\""}, {"meta", "\"Loading queue…\""}, {"artKey", "\"\""}, {"activity", "\"loading\""},
           {"ring", R"({"style":"off","value":0,"index":0,"count":0})"}}},
-        {"v5-seek-0", "Seek 0:00", "art-den-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":287})"}}},
-        {"v5-seek-959", "Seek 9:59", "art-den-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":599,"count":3600})"}}},
-        {"v5-seek-5959", "Seek 59:59", "art-den-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":3599,"count":3600})"}}},
-        {"v5-seek-99959", "Seek 999:58 (the widest lap time)", "art-den-120", SEEK5,
+        {"v5-seek-0", "Seek 0:00", "art-hall-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":287})"}}},
+        {"v5-seek-959", "Seek 9:59", "art-hall-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":599,"count":3600})"}}},
+        {"v5-seek-5959", "Seek 59:59", "art-hall-120", SEEK5, {{"ring", R"({"style":"lap","value":0,"index":3599,"count":3600})"}}},
+        {"v5-seek-99959", "Seek 999:58 (the widest lap time)", "art-hall-120", SEEK5,
          {{"meta", "\"of 999:59\""}, {"ring", R"({"style":"lap","value":0,"index":59998,"count":59999})"}}},
-        {"v5-seek-jumping", "Seek Jumping… [r2.2]", "art-den-120", SEEK5, {{"meta", "\"Jumping…\""}}},
-        {"v5-seek-failed", "Seek Didn’t jump · try again (error)", "art-den-120", SEEK5,
+        {"v5-seek-jumping", "Seek Jumping… [r2.2]", "art-hall-120", SEEK5, {{"meta", "\"Jumping…\""}}},
+        {"v5-seek-failed", "Seek Didn’t jump · try again (error)", "art-hall-120", SEEK5,
          {{"meta", "\"Didn’t jump · try again\""}, {"metaTone", "\"error\""}}},
-        {"v5-seek-no-lap", "Seek layout without a lap ring: no time", "art-den-120", SEEK5,
+        {"v5-seek-no-lap", "Seek layout without a lap ring: no time", "art-hall-120", SEEK5,
          {{"ring", R"({"style":"transport","value":0,"index":1,"count":3})"}}},
-        {"v5-tracks-shuffle", "Tracks under Sonos shuffle", "art-den-120", TRACKS5,
+        {"v5-tracks-shuffle", "Tracks under Sonos shuffle", "art-hall-120", TRACKS5,
          {{"subtitle", "\"Next: shuffle pick\""}, {"meta", "\"4 / 12 · shuffle\""}, {"ring", R"({"style":"transport","value":0,"index":2,"count":3})"}}},
-        {"v5-tracks-noprev", "Tracks, previous unavailable (prev #555555)", "art-den-120", TRACKS5,
+        {"v5-tracks-noprev", "Tracks, previous unavailable (prev #555555)", "art-hall-120", TRACKS5,
          {{"title", "\"Previous track\""}, {"subtitle", "\"Start of queue\""}, {"meta", "\"Previous unavailable\""},
           {"ring", R"({"style":"transport","value":0,"index":0,"count":3,"unavailable":1})"}}},
         {"v5-windows-accent", "Windows letter tile on the app accent (sat, #FFFFFF initial)", nullptr, WINDOWS5,
@@ -886,26 +960,26 @@ struct Artwork2Case {
     const char* json;
 };
 static const Artwork2Case ARTWORK2_CASES[] = {
-    {"a2-np-den", "artwork2 · Now Playing, 240 px JPEG cover", "a2-den", true, nullptr,
-     R"({"id":960,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Cloudbusting","subtitle":"Kate Bush","layout":"nowPlaying","artKey":"a2-den","volumeCaption":"Cloudbusting","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+    {"a2-np-hall", "artwork2 · Now Playing, 240 px JPEG cover", "a2-hall", true, nullptr,
+     R"({"id":960,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Pressure Front","subtitle":"Mira Vale","layout":"nowPlaying","artKey":"a2-hall","volumeCaption":"Pressure Front","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"a2-np-detail", "artwork2 · Now Playing, 1 px detail cover (only a 240 px path draws it)", "a2-detail", true,
      nullptr,
-     R"({"id":968,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Fine Lines","subtitle":"Resolution Test","layout":"nowPlaying","artKey":"a2-detail","volumeCaption":"Fine Lines","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+     R"({"id":968,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Fine Lines","subtitle":"Resolution Test","layout":"nowPlaying","artKey":"a2-detail","volumeCaption":"Fine Lines","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"a2-np-bright-dim", "artwork2 · Now Playing, bright 240 px JPEG cover, artDim", "a2-bright", true, nullptr,
-     R"({"id":961,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"Sonos unavailable","statusTone":"error","title":"Unfinished Sympathy","subtitle":"Massive Attack","layout":"nowPlaying","artKey":"a2-bright","artDim":true,"volumeCaption":"Unfinished Sympathy","buttons":[{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":false,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+     R"({"id":961,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"Sonos unavailable","statusTone":"error","title":"Harbour Song","subtitle":"Lumen Park","layout":"nowPlaying","artKey":"a2-bright","artDim":true,"volumeCaption":"Harbour Song","buttons":[{"label":"Play","enabled":false,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":false,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"a2-recent-bright", "artwork2 · Recently Added, bright 240 px JPEG cover", "a2-bright", true, nullptr,
-     R"({"id":962,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","title":"Vespertine","subtitle":"Björk","layout":"recent","heading":"RECENTLY ADDED","meta":"3/11 · Replaces queue","artKey":"a2-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":2,"count":11}})"},
-    {"a2-recent-den-dim", "artwork2 · Recently Added, not available: 240 px JPEG cover, artDim", "a2-den", true, nullptr,
-     R"({"id":963,"mode":"RECENTLY ADDED","target":"Den","value":"","detail":"","status":"","title":"Heligoland","subtitle":"Massive Attack","layout":"recent","heading":"RECENTLY ADDED","meta":"6/11 · Not available","titleTone":"muted","artKey":"a2-den","artDim":true,"buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":false,"icon":"play"}],"ring":{"style":"selection","value":0,"index":5,"count":11,"unavailable":32}})"},
-    {"a2-tracks-den", "artwork2 · Tracks, 240 px JPEG cover", "a2-den", true, nullptr,
-     R"({"id":964,"mode":"TRACKS","target":"Den","value":"","detail":"","status":"","title":"Turn to choose","subtitle":"Now: Cloudbusting","layout":"tracks","heading":"TRACKS","meta":"One press, one skip","artKey":"a2-den","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Skip","enabled":true,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})"},
+     R"({"id":962,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","title":"Perihelion","subtitle":"Linnéa Holm","layout":"recent","heading":"RECENTLY ADDED","meta":"3/11 · Replaces queue","artKey":"a2-bright","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":true,"icon":"play"}],"ring":{"style":"selection","value":0,"index":2,"count":11}})"},
+    {"a2-recent-hall-dim", "artwork2 · Recently Added, not available: 240 px JPEG cover, artDim", "a2-hall", true, nullptr,
+     R"({"id":963,"mode":"RECENTLY ADDED","target":"Hall","value":"","detail":"","status":"","title":"Glass Weather","subtitle":"Lumen Park","layout":"recent","heading":"RECENTLY ADDED","meta":"6/11 · Not available","titleTone":"muted","artKey":"a2-hall","artDim":true,"buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Play","enabled":false,"icon":"play"}],"ring":{"style":"selection","value":0,"index":5,"count":11,"unavailable":32}})"},
+    {"a2-tracks-hall", "artwork2 · Tracks, 240 px JPEG cover", "a2-hall", true, nullptr,
+     R"({"id":964,"mode":"TRACKS","target":"Hall","value":"","detail":"","status":"","title":"Turn to choose","subtitle":"Now: Pressure Front","layout":"tracks","heading":"TRACKS","meta":"One press, one skip","artKey":"a2-hall","buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Skip","enabled":true,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})"},
     {"a2-tracks-bright-dim", "artwork2 · Tracks, bright 240 px JPEG cover, artDim", "a2-bright", true, nullptr,
-     R"({"id":965,"mode":"TRACKS","target":"Den","value":"","detail":"","status":"","title":"Turn to choose","subtitle":"Now: Unfinished Sympathy","layout":"tracks","heading":"TRACKS","meta":"Skip unavailable","metaTone":"error","artKey":"a2-bright","artDim":true,"buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Skip","enabled":false,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})"},
+     R"({"id":965,"mode":"TRACKS","target":"Hall","value":"","detail":"","status":"","title":"Turn to choose","subtitle":"Now: Harbour Song","layout":"tracks","heading":"TRACKS","meta":"Skip unavailable","metaTone":"error","artKey":"a2-bright","artDim":true,"buttons":[{"label":"Back","enabled":true,"icon":"back"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Skip","enabled":false,"icon":"next"}],"ring":{"style":"transport","value":0,"index":1,"count":3}})"},
     {"a2-np-decode-fail", "artwork2 · Now Playing, committed cover TJpgDec cannot decode: no art", "a2-progressive", false,
      nullptr,
-     R"({"id":966,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Cloudbusting","subtitle":"Kate Bush","layout":"nowPlaying","artKey":"a2-progressive","volumeCaption":"Cloudbusting","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+     R"({"id":966,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Pressure Front","subtitle":"Mira Vale","layout":"nowPlaying","artKey":"a2-progressive","volumeCaption":"Pressure Front","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"a2-np-cover-absent", "artwork2 · Now Playing, cover not committed yet: no art", nullptr, false, nullptr,
-     R"({"id":967,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Cloudbusting","subtitle":"Kate Bush","layout":"nowPlaying","artKey":"a2-absent","volumeCaption":"Cloudbusting","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
+     R"({"id":967,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Pressure Front","subtitle":"Mira Vale","layout":"nowPlaying","artKey":"a2-absent","volumeCaption":"Pressure Front","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})"},
     {"a2-win-icon", "artwork2 · Windows, app icon on the tile", nullptr, false, "ic-code",
      R"({"id":970,"mode":"WINDOWS","target":"DESKTOP","value":"","detail":"","status":"","title":"cc_display.cpp — NanoD_RatchetH1","subtitle":"Visual Studio Code","layout":"windows","iconKey":"ic-code","buttons":[{"label":"Cancel","enabled":true,"icon":"cancel"},{"label":"Home","enabled":true,"icon":"home"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Switch","enabled":true,"icon":"switch"}],"ring":{"style":"selection","value":0,"index":1,"count":9}})"},
     {"a2-win-icon-closed", "artwork2 · Windows, closed entry with an app icon (tile group 0.35)", nullptr, false, "ic-chat",
@@ -928,7 +1002,19 @@ static std::vector<uint32_t> captureOffsets(JsonVariantConst expect) {
     if (expect["volumeHide"] | false) add({100, 170, 190, 240});
     if (expect["idleEnter"] | false) add({160, 200, 245, 290, 335, 380, 560, 800, 1100});
     if (expect["idleExit"] | false) add({90, 140, 160, 280, 420, 510});
-    if ((expect["slide"] | 0) != 0 || (expect["screenFade"] | false)) add({40, 60, 110, 160, 220, 300, 380});
+    if ((expect["slide"] | 0) != 0 || (expect["screenFade"] | false)) add({40, 60, 110, 160, 220, 240, 300, 380, 420});
+    // r4 key times (MOTION.md): M2 / M3 reveal, M11 stagger, M6 line rise, and the r4 moment probes.
+    if (expect["volumeReveal"] | false) add({130, 160, 220});
+    if (expect["volumeHide"] | false) add({130, 160, 350, 640});
+    if (expect["idleEnter"] | false) add({240});
+    if (expect["idleExit"] | false) add({350, 640});
+    if (expect["lineFade"] | false) add({240, 560});
+    if (expect["glide"] | false) add({20, 60, 120, 200, 300, 420});
+    if (expect["press"] | false) add({35, 70, 150, 300, 640});
+    if (expect["hold"] | false) add({250, 500, 750, 1000, 1100});
+    if (expect["wall"] | false) add({45, 90, 150, 250, 400, 650});
+    if (expect["pop"] | false) add({40, 100, 150, 200, 300, 640});
+    if (expect["tour"] | false) add({60, 120, 240, 420});
     if (expect["flash"].is<const char*>()) add({300});
     if (expect["artLate"] | false) add({30, 60, 120, 240, 270, 480, 520});
     if (expect["artFade"] | false) add({60, 120, 180, 240, 300});
@@ -945,7 +1031,9 @@ static std::vector<uint32_t> captureOffsets(JsonVariantConst expect) {
 
 using Commits = std::vector<std::pair<uint8_t, std::string>>;  // artwork2 (kind, fixture name)
 
-enum StepAction : uint8_t { STEP_FRAME, STEP_OFFLINE, STEP_OFFLINE_NATIVE, STEP_HANDBACK };
+enum StepAction : uint8_t { STEP_FRAME, STEP_OFFLINE, STEP_OFFLINE_NATIVE, STEP_HANDBACK,
+                            STEP_KEYS,    // r4: the physical buttons down become `keys` (cc_display_input)
+                            STEP_WALL };  // r4: a wall hit towards `wall` (cc_display_wall)
 
 struct Step {
     uint32_t t;
@@ -956,7 +1044,39 @@ struct Step {
     Commits commits = {};  // artwork2 commits just before this render (lcd_thread re-renders on them)
     uint32_t decodeMs = 0;  // fake ms each synchronous JPEG decode of this render takes
     uint8_t action = STEP_FRAME;
+    uint8_t keys = 0;       // STEP_KEYS
+    int8_t wall = 0;        // STEP_WALL
 };
+
+// FW-DES-003: the animations a render starts. Before the render every running anim is stamped (lv_anim_t
+// user_data, which cc_display never uses); afterwards the unstamped ones are new: their duration, delay
+// (lv_anim_start stores -delay in act_time) and the role of the object they animate ("" for a struct var).
+static int animStamp = 0;
+static void stampAnims() {
+    lv_ll_t* ll = &LV_GLOBAL_DEFAULT()->anim_state.anim_ll;
+    for (void* n = _lv_ll_get_head(ll); n; n = _lv_ll_get_next(ll, n)) static_cast<lv_anim_t*>(n)->user_data = &animStamp;
+}
+static void collectObjs(lv_obj_t* obj, std::map<const void*, std::string>& out) {
+    const char* role = static_cast<const char*>(lv_obj_get_user_data(obj));
+    out[obj] = role ? role : "";
+    for (uint32_t i = 0; i < lv_obj_get_child_count(obj); ++i) collectObjs(lv_obj_get_child(obj, i), out);
+}
+static void dumpStartedAnims(JsonArray out) {
+    std::map<const void*, std::string> objs;
+    if (hostScreen) collectObjs(hostScreen, objs);
+    lv_ll_t* ll = &LV_GLOBAL_DEFAULT()->anim_state.anim_ll;
+    for (void* n = _lv_ll_get_head(ll); n; n = _lv_ll_get_next(ll, n)) {
+        const lv_anim_t* a = static_cast<const lv_anim_t*>(n);
+        if (a->user_data == &animStamp) continue;
+        JsonObject o = out.add<JsonObject>();
+        const auto it = objs.find(a->var);
+        o["role"] = it != objs.end() ? it->second : std::string();
+        o["duration"] = a->duration;
+        o["delay"] = a->act_time < 0 ? -a->act_time : 0;
+        o["from"] = a->start_value;
+        o["to"] = a->end_value;
+    }
+}
 
 static bool pngCaptures = true;   // false in the full-layers run's copy pass
 
@@ -991,6 +1111,7 @@ static void runTimeline(JsonObject seqOut, const std::string& id, const std::vec
         const uint32_t at = e.at + (e.kind == 1 ? renderMs[e.step] : 0);
         if (at > fakeNow) advance(at - fakeNow, 1);
         const Step& step = steps[e.step];
+        heapContext = id + " / " + step.label;
         if (e.kind == 0) {
             JsonObject s = stepsOut.add<JsonObject>();
             s["t"] = step.t;
@@ -1012,6 +1133,7 @@ static void runTimeline(JsonObject seqOut, const std::string& id, const std::vec
             const uint16_t runningBefore = lv_anim_count_running();
             const uint32_t flushesBefore = flushes;
             const uint32_t renderStart = fakeNow;
+            stampAnims();
             if (step.action == STEP_FRAME) {
                 offlineLive = false;
                 decodeFakeMs = step.decodeMs;
@@ -1023,6 +1145,13 @@ static void runTimeline(JsonObject seqOut, const std::string& id, const std::vec
                 offlineLive = false;
                 cc_display_release_media();
                 liveFrame = nullptr;
+            } else if (step.action == STEP_KEYS) {
+                fakeKeys = step.keys;
+                cc_display_input(fakeKeys);
+                s["keys"] = step.keys;
+            } else if (step.action == STEP_WALL) {
+                cc_display_wall(step.wall);
+                s["wall"] = step.wall;
             } else {
                 // As render_host_frame: a claim or a handback reset the input, so the layer's first
                 // pass takes new references; a native tap bumps the edge counter by 2.
@@ -1038,6 +1167,7 @@ static void runTimeline(JsonObject seqOut, const std::string& id, const std::vec
             r["render_ms"] = renderMs[e.step];
             r["anims_running_before"] = runningBefore;
             r["anims_running_after"] = lv_anim_count_running();
+            dumpStartedAnims(r["anims_started"].to<JsonArray>());
             lv_refr_now(display);
             r["redraw_flushes"] = flushes - flushesBefore;
             dumpMedia(r);
@@ -1056,6 +1186,59 @@ static void runTimeline(JsonObject seqOut, const std::string& id, const std::vec
     }
     advance(1200);
     offlineLive = false;
+    fakeKeys = 0;
+    cc_display_input(0);
+}
+
+// FW-RES-001 soak: a timeline replayed without captures or JSON (the same render/input dispatch as
+// runTimeline), so main() can repeat every named timeline and record the LVGL pool after each round.
+// The knob lost ~18.6 KB of its pool over 42 h; a renderer that keeps allocating per frame, per screen
+// change or per animation shows here as used bytes growing from round to round.
+static void soakTimeline(const std::vector<Step>& steps) {
+    resetStore();
+    offlineLive = false;
+    for (const auto& commit : steps.front().commits) commitMedia(commit.first, commit.second);
+    cc_display_render(*steps.front().frame, steps.front().art);
+    liveFrame = steps.front().frame;
+    liveArt = steps.front().art;
+    advance(1200);
+    std::vector<size_t> order;
+    for (size_t i = 1; i < steps.size(); ++i) order.push_back(i);
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return steps[a].t < steps[b].t; });
+    const uint32_t start = fakeNow;
+    for (size_t i : order) {
+        const Step& step = steps[i];
+        if (start + step.t > fakeNow) advance(start + step.t - fakeNow, 1);
+        for (const auto& commit : step.commits) commitMedia(commit.first, commit.second);
+        if (step.action == STEP_FRAME) {
+            offlineLive = false;
+            decodeFakeMs = step.decodeMs;
+            cc_display_render(*step.frame, step.art);
+            decodeFakeMs = 0;
+            liveFrame = step.frame;
+            liveArt = step.art;
+        } else if (step.action == STEP_HANDBACK) {
+            offlineLive = false;
+            cc_display_release_media();
+            liveFrame = nullptr;
+        } else if (step.action == STEP_KEYS) {
+            fakeKeys = step.keys;
+            cc_display_input(fakeKeys);
+        } else if (step.action == STEP_WALL) {
+            cc_display_wall(step.wall);
+        } else {
+            if (!offlineLive) cc_offline_input_reset(offlineIn);
+            offlineLive = true;
+            if (step.action == STEP_OFFLINE_NATIVE) fakeKeyEdges += 2;
+            cc_display_offline(cc_offline_input_update(offlineIn, fakePos, fakeKeyEdges));
+            liveFrame = nullptr;
+        }
+        lv_refr_now(display);
+    }
+    advance(1200);
+    offlineLive = false;
+    fakeKeys = 0;
+    cc_display_input(0);
 }
 
 // Frames kept alive for a timeline (CCFrame storage with stable addresses).
@@ -1082,6 +1265,8 @@ int main(int argc, char** argv) try {
     const fs::path artwork2Dir = argc > arg + 3 ? fs::path(argv[arg + 3]) : fs::path(NANOD_ARTWORK2_DIR);
     const fs::path framesV5Path = fs::path(NANOD_FRAMES_V5_JSON);
     const fs::path copyPath = fs::path(NANOD_COPY_JSON);
+    const fs::path framesV6Path = fs::path(NANOD_FRAMES_V6_JSON);
+    const fs::path r3ScreensPath = fs::path(NANOD_R3_SCREENS_JSON);
     fs::create_directories(out);
 
     lv_init();
@@ -1093,12 +1278,15 @@ int main(int argc, char** argv) try {
 
     const char* names[] = {"play", "pause", "list", "win", "tracks", "back", "home", "more", "prev", "next",
                            "switch", "cancel", "expand", "clock", "playlists", "playnext", "seek", "shuffle",
-                           "heart", "snapleft", "snapright", "dotfill", "heartfill", "ok", "dot", "warn", "usb"};
+                           "heart", "snapleft", "snapright", "dotfill", "heartfill", "ok", "dot", "warn", "usb",
+                           "bulb", "thermo", "power", "wand", "house", "album"};   // presentation 6
     for (const char* name : names)
         for (int size : {16, 20, 26})
             if (const lv_image_dsc_t* dsc = cc_icon(name, size)) iconNames[dsc] = std::string(name) + "@" + std::to_string(size);
+    for (uint8_t k = 1; k <= CC_ICON_MORPH_FRAMES; ++k)   // r4 M9 frames
+        iconNames[cc_icon_morph(k)] = "morph" + std::to_string(k) + "@20";
 
-    for (const char* name : {"art-den-120", "art-bright-120"}) {
+    for (const char* name : {"art-hall-120", "art-bright-120"}) {
         artFixtures[name] = readFile(fixtures / (std::string(name) + ".rgb565"));
         if (artFixtures[name].size() != CC_ART120_BYTES)
             throw std::runtime_error(std::string("Artwork fixture is not 120x120 RGB565: ") + name);
@@ -1145,9 +1333,9 @@ int main(int argc, char** argv) try {
     // Keys no other case or timeline uses, so their timelines start with neither display buffer
     // holding them (a real decode on arrival); a5-* for the R5 timelines.
     std::vector<std::pair<std::string, std::string>> coverAliases = {
-        {"a2-late", "a2-bright"}, {"a2-swap-a", "a2-den"}, {"a2-swap-b", "a2-bright"}, {"a2-slide", "a2-bright"}};
+        {"a2-late", "a2-bright"}, {"a2-swap-a", "a2-hall"}, {"a2-swap-b", "a2-bright"}, {"a2-slide", "a2-bright"}};
     {
-        const char* cycle[3] = {"a2-den", "a2-bright", "a2-detail"};
+        const char* cycle[3] = {"a2-hall", "a2-bright", "a2-detail"};
         for (int k = 0; k < 40; ++k) {
             char key[16];
             std::snprintf(key, sizeof(key), "a5-k%02d", k);
@@ -1172,10 +1360,12 @@ int main(int argc, char** argv) try {
     if (DeserializationError error = deserializeJson(v5Fixture, reinterpret_cast<const char*>(v5Text.data()), v5Text.size()))
         throw std::runtime_error(std::string("frames_v5.json: ") + error.c_str());
 
+    usedBeforeCreate = lvglUsedNow();
     lv_obj_t* screen = cc_display_create(art240[0], oneBuffer ? nullptr : art240[1]);
     hostScreen = screen;
     lv_screen_load(screen);
     sampleHeap();
+    usedAfterCreate = lvglUsedNow();
 
     JsonDocument index;
     index["about"] = oneBuffer ? "cc5.4 LCD harness, one art buffer (main.cpp --one-buffer); checked by cc54_report.py"
@@ -1244,6 +1434,7 @@ int main(int argc, char** argv) try {
         c["art_key"] = frame.artKey;
         c["icon_key"] = frame.iconKey;
         c["art_dim"] = frame.artDim;
+        c["playing"] = frame.playing;          // [r3.1] a paused Home cover draws at image_opa CC_ART_PAUSED_OPA (255)
         static CCFrame twin;
         twin = frame;
         twin.artKey[0] = '\0';
@@ -1259,6 +1450,7 @@ int main(int argc, char** argv) try {
         dumpStats(render["stats"].to<JsonObject>(), before);
         advance(1200);
         capture(render, out, "cases/" + id, &frame);
+        if (!usedAfterFirstFrame) usedAfterFirstFrame = lvglUsedNow();
     };
 
     // The offline screen (section 8.10): from a settled Home render, initial and after native input.
@@ -1289,8 +1481,155 @@ int main(int argc, char** argv) try {
         advance(1200);
     };
 
+    // FW-DES-007: the native value screen in offline PC volume mode (no Desk Dial: the knob sends Consumer volume
+    // keys and cannot read the PC level). A stand-in of ui_valueScreen.c (black screen, ui_dataScreen's 100 % x 50 %
+    // centred flex column, ui_posIndicator with a "100" in a knob font, ui_Arc1's styles at 100 of 0..200: the
+    // offline profile re-centres there after every step) with the firmware's own PC volume view bound to it. Only
+    // the view's label and tick are drawn in these renders: the stand-ins (number, arc, and the profile name and
+    // "MIDI CC 7" description labels of the flex column) are hidden or muted (kind "native"; cc54_report.py
+    // native_pc_volume checks the layouts, the ring pixels and the transitions recorded here).
+    auto renderNativePcVolume = [&]() {
+        // The knob builds its value screen at boot, apart from the CC display, and the harness never builds the
+        // real one: this stand-in screen is held out of the CC display's heap peak (section 12.2) and measured on
+        // its own instead (heap_* below; cc54_report.py native_pc_volume bounds the firmware view's share).
+        const size_t savedPeak = peakUsed;
+        const std::string savedWhere = heapWhere;
+        const size_t heapEntry = lvglUsedNow();
+        peakUsed = 0;
+        heapContext = "native-pc-volume";
+        lv_obj_t* value = lv_obj_create(nullptr);
+        lv_obj_remove_flag(value, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_bg_color(value, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_bg_opa(value, 255, 0);
+        lv_obj_t* data = lv_obj_create(value);
+        lv_obj_remove_style_all(data);
+        lv_obj_set_size(data, lv_pct(100), lv_pct(50));
+        lv_obj_set_align(data, LV_ALIGN_CENTER);
+        lv_obj_set_flex_flow(data, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(data, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_row(data, 8, 0);
+        lv_obj_set_user_data(data, const_cast<char*>("native.data"));
+        lv_obj_t* number = lv_obj_create(data);
+        lv_obj_remove_style_all(number);
+        lv_obj_set_size(number, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_user_data(number, const_cast<char*>("native.number"));
+        lv_obj_t* digits = lv_label_create(number);
+        lv_obj_set_style_text_font(digits, &cc_font_48t, 0);
+        lv_obj_set_style_text_color(digits, lv_color_hex(0xFFFFFF), 0);
+        lv_label_set_text(digits, "100");
+        lv_obj_set_user_data(digits, const_cast<char*>("native.number.digits"));
+        // ui_profileName / ui_profileDesc: the flex column's other two children, shown at boot by
+        // ComThread::dispatchLcdConfig with the native profile's name and generateDescription's text (stand-in
+        // fonts: the SquareLine ones need C++20 here; widths, colours, letter space and alignment as on the knob).
+        lv_obj_t* profileName = lv_label_create(data);
+        lv_obj_set_width(profileName, lv_pct(78));
+        lv_label_set_long_mode(profileName, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_font(profileName, &cc_font_16, 0);
+        lv_obj_set_style_text_color(profileName, lv_color_hex(0xFF7D00), 0);
+        lv_obj_set_style_text_letter_space(profileName, 1, 0);
+        lv_obj_set_style_text_align(profileName, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(profileName, "Profile 1");
+        lv_obj_set_user_data(profileName, const_cast<char*>("native.profile.name"));
+        lv_obj_t* profileDesc = lv_label_create(data);
+        lv_obj_set_width(profileDesc, 150);
+        lv_obj_set_style_text_font(profileDesc, &cc_font_16, 0);
+        lv_obj_set_style_text_color(profileDesc, lv_color_hex(0x9D9D9D), 0);
+        lv_obj_set_style_text_letter_space(profileDesc, 1, 0);
+        lv_obj_set_style_text_line_space(profileDesc, 1, 0);
+        lv_obj_set_style_text_align(profileDesc, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(profileDesc, "MIDI CC 7");
+        lv_obj_set_user_data(profileDesc, const_cast<char*>("native.profile.desc"));
+        lv_obj_t* arc = lv_arc_create(value);
+        lv_obj_set_size(arc, lv_pct(98), lv_pct(98));
+        lv_obj_set_align(arc, LV_ALIGN_CENTER);
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+        lv_arc_set_bg_angles(arc, 89, 88);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0x282828), LV_PART_MAIN);
+        lv_obj_set_style_arc_width(arc, 2, LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(arc, false, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0xFF7D00), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_width(arc, 2, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR);
+        lv_obj_set_style_radius(arc, 12, LV_PART_KNOB);
+        lv_obj_set_style_bg_color(arc, lv_color_hex(0xFFFFFF), LV_PART_KNOB);
+        lv_obj_set_style_border_color(arc, lv_color_hex(0x000000), LV_PART_KNOB);
+        lv_obj_set_style_border_width(arc, 5, LV_PART_KNOB);
+        lv_arc_set_range(arc, 0, 200);
+        lv_arc_set_value(arc, 100);
+        lv_obj_set_user_data(arc, const_cast<char*>("native.arc"));
+        lv_screen_load(value);
+        fakePcVolumeActive = false;
+        fakePcVolumeSteps = 7;   // steps from before the mode never tick
+        const size_t heapBeforeView = lvglUsedNow();
+        cc_native_pc_volume_attach(data, number, arc, fakePcVolumeSource);
+        const size_t heapView = lvglUsedNow() - heapBeforeView;
+        advance(100);
+        bool beforeNumber = drawn(number), beforeArc = drawn(arc), beforeShown = cc_native_pc_volume_shown();
+        bool beforeProfile = drawn(profileName) && drawn(profileDesc);
+        auto addCase = [&](const char* id, const char* name, const char* tick) {
+            JsonObject c = cases.add<JsonObject>();
+            c["id"] = id;
+            c["name"] = name;
+            c["group"] = "native";
+            c["kind"] = "native";
+            c["tick"] = tick;
+            JsonObject render = c["render"].to<JsonObject>();
+            capture(render, out, std::string("cases/") + id);
+            return c;
+        };
+        fakePcVolumeActive = true;
+        advance(400);
+        JsonObject rest = addCase("native-pc-volume", "Offline PC volume (native screen): PC volume, no number, no arc", "");
+        JsonObject t = rest["transitions"].to<JsonObject>();
+        t["before_number_drawn"] = beforeNumber;
+        t["before_arc_drawn"] = beforeArc;
+        t["before_shown"] = beforeShown;
+        t["entry_ticked"] = drawn(findRole(value, "pcvol.tick"));
+        t["before_profile_drawn"] = beforeProfile;
+        t["mode_profile_drawn"] = drawn(profileName) || drawn(profileDesc);
+        // lcd_thread.cpp owns the labels' HIDDEN flags: the mode must leave them as they were (shown here).
+        t["mode_profile_hidden_flag"] = lv_obj_has_flag(profileName, LV_OBJ_FLAG_HIDDEN) ||
+                                        lv_obj_has_flag(profileDesc, LV_OBJ_FLAG_HIDDEN);
+        {
+            lv_obj_t* box = findRole(value, "pcvol");
+            lv_area_t a;
+            lv_obj_get_coords(box, &a);
+            t["box_x1"] = a.x1; t["box_y1"] = a.y1; t["box_x2"] = a.x2; t["box_y2"] = a.y2;
+        }
+        ++fakePcVolumeSteps;
+        advance(40);
+        addCase("native-pc-volume-up", "Offline PC volume: + tick on a volume-up step", "+");
+        advance(100);
+        t["tick_up_at_140_ms"] = drawn(findRole(value, "pcvol.tick"));
+        advance(300);
+        t["tick_up_at_440_ms"] = drawn(findRole(value, "pcvol.tick"));
+        fakePcVolumeSteps -= 2;
+        advance(40);
+        addCase("native-pc-volume-down", "Offline PC volume: - tick on a volume-down step", "-");
+        advance(400);
+        t["tick_down_at_440_ms"] = drawn(findRole(value, "pcvol.tick"));
+        fakePcVolumeActive = false;
+        advance(100);
+        t["exit_number_drawn"] = drawn(number);
+        t["exit_arc_drawn"] = drawn(arc);
+        t["exit_view_drawn"] = drawn(findRole(value, "pcvol"));
+        t["exit_profile_drawn"] = drawn(profileName) && drawn(profileDesc);
+        t["exit_shown"] = cc_native_pc_volume_shown();
+        lv_screen_load(hostScreen);
+        lv_obj_delete(value);   // the view's delete event stops its timer
+        advance(100);
+        t["released_on_delete"] = !cc_native_pc_volume_shown();
+        heapContext.clear();
+        t["heap_entry"] = static_cast<uint32_t>(heapEntry);
+        t["heap_peak"] = static_cast<uint32_t>(peakUsed);
+        t["heap_view_bytes"] = static_cast<uint32_t>(heapView);
+        t["heap_after_delete"] = static_cast<uint32_t>(lvglUsedNow());
+        peakUsed = savedPeak;
+        heapWhere = savedWhere;
+    };
+
     FrameBank bank;
-    const uint8_t* den = artFixtures.at("art-den-120").data();
+    const uint8_t* hall = artFixtures.at("art-hall-120").data();
     const uint8_t* bright = artFixtures.at("art-bright-120").data();
 
     if (!oneBuffer) {
@@ -1298,7 +1637,7 @@ int main(int argc, char** argv) try {
             const char* artName = item["art"].is<const char*>() ? item["art"].as<const char*>() : nullptr;
             if (item["frame"].isNull()) {
                 renderOffline(item["id"].as<std::string>(), item["name"].as<std::string>() + " (offline screen)", false,
-                              den, *bank.make(HOME5));
+                              hall, *bank.make(HOME5));
                 continue;
             }
             renderCase(item["id"].as<const char*>(), item["name"].as<const char*>(), item["group"].as<const char*>(),
@@ -1313,7 +1652,7 @@ int main(int argc, char** argv) try {
         renderCase(SYNTHETIC[i].id, SYNTHETIC[i].name, "synthetic", syntheticDocs[i].as<JsonVariantConst>(), art,
                    SYNTHETIC[i].art, Commits());
     }
-    // frames_v5.json: every input a cc5.4 parser accepts (v5.accept), drawn with the v1 Den
+    // frames_v5.json: every input a cc5.4 parser accepts (v5.accept), drawn with the v1 Hall
     // fixture as the cover of whatever artKey it names.
     std::deque<JsonDocument> v5Docs;
     if (!oneBuffer) {
@@ -1324,7 +1663,7 @@ int main(int argc, char** argv) try {
             v5Docs.back().set(item["input"]);
             const bool hasArt = item["input"]["artKey"].is<const char*>() && item["input"]["artKey"].as<std::string>().size();
             renderCase("v5." + name, item["note"].as<std::string>().substr(0, 120), "v5", v5Docs.back().as<JsonVariantConst>(),
-                       hasArt ? den : nullptr, hasArt ? "art-den-120" : nullptr, Commits());
+                       hasArt ? hall : nullptr, hasArt ? "art-hall-120" : nullptr, Commits());
         }
         for (const V5Case& v : v5Cases()) {
             v5Docs.emplace_back();
@@ -1334,9 +1673,33 @@ int main(int argc, char** argv) try {
             renderCase(v.id, v.name, "v5syn", v5Docs.back().as<JsonVariantConst>(),
                        hasArt ? artFixtures.at(v.art).data() : nullptr, hasArt ? v.art : nullptr, Commits());
         }
-        renderOffline("v5-offline", "Offline: Waiting for PC / Open Desk Dial on your PC", false, den, *bank.make(HOME5));
-        renderOffline("v5-offline-native", "Offline after native input: Knob controls still work", true, den,
+        // Presentation 6: the parser fixture's accepted frames, then the r3 contact-sheet screens.
+        const std::vector<uint8_t> v6Text = readFile(framesV6Path);
+        JsonDocument v6Fixture;
+        if (DeserializationError error = deserializeJson(v6Fixture, reinterpret_cast<const char*>(v6Text.data()), v6Text.size()))
+            throw std::runtime_error(std::string("frames_v6.json: ") + error.c_str());
+        for (JsonVariantConst item : v6Fixture["cases"].as<JsonArrayConst>()) {
+            if (!(item["expect"]["accept"] | false)) continue;
+            v5Docs.emplace_back();
+            v5Docs.back().set(item["input"]);
+            renderCase("v6." + item["name"].as<std::string>(), item["note"].as<std::string>().substr(0, 120), "v6",
+                       v5Docs.back().as<JsonVariantConst>(), nullptr, nullptr, Commits());
+        }
+        const std::vector<uint8_t> r3Text = readFile(r3ScreensPath);
+        JsonDocument r3Screens;
+        if (DeserializationError error = deserializeJson(r3Screens, reinterpret_cast<const char*>(r3Text.data()), r3Text.size()))
+            throw std::runtime_error(std::string("r3_screens.json: ") + error.c_str());
+        for (JsonVariantConst item : r3Screens["screens"].as<JsonArrayConst>()) {
+            v5Docs.emplace_back();
+            v5Docs.back().set(item["frame"]);
+            const char* artName = item["art"].is<const char*>() ? item["art"].as<const char*>() : nullptr;
+            renderCase("r3." + item["id"].as<std::string>(), item["name"].as<std::string>(), "r3",
+                       v5Docs.back().as<JsonVariantConst>(), artFor(item["art"]), artName, Commits());
+        }
+        renderOffline("v5-offline", "Offline: Waiting for PC / Open Desk Dial on your PC", false, hall, *bank.make(HOME5));
+        renderOffline("v5-offline-native", "Offline after native input: Knob controls still work", true, hall,
                       *bank.make(HOME5));
+        renderNativePcVolume();
     }
     std::vector<JsonDocument> artwork2Docs(sizeof(ARTWORK2_CASES) / sizeof(ARTWORK2_CASES[0]));
     for (size_t i = 0; i < artwork2Docs.size(); ++i) {
@@ -1498,25 +1861,29 @@ int main(int argc, char** argv) try {
     JsonObject ex = expectDoc.to<JsonObject>();
     ex["none"].to<JsonObject>();
     ex["identical"]["identical"] = true;
-    ex["deeper"]["slide"] = 20;
-    ex["back"]["slide"] = -20;
+    ex["deeper"]["slide"] = 28;
+    ex["back"]["slide"] = -28;
     ex["same"]["slide"] = 0;
+    // FW-DES-004: Recently Added's source toggle: no slide, the crumb crossfades (captures at the line-fade times).
+    ex["sourceToggle"]["slide"] = 0;
+    ex["sourceToggle"]["lineFade"] = true;
+    ex["sourceToggle"]["sourceToggle"] = true;
     ex["late"]["artLate"] = true;
     ex["icon"]["iconArrive"] = true;
     ex["artFade"]["artFade"] = true;
     ex["artFade"]["slide"] = 0;
     ex["artFadeDeeper"]["artFade"] = true;
-    ex["artFadeDeeper"]["slide"] = 20;
+    ex["artFadeDeeper"]["slide"] = 28;
     ex["artFadeBack"]["artFade"] = true;
-    ex["artFadeBack"]["slide"] = -20;
+    ex["artFadeBack"]["slide"] = -28;
     ex["line"]["lineFade"] = true;
     ex["line"]["slide"] = 0;
     ex["ink"]["inkFade"] = true;
     ex["ink"]["slide"] = 0;
     ex["inkDeeper"]["inkFade"] = true;
-    ex["inkDeeper"]["slide"] = 20;
+    ex["inkDeeper"]["slide"] = 28;
     ex["inkBack"]["inkFade"] = true;
-    ex["inkBack"]["slide"] = -20;
+    ex["inkBack"]["slide"] = -28;
     ex["idleIn"]["idleEnter"] = true;
     ex["idleOut"]["idleExit"] = true;
     ex["reveal"]["volumeReveal"] = true;
@@ -1536,15 +1903,30 @@ int main(int argc, char** argv) try {
     ex["reducedIdleOut"]["idleExit"] = true;
     ex["reducedIdleOut"]["reduced"] = true;
     ex["twinContent"]["twinFade"] = "content";
-    ex["twinContent"]["slide"] = 20;
+    ex["twinContent"]["slide"] = 28;
     ex["twinTrack"]["twinFade"] = "track";
     ex["twinTrack"]["volumeReveal"] = true;
     ex["twinVolume"]["twinFade"] = "volume";
     ex["twinVolume"]["volumeHide"] = true;
     ex["seek"]["slide"] = 0;
     ex["seek"]["seek"] = true;
-    ex["footerStatic"]["slide"] = 20;
+    ex["footerStatic"]["slide"] = 28;
     ex["footerStatic"]["footerStatic"] = true;
+    // r4 moment probes (captureOffsets above).
+    ex["glide"]["glide"] = true;
+    ex["glide"]["slide"] = 0;
+    ex["press"]["press"] = true;
+    ex["hold"]["hold"] = true;
+    ex["hold"]["press"] = true;
+    ex["wall"]["wall"] = true;
+    ex["pop"]["pop"] = true;
+    ex["pop"]["slide"] = 0;
+    ex["popLine"]["pop"] = true;
+    ex["popLine"]["lineFade"] = true;
+    ex["popLine"]["slide"] = 0;
+    ex["reveal4"]["volumeReveal"] = true;
+    ex["hide4"]["volumeHide"] = true;
+    ex["tour"]["tour"] = true;
     auto E = [&](const char* key) -> JsonVariantConst { return expectDoc[key]; };
 
     struct Named { std::string id; std::string name; std::vector<Step> steps; };
@@ -1553,8 +1935,8 @@ int main(int argc, char** argv) try {
     // Harness-only timeline: a cover whose pixels arrive after its key (late arrival: hidden, then
     // a 240 ms fade, section 8.4), then idle entry/exit.
     if (!oneBuffer) {
-        const CCFrame* lateNp = bank.parse(R"({"id":950,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Unfinished Sympathy","subtitle":"Massive Attack","layout":"nowPlaying","artKey":"late-bright-120","volumeCaption":"Unfinished Sympathy","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})");
-        const CCFrame* lateIdle = bank.parse(patched(R"({"id":950,"mode":"VOLUME","target":"Den","value":"54%","detail":"","status":"","title":"Unfinished Sympathy","subtitle":"Massive Attack","layout":"idle","restLayout":"idle","artKey":"late-bright-120","volumeCaption":"Unfinished Sympathy","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})", {}));
+        const CCFrame* lateNp = bank.parse(R"({"id":950,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Harbour Song","subtitle":"Lumen Park","layout":"nowPlaying","artKey":"late-bright-120","volumeCaption":"Harbour Song","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})");
+        const CCFrame* lateIdle = bank.parse(patched(R"({"id":950,"mode":"VOLUME","target":"Hall","value":"54%","detail":"","status":"","title":"Harbour Song","subtitle":"Lumen Park","layout":"idle","restLayout":"idle","artKey":"late-bright-120","volumeCaption":"Harbour Song","buttons":[{"label":"Pause","enabled":true,"icon":"pause"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Win","enabled":true,"icon":"win"},{"label":"Tracks","enabled":true,"icon":"tracks"}],"ring":{"style":"level","value":54,"index":0,"count":101}})", {}));
         JsonDocument winDoc;
         deserializeJson(winDoc, SYNTHETIC[0].json);
         const CCFrame* win = bank.parse(SYNTHETIC[0].json);
@@ -1578,33 +1960,33 @@ int main(int argc, char** argv) try {
             {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"Recent","enabled":true,"icon":"clock","lit":"off"},{"label":"Playlists","enabled":true,"icon":"playlists","lit":"on"},{"label":"Play","enabled":true,"icon":"play"}])"}});
         const CCFrame* upnext = bank.make(UPNEXT5);
         const CCFrame* tracks = bank.make(TRACKS5);
-        const CCFrame* tracksNext = bank.make(TRACKS5, {{"title", "\"Next track\""}, {"subtitle", "\"Next: Hounds of Love\""},
+        const CCFrame* tracksNext = bank.make(TRACKS5, {{"title", "\"Next track\""}, {"subtitle", "\"Next: Paper Lanterns\""},
             {"meta", "\"Press 4 to skip\""}, {"ring", R"({"style":"transport","value":0,"index":2,"count":3})"}});
         const CCFrame* seek = bank.make(SEEK5);
         const CCFrame* windows = bank.make(WINDOWS5);
         const CCFrame* homeHeld = bank.make(HOME5, {{"id", "511"}});
         named.push_back({"v5-flips", "Section 8.7 flip table (one timeline, every r2.1 flip)", {
-            {0, home, den, E("none"), "baseline"},
+            {0, home, hall, E("none"), "baseline"},
             {600, recent, bright, E("deeper"), "home-to-recent"},
             {1400, recent2, bright, E("same"), "recent-detent"},
-            {1800, explorer0, den, E("deeper"), "recent-to-explorer"},
-            {2600, explorer1, den, E("deeper"), "tab-0-to-1"},
-            {3400, explorer0, den, E("back"), "tab-1-to-0"},
+            {1800, explorer0, hall, E("deeper"), "recent-to-explorer"},
+            {2600, explorer1, hall, E("deeper"), "tab-0-to-1"},
+            {3400, explorer0, hall, E("back"), "tab-1-to-0"},
             {4200, recent, bright, E("back"), "explorer-to-recent"},
-            {5000, home, den, E("back"), "recent-to-home"},
-            {5800, tracks, den, E("deeper"), "home-to-tracks"},
-            {6600, tracksNext, den, E("same"), "tracks-detent"},
-            {7000, seek, den, E("same"), "tracks-to-seek"},
+            {5000, home, hall, E("back"), "recent-to-home"},
+            {5800, tracks, hall, E("deeper"), "home-to-tracks"},
+            {6600, tracksNext, hall, E("same"), "tracks-detent"},
+            {7000, seek, hall, E("same"), "tracks-to-seek"},
             {7800, upnext, bright, E("deeper"), "seek-to-upnext"},
-            {8600, tracks, den, E("back"), "upnext-to-tracks"},
-            {9400, seek, den, E("same"), "seek-on"},
-            {10000, tracks, den, E("same"), "seek-off"},
-            {10600, home, den, E("back"), "tracks-to-home"},
+            {8600, tracks, hall, E("back"), "upnext-to-tracks"},
+            {9400, seek, hall, E("same"), "seek-on"},
+            {10000, tracks, hall, E("same"), "seek-off"},
+            {10600, home, hall, E("back"), "tracks-to-home"},
             {11400, windows, nullptr, E("deeper"), "home-to-windows"},
-            {12200, home, den, E("back"), "windows-to-home"},
+            {12200, home, hall, E("back"), "windows-to-home"},
             {13000, upnext, bright, E("deeper"), "home-to-upnext"},
-            {13800, homeHeld, den, E("back"), "hold-to-home"},
-            {14600, bank.make(HOME5, {{"id", "512"}}), den, E("same"), "control-id-change"},
+            {13800, homeHeld, hall, E("back"), "hold-to-home"},
+            {14600, bank.make(HOME5, {{"id", "512"}}), hall, E("same"), "control-id-change"},
             {15200, bank.make(HOME5, {{"layout", "\"notice\""}, {"artKey", "\"\""}, {"title", "\"Sonos unavailable\""},
                                      {"subtitle", "\"Looking for Sonos…\""}, {"meta", "\"Windows still works\""}}), nullptr,
              E("same"), "home-layout-change"},
@@ -1616,7 +1998,7 @@ int main(int argc, char** argv) try {
         named.push_back({"v5-footer-static", "The footer never moves or fades on a screen change", {
             {0, recent, bright, E("none"), "baseline"},
             {600, bank.make(UPNEXT5, {{"buttons", sameButtons}}), bright, E("footerStatic"), "recent-to-upnext"},
-            {1600, bank.make(EXPLORER5, {{"buttons", sameButtons}}), den, E("footerStatic"), "upnext-to-explorer"},
+            {1600, bank.make(EXPLORER5, {{"buttons", sameButtons}}), hall, E("footerStatic"), "upnext-to-explorer"},
         }});
 
         // Text at rest (section 8.5.4): meta and status fade in over 160 ms; titles, sub-lines,
@@ -1628,14 +2010,14 @@ int main(int argc, char** argv) try {
             {1800, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("line"), "meta-and-title"},
             {2400, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("identical"), "heartbeat-after-fade"},
             {2500, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("identical"), "heartbeat"},
-            {3000, home, den, E("back"), "to-home"},
-            {3800, bank.make(HOME5, {{"status", "\"Paused\""}}), den, E("line"), "status-change"},
-            {4400, bank.make(HOME5, {{"status", "\"Paused\""}, {"title", "\"Hounds of Love\""}}), den, E("line"), "home-title"},
-            {5000, tracks, den, E("deeper"), "to-tracks"},
-            {5800, bank.make(TRACKS5, {{"meta", "\"Skipping…\""}}), den, E("line"), "tracks-meta"},
-            {6400, seek, den, E("same"), "to-seek"},
-            {7000, bank.make(SEEK5, {{"meta", "\"Jumping…\""}}), den, E("line"), "seek-line"},
-            {7600, bank.make(SEEK5, {{"meta", "\"Jumping…\""}, {"ring", R"({"style":"lap","value":0,"index":79,"count":287})"}}), den,
+            {3000, home, hall, E("back"), "to-home"},
+            {3800, bank.make(HOME5, {{"status", "\"Paused\""}}), hall, E("line"), "status-change"},
+            {4400, bank.make(HOME5, {{"status", "\"Paused\""}, {"title", "\"Paper Lanterns\""}}), hall, E("line"), "home-title"},
+            {5000, tracks, hall, E("deeper"), "to-tracks"},
+            {5800, bank.make(TRACKS5, {{"meta", "\"Skipping…\""}}), hall, E("line"), "tracks-meta"},
+            {6400, seek, hall, E("same"), "to-seek"},
+            {7000, bank.make(SEEK5, {{"meta", "\"Jumping…\""}}), hall, E("line"), "seek-line"},
+            {7600, bank.make(SEEK5, {{"meta", "\"Jumping…\""}, {"ring", R"({"style":"lap","value":0,"index":79,"count":287})"}}), hall,
              E("line"), "seek-time"},
             {8200, windows, nullptr, E("deeper"), "to-windows"},
             {9000, bank.make(WINDOWS5, {{"meta", "\"Switching…\""}}), nullptr, E("line"), "windows-meta"},
@@ -1653,8 +2035,8 @@ int main(int argc, char** argv) try {
             {1200, shuffled, bright, E("ink"), "shuffle-on"},
             {1800, bank.make(UPNEXT5, {{"meta", "\"Shuffle on\""}, {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"Shuffle","enabled":true,"icon":"shuffle","lit":"on"},{"label":"Liked","enabled":true,"icon":"heart","lit":"on"},{"label":"Play","enabled":true,"icon":"play"}])"}}), bright,
              E("identical"), "heartbeat"},
-            {2400, explorer0, den, E("inkDeeper"), "to-explorer"},
-            {3200, explorer1, den, E("inkDeeper"), "tab-switch"},
+            {2400, explorer0, hall, E("inkDeeper"), "to-explorer"},
+            {3200, explorer1, hall, E("inkDeeper"), "tab-switch"},
             {4000, idleNothing, nullptr, E("inkBack"), "to-idle-nothing"},
             {5500, idlePaused, nullptr, E("ink"), "play-becomes-available"},
         }});
@@ -1664,57 +2046,57 @@ int main(int argc, char** argv) try {
         const CCFrame* volumeFrame = bank.make(HOME5, {{"layout", "\"volume\""}, {"value", "\"55%\""}});
         const CCFrame* idleFrame = bank.make(IDLE5);
         named.push_back({"v5-reduced", "reducedMotion true: content fade only, reveal/idle opacity only", {
-            {0, home, den, E("none"), "baseline"},
-            {100, homeReduced, den, E("identical"), "latch-reduced"},
+            {0, home, hall, E("none"), "baseline"},
+            {100, homeReduced, hall, E("identical"), "latch-reduced"},
             {600, recent, bright, E("reducedSlide"), "home-to-recent"},
-            {1400, home, den, E("reducedSlide"), "recent-to-home"},
-            {2200, volumeFrame, den, E("reducedReveal"), "reveal"},
-            {3800, home, den, E("reducedHide"), "reveal-out"},
-            {5000, idleFrame, den, E("reducedIdle"), "idle-in"},
-            {7000, home, den, E("reducedIdleOut"), "idle-out"},
-            {8000, bank.make(HOME5, {{"reducedMotion", "false"}}), den, E("none"), "latch-full"},
+            {1400, home, hall, E("reducedSlide"), "recent-to-home"},
+            {2200, volumeFrame, hall, E("reducedReveal"), "reveal"},
+            {3800, home, hall, E("reducedHide"), "reveal-out"},
+            {5000, idleFrame, hall, E("reducedIdle"), "idle-in"},
+            {7000, home, hall, E("reducedIdleOut"), "idle-out"},
+            {8000, bank.make(HOME5, {{"reducedMotion", "false"}}), hall, E("none"), "latch-full"},
             {8600, recent, bright, E("deeper"), "full-motion-again"},
         }});
 
         // Seek digits (sections 8.6.8, 10): detents redraw the time only; tabular cells.
-        std::vector<Step> seekSteps = {{0, tracks, den, E("none"), "baseline"},
-                                       {600, bank.make(SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":59999})"}}), den, E("seek"), "0:00"}};
+        std::vector<Step> seekSteps = {{0, tracks, hall, E("none"), "baseline"},
+                                       {600, bank.make(SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":59999})"}}), hall, E("seek"), "0:00"}};
         const uint32_t seconds[] = {1, 9, 10, 59, 60, 61, 74, 119, 480, 599, 600, 601, 999, 1234, 3599, 3600, 3601, 35999, 59998};
         uint32_t t = 900;
         for (uint32_t s : seconds) {
             char ring[96], label[16];
             std::snprintf(ring, sizeof(ring), R"({"style":"lap","value":0,"index":%u,"count":59999})", s);
             cc_mmss(s, label, sizeof(label));
-            seekSteps.push_back({t, bank.make(SEEK5, {{"ring", ring}}), den, E("seek"), label});
+            seekSteps.push_back({t, bank.make(SEEK5, {{"ring", ring}}), hall, E("seek"), label});
             t += 300;
         }
         named.push_back({"v5-seek", "Seek time per detent: cc_font_48t, no animation, fixed digit cells", seekSteps});
 
         // Offline screen (section 8.10): entry, native input, the next claim.
         // The baseline draws an artwork2 cover so the display-pin release after the fade is visible.
-        const CCFrame* homeA2 = bank.make(HOME5, {{"artKey", "\"a2-den\""}});
+        const CCFrame* homeA2 = bank.make(HOME5, {{"artKey", "\"a2-hall\""}});
         named.push_back({"v5-offline", "Offline layer: entry, native input, return on the next claim", {
-            {0, homeA2, nullptr, E("none"), "baseline", {{static_cast<uint8_t>(CC_DISPLAY_MEDIA_COVER), "a2-den"}}},
+            {0, homeA2, nullptr, E("none"), "baseline", {{static_cast<uint8_t>(CC_DISPLAY_MEDIA_COVER), "a2-hall"}}},
             {600, nullptr, nullptr, E("offIn"), "lease-expired", {}, 0, STEP_OFFLINE},
             {1600, nullptr, nullptr, E("offNative"), "native-input", {}, 0, STEP_OFFLINE_NATIVE},
             {2600, recent, bright, E("offOut"), "claim", {}, 0, STEP_FRAME},
             {3600, nullptr, nullptr, E("offIn"), "lease-expired-again", {}, 0, STEP_OFFLINE},
             {4600, nullptr, nullptr, E("none"), "handback", {}, 0, STEP_HANDBACK},
-            {5000, home, den, E("none"), "claim-after-handback"},
+            {5000, home, hall, E("none"), "claim-after-handback"},
         }});
 
         // Art show/hide (section 8.4): 240 ms OUT fades; instant swaps over a visible cover.
         named.push_back({"v5-art", "Cover show/hide 240 ms: Windows, idle, notice, artKey \"\"; instant swaps", {
-            {0, home, den, E("none"), "baseline"},
+            {0, home, hall, E("none"), "baseline"},
             {600, windows, nullptr, E("artFadeDeeper"), "to-windows"},
-            {1600, home, den, E("artFadeBack"), "from-windows"},
-            {2600, idleFrame, den, E("artFade"), "to-idle"},
-            {4400, home, den, E("artFade"), "from-idle"},
+            {1600, home, hall, E("artFadeBack"), "from-windows"},
+            {2600, idleFrame, hall, E("artFade"), "to-idle"},
+            {4400, home, hall, E("artFade"), "from-idle"},
             {5400, bank.make(NOTICE5), nullptr, E("artFade"), "to-notice"},
-            {6400, home, den, E("artFade"), "from-notice"},
-            {7400, bank.make(HOME5, {{"artKey", "\"\""}}), den, E("artFade"), "key-cleared"},
-            {8400, home, den, E("artFade"), "key-back"},
-            {9400, bank.make(HOME5, {{"artKey", "\"k-swap\""}, {"title", "\"Hounds of Love\""}}), bright, E("artFade"), "instant-swap"},
+            {6400, home, hall, E("artFade"), "from-notice"},
+            {7400, bank.make(HOME5, {{"artKey", "\"\""}}), hall, E("artFade"), "key-cleared"},
+            {8400, home, hall, E("artFade"), "key-back"},
+            {9400, bank.make(HOME5, {{"artKey", "\"k-swap\""}, {"title", "\"Paper Lanterns\""}}), bright, E("artFade"), "instant-swap"},
         }});
 
         // Twin-fade probes (P5-13): the content, track and volume fades.
@@ -1729,6 +2111,182 @@ int main(int argc, char** argv) try {
              E("twinTrack"), "reveal"},
             {3200, homeScrim, scrim, E("twinVolume"), "reveal-out"},
         }});
+
+        // r4 motion moments (README 3.2): one timeline through M1-M15 on presentation-6 frames with covers, and the
+        // same script under reduced motion (every moment a 160 ms opacity crossfade).
+        auto r4Steps = [&](bool reduced) -> std::vector<Step> {
+            const std::string rm = reduced ? "true" : "false";
+            const Patch music = {{"crumb", "\"music\""}, {"playing", "true"}, {"holdMarker", "true"}, {"reducedMotion", rm}};
+            auto homeWith = [&](Patch extra) { Patch p = music; p.insert(p.end(), extra.begin(), extra.end()); return bank.make(HOME5, p); };
+            const char* playButtons = R"([{"label":"Play","enabled":true,"icon":"play"},{"label":"Browse","enabled":true,"icon":"list"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Win","enabled":true,"icon":"win"}])";
+            const CCFrame* home4 = homeWith({});
+            const CCFrame* reveal4 = homeWith({{"layout", "\"volume\""}, {"value", "\"55%\""}});
+            const CCFrame* song4 = homeWith({{"title", "\"Paper Lanterns\""}, {"volumeCaption", "\"Paper Lanterns\""}});
+            const CCFrame* paused4 = homeWith({{"title", "\"Paper Lanterns\""}, {"volumeCaption", "\"Paper Lanterns\""},
+                                               {"playing", "false"}, {"status", "\"Paused\""}, {"buttons", playButtons}});
+            auto recentAt = [&](int index, const char* title, const char* extraMeta, bool feedback) {
+                char ring[96], meta[64];
+                std::snprintf(ring, sizeof(ring), R"({"style":"selection","value":0,"index":%d,"count":24,"first":0})", index);
+                std::snprintf(meta, sizeof(meta), "\"%s\"", extraMeta);
+                Patch p = {{"crumb", "\"recent\""}, {"holdMarker", "true"}, {"reducedMotion", rm}, {"ring", ring},
+                           {"title", std::string("\"") + title + "\""}, {"meta", meta}};
+                if (feedback) p.push_back({"feedback", R"({"kind":"ok","seq":7})"});
+                return bank.make(RECENT5, p);
+            };
+            const CCFrame* r2 = recentAt(2, "Night Channel", "3 / 24", false);
+            const CCFrame* r3 = recentAt(3, "Kill for Love", "4 / 24", false);
+            const CCFrame* r4 = recentAt(4, "Lady", "5 / 24", false);
+            const CCFrame* r5 = recentAt(5, "Tick of the Clock", "6 / 24", false);
+            const CCFrame* r4b = recentAt(4, "Lady", "5 / 24", false);
+            const CCFrame* queued = recentAt(4, "Lady", "Queued \xC2\xB7 Lady", true);
+            // HN-DES-002: the wall on every other bounded layout (after the M1 back, which still leaves the list):
+            // Volume 100 % / 0 %, Windows last, Scenes first, Seek 0:00, Up next last (the content moves 9 px towards
+            // the wall whatever the layout).
+            const CCFrame* vol100 = homeWith({{"layout", "\"volume\""}, {"value", "\"100%\""},
+                                              {"ring", R"({"style":"level","value":100,"index":0,"count":101})"}});
+            const CCFrame* vol0 = homeWith({{"layout", "\"volume\""}, {"value", "\"0%\""},
+                                            {"ring", R"({"style":"level","value":0,"index":0,"count":101})"}});
+            const CCFrame* windowsLast = bank.make(WINDOWS5, {{"reducedMotion", rm}, {"meta", "\"9 / 9\""},
+                                                              {"ring", R"({"style":"selection","value":0,"index":8,"count":9})"}});
+            const CCFrame* scenesFirst = bank.make(WINDOWS5, {
+                {"reducedMotion", rm}, {"mode", "\"LIGHTS\""}, {"target", "\"LIGHTS\""}, {"layout", "\"scenes\""},
+                {"heading", "\"SCENES\""}, {"title", "\"Scene 1\""}, {"prevTitle", "\"\""}, {"nextTitle", "\"Scene 2\""},
+                {"subtitle", "\"\""}, {"meta", "\"1 / 5\""}, {"ring", R"({"style":"clusters","value":0,"index":0,"count":5})"},
+                {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"","enabled":false,"icon":""},{"label":"","enabled":false,"icon":""},{"label":"Run","enabled":true,"icon":"switch"}])"}});
+            const CCFrame* seek0 = bank.make(SEEK5, {{"reducedMotion", rm}, {"value", "\"0:00\""},
+                                                    {"ring", R"({"style":"lap","value":0,"index":0,"count":287})"}});
+            const CCFrame* upNextLast = bank.make(UPNEXT5, {{"reducedMotion", rm}, {"meta", "\"12 / 12\""},
+                                                            {"ring", R"({"style":"selection","value":0,"index":11,"count":12,"now":4})"}});
+            std::vector<Step> v = {
+                {0, home4, hall, E("none"), "baseline"},
+                {600, reveal4, hall, E("reveal4"), "M2-reveal"},
+                {2000, home4, hall, E("hide4"), "M3-reveal-out"},
+                {3200, song4, bright, E("glide"), "M5-track-change"},
+                {4200, paused4, bright, E("popLine"), "M8-M9-M6-pause"},
+                {5200, song4, bright, E("pop"), "M8-M9-play"},
+                {6200, r2, bright, E(reduced ? "reducedSlide" : "deeper"), "M1-M15-push-recent"},
+                {7200, r3, bright, E("glide"), "M4-detent"},
+                {7330, r4, bright, E("glide"), "M4-fast-1"},
+                {7460, r5, bright, E("glide"), "M4-fast-2"},
+                {8200, r4b, bright, E("glide"), "M4-back"},
+                {9000, nullptr, nullptr, E("hold"), "M7-M10-hold-4-down", {}, 0, STEP_KEYS, 8},
+                {10100, queued, bright, E("popLine"), "M8-landing-queued"},
+                {10300, nullptr, nullptr, E("press"), "hold-4-up", {}, 0, STEP_KEYS, 0},
+                {11000, nullptr, nullptr, E("press"), "M7-press-2", {}, 0, STEP_KEYS, 2},
+                {11300, nullptr, nullptr, E("press"), "M7-release-2", {}, 0, STEP_KEYS, 0},
+                {12000, nullptr, nullptr, E("hold"), "M10-early-release-down", {}, 0, STEP_KEYS, 8},
+                {12400, nullptr, nullptr, E("press"), "M10-early-release-up", {}, 0, STEP_KEYS, 0},
+                {13200, nullptr, nullptr, E("wall"), "M13-wall-start", {}, 0, STEP_WALL, 0, -1},
+                {14000, nullptr, nullptr, E("wall"), "M13-wall-end", {}, 0, STEP_WALL, 0, 1},
+                {14120, nullptr, nullptr, E("wall"), "M13-wall-again", {}, 0, STEP_WALL, 0, 1},
+                {15000, home4, hall, E(reduced ? "reducedSlide" : "back"), "M1-M15-back-to-music"},
+                {16000, vol100, hall, E("none"), "M13-volume-100"},
+                {16800, nullptr, nullptr, E("wall"), "M13-wall-volume-100", {}, 0, STEP_WALL, 0, 1},
+                {17600, vol0, hall, E("none"), "M13-volume-0"},
+                {18400, nullptr, nullptr, E("wall"), "M13-wall-volume-0", {}, 0, STEP_WALL, 0, -1},
+                {19200, windowsLast, nullptr, E("none"), "M13-windows-last"},
+                {20000, nullptr, nullptr, E("wall"), "M13-wall-windows-last", {}, 0, STEP_WALL, 0, 1},
+                {20800, scenesFirst, nullptr, E("none"), "M13-scenes-first"},
+                {21600, nullptr, nullptr, E("wall"), "M13-wall-scenes-first", {}, 0, STEP_WALL, 0, -1},
+                {22400, seek0, hall, E("none"), "M13-seek-0"},
+                {23200, nullptr, nullptr, E("wall"), "M13-wall-seek-0", {}, 0, STEP_WALL, 0, -1},
+                {24000, upNextLast, bright, E("none"), "M13-up-next-last"},
+                {24800, nullptr, nullptr, E("wall"), "M13-wall-up-next-last", {}, 0, STEP_WALL, 0, 1},
+                {25600, home4, hall, E(reduced ? "reducedSlide" : "none"), "M13-bounded-home"},
+                // The latch goes back to full motion (the next timelines start without it).
+                {26600, bank.make(HOME5, {{"crumb", "\"music\""}, {"playing", "true"}, {"holdMarker", "true"},
+                                          {"reducedMotion", "false"}}), hall, E("none"), "latch-full"},
+            };
+            return v;
+        };
+        named.push_back({"r4-moments", "r4 moments M1-M15 (README 3.2): push, reveal, glides, status, press, pop, morph, "
+                                       "hold fill, wall, crumb", r4Steps(false)});
+        named.push_back({"r4-reduced", "r4 moments under reduced motion: 160 ms opacity crossfades only", r4Steps(true)});
+        // FW-DES-004: Recently Added's source toggle (button 3) recent -> playlists -> recent on the same group and
+        // page: the crumb crossfades (M15) and the labels change in place; never a screen change, slide or glide.
+        {
+            auto source = [&](const char* crumb, int index, int count, const char* title, const char* meta) {
+                char ring[96];
+                std::snprintf(ring, sizeof(ring), R"({"style":"selection","value":0,"index":%d,"count":%d,"first":0})",
+                              index, count);
+                return bank.make(RECENT5, {{"crumb", std::string("\"") + crumb + "\""}, {"ring", ring},
+                                           {"title", std::string("\"") + title + "\""},
+                                           {"meta", std::string("\"") + meta + "\""}});
+            };
+            named.push_back({"r4-source-toggle", "Recently Added source toggle: crumb crossfade, labels in place", {
+                {0, source("recent", 2, 24, "Night Channel", "3 / 24"), bright, E("none"), "baseline"},
+                {800, source("playlists", 0, 9, "Late Night Mix", "1 / 9"), bright, E("sourceToggle"), "to-playlists"},
+                {1800, source("recent", 2, 24, "Night Channel", "3 / 24"), bright, E("sourceToggle"), "back-to-recent"},
+            }});
+        }
+
+        // r4 motion tour (README section 8) on the r3 screens (the Desk Dial captures of r3-handoff).
+        {
+            const std::vector<uint8_t> tourText = readFile(r3ScreensPath);
+            static JsonDocument tourScreens;
+            if (DeserializationError error = deserializeJson(tourScreens, reinterpret_cast<const char*>(tourText.data()), tourText.size()))
+                throw std::runtime_error(std::string("r3_screens.json (tour): ") + error.c_str());
+            auto screenOf = [&](const char* id, Patch patch = {}) -> std::pair<const CCFrame*, const uint8_t*> {
+                for (JsonVariantConst item : tourScreens["screens"].as<JsonArrayConst>()) {
+                    if (item["id"] != id) continue;
+                    std::string text;
+                    serializeJson(item["frame"], text);
+                    return {bank.make(text.c_str(), patch), artFor(item["art"])};
+                }
+                throw std::runtime_error(std::string("tour: unknown r3 screen ") + id);
+            };
+            std::vector<Step> tour;
+            auto frameAt = [&](uint32_t t, const char* id, const char* label, Patch patch = {}) {
+                const auto f = screenOf(id, patch);
+                tour.push_back({t, f.first, f.second, E("tour"), label});
+            };
+            auto keysAt = [&](uint32_t t, uint8_t keys, const char* label) {
+                tour.push_back({t, nullptr, nullptr, E("tour"), label, {}, 0, STEP_KEYS, keys});
+            };
+            auto wallAt = [&](uint32_t t, int8_t dir, const char* label) {
+                tour.push_back({t, nullptr, nullptr, E("tour"), label, {}, 0, STEP_WALL, 0, dir});
+            };
+            frameAt(0, "cap-home", "baseline", {{"holdMarker", "true"}});
+            frameAt(600, "cap-home-turn", "0.6 Turn: volume reveal (M2)");
+            frameAt(2000, "cap-home", "M3 reveal out", {{"holdMarker", "true"}});
+            frameAt(2600, "cap-home-1", "2.6 Push into Music (M1, crumb)");
+            frameAt(3500, "cap-music-2", "3.5 Push into Recently Added (M1, M15)", {{"holdMarker", "true"}});
+            frameAt(4400, "cap-recent-turn", "4.4 List glides one row per notch (M4)", {{"holdMarker", "true"}});
+            frameAt(4900, "cap-music-2", "4.9 glide back (M4)", {{"holdMarker", "true"}});
+            wallAt(5700, -1, "5.7 Turn past the start: wall (M13)");
+            keysAt(7000, 8, "7.0 Hold 4: icon fills (M10)");
+            frameAt(8050, "cap-recent-hold-4", "8.05 lands with a pop, Queued (M8, M6)", {{"holdMarker", "true"}, {"feedback", R"({"kind":"ok","seq":41})"}});
+            keysAt(8200, 0, "8.2 release");
+            frameAt(9200, "cap-recent-3", "9.2 Tap 3: Playlists");
+            frameAt(10200, "cap-playlists-3", "10.2 back");
+            frameAt(11200, "cap-recent-1", "11.2 Back to Music (M1 reverse)");
+            frameAt(12100, "cap-recent-1", "12.1 Pause: bars melt into the triangle (M9, M8)",
+                    {{"playing", "false"}, {"status", "\"Paused\""},
+                     {"buttons", R"([{"label":"Home","enabled":true,"icon":"house"},{"label":"Recent","enabled":true,"icon":"album"},{"label":"Tracks","enabled":true,"icon":"tracks"},{"label":"Play","enabled":true,"icon":"play"}])"}});
+            frameAt(13300, "cap-recent-1", "13.3 Play (M9, M8)", {{"playing", "true"}});
+            frameAt(14400, "cap-music-3", "14.4 Tracks (M1)");
+            frameAt(15300, "cap-tracks-turn", "15.3 browse (M4)");
+            frameAt(16300, "cap-tracks-4", "16.3 jump (M5)");
+            keysAt(17400, 1, "17.4 Hold 1 (M7)");
+            keysAt(18000, 0, "18.0 release");
+            frameAt(18000, "cap-hold-1-from-music", "18.0 Home (M1 back)", {{"holdMarker", "true"}});
+            keysAt(18800, 8, "18.8 Hold 4 on Home (M10)");
+            frameAt(19850, "cap-home-hold-4", "19.85 lands: Lights (M12 ring, M1 lateral)", {{"holdMarker", "true"}, {"feedback", R"({"kind":"ok","seq":42})"}});
+            keysAt(19900, 0, "19.9 release");
+            frameAt(20600, "cap-home-lights-turn", "20.6 Brightness (M2)");
+            // HN-DES-002: the brightness reaches 100 % (20.6 shows 66 %), settled before the turn past it.
+            frameAt(21300, "cap-home-lights-turn", "21.3 Brightness at 100 % (M2)",
+                    {{"value", "\"100\""}, {"subtitle", "\"100% \xC2\xB7 3200 K\""},
+                     {"ring", R"({"style":"bri","value":100,"index":0,"count":0,"kelvin":3200})"}});
+            wallAt(21800, 1, "21.8 Past 100 % (M13)");
+            frameAt(23600, "cap-home-hold-4-again", "23.6 Hold 4 back to volume (M1)");
+            frameAt(25200, "cap-home-2", "25.2 Windows: open (M1)");
+            frameAt(26000, "cap-windows-turn", "26.0 turn (M4)");
+            keysAt(26800, 2, "26.8 snap left (M7)");
+            keysAt(27000, 0, "27.0 release");
+            frameAt(27900, "cap-windows-3", "27.9 switch");
+            named.push_back({"r4-tour", "r4 motion tour (README section 8) on the r3 screens", tour});
+        }
     }
 
     // artwork2 timelines (ARTWORK2.md section 7; the late fade is v5's 240 ms, section 8.4).
@@ -1758,10 +2316,10 @@ int main(int argc, char** argv) try {
             return &a2Frames.back();
         };
         const uint8_t COVER = CC_DISPLAY_MEDIA_COVER, ICON = CC_DISPLAY_MEDIA_ICON;
-        const CCFrame* np = caseFrame("a2-np-den");
+        const CCFrame* np = caseFrame("a2-np-hall");
         const CCFrame* win = caseFrame("a2-win-icon");
         named.push_back({"a2-heartbeat", "artwork2: identical frames re-render nothing (JPEG cover, app icon)", {
-            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-den"}}},
+            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-hall"}}},
             {1000, copyOf(np), nullptr, E("identical"), "heartbeat"},
             {1500, copyOf(np), nullptr, E("identical"), "unrelated-commit-home", {{COVER, "a2-bright"}, {ICON, "ic-chat"}}},
             {2000, win, nullptr, E("deeper"), "windows", {{ICON, "ic-code"}}},
@@ -1783,7 +2341,7 @@ int main(int argc, char** argv) try {
             {600, copyOf(lateFrame), nullptr, E("late"), "cover-arrives", {{COVER, "a2-late"}}},
             {1600, copyOf(lateFrame), nullptr, E("identical"), "heartbeat"},
         }});
-        const CCFrame* swapA = withArt(caseFrame("a2-recent-den-dim"), "a2-swap-a");
+        const CCFrame* swapA = withArt(caseFrame("a2-recent-hall-dim"), "a2-swap-a");
         const CCFrame* swapB = withArt(caseFrame("a2-recent-bright"), "a2-swap-b");
         named.push_back({"a2-swap", "artwork2: front/back swap between two JPEG covers", {
             {0, swapA, nullptr, E("none"), "baseline", {{COVER, "a2-swap-a"}, {COVER, "a2-swap-b"}}},
@@ -1793,7 +2351,7 @@ int main(int argc, char** argv) try {
         }});
         const CCFrame* broken = withArt(np, "a2-progressive");
         named.push_back({"a2-decode-fail", "artwork2: a decode failure shows no art and is not retried", {
-            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-den"}, {COVER, "a2-progressive"}}},
+            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-hall"}, {COVER, "a2-progressive"}}},
             {500, broken, nullptr, E("none"), "decode-fails"},
             {1000, copyOf(broken), nullptr, E("identical"), "heartbeat"},
             {1500, copyOf(np), nullptr, E("artFade"), "other-key"},   // the hidden cover shows again: 240 ms
@@ -1803,7 +2361,7 @@ int main(int argc, char** argv) try {
         index["sim_decode_ms"] = SIM_DECODE_MS;
         const CCFrame* slideTo = withArt(caseFrame("a2-recent-bright"), "a2-slide");
         named.push_back({"a2-slide-decode", "artwork2: a 150 ms decode does not shorten the screen change", {
-            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-den"}}},
+            {0, np, nullptr, E("none"), "baseline", {{COVER, "a2-hall"}}},
             {500, slideTo, nullptr, E("deeper"), "slide-decode", {{COVER, "a2-slide"}}, SIM_DECODE_MS},
             {1500, copyOf(np), nullptr, E("back"), "slide-back", {}, SIM_DECODE_MS},
         }});
@@ -1840,7 +2398,7 @@ int main(int argc, char** argv) try {
             record(label, before);
         };
         resetStore();
-        commitMedia(COVER, "a2-den");
+        commitMedia(COVER, "a2-hall");
         renderSettled(np, "host-cover");
         handBack("handback-cover");
         renderSettled(copyOf(np), "return-cover");
@@ -2050,23 +2608,23 @@ int main(int argc, char** argv) try {
         const CCFrame* volume = bank.make(HOME5, {{"layout", "\"volume\""}, {"value", "\"55%\""}});
         const CCFrame* idle = bank.make(IDLE5);
         const CCFrame* noArt = bank.make(HOME5, {{"artKey", "\"\""}});
-        cc_display_render(*home, den);
+        cc_display_render(*home, hall);
         advance(1200);
         struct CadenceStep { uint32_t t; const CCFrame* frame; const uint8_t* art; uint8_t action; const char* label; };
         const std::vector<CadenceStep> script = {
             {0, recent, bright, STEP_FRAME, "slide-deeper"},
-            {600, home, den, STEP_FRAME, "slide-back"},
-            {1200, volume, den, STEP_FRAME, "volume-reveal"},
-            {1800, home, den, STEP_FRAME, "volume-hide"},
-            {2400, idle, den, STEP_FRAME, "idle-enter"},
-            {3400, home, den, STEP_FRAME, "idle-exit"},
+            {600, home, hall, STEP_FRAME, "slide-back"},
+            {1200, volume, hall, STEP_FRAME, "volume-reveal"},
+            {1800, home, hall, STEP_FRAME, "volume-hide"},
+            {2400, idle, hall, STEP_FRAME, "idle-enter"},
+            {3400, home, hall, STEP_FRAME, "idle-exit"},
             {4400, recent, bright, STEP_FRAME, "slide-deeper-again"},
             {6600, detent, bright, STEP_FRAME, "detent-2s-after-the-slide"},
             {7400, noArt, nullptr, STEP_FRAME, "cover-hide"},
-            {8000, home, den, STEP_FRAME, "cover-show"},
+            {8000, home, hall, STEP_FRAME, "cover-show"},
             {8600, nullptr, nullptr, STEP_OFFLINE, "offline-in"},
             {9400, nullptr, nullptr, STEP_OFFLINE_NATIVE, "native-tap"},
-            {10200, home, den, STEP_FRAME, "claim"},
+            {10200, home, hall, STEP_FRAME, "claim"},
         };
         CCAnimCadence cadence = {};
         flushGap = FlushGapMetric{};
@@ -2124,6 +2682,40 @@ int main(int argc, char** argv) try {
         stall["late"] = stalled.lateRuns;
         stall["max_gap_ms"] = stalled.maxGapMs;
         cadenceProbe = nullptr;
+
+        // FW-BUG-044 cadence_ignores_paused_lvgl: an app frame arrives mid-slide, so lcd_thread skips
+        // lv_timer_handler() (app_on) while the slide stays listed and the animation timer's last_run stays
+        // frozen; 500 such 1 ms passes. Then the app exits: the host frame is rendered again (a slide starts, as
+        // render_host_frame() does after app_exit()) and LVGL resumes. With the pause passed to the poll
+        // (lcd_thread's perfCadence(app_on)) the session ends the episode: nothing late, no session-long gap.
+        // The control polls the same passes as if LVGL ran (the old perfCadence()) and must count the gap.
+        for (int fixed = 0; fixed < 2; ++fixed) {
+            CCAnimCadence app = {};
+            cadenceProbe = &app;
+            cc_display_render(*home, hall);
+            lv_refr_now(display);
+            advance(40, 1);
+            const uint32_t lateBefore = app.lateRuns;
+            const bool listed = lv_anim_count_running() > 0;
+            const uint32_t frozenRun = lv_anim_get_timer()->last_run;
+            cadenceProbe = nullptr;
+            for (int pass = 0; pass < 500; ++pass) {
+                ++fakeNow;
+                cc_anim_cadence_poll(app, fixed != 0);
+            }
+            cc_display_render(*recent, bright);
+            lv_refr_now(display);
+            cadenceProbe = &app;
+            advance(600, 1);
+            cadenceProbe = nullptr;
+            JsonObject o = cad[fixed ? "app_session" : "app_session_control"].to<JsonObject>();
+            o["passes"] = 500;
+            o["listed_at_entry"] = listed;
+            o["timer_ran_after"] = lv_anim_get_timer()->last_run != frozenRun;
+            o["late_before"] = lateBefore;
+            o["late"] = app.lateRuns;
+            o["max_gap_ms"] = app.maxGapMs;
+        }
         flushGap.on = false;
         lv_timer_set_period(refrTimer, LV_DEF_REFR_PERIOD);
         lv_timer_set_period(lv_anim_get_timer(), LV_DEF_REFR_PERIOD);
@@ -2171,17 +2763,17 @@ int main(int argc, char** argv) try {
             if (id == "ra-hounds") parseFrame(item["frame"], b), detents[1] = &b;
         }
         if (!detents[0] || !detents[1]) throw std::runtime_error("latency frames missing");
-        cc_display_render(*detents[0], den);
+        cc_display_render(*detents[0], hall);
         advance(1200);
         JsonArray waits = latency["timer_wait_ms"].to<JsonArray>();
         JsonArray gaps = latency["gap_ms"].to<JsonArray>();
         uint32_t worst = 0;
         bool anyAnimated = false;
         for (uint32_t gap = 0; gap <= 32; gap += 4) {
-            cc_display_render(*detents[1], den);
+            cc_display_render(*detents[1], hall);
             for (uint32_t first = flushes, guard = 0; flushes == first && guard < 200; ++guard) advance(1, 1);
             if (gap) advance(gap, 1);
-            cc_display_render(*detents[0], den);
+            cc_display_render(*detents[0], hall);
             anyAnimated = anyAnimated || cc_display_stats().lastAnimated;
             const uint32_t before = flushes;
             uint32_t waited = 0;
@@ -2191,7 +2783,7 @@ int main(int argc, char** argv) try {
             worst = std::max(worst, waited);
         }
         latency["animated_in_sample"] = anyAnimated;
-        cc_display_render(*detents[1], den);
+        cc_display_render(*detents[1], hall);
         const uint32_t before = flushes;
         const auto t0 = std::chrono::steady_clock::now();
         lv_refr_now(display);
@@ -2205,6 +2797,44 @@ int main(int argc, char** argv) try {
                           "refresh timer; host time is informative only (ESP32-S3 SPI transfer dominates).";
     }
 
+    // FW-RES-001: every named timeline replayed SOAK_ROUNDS more times (no captures); the LVGL pool's
+    // used bytes after each round go to render-index.json "soak" (display_soak_tests.py: no growth).
+    if (!oneBuffer && !CC_DISPLAY_FULL_LAYERS) {
+        constexpr int SOAK_ROUNDS = 4;
+        JsonObject soak = index["soak"].to<JsonObject>();
+        soak["rounds"] = SOAK_ROUNDS;
+        soak["timelines"] = static_cast<uint32_t>(named.size());
+        soak["used_before_create"] = static_cast<uint32_t>(usedBeforeCreate);
+        soak["used_after_create"] = static_cast<uint32_t>(usedAfterCreate);
+        soak["used_after_first_frame"] = static_cast<uint32_t>(usedAfterFirstFrame);
+        soak["used_before_soak"] = static_cast<uint32_t>(lvglUsedNow());
+        JsonArray usedAfter = soak["used_after_round"].to<JsonArray>();
+        JsonArray freeBiggest = soak["free_biggest_after_round"].to<JsonArray>();
+        heapContext = "soak";
+        uint32_t soakCases = 0;
+        for (int round = 0; round < SOAK_ROUNDS; ++round) {
+            for (const Named& t : named) soakTimeline(t.steps);
+            // Every accepted case frame again (every layout, token and state), with its cover when it had one.
+            resetStore();
+            for (JsonVariantConst c : index["cases"].as<JsonArrayConst>()) {
+                if (c["kind"] != "frame") continue;
+                static CCFrame soakFrame;
+                if (!parseFrame(c["wire"], soakFrame)) continue;
+                liveFrame = nullptr;
+                const auto art = c["art"].is<const char*>() ? artFixtures.find(c["art"].as<const char*>()) : artFixtures.end();
+                cc_display_render(soakFrame, art != artFixtures.end() ? art->second.data() : nullptr);
+                advance(600);
+                if (round == 0) ++soakCases;
+            }
+            liveFrame = nullptr;
+            lv_mem_monitor_t m{};
+            lv_mem_monitor(&m);
+            usedAfter.add(static_cast<uint32_t>(m.total_size - m.free_size));
+            freeBiggest.add(static_cast<uint32_t>(m.free_biggest_size));
+        }
+        soak["cases"] = soakCases;
+    }
+
     lv_mem_monitor_t monitor{};
     lv_mem_monitor(&monitor);
     JsonObject heap = index["heap"].to<JsonObject>();
@@ -2214,6 +2844,7 @@ int main(int argc, char** argv) try {
     heap["free_biggest_size"] = static_cast<uint32_t>(monitor.free_biggest_size);
     heap["max_used"] = static_cast<uint32_t>(monitor.max_used);
     heap["peak_used_sampled"] = static_cast<uint32_t>(peakUsed);
+    heap["peak_where"] = heapWhere;
     heap["used_pct"] = monitor.used_pct;
     heap["frag_pct"] = monitor.frag_pct;
     heap["pointer_bytes"] = static_cast<uint32_t>(sizeof(void*));

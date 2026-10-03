@@ -250,7 +250,7 @@ the ambient cover at 80 %.
   lag on fast turns). §12, Q1.
 - **"Like feeds Favourite playlists"** (01 §6; B&S:L376) conflicts with README §8 ("It does not
   appear in Favourite playlists"). README wins.
-- **The room in the toast** is hard-coded `· Den` (L773). Production: the Sonos group label
+- **The room in the toast** is hard-coded `· Hall` (L773). Production: the Sonos group label
   (`controller.state["group_label"]`).
 - **Not specified by the prototype**:
   - The Recently Added paging with `More` entries (03; `controller.py:607-632`) and page
@@ -706,7 +706,7 @@ Also: Archivo, radius 0, 2 px rules (`RULE_WIDTH`). **Identical: no delta.**
   - The mode at **26 px weight 800**: `Volume`, `Recently Added`, `Tracks`, `Windows` or
     `Waiting` (old mode set).
   - A detail line (14 px `#d7d3d3`). On Home it reads `{Paused · }{vol} % · {title} — {artist}`,
-    or `Nothing playing`, or `Den unavailable; Windows still works` while offline. In other modes
+    or `Nothing playing`, or `Hall unavailable; Windows still works` while offline. In other modes
     it is the LCD title, or `{App} · {Title}` in Windows.
   - On the right, a **live mirror** of the Knob Face at zoom 0.42, captioned `Live mirror`.
 - **Buttons**:
@@ -717,7 +717,7 @@ Also: Archivo, radius 0, 2 px rules (`RULE_WIDTH`). **Identical: no delta.**
 - Behaviour (CC:L325): "Closing hides to the tray; Quit stops the controller."
 - **Current**: the live app has **no main window** (DESKTOP.md; standalone `chrome=False`,
   `ui.py:630-686`). The dev/simulator window (`ControlCenterApp.build`, `ui.py:812-863`) shows
-  `NANO_D++` / `Your desk, within reach.`, `Setup`, `LIVE · DEN` / `SIMULATOR`, the mirror,
+  `NANO_D++` / `Your desk, within reach.`, `Setup`, `LIVE · HALL` / `SIMULATOR`, the mirror,
   a list, and `Connect knob`. Adopting the design's main window would reverse the user's
   floating-knob-only decision (§12, Q16).
 
@@ -726,7 +726,7 @@ Also: Archivo, radius 0, 2 px rules (`RULE_WIDTH`). **Identical: no delta.**
 |---|---|---|
 | Window | Title `Settings` (34 px bar, 2 px rule) | Title `Nano_D++ · Setup`, heading `Connect your desk` (`:1568`, `:1574`), subtitle `SETUP_SUBTITLE` (`:113`) |
 | Knob | `Knob` · `Ready` (#6ed996); a 4-cell button map with the **old grammar** (`1 Play/Pause · Back`, `2 Browse · Home`, `3 Windows`, `4 Tracks · Action`); note "Left to right, under the knob. Fixed mapping." and a `Proposed` press-to-light test | Raw button indices, `Verify physical button order` probe (`:1583-1606`) |
-| Sonos target | Room radio list with detail (`Den — Stereo pair + Sub · Victoria`, `Kitchen — One`); `Manual IP, if discovery fails` input (placeholder IP) | `Den speaker IP` entry; room chosen by config |
+| Sonos target | Room radio list with detail (`Hall — Stereo pair + Sub · Victoria`, `Kitchen — One`); `Manual IP, if discovery fails` input (placeholder IP) | `Hall speaker IP` entry; room chosen by config |
 | Apple Music | Status `Signed in` / `Sign-in expired` (colour-coded); "Signing keys stay in Windows Credential Manager and are never shown here."; `Renew sign-in…` | `Apple Team ID`, `MusicKit Key ID`, `Choose .p8 key`, `Authorize Apple Music`. Keys are DPAPI-protected (`credentials.bin`), not Credential Manager |
 | LED brightness | `Proposed`: Dim · **Standard** · Bright, "Scales L1–L4 together; ratios stay fixed." | none (ALIVE adds `led_drive` in settings.json with **no UI**, ALIVE §10.2) |
 | Launch at sign-in | Checkbox `Launch at Windows sign-in` | Installer-registered Task Scheduler task; no toggle |
@@ -750,7 +750,7 @@ LCD:
 |---|---|---|---|
 | `Knob not found` | "Plug in the USB cable. The app keeps looking and connects on its own; nothing else to do." | `Open Settings` | Knob `Not found` (bad) |
 | `Reconnecting…` | "Reads fresh volume and track from Sonos, then opens Volume. Turns and presses made while unplugged are discarded." | — | Knob `Reconnecting` (wait) |
-| `Den unavailable` | "Volume and Tracks wait for Sonos. Windows switching keeps working. Retrying every 5 s." | `Set manual IP…` | Sonos `Unavailable` |
+| `Hall unavailable` | "Volume and Tracks wait for Sonos. Windows switching keeps working. Retrying every 5 s." | `Set manual IP…` | Sonos `Unavailable` |
 | `Apple Music sign-in expired` | "Recently Added can’t load. Volume, Tracks and Windows are unaffected." | `Renew sign-in…` | Apple Music `Sign-in needed` |
 
 **Current**: the tray header and status line, tray balloons for failures, Settings notes for the

@@ -1,0 +1,2 @@
+# App profiles are hashed byte for byte (profiles/index.json, the updater, Karl import): never convert line endings.
+profiles/** -text

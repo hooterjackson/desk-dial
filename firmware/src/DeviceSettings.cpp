@@ -2,6 +2,9 @@
 #include "./DeviceSettings.h"
 #include <Arduino.h>
 #include "nanofoc_d.h"
+#include "cc_fw_version.h"
+#include "cc_cal_blob.h"
+#include "cc_serial_out.h"
 #include "SPIFFS.h"
 #include <Preferences.h>
 #include <common/foc_utils.h>
@@ -30,12 +33,10 @@ DeviceSettings::DeviceSettings() {
     deviceOrientation = 1;
     serialNumber = String(ESP.getEfuseMac(), HEX);
     deviceName = "Nano_" + serialNumber;
-    firmwareVersion = String(NANO_FIRMWARE_VERSION);
+    firmwareVersion = String(cc_fw_version());   // FW-PUB-004: "<public>+<build id>.<binary>"
     midiUsb = midiSettings();
     midi2 = midiSettings();
     dirty = true;
-    wifiSsid = "";
-    wifiPassword = "";
     wifiEnabled = false;
     midi_sysex_id = 0x00;
     idleTimeout = 10000;
@@ -60,10 +61,8 @@ DeviceSettings& DeviceSettings::operator=(JsonObject& obj){
         deviceOrientation = obj["deviceOrientation"].as<uint16_t>();
     if (obj["deviceName"]!=nullptr)
         deviceName = obj["deviceName"].as<String>();
-    if (obj["wifiSsid"]!=nullptr)
-        wifiSsid = obj["wifiSsid"].as<String>();
-    if (obj["wifiPassword"]!=nullptr)
-        wifiPassword = obj["wifiPassword"].as<String>();
+    // FW-SEC-003: the knob has no Wi-Fi. "wifiSsid" / "wifiPassword" are neither accepted nor kept (an older
+    // configurator stored them in clear text); fromSPIFFS() drops them from the file at the next save.
     if (obj["wifiEnabled"]!=nullptr)
         wifiEnabled = obj["wifiEnabled"].as<bool>();
     if (obj["midiUsb"]!=nullptr) {
@@ -110,10 +109,7 @@ void DeviceSettings::toJSON(JsonObject& obj){
     obj["deviceOrientation"] = deviceOrientation;
     obj["deviceName"] = deviceName;
 
-    if (wifiSsid.length() > 0)
-        obj["wifiSsid"] = wifiSsid;
-    if (wifiPassword.length() > 0)
-        obj["wifiPassword"] = wifiPassword;
+    // FW-SEC-003: no Wi-Fi credentials, ever (this is both the settings reply and the SPIFFS file).
     obj["wifiEnabled"] = wifiEnabled;
 
     obj["serialNumber"] = serialNumber;
@@ -137,12 +133,12 @@ void DeviceSettings::toJSON(JsonObject& obj){
 
 
 bool DeviceSettings::toSPIFFS(){
-    // note: use of serial: this function is called from the comms thread.
+    // note: called from the comms thread (off the task watchdog): diagnostics go through cc_send_note(), which never waits (FW-BUG-001).
     if (dirty) {
-        Serial.println("Saving settings to SPIFFS...");
+        cc_send_note("Saving settings to SPIFFS...");
         File file = SPIFFS.open(DEVICE_SETTINGS_FILE, "w");
         if (!file) {
-            Serial.println("ERROR: unable to open settings file!");
+            cc_send_note("ERROR: unable to open settings file!");
             return false;
         }
         // create the JSON
@@ -152,7 +148,7 @@ bool DeviceSettings::toSPIFFS(){
         // write the JSON to the file
         serializeJson(doc, file);
         file.close();
-        Serial.println("Settings saved");
+        cc_send_note("Settings saved");
         dirty = false;
     }
     return true;
@@ -160,29 +156,30 @@ bool DeviceSettings::toSPIFFS(){
 
 
 bool DeviceSettings::fromSPIFFS(){
-    // note: use of serial: this function is called from setup() in main.cpp, or from the comms thread.
-    Serial.println("Loading settings from SPIFFS...");
+    // note: called from setup() in main.cpp, or from the comms thread: diagnostics use cc_send_note(), which never waits (FW-BUG-001).
+    cc_send_note("Loading settings from SPIFFS...");
     if (SPIFFS.exists(DEVICE_SETTINGS_FILE)) {
         File file = SPIFFS.open(DEVICE_SETTINGS_FILE, "r");
         if (!file) {
-            Serial.println("ERROR: unable to open settings file!");
+            cc_send_note("ERROR: unable to open settings file!");
             return false;
         }
         // parse the JSON
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, file);
         if (error) {
-            Serial.println("ERROR: unable to parse settings file!");
+            cc_send_note("ERROR: unable to parse settings file!");
             return false;
         }
         // update the settings
         JsonObject obj = doc.as<JsonObject>();
         *this = obj;
-        Serial.println("Settings loaded");
-        dirty = false;
+        cc_send_note("Settings loaded");
+        // FW-SEC-003: a file that still holds Wi-Fi credentials stays dirty, so the next save rewrites it without them.
+        dirty = obj["wifiSsid"] != nullptr || obj["wifiPassword"] != nullptr;
     }
     else {
-        Serial.println("Settings not found, default settings used...");
+        cc_send_note("Settings not found, default settings used...");
     }
     return true;
 };
@@ -190,14 +187,14 @@ bool DeviceSettings::fromSPIFFS(){
 
 bool DeviceSettings::init() {
     if (!nano_preferences.begin("nano_D", false)) {
-        Serial.println("ERROR: unable to open Preferences!");
+        cc_send_note("ERROR: unable to open Preferences!");
         return false;
     }
     if (SPIFFS.begin(true)) {
-        Serial.println("SPIFFS mounted successfully");
+        cc_send_note("SPIFFS mounted successfully");
     }
     else {
-        Serial.println("ERROR: SPIFFS mount failed");
+        cc_send_note("ERROR: SPIFFS mount failed");
         // this is kind of fatal...
         return false;
     }
@@ -205,17 +202,50 @@ bool DeviceSettings::init() {
 };
 
 
-void DeviceSettings::storeCalibration(MotorCalibration& cal) {
-    nano_preferences.putUChar("direction", cal.direction);
-    nano_preferences.putFloat("zero_angle", cal.zero_angle);
+// FW-BUG-028: one NVS entry ("cal", cc_cal_blob.h), written whole or not at all; false when it was not stored (an
+// implausible calibration, or the put wrote less than the blob), and NVS then still holds the previous one.
+bool DeviceSettings::storeCalibration(const MotorCalibration& cal) {
+    if (!cc_cal_values_ok(cal.direction, cal.zero_angle)) return false;
+    const CcCalBlob blob = cc_cal_encode(cal.direction, cal.zero_angle);
+    if (nano_preferences.putBytes("cal", &blob, sizeof blob) != sizeof blob) return false;
+    // The two-key pair of older firmware is stale from here on. Removed after the blob is in, so a cut between the
+    // two leaves the blob (read first); an older firmware finds no pair and aligns again.
+    if (nano_preferences.isKey("direction")) nano_preferences.remove("direction");
+    if (nano_preferences.isKey("zero_angle")) nano_preferences.remove("zero_angle");
+    return true;
 };
 
 
+// Uncalibrated ({0, NOT_SET}: initFOC() aligns) unless NVS holds a whole, plausible calibration: the "cal" blob, or,
+// on a knob last calibrated by older firmware, the two-key pair (range-checked; a damaged blob never falls back to it).
 MotorCalibration DeviceSettings::loadCalibration() {
     MotorCalibration result;
-    result.direction = nano_preferences.getUChar("direction", 0);
-    result.zero_angle = nano_preferences.getFloat("zero_angle", NOT_SET);
+    result.direction = 0;
+    result.zero_angle = NOT_SET;
+    int8_t direction = 0;
+    float zero = NOT_SET;
+    if (nano_preferences.isKey("cal")) {
+        CcCalBlob blob;
+        const size_t length = nano_preferences.getBytesLength("cal");
+        const size_t got = length == sizeof blob ? nano_preferences.getBytes("cal", &blob, sizeof blob) : 0;
+        if (cc_cal_decode(&blob, got, direction, zero)) { result.direction = direction; result.zero_angle = zero; }
+        return result;
+    }
+    direction = static_cast<int8_t>(nano_preferences.getUChar("direction", 0));
+    zero = nano_preferences.getFloat("zero_angle", NOT_SET);
+    if (cc_cal_values_ok(direction, zero)) { result.direction = direction; result.zero_angle = zero; }
     return result;
+};
+
+
+bool DeviceSettings::loadHostSeen() {
+    return nano_preferences.getBool("host_seen", false);
+};
+
+
+// Written once per knob (the HMI thread calls it only on the first claim it sees while the flag is clear).
+void DeviceSettings::storeHostSeen() {
+    nano_preferences.putBool("host_seen", true);
 };
 
 

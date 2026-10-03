@@ -188,7 +188,7 @@ Method: PRESENTATION_V5.md Notation (`D\assets\fonts\Montserrat.ttf` at wght 500
 widths, no kerning, ±2 px), plus the authoritative LVGL port (`W\lcd-preview\font_tests.py`
 `resolved_run_width`: `cc_font_N` → kerned `lv_font_montserrat_N` fallback for ASCII;
 `lv_text_get_width` adds letter space n−1 times) and the firmware's ink-row chord (`safeHalf`).
-The script is in the session scratchpad: `rename\measure_desk_dial.py`.
+The script is in a scratch folder: `rename\measure_desk_dial.py`.
 
 Calibration: it reproduces every contract value exactly.
 
@@ -504,7 +504,8 @@ Written 2026-09-26. Sections 1–13 hold the detail; this section sets the order
      - Then, only after the bundle hashes verify and the data step reports a pass:
        - unregister `\NanoD Control Center`;
        - move `Programs\NanoDControlCenter` to
-         `D\backups\desktop-program-NanoDControlCenter-<UTC>` (moved, never hard-deleted);
+         `%LOCALAPPDATA%\DeskDial\backups\program-NanoDControlCenter-<UTC>` (same volume as the
+         program folder; moved, never hard-deleted), then remove `Nano_D++ Control Center.lnk`;
        - record both in `diagnostics\desktop-installation.json`.
      - Installing a pinned rollback bundle does the reverse (section 12).
    - **`Install-UserData.ps1`** runs in the task context (11.4), in this order:
@@ -573,7 +574,7 @@ data folder before the task-context step runs. Both files exist today.
    After both dry runs the scheduled tasks, the Start-menu shortcuts and both program and data
    folders are unchanged. Run the real install only after this review.
 3. **Harness widths.**
-   - Move `rename\measure_desk_dial.py` from the session scratchpad into `W\lcd-preview\` so it
+   - Move `rename\measure_desk_dial.py` from a scratch folder into `W\lcd-preview\` so it
      survives this session.
    - It must reproduce the four calibration values in 5.2 and give:
      - `DESK DIAL`: 74.8 / 75 against a 138 px limit;
@@ -603,7 +604,7 @@ the real profile belong to the hardware window (`firmware\BUILD-cc5.4.md` steps 
 | RN-2 | Migrate `data\` and the root `.bin` files; `logs\` stays (4.2) | the **whole** old home (`data\`, `logs\`, `backups\`, root `.bin` files, anything else), copied once (`DeskDial\migration.json` marks it done, so a later install never brings back a `queue-recovery.bin` the app removed), each file hash-checked under a `.migrating` name before it takes its own, a file already in the new home kept, the old home only read | ruling item 3 |
 | RN-3 | Primary step in Install-UserData.ps1 plus a first-run fallback in `standalone.main()` (4.1, 14.2 step 4) | installer only: Install-Desktop.ps1 plans it (also in `-DryRun`) and runs it through its one-shot task step (Install-UserData.ps1, `Desk Dial Data Setup <guid>`); the app never reads the old home (`control_center/paths.py` names it only as `LEGACY_HOME_NAME`) | ruling item 3 ("inside Install-Desktop.ps1, not the app"); the copy itself must run outside AppData virtualization (11.4). A program folder copied by hand without the installer starts with empty data; the old home stays. **Accepted by the lead (2026-09-26).** |
 | RN-4 | — | the task step first checks the installed exe's hash **as the signed-in user sees it**, and stops before any data work if it differs | `Programs\DeskDial` is a new folder: from a packaged parent its creation could be redirected (11.4) and the sign-in task would find no exe. **Accepted by the lead (2026-09-26).** |
-| RN-5 | Retire the old name after verification (3.2, 12) | in this order: bundle hashes verify, task step (program check, migration, seeds, new shortcut) passes, `\Desk Dial` registered, `\NanoD Control Center` unregistered, then a second task step removes `Nano_D++ Control Center.lnk` and moves `Programs\NanoDControlCenter` to `backups\desktop-program-NanoDControlCenter-<UTC>`; `diagnostics\desktop-installation.json` records both (`replaced`). A rollback bundle does the reverse by the same table (`$identities`, `$bundleIdentities`) | ruling item 2; 11.2 |
+| RN-5 | Retire the old name after verification (3.2, 12) | in this order: bundle hashes verify, task step (program check, migration, seeds, new shortcut) passes, `\Desk Dial` registered, `\NanoD Control Center` unregistered, then a second task step moves `Programs\NanoDControlCenter` to `%LOCALAPPDATA%\DeskDial\backups\program-NanoDControlCenter-<UTC>` (same volume as the program folder) and only then removes `Nano_D++ Control Center.lnk`; `diagnostics\desktop-installation.json` records both (`replaced`). A rollback bundle does the reverse by the same table (`$identities`, `$bundleIdentities`) | ruling item 2; 11.2 |
 | RN-6 | `-CarryDataBack` for a rollback (11.6, optional) | not built: no installer option carries data back. Settings changed and Apple Music sign-ins made in Desk Dial stay only in `%LOCALAPPDATA%\DeskDial\`, and are copied back by hand, with the user, if wanted (`firmware\BUILD-cc5.4.md` "Desktop rollback, v7 -> v6", `DESKTOP.md`, the `Install-Desktop.ps1` header) | optional; a rollback reads the old home as it was copied |
 | RN-7 | A11 wording (optional) | unchanged | optional; "control-center firmware" is the firmware feature's name (H6) |
 | RN-8 | `TRAY_NAME` (optional) | kept `NanoDControlCenter` | internal (H8); nothing shows it |
@@ -613,7 +614,7 @@ the real profile belong to the hardware window (`firmware\BUILD-cc5.4.md` steps 
 | RN-12 | The UI V2 handoff prompt states the new name (6, 14.2 step 6) | not edited | the prompt has not gone to the designer; state the name when it does |
 | RN-13 | The knob never names an app that is not installed (14.2 step 3) | a desktop rollback to v6 from a cc5.4 knob always follows the firmware rollback to cc5.3: every step-9 NO-GO in `firmware\BUILD-cc5.4.md` rolls back the firmware first, then the desktop, and the desktop rollback block refuses until the binary's rollback record is newer than its install record and reports a verified cc5.3. cc5.3 next to Desk Dial (the old copy) stays allowed (section 12). Recorded in K1 16.8 E-r | review finding RN-R3: cc5.4 carries C1 and C2, so a desktop-only rollback after step 9 would have left `Open Desk Dial on your PC` next to NanoD Control Center |
 
-Checks run: `harness\measure_desk_dial.py` (moved from the scratchpad; every value of 5.2
+Checks run: `harness\measure_desk_dial.py` (moved from a scratch folder; every value of 5.2
 reproduced, exit 0); the LVGL harness with `cc54_report.py` (39 of 39; `offline` requires the split
 `Open Desk Dial` / `on your PC`, and the render shows the no-break space as a space); a scratch build
 of the Desk Dial bundle (FileDescription and ProductName `Desk Dial`, FileVersion 7.0.0.0) and its
@@ -631,7 +632,7 @@ The redirect did not keep the run off the real system: it read the real process 
 and Start menu. It only read them; nothing on the machine changed, and no `desktop-install-plan.json`
 was written to `diagnostics\`. But whether it changed nothing depended on the untested script under
 review. Those runs are not evidence for this release, and the plans they wrote in the session
-scratchpad are not checks. No test or test tool under `tests\` runs `Install-Desktop.ps1`, and a static
+a scratch folder are not checks. No test or test tool under `tests\` runs `Install-Desktop.ps1`, and a static
 test keeps it that way (`InstallScriptTests.test_install_desktop_is_never_run_by_a_test`).
 
 **Acknowledged by the lead (2026-09-26).** RN-R4 stands as a recorded process breach of this release. The installer's dry run is only the supervised runbook's step 9a, run with the user; no agent runs `Install-Desktop.ps1` in any form, not even a copy with `-DryRun`.

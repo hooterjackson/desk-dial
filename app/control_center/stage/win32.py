@@ -324,22 +324,6 @@ def adapter_for_display(device_name: str):
     return q.AdapterLuid.key(), q.VidPnSourceId
 
 
-def dwm_timing():
-    """(qpcRefreshPeriod, qpcVBlank, rate_hz) or None: P is re-read on WM_DISPLAYCHANGE (§0.6)."""
-    ti = DWM_TIMING_INFO()
-    ti.cbSize = C.sizeof(DWM_TIMING_INFO)
-    if DwmGetCompositionTimingInfo(None, C.byref(ti)) != 0:
-        return None
-    rate = ti.rateRefresh.num / ti.rateRefresh.den if ti.rateRefresh.den else None
-    return ti.qpcRefreshPeriod, ti.qpcVBlank, rate
-
-
-def thread_cpu_seconds() -> float:
-    a, b, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
-    GetThreadTimes(GetCurrentThread(), C.byref(a), C.byref(b), C.byref(k), C.byref(u))
-    return k.seconds() + u.seconds()
-
-
 class ThreadCpu:
     """Kernel + user time (``GetThreadTimes``) summed over some threads of this process, by their
     native ids (``threading.Thread.native_id``): the §6.2 ``cpu_pct_one_core`` source for the
@@ -368,8 +352,3 @@ class ThreadCpu:
             CloseHandle(h)
         self.handles = []
 
-
-def thread_cycles() -> int:
-    v = C.c_uint64()
-    QueryThreadCycleTime(GetCurrentThread(), C.byref(v))
-    return v.value

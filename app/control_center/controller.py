@@ -45,6 +45,9 @@ import time
 
 from .presentation import (EXTERNAL_SECONDS, LED_GREEN, LED_RED, LED_WHITE, RING_WINDOW, clean_text,
                            mmss, window_first_v5)
+from .onshape import HOME_CHORD_SECONDS, KeyTracker
+from .app_engine import (DISABLED_REFUSED, FOCUS_REFUSED, KEYBOARD_REFUSED, REFUSALS, REFUSED, SlotTracker,
+                         knob_label, slot_of_button, turn_buttons, wheel_button)
 from .queue_context import QueueLedger
 
 _log = logging.getLogger(__name__)
@@ -56,14 +59,34 @@ TONE_COLORS = {"go": LED_GREEN, "stop": LED_RED}
 # The retired v6 lookahead page marker (kept so old imports resolve; never set any more).
 LOOKAHEAD_PAGE = "lookahead"
 
-MODES = ("home", "recent", "explorer", "tracks", "seek", "upnext", "windows")
+MODES = ("home", "recent", "explorer", "tracks", "seek", "upnext", "windows", "launcher", "lights", "scenes",
+         "onshape")
 OVERLAY_MODES = ("explorer", "upnext", "windows")
+# r3 (Desk Dial r3 release 1, presentation >= 6 only): `launcher` is the new Home (knob = volume;
+# 1 Music · 2 Windows · 3 Lights · 4 Play/Pause), `home` is then the Music space (today's Home screen
+# with 1 Home · 2 Recently Added · 3 Tracks · 4 Play/Pause), `lights` / `scenes` the Lights space.
+# Without r3 (`Controller.spaces` False) `launcher`, `lights` and `scenes` are never entered.
+# A0 (ONSHAPE.md, presentation >= 6 only): `onshape`, the knob as Onshape's mouse (zoom / orbit / pan /
+# Undo); the runtime's injector does the input, the controller only what the knob shows and hold 1.
+VOLUME_MODES = ("home", "launcher")
+LIGHTS_MODES = ("lights", "scenes")
 PROFILES = {"home": "BINARIS BEER", "recent": "MIDI SKIPPER", "explorer": "MIDI SKIPPER",
             "tracks": "MIDI CLACK JONES", "seek": "BINARIS BEER", "upnext": "MIDI SKIPPER",
-            "windows": "MIDI SKIPPER"}
+            "windows": "MIDI SKIPPER", "launcher": "BINARIS BEER", "lights": "BINARIS BEER",
+            "scenes": "MIDI SKIPPER", "onshape": "BINARIS BEER"}
+LIGHTS_TEMP_PROFILE = "MIDI SKIPPER"   # Lights in temperature mode (100 K per detent, bounded)
+QUEUE_PROFILE = "MIDI SKIPPER"         # r3.1 Tracks over the whole queue, one row per detent
+# DD-BUG-004: a knob whose owner renamed or deleted one of the profiles above still gets a control the
+# device accepts: the nearest installed stand-in (this order), else the inventory's first profile. The
+# runtime hands the inventory over at `connected` (set_installed_profiles) and shows `profile_status`.
+PROFILE_FALLBACKS = {"BINARIS BEER": ("MIDI SKIPPER", "MIDI CLACK JONES"),
+                     "MIDI SKIPPER": ("MIDI CLACK JONES", "BINARIS BEER"),
+                     "MIDI CLACK JONES": ("MIDI SKIPPER", "BINARIS BEER")}
+PROFILE_MISSING_STATUS = "Knob profile missing · {names} · using {used}"
 # Legacy `mode` text (presentation < 4 knobs derive a layout from it; v4/v5 knobs ignore it).
 MODE_TITLES = {"home": "VOLUME", "recent": "RECENTLY ADDED", "explorer": "RECENTLY ADDED",
-               "tracks": "TRACKS", "seek": "TRACKS", "upnext": "TRACKS", "windows": "WINDOWS"}
+               "tracks": "TRACKS", "seek": "TRACKS", "upnext": "TRACKS", "windows": "WINDOWS",
+               "launcher": "VOLUME", "lights": "LIGHTS", "scenes": "LIGHTS", "onshape": "ONSHAPE"}
 KIND_LABELS = {"album": "Album", "library-albums": "Album", "song": "Song", "library-songs": "Song",
                "playlist": "Playlist", "library-playlists": "Playlist"}
 SOURCES = ("queue", "airplay", "radio", "linein", "none")
@@ -84,6 +107,9 @@ LIKE_LATE_CHECK = 5.0
 PREFETCH_RESOLVE_REST = 0.4
 FAIL_META = 2.4
 QUEUED_META = 1.5
+QUEUED_META_R3 = 2.2             # r3.1 design: `Queued · {title}` / `Plays next · {track}`
+DOMAIN_META = 1.8                # r3.1 design: `Knob sets brightness` / `Knob sets volume`
+LIST_SOURCE_META = 1.2           # r3.1 design: `Favourite playlists` / `Recently Added`
 FEEDBACK_META = 1.5
 PARTIAL_STATUS = 3.0
 START_FAIL_STATUS = 2.6
@@ -100,7 +126,6 @@ EXIT_TOAST_DELAY = 0.360
 OVERLAY_IDLE = 60.0
 VOLUME_REVEAL_SECONDS = 1.4
 EXTERNAL_REVEAL_SECONDS = 2.6
-PAUSED_IDLE_SECONDS = 4.0
 STATE_POLL = 1.0
 STATE_POLL_BUSY = 2.0
 FAVOURITES_STALE = 600.0
@@ -122,8 +147,69 @@ DISCONNECTED_STATUS = "Knob disconnected · reconnect to resume"
 LINE_META = (12, 170)
 LINE_STATUS = (12, 160)
 LINE_14 = (14, 170)
+LINE_R3 = (12, 180)          # r3 status / meta lines (README 2: x 30, w 180)
 EXPLORER_PRELOAD_BEHIND = 12
 EXPLORER_PRELOAD_AHEAD = 16  # +-12 plus 4 in the direction of travel
+# r3 Lights (README sections 1.2, 3, 7).
+LIGHTS_WRITE_INTERVAL = 0.25     # <= 4 Hz brightness / temperature writes (each fades over
+                                 # home_assistant.LIGHT_TRANSITION), the final value on settle
+LIGHTS_POLL = 2.0                # a lights_read while the Lights space is open (the stream is the main source)
+LIGHTS_ECHO = 3.0                # our own write's state echo is not an "external" change for this long
+LIGHTS_SETTLE = 1.0              # user 2026-09-29: from this long after the last write, lights reporting another
+                                 # level than we set (a fade ending short, a late stale report) get it once
+                                 # more, without a fade (100 % no longer drifts back to 95 / 97 %)
+LIGHTS_MIXED_QUIET = 2.5         # user 2026-09-29: while the knob drives the lights (and this long after the
+                                 # last write) the area keeps its uniform / mixed look: the lights report one
+                                 # by one mid-fade, which flickered the Navigator card between its layouts
+LIGHTS_NEAR = {"bri": 6, "kelvin": 300}   # a report this close to our last write is that write (the knob keeps
+                                 # showing what was set); a farther one is a real change (another app, a switch)
+SCENE_SETTLE = 3.0               # the state changes a scene run causes are applied silently
+LIGHTS_FINAL_WINDOW = LIGHTS_ECHO + LIGHTS_SETTLE   # DD-BUG-002: a near report is "our write" (masked, corrected
+                                 # once) only this long after that write; later it is a real change (the HA app,
+                                 # an automation, a scene) and is shown, never reverted
+LIGHTS_MEMBERS_DRAWN = 32        # DD-BUG-008: per-light rows handed to the frames / Navigator (drawing only);
+                                 # a turn targets every on light of the area, however many
+LIGHTS_MEMBERS_MAX = 1024        # a sanity bound on the adapter's per-light rows (memory, not targeting)
+LIGHTS_MODE_META = 1.4           # `Knob: temperature` / `Knob: brightness` after a mode toggle
+SCENE_META = 2.2                 # `Scene running`
+KELVIN_MIN, KELVIN_MAX, KELVIN_STEP = 2200, 6500, 100
+BRI_ON_HIGH = 99    # lights on: positions 0..99 are 1..100 % (DD-DES-003)
+KELVIN_DEFAULT = 2700
+SCENES_MAX = 20
+# r3 navigation (README sections 1 and 2.1).
+HOME_GUARD = 0.7                 # a tap on 1 this soon after arriving Home is ignored (overshoot guard)
+HOME_GUARD_META = 1.4            # `Home · press 1 again for Music`
+SEEK_R3_META = 1.4               # `Seek set` / `Seek cancelled`
+R3_REFUSED_META = 2.0            # r3 unavailable-press reasons (README 1: #FF8474, 2 s)
+# The arc breadcrumb of each r3 screen (presentation 6 `crumb`; README 2.1 paths). The launcher has none.
+CRUMBS = {"home": "music", "recent": "recent", "tracks": "tracks", "seek": "tracks", "upnext": "upnext",
+          "windows": "windows", "lights": "lights", "scenes": "scenes"}
+# r3.1 (2026-09-29 feedback round).
+HOME_DOMAINS = ("volume", "lights")   # the launcher's knob: music volume or the Lights area's brightness
+LIST_SOURCES = ("recent", "favourites")   # the Recently Added list's source (button 3 toggles it)
+TRACKS_PAGE = 20                 # whole-queue Tracks: queue rows read per page (the focus page + one ahead)
+TRACKS_EDGE = 5                  # the next page is read when the focus is this close to a loaded edge
+TRACKS_CACHE_ROWS = 400          # rows kept per queue revision (older pages dropped first)
+# A0 Onshape mode (ONSHAPE.md): the knob's control is (0, 65535, 32768), re-centred on every entry
+# and again (after a quiet 400 ms) once the knob has travelled this far from the centre.
+# 2026-09-30: never 65535 wide. The knob's haptic loop counts positions as a uint16 (haptic.cpp: end - start
+# + 1), so 0..65535 wrapped to 0 and switched on its derivative term: the knob buzzed in Onshape mode only.
+ONSHAPE_BOUNDS = (0, 60000, 30000)
+ONSHAPE_RECENTRE = 25000
+ONSHAPE_REFUSED_META = 2.0       # `Point at the model` (the injector refuses at most once per burst)
+ONSHAPE_UNDO_META = 1.2
+ONSHAPE_PARAM_LAG = 0.5          # after 3's release ends parameter mode, the injector's snapshot may still say `param`
+# r4 FEEL (firmware 1.0.0-cc5.7, plan F2; firmware HAPTICS.md, CONTROL_CENTER.md "Feel and sound"). The control's
+# `feel` token per screen (r4 section 4.4); device.py sends it only to a knob whose capabilities carry feel 1 (older
+# firmware keeps the PROFILES feel exactly). Recently Added / Playlists coast (free.spin) only over this many items.
+FREE_SPIN_MIN_ITEMS = 20
+FEEL_TOKENS = ("detent.value", "detent.dimmer", "detent.list", "detent.coarse", "detent.fine", "fluid.scrub",
+               "fluid.light", "free.spin")
+# The frame's `haptic` event tokens (capability hapticFx 1): only four things thump (hold landings, Play, Turn on,
+# Scene run; r4 4.4); a refusal or an error buzzes at most once a second.
+HAPTIC_TOKENS = ("confirm.tick", "confirm.thump", "nudge.left", "nudge.right", "refuse.buzz", "error.buzz",
+                 "confirm.off")
+HAPTIC_BUZZ_GAP = 1.0
 
 # ------------------------------------------------------------------ copy (VOC section 9; K3 section 15)
 COPY = {
@@ -168,6 +254,7 @@ COPY = {
     "knob.meta.like.unknown": "Checking likes…",
     "knob.meta.like.not_catalog": "Not an Apple Music song",
     "knob.meta.like.signin_expired": "Sign-in expired",
+    "knob.meta.like.signin_needed": "Not signed in",
     "knob.meta.like.failed": "Didn’t save · try again",
     "knob.meta.like.unlike_in_music": "Unfavourite in Music app",
     "knob.meta.shuffle.on": "Shuffle on",
@@ -192,7 +279,6 @@ COPY = {
     "knob.line.tracks.start": "Start of queue",
     "knob.line.tracks.next_shuffle": "Next: shuffle pick",
     "knob.line.tracks.prev_shuffle": "Prev: last played",
-    "knob.line.tracks.next_wrap": "Next: back to track 1",
     "knob.title.tracks.choose": "Turn to choose",
     "knob.title.tracks.prev": "Previous track",
     "knob.title.tracks.next": "Next track",
@@ -230,6 +316,8 @@ COPY = {
     "knob.sub.recent_empty": "Apple Music library",
     "knob.title.signin_expired": "Apple Music sign-in expired",
     "knob.sub.signin_expired": "Renew on your PC",
+    "knob.title.signin_needed": "Connect Apple Music",
+    "knob.sub.signin_needed": "Sign in on your PC",
     "knob.title.library_error": "Library not loaded",
     "knob.sub.library_error": "Home, then Browse",
     "knob.title.upnext_sonos_card": "Shuffled by Sonos",
@@ -238,6 +326,7 @@ COPY = {
     "knob.meta.busy.shuffling": "Shuffling…",
     "knob.meta.library_error": "Library not loaded",
     "knob.meta.signin_expired": "Sign-in expired",
+    "knob.meta.signin_needed": "Not signed in",
     "knob.meta.sonos_unavailable": "Sonos unavailable",
     "knob.meta.item_unavailable": "Not available",
     "knob.meta.group_changed": "Speaker group changed",
@@ -264,6 +353,145 @@ COPY = {
     "toast.snap.pair": "Side by side · {A} and {B}",
     "toast.snap.one_side": "{A} left · {B} right",
     "toast.like.signin_expired": "Apple Music sign-in expired · open Settings",
+    "toast.like.signin_needed": "Apple Music not connected · open Settings",
+    # r3 Lights (README sections 2.2 and 6).
+    "knob.heading.music": "MUSIC",
+    "knob.heading.lights": "LIGHTS",
+    "knob.heading.scenes": "SCENES",
+    "knob.title.lights_off": "Lights off",
+    "knob.sub.lights_off": "Tap 4 to turn on",
+    "knob.sub.lights_level": "{bri}% · {K} K",
+    "knob.sub.lights_level_bri": "{bri}%",
+    "knob.title.lights_adjusted": "{scene} · adjusted",
+    "knob.title.lights_default": "Lights",
+    "knob.title.lights_not_set_up": "Lights not set up",
+    "knob.sub.lights_not_set_up": "Add Home Assistant in Settings",
+    "knob.title.lights_connecting": "Connecting to lights…",
+    "knob.sub.lights_connecting": "Home Assistant",
+    "knob.title.lights_offline": "Lights unavailable",
+    "knob.sub.lights_offline": "Can’t reach Home Assistant",
+    "knob.sub.lights_unavailable": "The light is unavailable",
+    "knob.title.lights_auth": "Home Assistant sign-in",
+    "knob.sub.lights_auth": "Check the token in Settings",
+    "knob.caption.brightness": "Brightness",
+    "knob.caption.temperature": "Colour temperature",
+    "knob.status.lights_changed": "Changed in Home Assistant",
+    "knob.meta.lights.knob_temperature": "Knob: temperature",
+    "knob.meta.lights.knob_brightness": "Knob: brightness",
+    "knob.meta.lights.on": "Lights on",
+    "knob.meta.lights.off": "Lights off",
+    "knob.meta.lights.unavailable": "Lights unavailable",
+    "knob.meta.lights.no_scenes": "No scenes set up",
+    "knob.meta.lights.no_temperature": "No colour temperature",
+    "knob.meta.lights.failed": "Didn’t change · try again",
+    "knob.meta.lights.not_allowed": "Not allowed in Desk Dial",
+    "knob.meta.lights.signin": "Check the token in Settings",
+    "knob.meta.lights.blocked": "Blocked by Home Assistant",
+    "knob.meta.scenes.position": "{i} / {n}",
+    "knob.meta.scenes.preview": "{i} / {n} · {bri}% · {K} K",
+    "knob.meta.scenes.preview_bri": "{i} / {n} · {bri}%",
+    "knob.meta.scenes.running": "{i} / {n} · running now",
+    "knob.meta.scenes.choose": "Turn to choose · 4 runs it",
+    "knob.meta.scene.running": "Scene running",
+    "knob.meta.scene.failed": "Didn’t run · try again",
+    "toast.scene.ok": "Lights · {scene}",
+    "toast.scene.failed": "Couldn’t run {scene}",
+    # r3 navigation (README sections 1, 2.2 and 6; release 2 of the plan, delivered with release 1).
+    "knob.status.home_guard": "Home · press 1 again for Music",
+    "knob.meta.skip.choose": "Turn to pick previous or next",
+    "knob.meta.skip.seeking": "Set or cancel seek first",
+    "knob.meta.seek.set": "Seek set",
+    "knob.meta.seek.cancelled": "Seek cancelled",
+    "knob.line.seek.r3": "of {m:ss} · 3 sets · 1 cancels",
+    "knob.title.tracks.prev_r3": "Previous",
+    "knob.title.tracks.next_r3": "Next",
+    "knob.meta.tracks.turn": "Turn for previous or next",
+    "knob.meta.snap.left": "Snapped left",
+    "knob.meta.snap.right": "Snapped right",
+    "knob.status.switched": "Switched to {App}",
+    # r3.1 (2026-09-29 feedback round): hold 4, the Playlists toggle, whole-queue Tracks, area Lights.
+    "knob.heading.playlists": "PLAYLISTS",
+    "knob.status.domain.lights": "Knob sets brightness",
+    "knob.status.domain.volume": "Knob sets volume",
+    "knob.sub.lights_area_level": "{name} · {bri}% · {K} K",
+    "knob.sub.lights_area_level_bri": "{name} · {bri}%",
+    "knob.title.lights_count": "{n} lights",
+    "knob.title.lights_count_one": "1 light",
+    "knob.title.lights_none": "No lights in {name}",
+    "knob.title.lights_blocked_unav": "Lights unavailable",
+    "knob.title.lights_none_area": "No lights in the area",
+    "knob.sub.lights_none": "Add them in Home Assistant",
+    "knob.meta.lights.none": "No lights in {name}",
+    "knob.meta.lights.not_connected": "Home Assistant not connected",
+    "knob.meta.lights.no_scenes_area": "No scenes in {name}",
+    "knob.meta.lights.check": "Check them in Home Assistant",
+    "knob.meta.lights.open_settings": "Open Settings on your PC",
+    "knob.meta.lights.area": "{name} · {lights}",
+    "knob.meta.lights.one_unavailable": "{name} unavailable",
+    "knob.meta.lights.n_unavailable": "{n} lights unavailable",
+    "knob.meta.lights.some_on": "{on} of {ok} on",
+    "knob.meta.lights.average": " · average",
+    "knob.meta.lights.raw": "{text}",
+    "knob.title.lights_nc": "Not connected",
+    "knob.sub.lights_nc": "Home Assistant",
+    "knob.caption.brightness_average": "Brightness · average",
+    "knob.meta.upnext.already_playing": "Already playing",
+    "knob.meta.upnext.plays_next": "Plays next · {title}",
+    "knob.meta.queued_title": "Queued · {title}",
+    "knob.meta.list.favourites": "Favourite playlists",
+    "knob.meta.list.recent": "Recently Added",
+    "knob.meta.list.position_artist": "{i} / {n} · {artist}",
+    "knob.meta.list.position_songs": "{i} / {n} · {count} songs",
+    "knob.sub.favourite_playlist": "Favourite playlist",
+    "knob.meta.tracks.skip_to": "Skip to {n} / {T} · 4 plays",
+    "knob.meta.tracks.back_to": "Back to {n} / {T} · 4 plays",
+    "knob.meta.tracks.playing": "Playing {n} / {T}",
+    "knob.status.nothing_loaded": "Nothing loaded",
+    "knob.status.nothing_loaded_pick": "Nothing loaded · pick in Recent",
+    "knob.title.lights_area_missing": "Area not found",
+    "knob.sub.lights_area_missing": "Pick the area in Settings",
+    "knob.meta.lights.area_missing": "Area not found",
+    "knob.meta.tracks.browse": "Turn to browse the queue",
+    "knob.meta.tracks.play": "Press 4 to play",
+    "knob.sub.tracks.skip_to": "Skip to · {n} / {T}",
+    "knob.sub.tracks.back_to": "Back to · {n} / {T}",
+    "knob.title.tracks.row": "Track {n}",
+    # A0 Onshape mode (ONSHAPE.md): the title is the live action.
+    "knob.heading.onshape": "ONSHAPE",
+    "knob.title.onshape.zoom": "ZOOM",
+    "knob.title.onshape.orbit": "ORBIT",
+    "knob.title.onshape.pan": "PAN",
+    "knob.title.onshape.tilt": "TILT",
+    "knob.title.onshape.refused": "Point at the model",
+    # DD-SEC-001: the cursor is on the model but the keyboard focus is outside the page (address bar, find bar).
+    "knob.title.onshape.focus_refused": "Click the model first",
+    "knob.sub.onshape.zoom": "1 tilt · 2 orbit · 4 pan",   # "Hold 1 tilt ..." is cut off
+    "knob.sub.onshape.orbit": "Turn to orbit",
+    "knob.sub.onshape.tilt": "Turn to tilt",
+    "knob.sub.onshape.pan": "Turn to pan",
+    "knob.sub.onshape.refused": "Put the cursor on it",
+    "knob.sub.onshape.focus_refused": "Keys go to the page",
+    "knob.status.onshape.undo": "Undo",
+    "knob.status.onshape.home": "Hold all 4 for Home",
+    # App profiles (plan 4a, S1 DD-B): a chord the foreground keyboard layout can't type, a command the profile turned
+    # off on Windows. Nothing is sent; the knob says why (the canvas gives way to this text screen for the moment).
+    "knob.title.onshape.keyboard_refused": "Not on this keyboard",
+    "knob.sub.onshape.keyboard_refused": "Its key needs another layout",
+    "knob.title.onshape.disabled_refused": "Not on Windows",
+    "knob.sub.onshape.disabled_refused": "This command is off here",
+    # App profiles: every other app's text screen (heading = the profile's name, title = the live action, subtitle =
+    # its legend), shown on a knob without the app canvas or while its profile uploads.
+    "knob.title.app.refused": "Point at the app",
+    "knob.sub.app.refused": "Put the cursor on it",
+    "knob.title.app.focus_refused": "Click the app first",
+    "knob.sub.app.focus_refused": "Keys go to the app",
+    "knob.title.app.keyboard_refused": "Not on this keyboard",
+    "knob.sub.app.keyboard_refused": "Its key needs another layout",
+    "knob.title.app.disabled_refused": "Not on Windows",
+    "knob.sub.app.disabled_refused": "This command is off here",
+    "knob.title.app.cancel": "Cancel",
+    "knob.sub.app.param": "Tap {n} OK · hold {n} cancel",
+    "knob.status.app.home": "Hold all 4 for Home",
 }
 # Home button labels (the idle-row words, VOC-D08; each <= 46 px at 12 px).
 HOME_LABELS = ("Play", "Pause", "Browse", "Tracks", "Win")
@@ -301,6 +529,19 @@ def measure(text, size):
 
 
 _FIT_CACHE = OrderedDict()
+
+
+APP_NAMES = {"onshape": "Onshape", "figma": "Figma", "plasticity": "Plasticity", "blender": "Blender",
+             "autocad": "AutoCAD"}
+
+
+def app_display_name(profile):
+    """A profile's name for people ("Figma", "AutoCAD"): Karl's names are capitals."""
+    pid = getattr(profile, "id", None)
+    if pid in APP_NAMES:
+        return APP_NAMES[pid]
+    name = str(getattr(profile, "name", "") or pid or "")
+    return name[:1].upper() + name[1:].lower()
 
 
 def fit_copy(copy_id, line=LINE_META, **fields):
@@ -343,8 +584,14 @@ def _clean_frame(frame):
 
 
 def _needs_login(lower):
-    """An Apple Music sign-in/authorization failure (lower-cased status text)."""
-    return "authorization" in lower or "credentials" in lower or "connect apple music" in lower
+    """An Apple Music sign-in/authorization failure (lower-cased status text). A never-connected
+    Apple Music ("Connect Apple Music ...", outcome ``signin_needed``) is not one (DD-BUG-023)."""
+    return "authorization" in lower or "credentials" in lower
+
+
+def _signin_needed(error):
+    """Apple Music was never connected on this PC (outcome ``signin_needed``, DD-BUG-023)."""
+    return getattr(error, "outcome", None) == "signin_needed"
 
 
 def _clamp(value, low, high):
@@ -401,6 +648,7 @@ class RecentList:
     inflight: int | None = None
     inflight_lane: str = ""
     state: str = "loading"          # loading | ready | empty | signin | error
+    signin_needed: bool = False     # state signin: never connected, not expired (DD-BUG-023)
     retry_at: float = 0.0
     rev: int = 0
 
@@ -420,6 +668,7 @@ class FavouritesList:
     """Favourite playlists (section 9.8.5): session cache, refreshed after 600 s."""
     items: list = field(default_factory=list)
     state: str = "none"             # none | loading | ready | empty | signin | error
+    signin_needed: bool = False     # state signin: never connected, not expired (DD-BUG-023)
     loaded_at: float | None = None
     focus_id: str | None = None
     inflight: int | None = None
@@ -557,6 +806,32 @@ class TransientCopy:
 
 
 @dataclass
+class LightsState:
+    """The Home Assistant light as the adapter last reported it (r3; README section 8 subset)."""
+    configured: bool = False
+    known: bool = False              # a state was ever read
+    online: bool = False
+    reason: str = "not_configured"   # not_configured | connecting | offline | auth | unavailable | ""
+    on: bool = False
+    bri: int = 0                     # 1..100 while on (0 off)
+    last_bri: int = 0                # the level before the last off (turn-on by temperature uses it)
+    kelvin: int | None = None
+    min_k: int = KELVIN_MIN
+    max_k: int = KELVIN_MAX
+    supports_ct: bool = True
+    name: str = ""                   # r3.1: the Home Assistant area's name (shown as the room label)
+    count: int | None = None         # r3.1: the lights in that area (None: an adapter without it)
+    detail: str = ""                 # r3.1: why the area is not usable ("no_lights", "area_missing", ...)
+    on_count: int | None = None      # r3.1: the lights that are on
+    members: list = field(default_factory=list)   # r3.1: [{entity_id, name, on, bri, kelvin, available}]
+    scenes: list = field(default_factory=list)   # [{entity_id, type, label, running, bri?, kelvin?}]
+    snapshot: bool = False
+    scene_id: str | None = None      # the scene Desk Dial last ran (the title)
+    scene_label: str = ""
+    adjusted: bool = False           # changed by hand after that scene
+
+
+@dataclass
 class Screen:
     """One per mode entry (a new view_id per Screen).
 
@@ -608,7 +883,7 @@ class Controller:
         self.effects = []
         self.pending = {}
         self.serial = 0
-        self.state = {"online": False, "volume": 0, "group_label": "Den",
+        self.state = {"online": False, "volume": 0, "group_label": "Speaker",
                       "group_revision": "", "title": "", "artist": "",
                       "can_next": False, "can_previous": False,
                       "can_play": False, "can_pause": False, "playback": "UNKNOWN"}
@@ -625,8 +900,6 @@ class Controller:
         self._volume_reveal_until = 0.0
         self._volume_reveal_source = ""
         self._external_until = 0.0
-        self._paused_since = None
-        self._paused_idle_cancelled = False
         self._album_start_until = 0.0
         self.last_poll = -10.0
         self.command_request = None      # the Home play/pause or the Tracks skip that is out
@@ -637,6 +910,13 @@ class Controller:
         self.accent_lookup = None        # runtime hook: (kind, item) -> 0xRRGGBB (section 10.4)
         self.feedback = None
         self.feedback_seq = 0
+        # r4: the newest haptic event ({token, seq}, in every frame until the next; the knob plays each seq once),
+        # the time of the last buzz per token (refuse / error at most once a second), and whether the knob runs
+        # the r4 feel (capabilities.feel, set by the runtime: Onshape's modifiers then re-enter for fluid.light).
+        self.haptic = None
+        self.haptic_seq = 0
+        self._haptic_buzz_at = {}
+        self.feel_supported = False
         self._started_seq = None         # the `started` feedback whose first frame omits playing
         self._decorate_failed = False
         self.reduced_motion = False
@@ -660,6 +940,7 @@ class Controller:
         self.last_knob_input = self.clock()
         self._last_detent = -10.0
         self._detent_dir = 1
+        self._home_arrived_at = -10.0    # r3: the last arrival at the launcher (overshoot guard)
         self._passive = None             # (cause, view_id): a passive re-entry waiting for quiet
         self._preresolve_due = None
         self._preresolve_batch = 0
@@ -671,6 +952,64 @@ class Controller:
         self._cancel_pending = None      # the picker close waiting for cancel_result
         self.last_reentry_cause = ""
         self.origin = None               # compat: v6 Windows origin (never a resumable Screen)
+        # r3 (presentation >= 6): the spaces navigation and the Lights space. Off = r2.2 exactly.
+        self.spaces = False
+        self.lights = LightsState()
+        self.lights_mode = "bri"         # bri | temp (README 1.2: knob modes, not menus)
+        self._lights_lock = threading.Lock()
+        self._lights_intent = {}         # {"bri": 1..100, "kelvin": K}: the newest unsent / in-flight target
+        self.lights_request = None       # the lights_set in flight
+        self.lights_due = 0.0
+        self.last_lights_write = -10.0
+        self.lights_command = None       # the lights_power / scene_run in flight
+        self._lights_reveal_until = 0.0
+        self._lights_reveal_kind = "bri"
+        self._lights_reveal_source = ""
+        self._lights_expect = None       # (values, until): our own write's echo
+        self._lights_reported = {}       # the adapter's last on / bri / kelvin, before the echo mask
+        self._lights_final = None        # (values, t, settled): the last write's applied values
+        self._lights_reconcile = False   # the next lights_set is the settle write (no fade)
+        self._mixed_shown = None         # the area's uniform / mixed look as shown (held while the knob drives)
+        self._scene_settle_until = 0.0
+        self.last_lights_poll = -10.0
+        self._knob_bounds = None         # (min, max, position) the knob holds (entry or its last turn)
+        # r3.1 (2026-09-29): hold 4 swaps the launcher's knob (kept for the session); the Recently
+        # Added list's source (button 3) with each source's focus; the whole-queue Tracks row cache.
+        self.home_domain = "volume"
+        self.list_source = "recent"
+        self._list_index = {"recent": 0, "favourites": 0}
+        self._tracks_rows = {}           # 1-based row -> row dict, for `_tracks_revision`
+        self._tracks_revision = None
+        self._tracks_pages = {}          # page start (0-based) -> the queue_window request in flight
+        self._tracks_retry_at = 0.0
+        self._tracks_is_queue = False    # the Tracks regime of the last entry (whole queue / transport)
+        # A0 Onshape mode (ONSHAPE.md): the knob profile the runtime chose from the inventory, the key
+        # grammar (a turn drops a key's tap and hold; 3+ keys down = the Home chord), the refusal line, the user
+        # exits (all four held 1.0 s, the tray: Auto waits for Onshape to lose and regain the foreground), Auto's
+        # pending switch and when all four buttons went down (the Home chord's start; None = not all four down).
+        self.onshape_profile = PROFILES["onshape"]
+        # DD-BUG-004: the knob's installed profile names (None until a connected inventory says) and the
+        # required names it lacks (each control then uses a stand-in, never a name the device refuses).
+        self.installed_profiles = None
+        self.missing_profiles = ()
+        self.onshape_keys = KeyTracker()
+        self.onshape_pending = False
+        self.onshape_user_exits = 0
+        self._onshape_refused_until = 0.0
+        self._onshape_refused_kind = "refused"
+        self._onshape_chord_at = None
+        # A2 (ONSHAPE.md section 10): the injector's wheel / parameter / echo state (onshape.OnshapeInjector
+        # .app_state(), set by the runtime every tick for a knob with the app canvas; None otherwise) and the keys
+        # pressed while the wheel or parameter mode owned them (their tap shows nothing).
+        self.onshape_app = None
+        self._onshape_swallowed = set()
+        self._onshape_wheel = None         # the control id under which 3's press opened the wheel (OnshapeApp.down)
+        self._onshape_param_left_at = None # when 3's release ended parameter mode (the snapshot lags the injector)
+        # App profiles (plan 3, S1 DD-B): the "onshape" screen is the app mode of every profile. `app_profile` is the
+        # active app_profiles.AppProfile (None = Onshape, presented exactly as before); `app_canvas_ref` the (id, crc)
+        # the knob has loaded for it (the runtime sets it once an upload is confirmed; None = the text screen).
+        self.app_profile = None
+        self.app_canvas_ref = None
         self._enter("startup")
 
     # ------------------------------------------------------------------ the current Screen
@@ -755,6 +1094,10 @@ class Controller:
                 self._seek_read.pop(request, None)
         if self.screen.windows is not None and self.screen.windows.switch_request == request:
             self.screen.windows.switch_request = None
+        if self.lights_request == request:
+            self.lights_request = None
+        if self.lights_command == request:
+            self.lights_command = None
 
     # ------------------------------------------------------------------ intents (lane handoffs)
     @property
@@ -776,6 +1119,44 @@ class Controller:
         with self._intent_lock:
             return self._volume_intent
 
+    def lights_intent(self):
+        """Atomic worker handoff (the volume pattern): the newest brightness / temperature target,
+        read when the `lights_set` job starts, so a burst of detents sends only its latest value."""
+        with self._lights_lock:
+            return dict(self._lights_intent)
+
+    def _set_lights_intent(self, **values):
+        with self._lights_lock:
+            self._lights_intent.update(values)
+
+    def _clear_lights_intent(self, applied=None):
+        """Drop the targets `applied` reached (all of them without `applied`)."""
+        with self._lights_lock:
+            if applied is None:
+                self._lights_intent = {}
+                return
+            for key, value in applied.items():
+                if value is not None and self._lights_intent.get(key) == value:
+                    del self._lights_intent[key]
+
+    @property
+    def display_bri(self):
+        intent = self.lights_intent()
+        if "bri" in intent:
+            return intent["bri"]
+        return self.lights.bri if self.lights.on else 0
+
+    @property
+    def display_kelvin(self):
+        intent = self.lights_intent()
+        if "kelvin" in intent:
+            return intent["kelvin"]
+        kelvin = self.lights.kelvin
+        return kelvin if type(kelvin) is int else _clamp(KELVIN_DEFAULT, self.lights.min_k, self.lights.max_k)
+
+    def lights_display_on(self):
+        return bool(self.lights_intent()) or self.lights.on
+
     def seek_target(self, effect):
         """The newest target of a `seek` job, read when the job starts (the volume pattern). The
         value read is remembered: it is the target that jump lands on (section 5.5.4)."""
@@ -788,8 +1169,13 @@ class Controller:
 
     @property
     def windows_button(self):
-        """The raw button mapped to slot 3 (VOC section 2.5): never the literal 3."""
-        return self.button_order[3]
+        """The raw button of the Win slot (VOC section 2.5): never a literal. r2.2: slot 3 (Home 4);
+        r3: slot 1 (the launcher's 2 Windows)."""
+        return self.button_order[self._windows_slot()]
+
+    def _windows_slot(self):
+        """The logical slot whose press opens the picker: r3's launcher 2, r2.2's Home 4."""
+        return 1 if self.spaces else 3
 
     @windows_button.setter
     def windows_button(self, _value):
@@ -899,14 +1285,18 @@ class Controller:
         self.ready = not self.hardware
         self.last_reentry_cause = cause
         self._passive = None
-        self.effects.append({"kind": "device_enter", "control": self.control()})
+        control = self.control()
+        self._knob_bounds = (control["min"], control["max"], control["position"])
+        if self.screen.mode == "tracks":
+            self._tracks_is_queue = self._tracks_queue()
+        self.effects.append({"kind": "device_enter", "control": control})
 
     def _reenter(self, cause, index=None):
         """One control for one host-driven move; `index` clamped into the new bounds."""
         if index is not None:
             self.screen.index = index
         low, high, _ = self.bounds()
-        if self.screen.mode not in ("home",):
+        if self.screen.mode not in VOLUME_MODES + ("lights", "onshape"):
             self.screen.index = _clamp(self.screen.index, low, high)
         self._enter(cause)
 
@@ -950,6 +1340,10 @@ class Controller:
 
     def _new_screen(self, mode, index=0, cause="", **fields):
         self._cancel_due(self.screen.view_id)
+        if self.spaces:
+            self.transient = None   # r3.1 design (`go`): a new screen starts without the old message
+        if mode == "launcher" and self.screen.mode != "launcher":
+            self._home_arrived_at = self.clock()   # README 1: the overshoot guard's arrival
         self.screen = Screen(mode=mode, index=index, **fields)
         if mode in ("recent", "explorer"):
             self.screen.recent = self.recent
@@ -960,15 +1354,73 @@ class Controller:
         self._enter(cause or mode)
 
     def _go_home(self, cause="home"):
+        """To `home`: r2.2's Home, r3's Music space (Back from Recently Added / Tracks)."""
         if self.screen.mode == "seek":
             self._leave_seek(flush=True)
         self._new_screen("home", self.display_volume, cause)
 
+    def _root(self):
+        """The Home of the navigation: r3's launcher, r2.2's Home."""
+        return "launcher" if self.spaces else "home"
+
+    def _go_root(self, cause="home"):
+        """Hold 1, the picker's Back / Switch and every "Home from anywhere" (r3: the launcher)."""
+        if self.screen.mode == "seek":
+            self._leave_seek(flush=True)
+        self._new_screen(self._root(), self.display_volume, cause)
+
+    def set_spaces(self, on):
+        """r3 navigation on (presentation >= 6) or off (r2.2 exactly). Leaves a space the other
+        navigation does not have for its Home; the caller's next entry (set_hardware) sends it."""
+        on = bool(on)
+        if on == self.spaces:
+            return
+        self.spaces = on
+        if self.screen.mode in ("launcher", "onshape") + LIGHTS_MODES and not on:
+            self._cancel_due(self.screen.view_id)
+            self.screen = Screen(mode="home", index=self.display_volume)
+        elif on and self.screen.mode == "home":
+            self._cancel_due(self.screen.view_id)
+            self.screen = Screen(mode="launcher", index=self.display_volume)
+
     # ------------------------------------------------------------------ bounds and control
+    # ------------------------------------------------------------------ r3.1 helpers
+    def _lights_domain(self):
+        """r3.1: the launcher's knob sets the Lights area's brightness (hold 4 swapped it)."""
+        return bool(self.spaces and self.screen.mode == "launcher" and self.home_domain == "lights")
+
+    def _lights_knob(self):
+        """The knob sets the lights now: the Lights space, or the launcher in its lights domain."""
+        return self.screen.mode == "lights" or self._lights_domain()
+
+    def _lights_knob_mode(self):
+        """bri | temp of the lights knob: the launcher's lights domain is always brightness."""
+        return self.lights_mode if self.screen.mode == "lights" else "bri"
+
+    def _recent_source(self):
+        """The knob list's source: r3 toggles Recently Added / Favourite playlists on button 3;
+        r2.2 is always Recently Added (its button 3 is Play next)."""
+        return self.list_source if self.spaces and self.list_source in LIST_SOURCES else "recent"
+
+    def _shown_source(self):
+        """The list source on screen (recent / explorer), else None."""
+        mode = self.screen.mode
+        if mode == "recent":
+            return self._recent_source()
+        if mode == "explorer" and self.screen.explorer is not None:
+            return self.screen.explorer.source
+        return None
+
+    def _tracks_queue(self):
+        """r3.1 whole-queue Tracks: the knob browses rows 1..T (the queue is the source)."""
+        if not self.spaces or self.source() != "queue":
+            return False
+        return self._position()[1] > 0
+
     def _list_count(self):
         mode = self.screen.mode
         if mode == "recent":
-            return self.recent.count()
+            return self._source_count(self._recent_source())
         if mode == "explorer":
             return self._source_count(self.screen.explorer.source)
         if mode == "upnext":
@@ -977,11 +1429,38 @@ class Controller:
             return len(self.screen.windows.items) if self.screen.windows else 0
         return 0
 
+    def _kelvin_range(self):
+        low = _clamp(self.lights.min_k, KELVIN_MIN, KELVIN_MAX)
+        high = _clamp(self.lights.max_k, low, KELVIN_MAX)
+        return low, high
+
     def bounds(self):
         mode = self.screen.mode
-        if mode == "home":
+        if mode == "onshape":
+            return ONSHAPE_BOUNDS
+        if mode in VOLUME_MODES and not self._lights_domain():
             return 0, 100, self.display_volume
+        if self._lights_knob():
+            if self._lights_knob_mode() == "temp":
+                low, high = self._kelvin_range()
+                count = (high - low) // KELVIN_STEP + 1
+                return 0, count - 1, _clamp((self.display_kelvin - low) // KELVIN_STEP, 0, count - 1)
+            # Brightness 1 % per detent. The control contract fixes min at 0 (device._enter and the
+            # firmware refuse any other min). While on, 0..99 = 1..100 % (DD-DES-003: the wall sits at
+            # the 1 % floor, no dead detent below it; All off turns the light off); from off 0..100,
+            # position 0 = off and the first detent turns it on at 1 %. The LED ring's local cursor
+            # (alive_lights._local / firmware cc_alive_local, style bri) must read the on frame as
+            # value = position + 1 (max 99) and the off frame as value = position (max 100).
+            if self.lights_display_on():
+                return 0, BRI_ON_HIGH, _clamp(self.display_bri, 1, 100) - 1
+            return 0, 100, 0
+        if mode == "scenes":
+            high = max(0, min(SCENES_MAX, len(self.lights.scenes)) - 1)
+            return 0, high, _clamp(self.screen.index, 0, high)
         if mode == "tracks":
+            if self._tracks_queue():
+                T = self._position()[1]
+                return 0, T - 1, _clamp(self.screen.index, 0, T - 1)
             return 0, 2, _clamp(self.screen.index, 0, 2)
         if mode == "seek":
             seek = self.screen.seek
@@ -989,18 +1468,72 @@ class Controller:
         high = max(0, self._list_count() - 1)
         return 0, high, _clamp(self.screen.index, 0, high)
 
+    @staticmethod
+    def required_profiles():
+        """Every profile name a control can ask for (DD-BUG-004)."""
+        return tuple(sorted(set(PROFILES.values()) | {LIGHTS_TEMP_PROFILE, QUEUE_PROFILE}))
+
+    def set_installed_profiles(self, profiles):
+        """The connected knob's inventory ({name: profile} or names; DD-BUG-004). Returns the required
+        names it lacks; their controls then use the nearest installed stand-in (`_installed_profile`)."""
+        if isinstance(profiles, dict):
+            names = [name for name in profiles if isinstance(name, str)]
+        elif isinstance(profiles, (list, tuple)):
+            names = [name for name in profiles if isinstance(name, str)]
+        else:
+            names = []
+        self.installed_profiles = tuple(names) if names else None
+        if self.installed_profiles is None:
+            self.missing_profiles = ()
+        else:
+            self.missing_profiles = tuple(name for name in self.required_profiles()
+                                          if name not in self.installed_profiles)
+            if self.missing_profiles:
+                _log.warning("Knob inventory lacks %s; using installed stand-ins", ", ".join(self.missing_profiles))
+        return self.missing_profiles
+
+    def _installed_profile(self, name):
+        """`name` when installed (or the inventory is unknown), else its nearest installed stand-in."""
+        installed = self.installed_profiles
+        if not installed or name in installed:
+            return name
+        for other in PROFILE_FALLBACKS.get(name, ()):
+            if other in installed:
+                return other
+        return installed[0]
+
+    @property
+    def profile_status(self):
+        """A precise status line while required profiles are missing ('' when all are installed)."""
+        if not self.missing_profiles:
+            return ""
+        used = sorted({self._installed_profile(name) for name in self.missing_profiles})
+        return PROFILE_MISSING_STATUS.format(names=", ".join(self.missing_profiles), used=", ".join(used))
+
     def control(self):
         low, high, position = self.bounds()
-        return {"id": self.control_id, "profile": PROFILES[self.screen.mode],
+        profile = PROFILES[self.screen.mode]
+        if self.screen.mode == "lights" and self.lights_mode == "temp":
+            profile = LIGHTS_TEMP_PROFILE
+        elif self.screen.mode == "tracks" and self._tracks_queue():
+            profile = QUEUE_PROFILE   # r3.1: the whole queue, one row per detent
+        elif self.screen.mode == "onshape":
+            profile = self.onshape_profile or PROFILES["onshape"]
+        profile = self._installed_profile(profile)
+        return {"id": self.control_id, "profile": profile, "feel": self.feel(),
                 "min": low, "max": high, "position": position,
-                "windowsButton": self.button_order[3], "buttonOrder": self.button_order[:],
-                "windowsHidEnabled": bool(self.windows_hid_enabled and self.screen.mode == "home"),
+                # The Win slot's raw button sends F24 (the knob's icon gate: that slot shows `win`).
+                # F24 is what opens the picker: the WM_HOTKEY grant is the only way Windows lets
+                # the picker take the foreground (a serial press alone is refused focus). r2.2:
+                # Home 4; r3: the launcher's 2 Windows (button 4 is Play/Pause there, never F24).
+                "windowsButton": self.windows_button, "buttonOrder": self.button_order[:],
+                "windowsHidEnabled": bool(self.windows_hid_enabled and self.screen.mode == self._root()),
                 "frame": self.frame(assume_ready=True)}
 
     # ------------------------------------------------------------------ transient copy (section 2.4)
     def _set_transient(self, copy_id, *, tone="meta", ms=REASON_META, text=None, **fields):
         """Show copy on the current screen's copy line; the id's twin follows the line."""
-        home = self.screen.mode == "home"
+        home = self.screen.mode in VOLUME_MODES
         if home and copy_id.startswith("knob.meta.") and copy_id.replace("knob.meta.", "knob.status.") in COPY:
             copy_id = copy_id.replace("knob.meta.", "knob.status.")
         elif not home and copy_id.startswith("knob.status.") and copy_id.replace("knob.status.", "knob.meta.") in COPY:
@@ -1019,11 +1552,16 @@ class Controller:
             return None
         return transient
 
-    def _feedback(self, kind, skip=0, *, moment=None, side=None, color=None):
-        """Arm a moment: a new seq plays exactly once (VOC section 4)."""
+    def _feedback(self, kind, skip=0, *, moment=None, side=None, color=None, haptic=None):
+        """Arm a moment: a new seq plays exactly once (VOC section 4). r4: it also arms its haptic event
+        (`haptic` a token to override the default of _feedback_haptic, False for none)."""
+        if haptic is not False:
+            self._haptic(haptic or self._feedback_haptic(kind, skip, moment, side))
         self.feedback_seq = self.feedback_seq % FEEDBACK_SEQ_MAX + 1
         self.feedback = {"kind": kind, "seq": self.feedback_seq}
-        if kind == "ok" and skip in (-1, 1):
+        if kind == "err" and moment == "refused":
+            self.feedback["moment"] = "refused"   # r3 (presentation 6): the unavailable-press flash
+        elif kind == "ok" and skip in (-1, 1):
             self.feedback["skip"] = skip
         elif kind == "ok" and moment:
             self.feedback["moment"] = moment
@@ -1033,6 +1571,92 @@ class Controller:
                 self.feedback["color"] = color
             if moment == "started":
                 self._started_seq = self.feedback_seq
+
+    # ------------------------------------------------------------------ r4 feel and haptics
+    def feel(self, mode=None):
+        """The r4 feel token of the current screen (r4 section 4.4): Home music volume detent.value; Home lights /
+        Lights brightness detent.dimmer, temperature detent.fine; Recently Added / Playlists detent.list (free.spin
+        over FREE_SPIN_MIN_ITEMS items); Tracks / Up next detent.list; Seek fluid.scrub; Windows / Scenes
+        detent.coarse; Onshape detent.value to zoom, fluid.light while a modifier (tilt / orbit / pan) is held."""
+        mode = self.screen.mode if mode is None else mode
+        if mode == "onshape":
+            return "fluid.light" if self._onshape_fluid() else "detent.value"
+        if mode == self.screen.mode and self._lights_knob():
+            return "detent.fine" if self._lights_knob_mode() == "temp" else "detent.dimmer"
+        if mode in VOLUME_MODES:
+            return "detent.value"
+        if mode == "seek":
+            return "fluid.scrub"
+        if mode in ("windows", "scenes"):
+            return "detent.coarse"
+        if mode in ("recent", "explorer"):
+            return "free.spin" if self._list_count() > FREE_SPIN_MIN_ITEMS else "detent.list"
+        if mode in ("tracks", "upnext"):
+            return "detent.list"
+        return "detent.value"
+
+    def _onshape_fluid(self):
+        """Onshape: a held modifier drags (fluid.light), the way the injector reads it: never while the command
+        wheel or parameter mode owns the knob, nor for a swallowed key (a ring switch / a parameter step), so those
+        keys never re-enter (a re-entry re-activates the injector, which would close the wheel / parameter mode)."""
+        slot = self.onshape_keys.modifier_slot()
+        if self.app_profile is not None:
+            # App profiles: a drag slot (held, or the knob alone: Plasticity's zoom) is fluid; wheel / keys slots click.
+            spec = self.app_profile.slots.get("knob") if slot is None else slot_of_button(self.app_profile, slot)
+            if spec is None or spec.kind != "drag" or (slot is not None and slot in self._onshape_swallowed):
+                return False
+            return not (self._onshape_wheel_open() or self._onshape_param_on())
+        if slot is None or slot in self._onshape_swallowed:
+            return False
+        return not (self._onshape_wheel_open() or self._onshape_param_on())
+
+    def _onshape_wheel_open(self):
+        """The command wheel is open, as OnshapeApp.down / up / chord / seed track it: 3 went down with none of 1 / 2 / 4
+        down and parameter mode off, and it is still down under the same control (a re-activation resets the app)."""
+        return self._onshape_wheel is not None and self._onshape_wheel == self.control_id \
+            and self.onshape_app is not None and self.onshape_keys.is_down(self._app_wheel_button())
+
+    def _app_wheel_button(self):
+        """The logical button that holds the command wheel open: 3 for Onshape, the profile's commands slot otherwise
+        (None: the profile has no wheel)."""
+        return 2 if self.app_profile is None else wheel_button(self.app_profile)
+
+    def _onshape_param_on(self):
+        """Parameter mode is on: the injector's snapshot says so, unless 3's release just ended it (the snapshot is
+        polled once a tick, so it may still show `param` for a moment)."""
+        app = self.onshape_app
+        if not isinstance(app, dict) or "param" not in app:
+            return False
+        left = self._onshape_param_left_at
+        return left is None or self.clock() - left >= ONSHAPE_PARAM_LAG
+
+    def _haptic(self, token):
+        """Arm a haptic event (r4 4.2): a new seq plays exactly once on a hapticFx knob (every later frame carries
+        it until the next). refuse.buzz and error.buzz at most once a second each (the knob enforces it too)."""
+        if token not in HAPTIC_TOKENS:
+            return
+        if token in ("refuse.buzz", "error.buzz"):
+            now = self.clock()
+            last = self._haptic_buzz_at.get(token)
+            if last is not None and now - last < HAPTIC_BUZZ_GAP:
+                return
+            self._haptic_buzz_at[token] = now
+        self.haptic_seq = self.haptic_seq % FEEDBACK_SEQ_MAX + 1
+        self.haptic = {"token": token, "seq": self.haptic_seq}
+
+    @staticmethod
+    def _feedback_haptic(kind, skip, moment, side):
+        """The haptic event a feedback moment carries by default (r4 4.4): refusals buzz, errors buzz slower; a
+        skip or a window snap nudges its way; a queue landing and a started list thump; the rest ticks."""
+        if kind == "err":
+            return "refuse.buzz" if moment == "refused" else "error.buzz"
+        if skip in (-1, 1):
+            return "nudge.right" if skip == 1 else "nudge.left"
+        if moment == "snap":
+            return "nudge.left" if side == -1 else "nudge.right"
+        if moment in ("queued", "started"):
+            return "confirm.thump"
+        return "confirm.tick"
 
     # ------------------------------------------------------------------ toasts (section 12)
     def _toast(self, copy_id, **fields):
@@ -1074,10 +1698,20 @@ class Controller:
         if not self._accepts(control_id) or type(position) is not int:
             return
         low, high, current = self.bounds()
+        if self._lights_bri_frame() is not None:
+            # DD-DES-003: brightness has two frames (on 0..99, off 0..100); a detent reads in the frame the
+            # knob holds (its control or last turn) until a re-entry moves it to the other one.
+            low, high, current = self._knob_bounds
         if not low <= position <= high or position == current:
             return
         now = self.clock()
         mode = self.screen.mode
+        if mode == "onshape":
+            # The injector turns detents into input; the controller only re-centres the knob's control.
+            self.last_knob_input = self._last_detent = now
+            if abs(position - ONSHAPE_BOUNDS[2]) > ONSHAPE_RECENTRE:
+                self._request_passive("onshape recentre")
+            return
         if self._play_window(now):
             return
         if mode == "explorer" and now < self.screen.explorer.swap_until:
@@ -1087,8 +1721,15 @@ class Controller:
         self.last_knob_input = now
         self._detent_dir = 1 if position > current else -1
         self._last_detent = now
-        if mode == "home":
-            if not self.state["online"]:
+        if self._lights_knob():
+            self._lights_turn(position, low, high, now)
+            return
+        if mode in VOLUME_MODES:
+            if not self.state["online"] or self.onshape_pending:
+                # A0: Sonos volume ignores the knob while a switch to Onshape is pending. DD-BUG-003: the
+                # knob's absolute position moved anyway, so it is re-anchored at the shown volume once it
+                # rests (else the first detent after Sonos returns jumps the volume to the drifted spot).
+                self._request_passive("ignored turn")
                 return
             self.desired_volume = position
             self._reveal_volume(VOLUME_REVEAL_SECONDS, "local")
@@ -1096,16 +1737,25 @@ class Controller:
             self.volume_due = max(now, self.last_volume_write + 0.1)
             return
         self.screen.index = position
+        if self.spaces and mode in ("tracks", "upnext", "windows") and self.transient is not None:
+            self.transient = None   # r3 (README 2.2): a turn on these screens clears the message line
         if mode == "recent":
-            self._recent_moved()
+            if self._recent_source() == "favourites":
+                self._favourites_moved()
+            else:
+                self._recent_moved()
         elif mode == "explorer":
             self._explorer_moved()
         elif mode == "tracks":
+            if self._tracks_queue():
+                self._tracks_fetch()
+        elif mode == "scenes":
             pass
         elif mode == "seek":
             seek = self.screen.seek
             seek.target_s = seek.t(position)
-            seek.due = now + SEEK_DEBOUNCE
+            if not self.spaces:
+                seek.due = now + SEEK_DEBOUNCE   # r2.2: the live scrub (r3 applies it on Set only)
             seek.idle_due = now + SEEK_IDLE
             # A turn during a jump only moves the frozen target (C5-68). A job still queued on
             # the audio lane reads this newest target when it starts (the volume pattern).
@@ -1130,8 +1780,8 @@ class Controller:
     def button(self, logical, control_id=None, hid=False):
         if not self._accepts(control_id) or logical not in (0, 1, 2, 3):
             return
-        if logical == 3 and hid:
-            return  # the F24 path already acted (VOC section 2.5)
+        if hid:
+            return  # this press also sent F24: the hotkey path already acted (VOC section 2.5)
         now = self.clock()
         if self._play_window(now):
             return  # every button and hold (C5-9)
@@ -1144,10 +1794,22 @@ class Controller:
         if code is not None:
             self._refuse(logical, code)
             return
+        # 2026-09-30 (the user: every interaction has a sound and a haptic): every accepted press ticks (opening a menu,
+        # Back, Home, a source switch...). Armed first, so a screen the press enters carries it in its entry frame; a
+        # press that thumps, nudges or buzzes arms its own event after this one, and only the newest seq plays.
+        self._haptic("confirm.tick")
         getattr(self, "_press_" + mode)(logical, now)
 
     def hold(self, logical, control_id=None):
-        """The firmware's 600 ms hold (`kh`), logical 0 only, once per event (section 4.2)."""
+        """The firmware's hold (`kh`), once per event (section 4.2): logical 0 (600 ms) = Home / Back.
+        r3.1 (presentation 6): logical 3 (1.0 s) = the screen's secondary action (`_hold_4`); the
+        runtime has already dropped that press's tap. Holds of logical 1 and 2 are ignored. Onshape mode
+        has no holds (1 is ZOOM, 4 PAN; Home is all four held: onshape_home_chord)."""
+        if self.screen.mode == "onshape":
+            return
+        if logical == 3 and self.spaces and self._accepts(control_id):
+            self._hold_4(control_id)
+            return
         if logical != 0 or not self._accepts(control_id):
             return
         now = self.clock()
@@ -1155,13 +1817,14 @@ class Controller:
             return
         self.last_knob_input = now
         mode = self.screen.mode
-        if mode == "home":
+        if mode == self._root():
             return
-        if mode in ("recent", "tracks"):
-            self._go_home("hold")
+        self._haptic("confirm.thump")   # r4 4.4: hold 1 = tension -> thump -> Home
+        if mode in ("recent", "tracks", "home") + LIGHTS_MODES:
+            self._go_root("hold")
         elif mode == "seek":
             self._leave_seek(flush=True)
-            self._new_screen("home", self.display_volume, "hold")
+            self._new_screen(self._root(), self.display_volume, "hold")
         elif mode == "explorer":
             self._close_explorer("hold")
         elif mode == "upnext":
@@ -1172,6 +1835,118 @@ class Controller:
                 windows.latched_close = "hold"
             else:
                 self._close_windows("hold")
+
+    # ------------------------------------------------------------------ hold 4 (r3.1)
+    def _hold_actions(self):
+        """{mode: action(now)} of hold 4: the launcher's knob domain swap, and "queue / Play next"
+        in the music lists (Recently Added / Playlists, the explorer's both sources, Up next)."""
+        return {"launcher": self._swap_domain, "recent": self._hold_queue_list, "explorer": self._hold_queue_list,
+                "upnext": self._hold_move_next}
+
+    def hold_action(self, mode=None):
+        """Read-only: the label of hold 4 on `mode` (default: now), or '' where hold 4 does not exist
+        (r3.1 design `hasHold4`: Home, Recently Added / Playlists, the explorer and Up next only; the
+        runtime lets a `kh` elsewhere pass, so 4 acts on its release). The Navigator's HOLD chip."""
+        mode = self.screen.mode if mode is None else mode
+        if not self.spaces or mode == "onshape":
+            return ""   # A0: Onshape mode has no hold 4 (4 is pan's modifier)
+        if mode == "launcher":
+            return "Knob to music" if self.home_domain == "lights" else "Knob to lights"
+        if mode in ("recent", "explorer"):
+            return "Queue"
+        if mode == "upnext":
+            return "Play next"
+        return ""
+
+    def _hold_4(self, control_id):
+        """Hold 4 (>= 1.0 s): the screen's secondary action; where a screen has none, the hold is
+        simply the press (the runtime suppressed the tap when the hold matured)."""
+        now = self.clock()
+        if self._play_window(now):
+            return
+        mode = self.screen.mode
+        action = self._hold_actions().get(mode)
+        if action is None:
+            self.button(3, control_id)
+            return
+        self.last_knob_input = now
+        if mode == "explorer" and now < self.screen.explorer.swap_until:
+            return   # a tab swap is running: the focus belongs to neither source yet (section 3.4)
+        if mode == "upnext" and now < self.screen.upnext.swap_until:
+            return
+        code = self._hold_code(mode)
+        if code is not None:
+            self._refuse(3, code, hold=True)
+            return
+        action(now)
+
+    def _queue_code(self, source, item):
+        """Play next's own dims (section 3.1 Recent 3) for `item` of the list `source`."""
+        state = self._source_state(source)
+        code = self._list_codes(state, item, item is not None, source)
+        if code is None and source == "favourites" and item is not None:
+            if (self.favourites.meta.get(_item_id(item)) or {}).get("empty"):
+                code = "item_unavailable"
+        if code is None:
+            code = self._src_code() or ("sonos_shuffle" if self.sonos_shuffle() else None)
+        return code
+
+    def _hold_code(self, mode):
+        if mode == "launcher":
+            return None
+        if mode in ("recent", "explorer"):
+            source = self._shown_source()
+            return self._queue_code(source, self._source_item(source, self.screen.index))
+        if mode == "upnext":
+            upnext = self.screen.upnext
+            focus_row = self._upnext_focus_row()
+            if upnext.loading or (focus_row is None and not self._upnext_on_card()):
+                return "loading"
+            if self._upnext_on_card():
+                return "sonos_card"
+            if focus_row.get("row") == upnext.P:
+                return "already_playing"   # r3.1 design: the playing row cannot play next
+            busy = self._busy_code()
+            if busy:
+                return busy
+            if not self.state["online"]:
+                return "sonos_unavailable"
+            return None
+        return None
+
+    def _swap_domain(self, now):
+        """Launcher hold 4: the knob swaps music volume <-> the Lights area's brightness (1b)."""
+        self.home_domain = "lights" if self.home_domain != "lights" else "volume"
+        self._volume_reveal_until = 0.0
+        self._lights_reveal_until = 0.0
+        lights = self.home_domain == "lights"
+        self._set_transient("knob.status.domain.lights" if lights else "knob.status.domain.volume", tone="warm",
+                            ms=DOMAIN_META)
+        self._feedback("ok", haptic="confirm.thump")   # r3.1 (Job B): the landing flash; r4: a hold landing thumps
+        self._reenter("home domain")
+        if lights:
+            self._lights_read()
+
+    def _hold_queue_list(self, now):
+        """Recently Added / Playlists (knob list or explorer) hold 4: Play next (section 9.3)."""
+        source = self._shown_source()
+        item = self._source_item(source, self.screen.index)
+        if item is None:
+            return
+        self._feedback("ok", moment="queued")   # r3.1 (Job B): the green landing at the hold, not the result
+        if source == "favourites":
+            self._dispatch_play_next(item, kind="playlist", accent=self._accent("playlist", item))
+        else:
+            self._dispatch_play_next(item)
+
+    def _hold_move_next(self, now):
+        """Up next hold 4: the focused row plays next (`move_next`, section 9.4)."""
+        upnext = self.screen.upnext
+        row = self._upnext_focus_row()
+        self._feedback("ok", moment="queued")   # r3.1 (Job B): the green landing at the hold
+        self.move_next_request = self.request("move_next", row=row["row"],
+                                              expected_group_revision=self.state["group_revision"],
+                                              expected_update_id=upnext.revision, item=_descriptor(row))
 
     def limit(self, direction, control_id=None):
         """An end-stop push (`lim`): Seek limit line and idle re-arm, overlay end bumps, lifetime."""
@@ -1201,9 +1976,19 @@ class Controller:
         self.hardware = enabled
         if enabled:
             self.last_poll = -10.0
-            if self.screen.mode != "home":
+            # DD-BUG-007: a re-home without a disconnect first (the knob after a recalibration) leaves
+            # every mode the way disconnected() does: overlays close at once (no focus restore, no U12),
+            # Seek drops its unsent target, Onshape lets go of its keys. The entry below is the only one.
+            mode = self.screen.mode
+            if mode in OVERLAY_MODES:
+                self._close_overlay_now("disconnect")
+            elif mode == "seek":
+                self._leave_seek(flush=False, drop=True)
+            elif mode == "onshape":
+                self._onshape_reset()
+            if self.screen.mode != self._root():
                 self._cancel_due(self.screen.view_id)
-                self.screen = Screen(mode="home", index=self.display_volume)
+                self.screen = Screen(mode=self._root(), index=self.display_volume)
             self._enter("reconnect")
         else:
             self._enter("hardware off")
@@ -1225,9 +2010,11 @@ class Controller:
         self.transient = None
         self._toasts = []
         self._passive = None
-        if self.screen.mode != "home":
+        self._clear_lights_intent()
+        self._lights_reveal_until = 0.0
+        if self.screen.mode != self._root():
             self._cancel_due(self.screen.view_id)
-            self.screen = Screen(mode="home", index=self.display_volume)
+            self.screen = Screen(mode=self._root(), index=self.display_volume)
 
     def set_reduced_motion(self, on):
         self.reduced_motion = bool(on)
@@ -1237,7 +2024,7 @@ class Controller:
         is the knob's own button (its `kd` is dropped as `hid`), so it counts as knob input for
         the lifetime idle (section 13.1)."""
         self.last_knob_input = self.clock()
-        if self.screen.mode != "home" or any(e.get("kind") == "windows_open" for e in self.pending.values()):
+        if self.screen.mode != self._root() or any(e.get("kind") == "windows_open" for e in self.pending.values()):
             return
         self.request("windows_open")
 
@@ -1254,8 +2041,8 @@ class Controller:
             self._close_explorer("hold")
         elif self.screen.mode == "upnext":
             self._close_upnext("hold")
-        elif self.screen.mode != "home":
-            self._go_home("home")
+        elif self.screen.mode != self._root():
+            self._go_root("home")
 
     def close_overlay(self, reason):
         """Lifetime closes (section 13.1): lock, sleep, idle, group, foreground, source, disconnect.
@@ -1350,17 +2137,29 @@ class Controller:
         now = self.clock()
         explorer = self.screen.explorer
         index = explorer.index_by_source.get("recent", 0)
+        source = "recent"
+        if self.spaces:
+            # r3.1: the knob list returns on the explorer's source and focus (the tabs stay in sync).
+            source = explorer.source if explorer.source in LIST_SOURCES else "recent"
+            explorer.index_by_source[source] = self.screen.index
+            self.list_source = source
+            self._list_index.update({key: value for key, value in explorer.index_by_source.items()
+                                     if key in LIST_SOURCES})
+            index = explorer.index_by_source.get(source, 0)
         if emit:
             self._present("explorer_close", t0=now, reason=reason, close_at_ms=0)
         if reason in ("hold", "disconnect"):
             if reason == "disconnect":
                 self._cancel_due(self.screen.view_id)
-                self.screen = Screen(mode="home", index=self.display_volume)
+                self.screen = Screen(mode=self._root(), index=self.display_volume)
                 return
-            self._new_screen("home", self.display_volume, "hold")
+            self._new_screen(self._root(), self.display_volume, "hold")
             return
         self._new_screen("recent", index, reason)
-        self._recent_moved(schedule_preresolve=False)
+        if source == "favourites":
+            self._request_playlist_meta()
+        else:
+            self._recent_moved(schedule_preresolve=False)
 
     def _close_upnext(self, reason, emit=True):
         now = self.clock()
@@ -1373,12 +2172,13 @@ class Controller:
             self._exit_toast(armed, now)
         if reason == "disconnect":
             self._cancel_due(self.screen.view_id)
-            self.screen = Screen(mode="home", index=self.display_volume)
+            self.screen = Screen(mode=self._root(), index=self.display_volume)
             return
         if reason == "hold":
-            self._new_screen("home", self.display_volume, "hold")
+            self._new_screen(self._root(), self.display_volume, "hold")
             return
-        self._enter_tracks(parent, reason)
+        focus = self.screen.index if self.spaces else None
+        self._enter_tracks(parent, reason, focus=focus)   # r3.1: Tracks takes Up next's row
 
     def _close_windows(self, reason, emit=True):
         """Picker closes: back/hold/lock/sleep/idle apply U12 and go through `windows_cancel`, which
@@ -1405,9 +2205,9 @@ class Controller:
                 self._cancel_pending = None
         if reason == "disconnect":
             self._cancel_due(self.screen.view_id)
-            self.screen = Screen(mode="home", index=self.display_volume)
+            self.screen = Screen(mode=self._root(), index=self.display_volume)
             return
-        self._new_screen("home", self.display_volume, reason)
+        self._new_screen(self._root(), self.display_volume, reason)
 
     def _window_app(self, item_id):
         if item_id is None:
@@ -1458,13 +2258,20 @@ class Controller:
         return False
 
     # ------------------------------------------------------------------ refusals (section 3.3)
-    def _reason(self, code, slot):
-        """(copy_id, tone, seconds, toast_id) or None when the press is ignored (C5-59)."""
+    def _reason(self, code, slot, hold=False):
+        """(copy_id, tone, seconds, toast_id) or None when the press is ignored (C5-59). `hold`:
+        r3.1's hold 4 (queue / Play next) takes Play next's reasons."""
         mode = self.screen.mode
+        if self.spaces and code == "neutral":
+            if mode == "tracks" and self._tracks_queue():
+                return "knob.meta.tracks.browse", "error", R3_REFUSED_META, None   # r3.1 whole queue
+            return "knob.meta.skip.choose", "error", R3_REFUSED_META, None   # README 6
+        if self.spaces and code == "seeking":
+            return "knob.meta.skip.seeking", "error", R3_REFUSED_META, None
         if code in ("loading", "empty", "neutral", "seeking", "sonos_card"):
             return None
         if code == "starting":
-            if mode == "home" and slot == 0:
+            if mode in VOLUME_MODES and slot == self._play_slot():
                 return None
             return "knob.meta.busy.starting", "meta", REASON_META, None
         if code == "queueing":
@@ -1479,7 +2286,7 @@ class Controller:
                 return None
             return "knob.meta.busy.shuffling", "meta", REASON_META, None
         if code == "transport_pending":
-            if mode == "home":
+            if mode in VOLUME_MODES:
                 return None
             if self._skip_command() is not None:
                 return None
@@ -1492,19 +2299,26 @@ class Controller:
                 return None
             return "knob.meta.shuffle.nothing", "meta", REASON_META, None
         if code == "sonos_unavailable":
-            return ("knob.status.sonos_unavailable" if mode == "home" else "knob.meta.sonos_unavailable"), \
+            return ("knob.status.sonos_unavailable" if mode in VOLUME_MODES else "knob.meta.sonos_unavailable"), \
                 "meta", REASON_META, None
         if code == "nothing_playing":
+            if self.spaces:
+                # r3.1 design: Music 3 `Nothing loaded`; Play `Nothing loaded · pick in Recent`.
+                if mode == "home" and slot == 2:
+                    return "knob.status.nothing_loaded", "error", R3_REFUSED_META, None
+                return "knob.status.nothing_loaded_pick", "error", R3_REFUSED_META, None
             return "knob.status.nothing_playing", "meta", REASON_META, None
         if code == "signin_expired":
             return "knob.meta.signin_expired", "error", SIGNIN_META, None
+        if code == "signin_needed":
+            return "knob.meta.signin_needed", "error", SIGNIN_META, None
         if code == "list_error":
             return "knob.meta.library_error", "meta", REASON_META, None
         if code == "item_unavailable":
             return "knob.meta.item_unavailable", "meta", REASON_META, None
         if code.startswith("src_"):
             cls = code[4:]
-            if mode == "recent":
+            if mode == "recent" or (hold and mode == "explorer"):
                 toast = "toast.playnext.none" if cls == "none" else "toast.playnext.not_queue"
                 return "knob.meta.playnext." + cls, "meta", REASON_META, toast
             if slot == 2 and mode == "tracks":
@@ -1525,11 +2339,33 @@ class Controller:
             return "knob.meta.windows.closed", "meta", REASON_META, None
         if code == "unlike_unavailable":
             return "knob.meta.like.unlike_in_music", "meta", LIKE_FAIL_META, None
-        return None
+        if code == "scenes_choose":
+            return "knob.meta.scenes.choose", "error", REASON_META, None   # README 6: unavailable copy
+        if code == "lights_unavailable":
+            # r3.1 design (`lightsBlock`): the reason of the blocked state.
+            block = self.lights_block()
+            if block == "empty":
+                return "knob.meta.lights.none", "error", REASON_META, None
+            if block == "area":
+                return "knob.meta.lights.area_missing", "error", REASON_META, None
+            if block == "unav":
+                return "knob.meta.lights.unavailable", "error", REASON_META, None
+            if block == "connecting":
+                return "knob.title.lights_connecting", "meta", REASON_META, None
+            return "knob.meta.lights.not_connected", "error", REASON_META, None
+        if code == "no_scenes":
+            if self.lights.name:
+                return "knob.meta.lights.no_scenes_area", "error", REASON_META, None
+            return "knob.meta.lights.no_scenes", "meta", REASON_META, None
+        if code == "already_playing":
+            return "knob.meta.upnext.already_playing", "error", R3_REFUSED_META, None
+        if code == "no_temperature":
+            return "knob.meta.lights.no_temperature", "meta", REASON_META, None
+        return None   # lights_pending: ignored (C5-59)
 
-    def _refuse(self, slot, code):
+    def _refuse(self, slot, code, hold=False):
         """A press never acts on a dimmed button: reason copy + Head shake, unless ignored."""
-        reason = self._reason(code, slot)
+        reason = self._reason(code, slot, hold)
         if reason is None:
             return
         copy_id, tone, seconds, toast = reason
@@ -1537,9 +2373,17 @@ class Controller:
         if copy_id == "knob.meta.playnext.progress":
             job = self.play_next_job
             fields = {"k": job.k, "n": job.n}
-        self._set_transient(copy_id, tone=tone, ms=seconds, **fields)
-        self._feedback("err")
-        if toast and self.screen.mode == "recent" and slot == 2:
+        elif copy_id in ("knob.meta.lights.none", "knob.meta.lights.no_scenes_area"):
+            fields = {"name": self.lights.name or "the area"}
+        if self.spaces:
+            # r3 (README 1 "Unavailable buttons"): the reason in #FF8474 for at least 2 s and the
+            # bottom-segment red flash (feedback moment `refused`) instead of the head shake.
+            self._set_transient(copy_id, tone="error", ms=max(seconds, R3_REFUSED_META), **fields)
+            self._feedback("err", moment="refused")
+        else:
+            self._set_transient(copy_id, tone=tone, ms=seconds, **fields)
+            self._feedback("err", haptic="refuse.buzz")
+        if toast and self.screen.mode == "recent" and (hold or (slot == 2 and not self.spaces)):
             self._toast(toast)
 
     # ------------------------------------------------------------------ the button grammar (section 3.1)
@@ -1554,7 +2398,11 @@ class Controller:
         source = self.source()
         return None if source == "queue" else "src_" + source
 
-    def _buttons_home(self):
+    def _play_slot(self):
+        """The Play / Pause slot: button 4 in r3 (Home and Music), button 1 in r2.2."""
+        return 3 if self.spaces else 0
+
+    def _play_button(self):
         online = self.state["online"]
         playing = online and self.state.get("playback") == "PLAYING"
         token = "pause" if playing else "play"
@@ -1569,13 +2417,59 @@ class Controller:
             token = "pause" if command.get("direction") == "play" else "play"
         elif not self.has_media():
             code = "nothing_playing"
+        return self._btn(token, "Pause" if token == "pause" else "Play", code)
+
+    def _buttons_home(self):
+        online = self.state["online"]
         tracks_code = "sonos_unavailable" if not online else ("nothing_playing" if not self.has_media() else None)
-        return [self._btn(token, "Pause" if token == "pause" else "Play", code),
+        if self.spaces:
+            # r3 Music space: 1 Home · 2 Recently Added · 3 Tracks · 4 Play / Pause.
+            return [self._btn("house", "Home"), self._btn("album", "Recent"),
+                    self._btn("tracks", "Tracks", tracks_code), self._play_button()]
+        return [self._play_button(),
                 self._btn("list", "Browse"),
                 self._btn("tracks", "Tracks", tracks_code),
                 self._btn("win", "Win")]
 
-    def _list_codes(self, lst_state, item, focused_loaded):
+    def _buttons_launcher(self):
+        """r3 Home (1a Launcher): 1 Music · 2 Windows · 3 Lights · 4 Play / Pause; r3.1: in the
+        lights domain (hold 4) button 4 is the area's power (All off / Turn on)."""
+        fourth = self._power_button() if self._lights_domain() else self._play_button()
+        return [self._btn("list", "Music"), self._btn("win", "Win"), self._btn("bulb", "Lights"), fourth]
+
+    def _lights_code(self):
+        """r3.1: every blocked state dims 2-4 with its own reason (`_reason` "lights_unavailable")."""
+        return "lights_unavailable" if self.lights_block() is not None else None
+
+    def _power_button(self):
+        """All off / Turn on (Lights 4, the launcher's lights domain 4)."""
+        code = self._lights_code()
+        power_code = code or ("lights_pending" if self.lights_command is not None else None)
+        return self._btn("power", "All off" if self.lights_display_on() else "Turn on", power_code)
+
+    def _buttons_lights(self):
+        """r3 Lights (1e): 1 Home · 2 Scenes list · 3 Temperature on/off · 4 All off / Turn on."""
+        lights = self.lights
+        code = self._lights_code()
+        scenes_code = code or (None if lights.scenes else "no_scenes")
+        temp_code = code or (None if lights.supports_ct else "no_temperature")
+        temp = self._btn("thermo", "Temp", temp_code, lit="on" if self.lights_mode == "temp" else None)
+        return [self._btn("house", "Home"), self._btn("wand", "Scenes", scenes_code), temp, self._power_button()]
+
+    def _buttons_scenes(self):
+        """r3 Scenes list: 1 Back → Lights · 4 Run; 2 and 3 dimmed (`Turn to choose · 4 runs it`)."""
+        code = self._lights_code()
+        run_code = code or ("empty" if not self.lights.scenes else
+                            ("lights_pending" if self.lights_command is not None else None))
+        return [self._btn("back", "Back"), self._btn("", "", "scenes_choose"), self._btn("", "", "scenes_choose"),
+                self._btn("switch", "Run", run_code)]
+
+    def _signin_code(self, source="recent"):
+        """The dim of a list in state ``signin``: never connected or expired (DD-BUG-023)."""
+        lst = self.recent if source == "recent" else self.favourites
+        return "signin_needed" if lst.signin_needed else "signin_expired"
+
+    def _list_codes(self, lst_state, item, focused_loaded, source="recent"):
         """The shared first dims of Recent 3/4 and Explorer 4 (loading ... item_unavailable)."""
         if lst_state == "loading" or not focused_loaded:
             if lst_state not in ("empty", "signin", "error"):
@@ -1583,7 +2477,7 @@ class Controller:
         if lst_state == "empty":
             return "empty"
         if lst_state == "signin":
-            return "signin_expired"
+            return self._signin_code(source)
         if lst_state == "error":
             return "list_error"
         busy = self._busy_code()
@@ -1596,30 +2490,49 @@ class Controller:
         return None
 
     def _buttons_recent(self):
+        if self.spaces:
+            return self._buttons_recent_r3()
         lst = self.recent
         item = lst.item(self.screen.index)
         loaded = item is not None
-        open_code = "signin_expired" if lst.state == "signin" else ("list_error" if lst.state == "error" else None)
+        open_code = self._signin_code() if lst.state == "signin" else ("list_error" if lst.state == "error" else None)
         play_code = self._list_codes(lst.state, item, loaded)
         next_code = play_code
         if next_code is None:
             next_code = self._src_code() or ("sonos_shuffle" if self.sonos_shuffle() else None)
-        return [self._btn("back", "Back"), self._btn("expand", "Open", open_code),
+        return [self._btn("back", "Back"), self._btn("expand", "Full screen" if self.spaces else "Open", open_code),
                 self._btn("playnext", "Play next", next_code), self._btn("play", "Play", play_code)]
+
+    def _buttons_recent_r3(self):
+        """r3.1 Recently Added: 1 Back · 2 Full screen · 3 Playlists / Recent (the list's source) ·
+        4 Play (hold 4: Play next, gated by Play next's own dims)."""
+        source = self._recent_source()
+        item = self._source_item(source, self.screen.index)
+        state = self._source_state(source)
+        open_code = self._signin_code(source) if state == "signin" else ("list_error" if state == "error" else None)
+        play_code = self._list_codes(state, item, item is not None, source)
+        if play_code is None and source == "favourites" and item is not None:
+            if (self.favourites.meta.get(_item_id(item)) or {}).get("empty"):
+                play_code = "item_unavailable"
+        # r3.1 design: one list-music icon (`playlists`), lit amber (`act`) on Favourite playlists.
+        toggle = self._btn("playlists", "Playlists") if source == "recent" else \
+            self._btn("playlists", "Recent", lit="on")
+        return [self._btn("back", "Back"), self._btn("expand", "Full screen", open_code), toggle,
+                self._btn("play", "Play", play_code)]
 
     def _buttons_explorer(self):
         explorer = self.screen.explorer
         source = explorer.source
         item = self._source_item(source, self.screen.index)
         state = self._source_state(source)
-        code = self._list_codes(state, item, item is not None)
+        code = self._list_codes(state, item, item is not None, source)
         if code is None and source == "favourites" and item is not None:
             meta = self.favourites.meta.get(_item_id(item)) or {}
             if meta.get("empty"):
                 code = "item_unavailable"
         recent_on = source == "recent"
         return [self._btn("back", "Back"),
-                self._btn("clock", "Recent", lit="on" if recent_on else "off"),
+                self._btn("album" if self.spaces else "clock", "Recent", lit="on" if recent_on else "off"),
                 self._btn("playlists", "Playlists", lit="off" if recent_on else "on"),
                 self._btn("play", "Play", code)]
 
@@ -1630,7 +2543,9 @@ class Controller:
 
     def _queue_end(self, index):
         """Tracks 4 at a queue end: 'end' / 'start' (the press is refused), or None."""
-        if self.source() != "queue" or self.state.get("repeat") == "all" or self.sonos_shuffle():
+        # r4 4.3 (walls everywhere, no wrap-around): repeat-all no longer lets Next wrap to track 1 or Previous to
+        # the last track; the queue's ends are walls like every other list's.
+        if self.source() != "queue" or self.sonos_shuffle():
             return None
         P, T = self._position()
         if index == 2 and T and P >= T:
@@ -1648,6 +2563,20 @@ class Controller:
             seek_code = "no_length"
         if seek_code is None and self.start is not None:
             seek_code = "starting"
+        if self._tracks_queue():
+            # r3.1 whole queue: 4 plays the focused row (`jump`); on the playing row it is dimmed.
+            P, T = self._position()
+            play_code = None
+            if _clamp(self.screen.index, 0, T - 1) == P - 1:
+                play_code = "neutral"
+            elif not online:
+                play_code = "sonos_unavailable"
+            elif self._busy_code():
+                play_code = self._busy_code()
+            elif self.command_request is not None:
+                play_code = "transport_pending"
+            return [self._btn("back", "Back"), self._btn("expand", "Up next", upnext_code),
+                    self._btn("seek", "Seek", seek_code), self._btn("play", "Play", play_code)]
         skip_code = None
         if index == 1:
             skip_code = "neutral"
@@ -1676,6 +2605,11 @@ class Controller:
         return bool(self.state.get("can_seek"))
 
     def _buttons_seek(self):
+        if self.spaces:
+            # README 1.2 Seek: 1 Cancel (restores) · 2 Up next · 3 Set · 4 disabled.
+            # r3.1 design: 4 in Seek is the dimmed Play (`Set or cancel seek first`).
+            return [self._btn("back", "Cancel"), self._btn("expand", "Up next", self._tracks_upnext_code()),
+                    self._btn("seek", "Set", lit="on"), self._btn("play", "Play", "seeking")]
         return [self._btn("back", "Back"), self._btn("expand", "Up next", self._tracks_upnext_code()),
                 self._btn("seek", "Seek", lit="on"), self._btn("next", "Skip", "seeking")]
 
@@ -1744,28 +2678,406 @@ class Controller:
             left_btn.update(lit="on", color=self._accent("window", left))
         if right is not None:
             right_btn.update(lit="on", color=self._accent("window", right))
-        return [self._btn("back", "Back"), left_btn, right_btn, self._btn("switch", "Switch", code)]
+        first = self._btn("house", "Home") if self.spaces else self._btn("back", "Back")   # r3: a space root
+        return [first, left_btn, right_btn, self._btn("switch", "Switch", code)]
 
     # ------------------------------------------------------------------ Home (section 5.1)
+    def _toggle_playback(self):
+        direction, enabled = self.playback_action()
+        playback = self.state.get("playback")
+        if playback not in ("PLAYING", "PAUSED_PLAYBACK", "STOPPED") or not self.state.get("can_" + direction):
+            return  # an unstable transport: silently ignored (no blind toggle)
+        self.notice = ""
+        self._album_start_until = 0.0
+        self._haptic("confirm.tick")   # r4 4.4: Play / Pause ticks
+        self.command_request = self.request("transport", direction=direction,
+                                            expected_group_revision=self.state["group_revision"],
+                                            expected_track_id=self.state.get("track_id"))
+
+    def _lights_targets(self):
+        """The entity ids a brightness / temperature write goes to: the available lights that are
+        on; None (the whole area) when none is on or the adapter reports no per-light rows."""
+        members = [m for m in self.lights.members if isinstance(m, dict)]
+        on = [str(m.get("entity_id")) for m in members
+              if m.get("on") and m.get("available", True) is not False and m.get("entity_id")]
+        return on or None
+
+    def _lights_power(self):
+        """All off / Turn on of the Lights area (Lights 4; the launcher's lights domain 4)."""
+        on = not self.lights_display_on()
+        self._clear_lights_intent()
+        self._lights_reveal_until = 0.0
+        self._haptic("confirm.thump" if on else "confirm.off")   # r4 4.4: Turn on thumps, All off is one soft pulse
+        self.lights_command = self.request("lights_power", on=on)
+
     def _press_home(self, logical, now):
+        if self.spaces:
+            # r3 Music space.
+            if logical == 0:
+                self._go_root("home")
+            elif logical == 1:
+                self._browse()
+            elif logical == 2:
+                self._enter_tracks(1, "tracks")
+            elif logical == 3:
+                self._toggle_playback()
+            return
         if logical == 0:
-            direction, enabled = self.playback_action()
-            playback = self.state.get("playback")
-            if playback not in ("PLAYING", "PAUSED_PLAYBACK", "STOPPED") or not self.state.get("can_" + direction):
-                return  # an unstable transport: silently ignored (no blind toggle)
-            self.notice = ""
-            self._paused_since = None
-            self._paused_idle_cancelled = True
-            self._album_start_until = 0.0
-            self.command_request = self.request("transport", direction=direction,
-                                                expected_group_revision=self.state["group_revision"],
-                                                expected_track_id=self.state.get("track_id"))
+            self._toggle_playback()
         elif logical == 1:
             self._browse()
         elif logical == 2:
             self._enter_tracks(1, "tracks")
         elif logical == 3:
             self.open_windows()
+
+    def _press_launcher(self, logical, now):
+        if logical == 0:
+            if now - self._home_arrived_at < HOME_GUARD:
+                # README 1 overshoot guard: a 1 this soon after arriving Home is ignored.
+                self._set_transient("knob.status.home_guard", tone="secondary", ms=HOME_GUARD_META)
+                return
+            self._new_screen("home", self.display_volume, "music")
+        elif logical == 1:
+            self.open_windows()
+        elif logical == 2:
+            self._enter_lights("lights")
+        elif logical == 3:
+            if self._lights_domain():
+                self._lights_power()
+            else:
+                self._toggle_playback()
+
+    # ------------------------------------------------------------------ Lights (r3 README 1.2, 7)
+    def _enter_lights(self, cause, mode="bri"):
+        """Entering Lights from Home always starts in brightness (README 1.2)."""
+        self.lights_mode = mode
+        self._lights_reveal_until = 0.0
+        if cause == "lights":
+            self.transient = None   # Home's status copy does not follow into Lights
+        self._new_screen("lights", 0, cause)
+        self._lights_read()
+
+    def _lights_read(self):
+        if any(e.get("kind") == "lights_read" for e in self.pending.values()):
+            return
+        self.last_lights_poll = self.clock()
+        self.request("lights_read")
+
+    def _press_lights(self, logical, now):
+        lights = self.lights
+        if logical == 0:
+            self._go_root("home")
+        elif logical == 1:
+            index = 0
+            for position, scene in enumerate(lights.scenes):
+                if scene.get("entity_id") == lights.scene_id:
+                    index = position
+            self._lights_reveal_until = 0.0
+            self.transient = None
+            self._new_screen("scenes", index, "scenes")
+        elif logical == 2:
+            self.lights_mode = "bri" if self.lights_mode == "temp" else "temp"
+            self._lights_reveal_until = 0.0
+            self._set_transient("knob.meta.lights.knob_temperature" if self.lights_mode == "temp"
+                                else "knob.meta.lights.knob_brightness", tone="warm", ms=LIGHTS_MODE_META)
+            self._reenter("lights mode")
+        elif logical == 3:
+            self._lights_power()
+
+    def _press_scenes(self, logical, now):
+        if logical == 0:
+            self._enter_lights("back", self.lights_mode)
+        elif logical == 3:
+            scenes = self.lights.scenes
+            index = _clamp(self.screen.index, 0, max(0, len(scenes) - 1))
+            scene = scenes[index]
+            self._clear_lights_intent()
+            self._haptic("confirm.thump")   # r4 4.4: Scene run thumps (on the press)
+            self.lights_command = self.request("scene_run", entity_id=scene.get("entity_id"),
+                                               label=scene.get("label", ""))
+            self._enter_lights("scene run", self.lights_mode)
+
+    def _reveal_lights(self, kind, seconds, source):
+        self._lights_reveal_kind = kind
+        self._lights_reveal_until = self.clock() + seconds
+        self._lights_reveal_source = source
+
+    def _lights_reveal(self):
+        """'bri' / 'temp' while the big value shows (1.4 s after the last detent, 2.6 s after an
+        external change; held while a write is out), else None."""
+        if not self._lights_knob() or not self._lights_reveal_until:
+            return None
+        if self.clock() < self._lights_reveal_until or (self._lights_reveal_source == "local" and (
+                self.lights_intent() or self.lights_request is not None)):
+            return self._lights_reveal_kind
+        return None
+
+    def _lights_bri_frame(self):
+        """The brightness frame the knob holds (DD-DES-003): 1 = on (0..99 = 1..100 %), 0 = off (0..100, 0 = off),
+        None outside Lights brightness or before the knob holds a brightness control."""
+        if not self._lights_knob() or self._lights_knob_mode() == "temp" or self._knob_bounds is None:
+            return None
+        frame = tuple(self._knob_bounds[:2])
+        if frame == (0, BRI_ON_HIGH):
+            return 1
+        return 0 if frame == (0, 100) else None
+
+    def _lights_turn(self, position, low, high, now):
+        """A detent in Lights: brightness 1 % or temperature 100 K per detent; from off it turns the
+        light on (1 % or the stored level with the new temperature)."""
+        lights = self.lights
+        # The knob holds this position whether or not the turn is honoured (DD-BUG-003): an ignored turn
+        # (blocked, offline, no temperature) leaves bounds() != _knob_bounds, so _lights_tick re-anchors it.
+        self._knob_bounds = (low, high, position)
+        if self.lights_block() is not None:
+            if lights.online or self.lights_block() != "connecting":
+                self._refuse(3, "lights_unavailable")   # r3.1 design: the turn is denied with the reason
+            return
+        if not lights.online:
+            return
+        if self._lights_knob_mode() == "temp":
+            if not lights.supports_ct:
+                return
+            kelvin_low, kelvin_high = self._kelvin_range()
+            self._set_lights_intent(kelvin=_clamp(kelvin_low + position * KELVIN_STEP, kelvin_low, kelvin_high))
+            self._reveal_lights("temp", VOLUME_REVEAL_SECONDS, "local")
+        else:
+            offset = 1 if high == BRI_ON_HIGH else 0     # DD-DES-003: the on frame starts at 1 %
+            if not self.lights_display_on():
+                if position + offset < 1:
+                    return   # off: detent 0 is "off"; the first detent up turns it on at 1 %
+                if self.transient is not None and self.transient.copy_id == "knob.meta.lights.off":
+                    self.transient = None   # turning on: the All off copy no longer applies
+            # 1 % is the lowest level (position 0 while on); All off turns the light off.
+            self._set_lights_intent(bri=_clamp(position + offset, 1, 100))
+            self._reveal_lights("bri", VOLUME_REVEAL_SECONDS, "local")
+        if lights.scene_id:
+            lights.adjusted = True
+        self.lights_due = max(now, self.last_lights_write + LIGHTS_WRITE_INTERVAL)
+
+    def _lights_tick(self, now):
+        lights = self.lights
+        self._lights_settle(now)
+        if lights.online and self.lights_intent() and self.lights_request is None and now >= self.lights_due:
+            # r3.1 design: a turn changes only the lights that are on (all to the same value); from
+            # all off it turns every available light on (`targets` None: every available light).
+            reconcile, self._lights_reconcile = self._lights_reconcile, False
+            self.lights_request = self.request("lights_set", on_bri=lights.last_bri or None,
+                                               targets=self._lights_targets(),
+                                               **({"transition": 0} if reconcile else {}))
+            self.last_lights_write = now
+        if (self.screen.mode in LIGHTS_MODES or self._lights_domain()) and now - self.last_lights_poll >= LIGHTS_POLL:
+            self._lights_read()
+        # The knob follows a change it did not make (external, a scene, the lights coming online):
+        # a passive re-entry once the knob has rested (section 6.4), never over a pending write.
+        if (self._lights_knob() and not self.lights_intent() and self.lights_request is None
+                and self.lights_command is None and self._passive is None
+                and self._knob_bounds is not None and self.bounds() != self._knob_bounds):
+            self._request_passive("lights changed")
+        if self.screen.mode == "scenes":
+            low, high, _ = self.bounds()
+            if self._knob_bounds is not None and (low, high) != self._knob_bounds[:2] and self._passive is None:
+                self._request_passive("scenes changed")
+
+    def lights_state(self, state):
+        """A Home Assistant state (the adapter's read_state, from its stream or a read)."""
+        if not isinstance(state, dict):
+            return
+        lights = self.lights
+        now = self.clock()
+        before = (lights.on, lights.bri, lights.kelvin)
+        was_known, was_online = lights.known, lights.online
+        lights.configured = bool(state.get("configured"))
+        lights.online = bool(state.get("online"))
+        reason = state.get("reason")
+        lights.reason = "" if lights.online else (reason if isinstance(reason, str) and reason else "offline")
+        lights.scenes = [dict(scene) for scene in (state.get("scenes") or ())[:SCENES_MAX] if isinstance(scene, dict)
+                         and isinstance(scene.get("entity_id"), str)]
+        lights.snapshot = bool(state.get("snapshot"))
+        # r3.1 (Job C's area bridge): the area's name, its light count and the reason it is unusable
+        # arrive with every state, online or not ("no_lights" / "area_missing" are offline states).
+        if isinstance(state.get("name"), str):
+            lights.name = state["name"]
+        if "count" in state:
+            count = state.get("count")
+            lights.count = count if type(count) is int and count >= 0 else None
+        detail = state.get("detail")
+        lights.detail = detail if isinstance(detail, str) else ""
+        on_count = state.get("on_count")
+        lights.on_count = on_count if type(on_count) is int and on_count >= 0 else None
+        if "lights" in state:
+            lights.members = [dict(m) for m in (state.get("lights") or ()) if isinstance(m, dict)][:LIGHTS_MEMBERS_MAX]
+        if not lights.online:
+            if was_online:
+                self._clear_lights_intent()
+                self._lights_reveal_until = 0.0
+            return
+        values = {"on": bool(state.get("on")), "bri": _int(state.get("bri"), 0),
+                  "kelvin": state.get("kelvin") if type(state.get("kelvin")) is int else None}
+        self._lights_reported = dict(values)
+        expect = self._lights_expect
+        if expect is not None:
+            expected, until = expect
+            matches = all(values.get(key) == value for key, value in expected.items())
+            if matches or now >= until:
+                self._lights_expect = None
+            else:
+                # Our own write has not echoed yet: keep what we showed (no flicker back).
+                values = {key: expected.get(key, value) for key, value in values.items()}
+        settling = False
+        final = self._lights_final_live(now)
+        if final is not None:
+            raw = self._lights_reported
+            near = bool(raw.get("on")) and all(
+                raw.get(key) is None or abs(raw[key] - value) <= LIGHTS_NEAR[key] for key, value in final[0].items())
+            if near:
+                # Our last write, reported a little short (a fade ending short / a stale report): the knob keeps
+                # what was set, and the settle write (once) puts the lights exactly there.
+                settling = True
+                values = {key: final[0].get(key, value) for key, value in values.items()}
+                self._lights_correct(now)
+            else:
+                self._lights_final = None            # a real change (off, another app, a scene): shown
+        lights.on, lights.bri = values["on"], _clamp(values["bri"], 0, 100)
+        if lights.on and lights.bri < 1:
+            lights.bri = lights.last_bri or 1   # a Turn on whose level has not echoed yet
+        if lights.on and lights.bri >= 1:
+            lights.last_bri = lights.bri
+        if values["kelvin"] is not None:
+            lights.kelvin = values["kelvin"]
+        for key in ("min_k", "max_k"):
+            if type(state.get(key)) is int:
+                setattr(lights, key, _clamp(state[key], KELVIN_MIN, KELVIN_MAX))
+        if type(state.get("supports_ct")) is bool:
+            lights.supports_ct = state["supports_ct"]
+            if not lights.supports_ct and self.lights_mode == "temp":
+                self.lights_mode = "bri"
+        lights.known = True
+        after = (lights.on, lights.bri, lights.kelvin)
+        ours = (self.lights_intent() or self.lights_request is not None or self.lights_command is not None
+                or expect is not None or settling or now < self._scene_settle_until)
+        # User 2026-09-29: a light drifting its colour temperature a little after our brightness writes
+        # (4400 -> 4500 K) is not an external change: it flashed the knob's caption to Temperature mid-turn.
+        drift = (after[:2] == before[:2] and after[2] is not None and before[2] is not None
+                 and abs(after[2] - before[2]) <= LIGHTS_NEAR["kelvin"])
+        local = self._lights_reveal_source == "local" and self._lights_reveal() is not None
+        if was_known and was_online and after != before and not ours and not drift and not local:
+            # An external change (the HA app, a wall switch): the knob shows it for 2.6 s (r2.2 rule).
+            if lights.on:
+                kind = "temp" if after[:2] == before[:2] else "bri"
+                self._reveal_lights(kind, EXTERNAL_REVEAL_SECONDS, "external")
+            if lights.scene_id:
+                lights.adjusted = True
+        if self.screen.mode == "scenes" and self.screen.index >= len(lights.scenes):
+            self.screen.index = max(0, len(lights.scenes) - 1)
+
+    def _expect(self, **values):
+        self._lights_expect = (values, self.clock() + LIGHTS_ECHO)
+
+    def _lights_settle(self, now):
+        """The tick's side of the settle write (a short report that came while a write was in flight)."""
+        self._lights_correct(now)
+
+    def _lights_final_live(self, now):
+        """The last write's applied values while its settle window lasts (DD-BUG-002), else None (dropped)."""
+        final = self._lights_final
+        if final is not None and now - final[1] > LIGHTS_FINAL_WINDOW:
+            self._lights_final = None
+            return None
+        return final
+
+    def _lights_correct(self, now):
+        """From LIGHTS_SETTLE after the last write, once per write and only within LIGHTS_FINAL_WINDOW: when
+        the lights report (a little) another level or temperature than that write set, send it once more
+        without a fade."""
+        final = self._lights_final_live(now)
+        if final is None or final[2] or now - final[1] < LIGHTS_SETTLE:
+            return
+        if (not self.lights.online or self.lights_intent() or self.lights_request is not None
+                or self.lights_command is not None or now < self._scene_settle_until):
+            return
+        reported = self._lights_reported
+        if not reported.get("on"):
+            return                                   # turned off meanwhile (All off, a switch): leave it
+        differ = {key: value for key, value in final[0].items()
+                  if reported.get(key) is not None and reported.get(key) != value}
+        if differ:
+            self._lights_final = (final[0], final[1], True)
+            self._lights_reconcile = True
+            self._set_lights_intent(**differ)
+            self.lights_due = now
+
+    def _lights_failure(self, error, copy_id):
+        outcome = getattr(error, "outcome", None)
+        self._feedback("err")
+        if outcome == "auth":
+            self.lights.online, self.lights.reason = False, "auth"
+            self._set_transient("knob.meta.lights.signin", tone="error", ms=SIGNIN_META)
+        elif outcome == "forbidden":    # DD-BUG-049: HTTP 403 (an IP ban): offline until Settings fixes it
+            self.lights.online, self.lights.reason = False, "forbidden"
+            self._set_transient("knob.meta.lights.blocked", tone="error", ms=SIGNIN_META)
+        elif outcome == "not_allowed":
+            self._set_transient("knob.meta.lights.not_allowed", tone="error", ms=FAIL_META)
+        else:
+            if outcome in ("offline", "not_configured"):
+                self.lights.online, self.lights.reason = False, outcome
+            self._set_transient(copy_id, tone="error", ms=FAIL_META)
+
+    def _lights_set_result(self, effect, result, error):
+        if self.lights_request == effect["request"]:
+            self.lights_request = None
+        if error is not None:
+            if self._discarded(error):
+                return
+            self._clear_lights_intent()
+            self._lights_reveal_until = 0.0
+            self._lights_failure(error, "knob.meta.lights.failed")
+            return
+        result = dict(result or {})
+        applied = result.pop("_applied", None) or {}
+        applied = {key: applied.get(key) for key in ("bri", "kelvin") if type(applied.get(key)) is int}
+        expected = {"on": True, **applied}
+        self._clear_lights_intent(applied)
+        self._expect(**expected)
+        if applied:
+            self._lights_final = (dict(applied), self.clock(), effect.get("transition") == 0)
+        self.lights_state(result)
+
+    def _lights_power_result(self, effect, result, error):
+        if self.lights_command == effect["request"]:
+            self.lights_command = None
+        if error is not None:
+            if self._discarded(error):
+                return
+            self._lights_failure(error, "knob.meta.lights.failed")
+            return
+        on = bool(effect.get("on"))
+        self._lights_final = None   # DD-BUG-002: All off / Turn on supersedes the last level write
+        self._expect(on=on)
+        self.lights_state(result)
+        self._set_transient("knob.meta.lights.on" if on else "knob.meta.lights.off", tone="secondary",
+                            ms=FEEDBACK_META)
+
+    def _scene_run_result(self, effect, result, error):
+        if self.lights_command == effect["request"]:
+            self.lights_command = None
+        label = effect.get("label") or ""
+        if error is not None:
+            if self._discarded(error):
+                return
+            self._lights_failure(error, "knob.meta.scene.failed")
+            self._toast("toast.scene.failed", scene=label)
+            return
+        lights = self.lights
+        lights.scene_id, lights.scene_label, lights.adjusted = effect.get("entity_id"), label, False
+        self._scene_settle_until = self.clock() + SCENE_SETTLE
+        self._lights_final = None   # DD-BUG-002: the scene's levels are the lights' now, never "corrected" back
+        self.lights_state(result)
+        # The scene ran: the firmware's 700 ms green wash (feedback ok in the LIGHTS family). The thump was the press's.
+        self._feedback("ok", haptic=False)
+        self._set_transient("knob.meta.scene.running", tone="success", ms=SCENE_META)
+        self._toast("toast.scene.ok", scene=label)
 
     def _reveal_volume(self, seconds, source):
         self._volume_reveal_until = self.clock() + seconds
@@ -1785,17 +3097,18 @@ class Controller:
             return "nowPlaying"
         if not self.has_media():
             return "idle"
-        if (self.state.get("playback") == "PAUSED_PLAYBACK" and self._paused_since is not None
-                and now - self._paused_since >= PAUSED_IDLE_SECONDS):
-            return "idle"
+        # r3.1 (2026-09-29): paused keeps the Now Playing layout (artwork + buttons); only STOPPED
+        # and no media rest on `idle`.
         if self.state.get("playback") == "STOPPED":
             return "idle"
         return "nowPlaying"
 
     # ------------------------------------------------------------------ Recently Added (section 5.2)
     def _browse(self):
-        """Home 2: a new visit at item 1 (C5-1)."""
+        """Home 2: a new visit at item 1 (C5-1); r3.1: always on the Recently Added source."""
         self.recent = RecentList(visit=self.recent.visit + 1)
+        self.list_source = "recent"
+        self._list_index["recent"] = 0
         self._new_screen("recent", 0, "browse")
         self._request_recent_page(lane="library")
 
@@ -1812,6 +3125,8 @@ class Controller:
         """max(recent index, explorer recent index): what the prefetch keeps ahead of."""
         mode = self.screen.mode
         if mode == "recent":
+            if self._recent_source() == "favourites":
+                return self._list_index.get("recent", 0)   # r3.1: the Recently Added focus kept aside
             return self.screen.index
         if mode == "explorer":
             return self.screen.explorer.index_by_source.get("recent", 0)
@@ -1887,10 +3202,12 @@ class Controller:
                 lst.retry_at = self.clock() + RECENT_RETRY   # the list keeps its state; asked again
                 return
             outcome = getattr(error, "outcome", None)
-            signin = outcome == "signin_expired" or getattr(error, "status", None) in (401, 403) or \
+            needed = _signin_needed(error)
+            signin = needed or outcome == "signin_expired" or getattr(error, "status", None) in (401, 403) or \
                 _needs_login(str(error).lower())
             if not lst.items:
                 lst.state = "signin" if signin else "error"
+                lst.signin_needed = needed
                 lst.rev += 1
                 self._list_state_changed()
             else:
@@ -1919,7 +3236,7 @@ class Controller:
         if self.screen.mode in ("recent", "explorer"):
             count_now = lst.count()
             if count_now != was_count:
-                if self.screen.mode == "recent" or self.screen.explorer.source == "recent":
+                if self._shown_source() == "recent":
                     if was_count == 0:
                         self._reenter("recent loaded")
                     else:
@@ -1940,7 +3257,7 @@ class Controller:
             return
         self._preresolve_due = None
         index = self._recent_index()
-        if index is None or self.screen.mode == "explorer" and self.screen.explorer.source != "recent":
+        if index is None or self._shown_source() != "recent":
             return
         lst = self.recent
         focus = lst.item(index)
@@ -1983,14 +3300,23 @@ class Controller:
         return 0
 
     def _open_explorer(self, now):
+        """Recent 2: the explorer, on the knob list's source and focus (r3.1: Playlists opens on
+        the Favourites tab)."""
         index = self.screen.index
-        explorer = ExplorerState(source="recent", index_by_source={"recent": index})
+        source = self._recent_source()
+        self._list_index[source] = index
+        by_source = {"recent": index if source == "recent" else self._list_index.get("recent", 0)}
+        if source == "favourites":
+            by_source["favourites"] = index
+        explorer = ExplorerState(source=source, index_by_source=by_source)
         self._new_screen("explorer", index, "explorer open", explorer=explorer)
         self._favourites_ensure(now)
-        self._present("explorer_open", t0=now, **self._explorer_payload("recent", index),
+        self._present("explorer_open", t0=now, **self._explorer_payload(source, index),
                       control_id=self.control_id, control_min=0, reduced_motion=self.reduced_motion,
                       foreground_hwnd=None, sonos_available=bool(self.state["online"]))
-        explorer.sent = self._explorer_sent_marker("recent", index)
+        explorer.sent = self._explorer_sent_marker(source, index)
+        if source == "favourites":
+            self._request_playlist_meta()
 
     def _favourites_ensure(self, now, force=False):
         fav = self.favourites
@@ -2013,9 +3339,10 @@ class Controller:
         if error is not None:
             outcome = getattr(error, "outcome", None)
             status = getattr(error, "status", None)
-            if outcome == "signin_expired" or status in (401, 403):
+            if outcome in ("signin_expired", "signin_needed") or status in (401, 403):
                 if not fav.items:
                     fav.state = "signin"
+                    fav.signin_needed = outcome == "signin_needed"
                 fav.loaded_at = None  # stale
                 fav.retry_at = now + FAVOURITES_BACKOFF[0]
             elif outcome == "rate_limited" or status == 429:
@@ -2041,21 +3368,30 @@ class Controller:
         self._favourites_changed()
 
     def _favourites_changed(self):
-        if self.screen.mode != "explorer":
+        mode = self.screen.mode
+        if mode not in ("recent", "explorer"):
             return
-        explorer = self.screen.explorer
-        if explorer.source == "favourites":
+        if self._shown_source() == "favourites":
             focus = self._favourites_index()
-            explorer.index_by_source["favourites"] = focus
-            if focus != self.screen.index or self._list_count() - 1 != self.bounds()[1]:
-                self._request_passive("favourites refresh")
+            if mode == "explorer":
+                self.screen.explorer.index_by_source["favourites"] = focus
+                if focus != self.screen.index or self._list_count() - 1 != self.bounds()[1]:
+                    self._request_passive("favourites refresh")
+            else:
+                # r3.1 the knob list on Favourite playlists: the focus follows its playlist.
+                self._list_index["favourites"] = focus
+                moved = focus != self.screen.index
+                self.screen.index = focus
+                if moved or (self._knob_bounds is not None and self.bounds()[:2] != self._knob_bounds[:2]):
+                    self._request_passive("favourites refresh")
             self._request_playlist_meta()
-        self._explorer_push_highlight(data=True)
+        if mode == "explorer":
+            self._explorer_push_highlight(data=True)
 
     def _request_playlist_meta(self):
         """Count, mosaic and accent of the playlists near the focus (lookahead lane)."""
         fav = self.favourites
-        if self.screen.mode != "explorer" or self.screen.explorer.source != "favourites":
+        if self._shown_source() != "favourites":
             return
         index = self.screen.index
         for position in range(max(0, index - 2), min(len(fav.items), index + 3)):
@@ -2141,11 +3477,40 @@ class Controller:
         if explorer.source == "recent":
             self._recent_moved()
         else:
-            item = self._source_item("favourites", self.screen.index)
-            if item is not None:
-                self.favourites.focus_id = _item_id(item)
-            self._request_playlist_meta()
+            self._favourites_moved()
         self._explorer_push_highlight()
+
+    def _favourites_moved(self):
+        """A detent on Favourite playlists (the explorer's tab or r3.1's knob list)."""
+        item = self._source_item("favourites", self.screen.index)
+        if item is not None:
+            self.favourites.focus_id = _item_id(item)
+        if self.screen.mode == "recent":
+            self._list_index["favourites"] = self.screen.index
+        self._request_playlist_meta()
+
+    def _toggle_list_source(self, now):
+        """r3.1 Recently Added 3: the knob list's source Recently Added <-> Favourite playlists, each
+        keeping its focus (Playlists: the last focused playlist); crumb, heading and icon follow."""
+        source = self._recent_source()
+        self._list_index[source] = self.screen.index
+        target = "favourites" if source == "recent" else "recent"
+        self.list_source = target
+        if target == "favourites":
+            self._favourites_ensure(now)
+            fav = self.favourites
+            if fav.items:
+                fav.focus_id = _item_id(fav.items[0])
+        index = 0   # r3.1 design: the toggle starts the other list at its first item
+        self._list_index[target] = index
+        self._haptic("confirm.tick")   # r4 4.4: 3 source = tick (+ feel.fade on the knob)
+        self._reenter("list source", index=index)
+        self._set_transient("knob.meta.list.favourites" if target == "favourites" else "knob.meta.list.recent",
+                            tone="warm", ms=LIST_SOURCE_META)
+        if target == "favourites":
+            self._request_playlist_meta()
+        else:
+            self._recent_moved()
 
     def _press_explorer(self, logical, now):
         explorer = self.screen.explorer
@@ -2220,6 +3585,9 @@ class Controller:
 
     def _dispatch_start(self, item, kind, accent, source, now):
         name = item.get("title", "")
+        # DD-DES-001: one event at the press, as Scene run: Play's started thump (r4 4.4) plays here, and the
+        # speaker's answer carries no second haptic (_start_result); a failure keeps its error.buzz.
+        self._haptic(self._feedback_haptic("ok", 0, "started", None))
         self._drop_seek_follow_up()
         request = self.request("play_items", item=deepcopy(_descriptor_resource(item)), name=name, accent=accent,
                                source=source, lenient=kind == "playlist", item_kind=kind,
@@ -2242,11 +3610,18 @@ class Controller:
         elif logical == 1:
             self._open_explorer(now)
         elif logical == 2:
+            if self.spaces:
+                self._toggle_list_source(now)   # r3.1: Recently Added <-> Favourite playlists
+                return
             item = self.recent.item(self.screen.index)
             self._dispatch_play_next(item)
         elif logical == 3:
-            item = self.recent.item(self.screen.index)
-            self._dispatch_start(item, self._item_kind(item), self._accent("recent", item), "recent", now)
+            if self._recent_source() == "favourites":
+                item = self._source_item("favourites", self.screen.index)
+                self._dispatch_start(item, "playlist", self._accent("playlist", item), "recent", now)
+            else:
+                item = self.recent.item(self.screen.index)
+                self._dispatch_start(item, self._item_kind(item), self._accent("recent", item), "recent", now)
             self._new_screen("home", self.display_volume, "start")
 
     def _start_result(self, effect, result, error):
@@ -2288,25 +3663,33 @@ class Controller:
         self._state(result, enter=False)
         if self.confirmed_playing() is not True:
             self._album_start_until = now + ALBUM_START_HOLD_SECONDS
-        self._feedback("ok", moment="started", color=start.accent)
+        self._feedback("ok", moment="started", color=start.accent, haptic=False)   # DD-DES-001: armed at the press
         k, n, u = _int(info.get("k"), 0), _int(info.get("n"), 0), _int(info.get("u"), 0)
         if start.kind == "playlist" and u > 0 and n:
             self._set_transient("knob.status.partial", ms=PARTIAL_STATUS, k=k, n=n)
             toast, fields = ("toast.start.partial_one" if u == 1 else "toast.start.partial"), {"k": k, "n": n, "u": u}
         else:
             toast, fields = "toast.start.ok", {"name": start.name}
+        if start.source == "tracks":
+            # r3.1 design: Tracks 4 played the focused row: `Playing {n} / {T}` (success).
+            P, T = self._position()
+            self._set_transient("knob.meta.tracks.playing", tone="success", ms=R3_REFUSED_META, n=P, T=T)
         if overlay:
             self._exit_toast(toast, start.closed_at, **fields)
         else:
             self._toast(toast, **fields)
 
     # ------------------------------------------------------------------ Play next (section 9.3)
-    def _dispatch_play_next(self, item):
+    def _dispatch_play_next(self, item, kind=None, accent=None):
+        """Play next (section 9.3) of an album / song, or (r3.1) a favourite playlist (`kind`
+        "playlist", its playlist accent)."""
+        kind = kind or self._item_kind(item)
+        accent = self._accent("recent", item) if accent is None else accent
         request = self.request("play_next", item=deepcopy(_descriptor_resource(item)), name=item.get("title", ""),
-                               accent=self._accent("recent", item), item_kind=self._item_kind(item),
+                               accent=accent, item_kind=kind,
                                expected_group_revision=self.state["group_revision"],
                                expected_track_id=self.state.get("track_id"))
-        self.play_next_job = PlayNextJob(request, dict(item), item.get("title", ""), self._accent("recent", item))
+        self.play_next_job = PlayNextJob(request, dict(item), item.get("title", ""), accent)
         self.notice = ""
 
     def progress(self, request, payload):
@@ -2328,9 +3711,9 @@ class Controller:
             if not shuffle.accepted:
                 shuffle.accepted = True
                 self._note_shuffle_record(shuffle)
-                self._feedback("ok", moment="shuffle")
+                self._feedback("ok", moment="shuffle", haptic=False)   # DD-DES-001: the press ticked
                 self._set_transient("knob.meta.shuffle.on" if shuffle.on else "knob.meta.shuffle.off",
-                                    ms=FEEDBACK_META)
+                                    tone="warm" if self.spaces else "meta", ms=FEEDBACK_META)
 
     def _playnext_result(self, effect, result, error):
         job = self.play_next_job
@@ -2353,7 +3736,8 @@ class Controller:
                     "sonos_shuffle_on": "knob.meta.playnext.shuffle",
                     "group_changed": "knob.meta.group_changed",
                     "sonos_unavailable": "knob.meta.sonos_unavailable",
-                    "signin_expired": "knob.meta.signin_expired"}.get(outcome, "knob.meta.playnext.nothing")
+                    "signin_expired": "knob.meta.signin_expired",
+                    "signin_needed": "knob.meta.signin_needed"}.get(outcome, "knob.meta.playnext.nothing")
             toast = {"partial": "toast.playnext.partial", "song_changed": "toast.playnext.song_changed",
                      "sonos_shuffle_on": "toast.playnext.shuffle"}.get(outcome, "toast.playnext.nothing")
             if outcome == "not_queue_source":
@@ -2368,28 +3752,137 @@ class Controller:
         result = dict(result or {})
         result.pop("_inserted", None)
         self._apply_state_result(result)
-        self._feedback("ok", moment="queued")
-        self._set_transient("knob.meta.playnext.ok", ms=QUEUED_META)
+        if not self.spaces:
+            self._feedback("ok", moment="queued")   # r3.1 flashes at the hold (above), not again here
+        if self.spaces:
+            # r3.1 design: `Queued · {title}` / Up next `Plays next · {track}` (success, 2.2 s).
+            if effect["kind"] == "move_next":
+                title = (effect.get("item") or {}).get("title", "")
+                self._set_transient("knob.meta.upnext.plays_next", tone="success", ms=QUEUED_META_R3,
+                                    text=fit_copy("knob.meta.upnext.plays_next", LINE_R3, title=title))
+            else:
+                self._set_transient("knob.meta.queued_title", tone="success", ms=QUEUED_META_R3,
+                                    text=fit_copy("knob.meta.queued_title", LINE_R3, title=name))
+        else:
+            self._set_transient("knob.meta.playnext.ok", ms=QUEUED_META)
         if effect["kind"] == "play_next" and not overlay:
             self._toast("toast.playnext.ok", album=name)
         self._our_queue_changed()
 
     # ------------------------------------------------------------------ Tracks (section 5.4)
-    def _enter_tracks(self, index, cause):
+    def _enter_tracks(self, index, cause, focus=None):
+        """Tracks: r3.1 browses the whole queue from the playing row (the focus is a 0-based row;
+        `focus`: Up next's row on its Back); without a queue (a stream) and in r2.2 the 3-position
+        transport (0 previous · 1 · 2 next)."""
+        if self._tracks_queue():
+            P, T = self._position()
+            index = _clamp(focus, 0, T - 1) if type(focus) is int else P - 1
         self._new_screen("tracks", index, cause)
         self._neighbours_read()
+        self._tracks_fetch()
+
+    # r3.1 whole-queue Tracks: a paged row cache per queue revision -------------------------------
+    def _tracks_sync_revision(self):
+        revision = str(self.state.get("queue_revision", ""))
+        if revision != self._tracks_revision:
+            self._tracks_revision = revision
+            self._tracks_rows = {}
+            self._tracks_pages = {}
+
+    def _tracks_fetch(self):
+        """Read the queue page of the focus (and the next / previous page near a loaded edge) with
+        `queue_window` (purpose `tracks_page`); at most one read per page in flight."""
+        if self.screen.mode != "tracks" or not self._tracks_queue():
+            return
+        self._tracks_sync_revision()
+        if self.clock() < getattr(self, "_tracks_retry_at", 0.0):
+            return
+        P, T = self._position()
+        focus = _clamp(self.screen.index, 0, T - 1)
+        starts = []
+        for probe in (focus, focus + TRACKS_EDGE, focus - TRACKS_EDGE, P - 1):
+            if 0 <= probe < T:
+                start = probe // TRACKS_PAGE * TRACKS_PAGE
+                if start not in starts:
+                    starts.append(start)
+        for start in starts:
+            last = min(T, start + TRACKS_PAGE)
+            if start in self._tracks_pages or all(n in self._tracks_rows for n in range(start + 1, last + 1)):
+                continue
+            self._tracks_pages[start] = self.request("queue_window", start=start, count=last - start,
+                                                     purpose="tracks_page", key=[self._tracks_revision])
+        if len(self._tracks_rows) > TRACKS_CACHE_ROWS:
+            keep = sorted(self._tracks_rows, key=lambda n: abs(n - 1 - focus))[:TRACKS_CACHE_ROWS]
+            self._tracks_rows = {n: self._tracks_rows[n] for n in keep}
+
+    def _tracks_page_result(self, effect, result, error):
+        start = effect.get("start")
+        if self._tracks_pages.get(start) == effect["request"]:
+            del self._tracks_pages[start]
+        key = (effect.get("key") or [None])[0]
+        if key != self._tracks_revision:
+            return   # a page of an older queue revision never commits
+        if error is not None or not isinstance(result, dict):
+            if error is not None and not self._discarded(error):
+                self._tracks_retry_at = self.clock() + 1.0   # asked again by the next turn / tick
+            return
+        for row in result.get("rows") or ():
+            if isinstance(row, dict) and type(row.get("row")) is int:
+                self._tracks_rows[row["row"]] = dict(row)
+        self._tracks_fetch()
+
+    def _tracks_state_changed(self, was_position):
+        """A state while on Tracks: the focus follows the playing row it was on; the knob re-enters
+        when the queue's length or the Tracks regime (whole queue / transport) changed."""
+        if self.screen.mode != "tracks" or not self.spaces:
+            return
+        queue = self._tracks_queue()
+        if queue != getattr(self, "_tracks_is_queue", queue):
+            self.screen.index = self._position()[0] - 1 if queue else 1
+            self._request_passive("tracks regime")
+            self._tracks_fetch()
+            return
+        if not queue:
+            return
+        P, T = self._position()
+        old = _int(was_position, 0)
+        if old and P != old and self.screen.index == old - 1:
+            self.screen.index = P - 1
+            self._request_passive("tracks now playing")
+        elif self._knob_bounds is not None and self.bounds()[:2] != self._knob_bounds[:2]:
+            self.screen.index = _clamp(self.screen.index, 0, T - 1)
+            self._request_passive("tracks queue changed")
+        self._tracks_fetch()
+
+    def _tracks_jump(self, now):
+        """r3.1 Tracks 4 on another row: `jump` there (stays on Tracks, which re-centres on it)."""
+        number = self.screen.index + 1
+        row = self._tracks_rows.get(number) or {}
+        name = row.get("title", "")
+        accent = self._accent("row", row) if row else 0
+        playing, _total = self._position()
+        self._haptic("nudge.right" if number > playing else "nudge.left")   # r4 4.4: a jump nudges its way
+        self._drop_seek_follow_up()
+        request = self.request("jump", row=number, name=name, accent=accent,
+                               expected_group_revision=self.state["group_revision"],
+                               expected_track_id=self.state.get("track_id"),
+                               expected_update_id=str(self.state.get("queue_revision", "")))
+        self.start = StartPending(request, "track", name, accent, "tracks", now, str(row.get("song_id") or ""))
+        self.notice = ""
 
     def _neighbours_read(self):
         if self.screen.mode not in ("tracks",) or self.source() != "queue":
             return
+        if self._tracks_queue():
+            return   # r3.1: the whole-queue page cache has the rows
         P, T = self._position()
         key = (self.state.get("queue_revision"), P)
         if key in self._neighbours or self._neighbours_request in self.pending:
             return
-        self._neighbours_request = self.request("queue_window", start=max(0, P - 2), count=3, purpose="tracks",
+        # r3: rows P-2..P+2 (the Navigator's Tracks card, queue_titles); r2.2: P-1..P+1.
+        start, count = (max(0, P - 3), 5) if self.spaces else (max(0, P - 2), 3)
+        self._neighbours_request = self.request("queue_window", start=start, count=count, purpose="tracks",
                                                 key=list(key))
-        if P <= 1 and self.state.get("repeat") == "all" and T > 3:
-            self.request("queue_window", start=T - 1, count=1, purpose="tracks_last", key=list(key))
 
     def _neighbours_result(self, effect, result, error):
         if error is not None or not isinstance(result, dict):
@@ -2411,13 +3904,22 @@ class Controller:
         elif logical == 2:
             self._enter_seek(now)
         elif logical == 3:
+            if self._tracks_queue():
+                self._tracks_jump(now)
+                return
             index = self.screen.index
             end = self._queue_end(index)
             if end is not None:
+                if self.spaces:   # r3: an unavailable press (README 1)
+                    self._set_transient("knob.meta.skip." + end, tone="error", ms=R3_REFUSED_META)
+                    self._feedback("err", moment="refused")
+                    return
                 self._set_transient("knob.meta.skip." + end, ms=FEEDBACK_META)
                 self._feedback("err")
                 return
             direction = {0: "previous", 2: "next"}[index]
+            # DD-DES-001: a skip nudges its way at the press (r4 4.4); its result carries no second haptic.
+            self._haptic(self._feedback_haptic("ok", SKIP_DIRECTIONS[direction], None, None))
             self.notice = ""
             self.command_request = self.request("transport", direction=direction,
                                                 expected_group_revision=self.state["group_revision"],
@@ -2432,27 +3934,23 @@ class Controller:
                 return
             self.notice = str(error)
             self._feedback("err")
-            if home_command:
-                self._paused_since = None
             return
         result = dict(result or {})
         if self._obsolete_group(effect, result):
             return
         reenter = self._state(result, enter=False)
         if home_command:
-            if self.state["online"] and self.state.get("playback") == "PAUSED_PLAYBACK":
-                self._paused_since = self.clock()
-                self._paused_idle_cancelled = False
-            if reenter and self.screen.mode == "home":
+            if reenter and self.screen.mode in VOLUME_MODES:
                 self._enter("volume")
             return
         skip = SKIP_DIRECTIONS.get(effect.get("direction"), 0)
-        self._feedback("ok", skip)
+        self._feedback("ok", skip, haptic=False)   # DD-DES-001: the press nudged
         self._toast("toast.skip.next" if skip == 1 else "toast.skip.prev", title=self.state.get("title", ""))
-        if self.screen.mode == "tracks" and effect.get("view_id") == self.screen.view_id:
+        if (self.screen.mode == "tracks" and effect.get("view_id") == self.screen.view_id
+                and not self._tracks_queue()):
             self.screen.index = 1
             self._reenter("skip ok", index=1)
-        elif reenter and self.screen.mode == "home":
+        elif reenter and self.screen.mode in VOLUME_MODES:
             self._enter("volume")
 
     # ------------------------------------------------------------------ Seek (section 5.5)
@@ -2487,7 +3985,8 @@ class Controller:
                     seek.due = None
                     seek.landed_s = None
         seek = self.screen.seek if self.screen.mode == "seek" else None
-        if seek is not None and not seek.busy and seek.due is None and now >= seek.idle_due:
+        if (seek is not None and not self.spaces and not seek.busy and seek.due is None
+                and now >= seek.idle_due):   # r3 Seek waits for Set / Cancel (README 1.2)
             self._leave_seek(flush=False, drop=False)
             self._enter_tracks(1, "seek idle")
         if self._seek_bg is not None and self._seek_bg.inflight is None and (
@@ -2503,12 +4002,15 @@ class Controller:
         with self._seek_lock:
             self._seek_targets[request] = seek.target_s
 
-    def _leave_seek(self, flush=True, drop=False):
+    def _leave_seek(self, flush=True, drop=False, commit=False):
         """Explicit exits flush a debouncing target (C5-68: while a jump is in flight the one
-        follow-up target is kept for when it lands); unmade exits drop it (C5-47)."""
+        follow-up target is kept for when it lands); unmade exits drop it (C5-47). r3 (README 1.2):
+        only Set (`commit`) applies a scrub; every other exit drops it."""
         seek = self.screen.seek
         if seek is None:
             return
+        if self.spaces and not commit:
+            flush, drop = False, True
         seek.left = True
         if drop:
             seek.due = None
@@ -2526,6 +4028,9 @@ class Controller:
             self._seek_bg = seek
 
     def _press_seek(self, logical, now):
+        if self.spaces:
+            self._press_seek_r3(logical, now)
+            return
         if logical in (0, 2):
             self._leave_seek(flush=True)
             self._enter_tracks(1, "seek off")
@@ -2534,6 +4039,23 @@ class Controller:
             self._enter_tracks(1, "seek off")
             if self._tracks_upnext_code() is None:
                 self._open_upnext(now)
+
+    def _press_seek_r3(self, logical, now):
+        """README 1.2 Seek: a scrub is applied only by 3 Set; 1 Cancel leaves the song where it
+        was (nothing was sent), 2 opens Up next without applying the scrub."""
+        seek = self.screen.seek
+        if logical == 2:
+            self._leave_seek(flush=True, commit=True)   # the one seek of this Seek visit
+            self._enter_tracks(1, "seek set")
+            self._set_transient("knob.meta.seek.set", tone="success", ms=SEEK_R3_META)
+            self._feedback("ok")
+            return
+        self._leave_seek(flush=False, drop=True)
+        self._enter_tracks(1, "seek cancel" if logical == 0 else "seek off")
+        if logical == 0:
+            self._set_transient("knob.meta.seek.cancelled", tone="secondary", ms=SEEK_R3_META)
+        elif logical == 1 and self._tracks_upnext_code() is None:
+            self._open_upnext(now)
 
     def _seek_result(self, effect, result, error):
         seek = None
@@ -2634,9 +4156,14 @@ class Controller:
         upnext = UpNextState(P=P, T=T, card=card, regime="sonos" if card or T - P > COMPANION_SHUFFLE_MAX else "companion",
                              revision=str(self.state.get("queue_revision", "")))
         parent = _clamp(self.screen.index, 0, 2) if self.screen.mode == "tracks" else 1
-        self._new_screen("upnext", max(0, P - 1), "upnext open", upnext=upnext, parent_index=parent)
-        upnext.reads.append((max(0, P - 1 - 10), UPNEXT_WINDOW, "upnext"))
-        shuffle_read = self._upcoming_read(max(0, P - 1 - 10))
+        focus = max(0, P - 1)
+        if self.screen.mode == "tracks" and self._tracks_queue():
+            # r3.1 design: Up next opens on the row Tracks has in focus (and Back returns it).
+            parent = self.screen.index
+            focus = _clamp(self.screen.index, 0, max(0, (P + 1 if card else T) - 1))
+        self._new_screen("upnext", focus, "upnext open", upnext=upnext, parent_index=parent)
+        upnext.reads.append((max(0, focus - 10), UPNEXT_WINDOW, "upnext"))
+        shuffle_read = self._upcoming_read(max(0, focus - 10))
         if shuffle_read is not None:
             upnext.reads.append(shuffle_read)
         self._present("upnext_open", t0=now, **self._upnext_payload(), control_id=self.control_id, control_min=0,
@@ -2727,6 +4254,8 @@ class Controller:
 
     def _window_result(self, effect, result, error):
         purpose = effect.get("purpose")
+        if purpose == "tracks_page":
+            return self._tracks_page_result(effect, result, error)
         if purpose in ("tracks", "tracks_last"):
             if self._neighbours_request == effect["request"]:
                 self._neighbours_request = None
@@ -2932,6 +4461,8 @@ class Controller:
         elif logical == 3:
             row = self._upnext_focus_row()
             accent = self._accent("row", row)
+            # DD-DES-001: an Up next jump nudges its way at the press, as a Tracks jump (r4 4.4), never a thump.
+            self._haptic("nudge.right" if row["row"] > self._position()[0] else "nudge.left")
             self._drop_seek_follow_up()
             self.request("jump", row=row["row"], name=row.get("title", ""), accent=accent,
                          expected_group_revision=self.state["group_revision"],
@@ -2981,6 +4512,10 @@ class Controller:
                 self._set_transient("knob.meta.like.signin_expired", tone="error", ms=SIGNIN_META)
                 if upnext is not None:
                     upnext.armed_toast = "toast.like.signin_expired"
+            elif outcome == "signin_needed":   # never connected: not an expired sign-in (DD-BUG-023)
+                self._set_transient("knob.meta.like.signin_needed", tone="error", ms=SIGNIN_META)
+                if upnext is not None:
+                    upnext.armed_toast = "toast.like.signin_needed"
             else:
                 self._set_transient("knob.meta.like.failed", tone="error", ms=LIKE_FAIL_META)
                 if getattr(error, "late_check", False) or getattr(error, "confirm_timeout", False):
@@ -2990,7 +4525,7 @@ class Controller:
             return
         if not (isinstance(result, dict) and result.get("liked") is True):
             return
-        self._feedback("ok", moment="like")
+        self._feedback("ok", moment="like", haptic=False)   # DD-DES-001: the press ticked
         self._set_transient("knob.meta.like.on", ms=FEEDBACK_META)
         self.favourites.loaded_at = None  # Favorite Songs changed: the Favourites cache is stale (CF:15)
         if upnext is not None:
@@ -3146,12 +4681,12 @@ class Controller:
             else:
                 self.shuffle_record_order = None      # restored: the adapter deleted the record
             if not job.accepted:
-                self._feedback("ok", moment="shuffle")
+                self._feedback("ok", moment="shuffle", haptic=False)   # DD-DES-001: the press ticked
                 self._set_transient("knob.meta.shuffle.on" if job.on else "knob.meta.shuffle.off", ms=FEEDBACK_META)
             self._our_queue_changed()
             return
         # Sonos native regime: confirmed on the verified completion (t1).
-        self._feedback("ok", moment="shuffle")
+        self._feedback("ok", moment="shuffle", haptic=False)   # DD-DES-001: the press ticked
         self._set_transient("knob.meta.shuffle.sonos" if job.on else "knob.meta.shuffle.off", ms=FEEDBACK_META)
         if self.screen.mode != "upnext":
             return
@@ -3190,7 +4725,7 @@ class Controller:
                 if not self._overlay_open():
                     self.notice = str(error)
             return
-        if self.screen.mode != "home":
+        if self.screen.mode != self._root():
             self._present("windows_hide")
             return
         items = [dict(item) for item in result.get("items") or () if isinstance(item, dict)]
@@ -3305,7 +4840,7 @@ class Controller:
         a, b = self._window_app(left), self._window_app(right)
         self._present("windows_close_pair", left=left, right=right, focus=windows.last_side)
         self._cancel_pending = None
-        self._new_screen("home", self.display_volume, "snap pair")
+        self._new_screen(self._root(), self.display_volume, "snap pair")
         self._exit_toast("toast.snap.pair", now, A=a, B=b)
 
     def _activate_result(self, effect, result, error):
@@ -3318,9 +4853,13 @@ class Controller:
             item = effect.get("item") or {}
             now = self.clock()
             self._feedback("ok")
-            self._new_screen("home", self.display_volume, "switch")
-            self._exit_toast("toast.switch", now, App=item.get("label_app") or item.get("app", ""),
-                             Title=item.get("title", ""))
+            self._new_screen(self._root(), self.display_volume, "switch")
+            app = item.get("label_app") or item.get("app", "")
+            if self.spaces:
+                # README 6 `Switched to {app}` on the Home status line (the picker has closed).
+                self._set_transient("knob.status.switched", tone="success", ms=R3_REFUSED_META,
+                                    text=fit_copy("knob.status.switched", LINE_R3, App=app))
+            self._exit_toast("toast.switch", now, App=app, Title=item.get("title", ""))
             return
         if error is not None and self._discarded(error):
             return
@@ -3334,7 +4873,8 @@ class Controller:
         now = self.clock()
         self._run_due(now)
         self._run_toasts(now)
-        if self.state["online"] and self.desired_volume is not None and self.volume_request is None and now >= self.volume_due:
+        if (self.state["online"] and self.desired_volume is not None and self.volume_request is None
+                and now >= self.volume_due and self.screen.mode != "onshape" and not self.onshape_pending):
             self.volume_request = self.request("volume", value=self.desired_volume,
                                                expected_group_revision=self.state["group_revision"])
             self.last_volume_write = now
@@ -3345,11 +4885,15 @@ class Controller:
             self.request("state")
         self._seek_tick(now)
         self._preresolve(now)
+        if self.spaces:
+            self._lights_tick(now)
         self._run_passive(now)
         if self.screen.mode in ("recent", "explorer"):
             self._recent_prefetch()
-        if self.screen.mode == "explorer":
+        if self.screen.mode == "explorer" or self._shown_source() == "favourites":
             self._favourites_ensure(now)
+        if self.screen.mode == "tracks":
+            self._tracks_fetch()
         if self.screen.mode in ("explorer", "upnext", "windows") and now - self.last_knob_input >= OVERLAY_IDLE:
             self.close_overlay("idle")
 
@@ -3360,7 +4904,6 @@ class Controller:
         group_changed = bool(old_group and state.get("group_revision") and state.get("group_revision") != old_group)
         previous = self.display_volume if previous_position is None else previous_position
         was_online = self.state["online"]
-        was_playback = self.state.get("playback")
         was_track = self.state.get("track_id")
         was_revision = str(self.state.get("queue_revision", ""))
         was_position = self.state.get("playlist_position")
@@ -3370,14 +4913,6 @@ class Controller:
             self.shuffle_record_order = None   # [P3] the adapter reports no restore record any more
         self.state_known = True
         self._state_at = self.clock()
-        if self.state["online"] and self.state.get("playback") == "PAUSED_PLAYBACK":
-            fresh = group_changed or (was_online and was_playback != "PAUSED_PLAYBACK")
-            if fresh or (self._paused_since is None and not self._paused_idle_cancelled):
-                self._paused_since = self.clock()
-                self._paused_idle_cancelled = False
-        elif self.state["online"]:
-            self._paused_since = None
-            self._paused_idle_cancelled = False
         if self.state["online"] and self.state.get("playback") == "PLAYING":
             self._album_start_until = 0.0
         if group_changed or not self.state["online"]:
@@ -3390,7 +4925,7 @@ class Controller:
             self._external_until = self.clock() + EXTERNAL_SECONDS
         if group_changed:
             self.desired_volume = None
-        reenter = self.screen.mode == "home" and (
+        reenter = self.screen.mode in VOLUME_MODES and (
             group_changed or (self.desired_volume is None and previous != self.display_volume))
         if not self.state["online"]:
             self.desired_volume = None
@@ -3407,6 +4942,7 @@ class Controller:
             self._upnext_changes(was_revision, was_position)
         elif mode == "tracks":
             self._neighbours_read()
+            self._tracks_state_changed(was_position)
         if group_changed and self.state["online"]:
             self._group_changed_copy()
         if reenter and enter:
@@ -3482,6 +5018,20 @@ class Controller:
             return self._windows_open_result(effect, result, error)
         if kind == "windows_activate":
             return self._activate_result(effect, result, error)
+        if kind == "lights_read":
+            if error is None:
+                self.lights_state(result)
+            else:
+                self.lights_state({"configured": self.lights.configured, "online": False,
+                                   "reason": getattr(error, "outcome", None) or "offline",
+                                   "scenes": self.lights.scenes})
+            return
+        if kind == "lights_set":
+            return self._lights_set_result(effect, result, error)
+        if kind == "lights_power":
+            return self._lights_power_result(effect, result, error)
+        if kind == "scene_run":
+            return self._scene_run_result(effect, result, error)
 
     def _volume_result(self, effect, result, error):
         self.volume_request = None
@@ -3498,7 +5048,7 @@ class Controller:
                 self._group_changed_copy()
             if not self._overlay_open():
                 self.notice = str(error)
-            if self.screen.mode == "home":
+            if self.screen.mode in VOLUME_MODES:
                 self._enter("volume")
             return
         result = dict(result or {})
@@ -3556,22 +5106,62 @@ class Controller:
                  "layout": mode, "heading": "", "meta": "", "titleTone": "ink", "metaTone": "meta",
                  "statusTone": "meta"}
         getattr(self, "_frame_" + mode)(frame, ready)
-        if not ready and self.hardware and mode == "home":
+        if self.spaces:
+            crumb = self._crumb(mode)
+            if crumb:
+                frame["crumb"] = crumb
+            if self.hold_action():
+                frame["holdMarker"] = True   # r3.1: hold 4 exists here (the knob's hold tick and ring)
+        if not ready and self.hardware and mode in VOLUME_MODES:
             frame["status"], frame["activity"] = COPY["knob.status.connecting"], "loading"
         frame["value"] = frame["value"] or frame["title"]
         frame["detail"] = frame["detail"] or frame["subtitle"]
         frame["reducedMotion"] = self.reduced_motion
         if self.feedback:
             frame["feedback"] = dict(self.feedback)
+        if self.haptic:
+            frame["haptic"] = dict(self.haptic)   # r4: device.py keeps it only for a hapticFx knob
         return _clean_frame(frame)
+
+    def _crumb(self, mode):
+        """r3 (presentation 6): the arc breadcrumb token of `mode` (README 2.1), '' on the launcher."""
+        if mode == "explorer":
+            explorer = self.screen.explorer
+            return "onScreenPlaylists" if explorer is not None and explorer.source == "favourites" else "onScreenRecent"
+        if mode == "recent" and self._recent_source() == "favourites":
+            return "playlists"   # r3.1: MUSIC › PLAYLISTS
+        return CRUMBS.get(mode, "")
+
+    def queue_titles(self, rows):
+        """Read-only (the Navigator's Tracks card): {row: title} for the queue rows asked (1-based,
+        e.g. P-2..P+2, wrapped by the caller), from the Tracks neighbour reads and the Up next rows
+        already loaded, plus the playing song; a row not known yet is absent. Requests nothing."""
+        known = {}
+        P, _T = self._position()
+        key = (self.state.get("queue_revision"), P)
+        known.update(self._neighbours.get(key, {}))
+        if self._tracks_revision == str(self.state.get("queue_revision", "")):
+            for row, entry in self._tracks_rows.items():
+                if isinstance(entry, dict) and entry.get("title"):
+                    known.setdefault(row, entry["title"])
+        upnext = self.screen.upnext if self.screen.mode == "upnext" else None
+        if upnext is not None:
+            for row, entry in upnext.rows.items():
+                if isinstance(entry, dict) and entry.get("title"):
+                    known.setdefault(row, entry["title"])
+        if P and self.state.get("title"):
+            known[P] = self.state.get("title")
+        return {row: known[row] for row in (rows or ()) if type(row) is int and known.get(row)}
 
     def _target(self):
         if self.screen.mode == "windows":
             return "DESKTOP"
+        if self.screen.mode == "onshape":
+            return app_display_name(self.app_profile) if self.app_profile is not None else "Onshape"
         room_count = self.state.get("group_room_count", 1)
         if isinstance(room_count, int) and room_count > 1:
-            return f"{self.state.get('room_label', 'Den')} + {room_count - 1} room{'s' if room_count > 2 else ''}"
-        return self.state.get("group_label", "Den")
+            return f"{self.state.get('room_label', 'Speaker')} + {room_count - 1} room{'s' if room_count > 2 else ''}"
+        return self.state.get("group_label", "Speaker")
 
     def _selection_ring(self, index, count, entries, kind, unavailable=None):
         """A v5 selection ring: `first` by VOC-R03, colours of the window, the unavailable mask."""
@@ -3630,6 +5220,8 @@ class Controller:
             caption = copy_text("knob.caption.volume_paused", title=caption)
         frame["volumeCaption"] = caption
         frame["confirmedVolume"] = self.state["volume"]
+        if self.spaces and self.screen.mode == "home":
+            frame["heading"] = COPY["knob.heading.music"]   # r3: the Music space (the launcher has none)
         playing = self.confirmed_playing()
         started_frame = (self._started_seq is not None and self.feedback is not None
                          and self.feedback.get("seq") == self._started_seq)
@@ -3642,7 +5234,8 @@ class Controller:
             return COPY["knob.status.starting"], "meta"
         transient = self._transient()
         if transient is not None:
-            return transient.text, transient.tone if transient.tone in ("meta", "secondary", "error") else "meta"
+            tones = ("meta", "secondary", "error", "warm") if self.spaces else ("meta", "secondary", "error")
+            return transient.text, transient.tone if transient.tone in tones else "meta"
         if layout == "volume":
             volume = self.display_volume
             if self.desired_volume is not None:
@@ -3688,9 +5281,9 @@ class Controller:
             frame.update(title=COPY["knob.title.recent_empty"], subtitle=COPY["knob.sub.recent_empty"])
             return
         if lst.state in ("signin", "error"):
-            signin = lst.state == "signin"
-            frame.update(title=COPY["knob.title.signin_expired" if signin else "knob.title.library_error"],
-                         subtitle=COPY["knob.sub.signin_expired" if signin else "knob.sub.library_error"],
+            signin = self._signin_code() if lst.state == "signin" else None
+            frame.update(title=COPY["knob.title." + signin if signin else "knob.title.library_error"],
+                         subtitle=COPY["knob.sub." + signin if signin else "knob.sub.library_error"],
                          meta=COPY["knob.meta.windows_still_works"], metaTone="secondary", activity="error")
             return
         total = lst.count()
@@ -3705,10 +5298,20 @@ class Controller:
         else:
             frame["title"] = item.get("title", "")
             frame["subtitle"] = item.get("artist") or KIND_LABELS.get(item.get("kind"), "")
+            if self.spaces and not explorer and item.get("artist"):
+                # r3.1: the artist is on the `{i} / {n} · {artist}` line; the subtitle names the kind
+                # (and the year when known) instead of repeating it.
+                year = item.get("year") or item.get("release_year")
+                kind = KIND_LABELS.get(item.get("kind"), "Album")
+                frame["subtitle"] = f"{kind} · {year}" if year else kind
             if item.get("available") is False:
                 frame["titleTone"] = "muted"
                 frame["artDim"] = True
             frame["meta"] = self._list_meta(total, index, lst.complete)
+            if self.spaces and not explorer and item.get("artist"):
+                # r3.1 design: `{i} / {n} · {artist}`.
+                frame["meta"] = fit_copy("knob.meta.list.position_artist", LINE_R3, i=index + 1, n=total,
+                                         artist=item.get("artist"))
         if transient is not None:
             frame["meta"], frame["metaTone"] = transient.text, transient.tone
         if progress is not None:
@@ -3717,6 +5320,9 @@ class Controller:
                                              unavailable=lambda entry: entry.get("available") is False)
 
     def _frame_recent(self, frame, ready):
+        if self._recent_source() == "favourites":
+            self._frame_list_favourites(frame, self.screen.index)   # r3.1: MUSIC › PLAYLISTS
+            return
         self._frame_list_recent(frame, self.screen.index)
 
     # Explorer --------------------------------------------------------------------------------------------
@@ -3728,8 +5334,13 @@ class Controller:
             self._frame_list_recent(frame, self.screen.index, explorer=True)
             frame["page"] = 0
             return
-        frame["page"] = 1
-        frame["heading"] = COPY["knob.heading.explorer_favourites"]
+        self._frame_list_favourites(frame, self.screen.index, explorer=True)
+
+    def _frame_list_favourites(self, frame, index, *, explorer=False):
+        """Favourite playlists: the explorer's Favourites tab (page 1) or r3.1's knob list (page 0,
+        heading PLAYLISTS, the Play next progress on its meta line)."""
+        frame["page"] = 1 if explorer else 0
+        frame["heading"] = COPY["knob.heading.explorer_favourites" if explorer else "knob.heading.playlists"]
         fav = self.favourites
         state = self._source_state("favourites")
         if state == "loading":
@@ -3739,10 +5350,11 @@ class Controller:
             frame.update(title=COPY["knob.title.favourites_empty"], subtitle=COPY["knob.sub.favourites_empty"])
             return
         if state == "signin":
-            frame.update(title=COPY["knob.title.signin_expired"], subtitle=COPY["knob.sub.signin_expired"])
+            code = self._signin_code("favourites")
+            frame.update(title=COPY["knob.title." + code], subtitle=COPY["knob.sub." + code])
             return
         total = fav.count()
-        index = _clamp(self.screen.index, 0, max(0, total - 1))
+        index = _clamp(index, 0, max(0, total - 1))
         item = fav.items[index] if index < len(fav.items) else None
         if item is None:
             frame["meta"] = COPY["knob.meta.loading"]
@@ -3756,9 +5368,17 @@ class Controller:
                 frame["titleTone"] = "muted"
                 frame["artDim"] = True
             frame["meta"] = copy_text("knob.meta.position", i=index + 1, n=total)
+            if self.spaces and not explorer:
+                # r3.1 design: `Favourite playlist`, `{i} / {n} · {count} songs`.
+                frame["subtitle"] = COPY["knob.sub.favourite_playlist"]
+                if isinstance(count, int):
+                    frame["meta"] = copy_text("knob.meta.list.position_songs", i=index + 1, n=total, count=count)
         transient = self._transient()
         if transient is not None:
             frame["meta"], frame["metaTone"] = transient.text, transient.tone
+        progress = None if explorer else self._playnext_meta()
+        if progress is not None:
+            frame["meta"], frame["metaTone"] = progress, "meta"
         frame["activity"] = "pending" if self.play_next_job is not None else "idle"
         frame["ring"] = self._selection_ring(index, total, lambda j: fav.items[j] if j < len(fav.items) else None,
                                              "playlist",
@@ -3770,16 +5390,63 @@ class Controller:
         entry = self._neighbours.get((self.state.get("queue_revision"), P)) or {}
         return entry.get(row)
 
+    def _frame_tracks_queue(self, frame):
+        """r3.1 whole-queue Tracks: the focused row, `Turn to browse the queue` on the playing row,
+        elsewhere `Skip to` / `Back to` · {n} / {T} and `Press 4 to play`; a selection ring."""
+        P, T = self._position()
+        index = _clamp(self.screen.index, 0, T - 1)
+        number = index + 1
+        row = self._tracks_rows.get(number) or {}
+        tone = "meta"
+        if number == P:
+            frame["title"] = self.state.get("title") or row.get("title") or COPY["knob.caption.nothing_playing"]
+            frame["subtitle"] = self.state.get("artist") or row.get("artist") or ""
+            meta = COPY["knob.meta.tracks.browse"]
+        else:
+            # r3.1 design: the focused song / artist and `Skip to {n} / {T} · 4 plays` in green.
+            frame["title"] = row.get("title") or copy_text("knob.title.tracks.row", n=number)
+            frame["subtitle"] = row.get("artist") or ""
+            meta = copy_text("knob.meta.tracks.skip_to" if number > P else "knob.meta.tracks.back_to", n=number, T=T)
+            tone = "success"
+        jumping = self.start is not None and self.start.source == "tracks"
+        if jumping:
+            meta, tone = COPY["knob.meta.tracks.skipping"], "meta"
+        transient = self._transient()
+        if transient is not None:
+            frame["meta"], frame["metaTone"] = transient.text, transient.tone
+        else:
+            frame["meta"], frame["metaTone"] = meta, tone
+        frame["activity"] = "pending" if jumping else "idle"
+        # r3.1 (19.10): the `queue` ring, the focus among the T rows with the playing row as `now`.
+        ring = self._selection_ring(index, T, lambda j: self._tracks_rows.get(j + 1), "row")
+        ring.pop("unavailable", None)
+        ring.update(style="queue", now=_clamp(P - 1, -1, T - 1))
+        frame["ring"] = ring
+
     def _frame_tracks(self, frame, ready):
         index = _clamp(self.screen.index, 0, 2)
         frame["heading"] = COPY["knob.heading.tracks"]
+        if self._tracks_queue():
+            self._frame_tracks_queue(frame)
+            return
         title = self.state.get("title") or ""
         queue = self.source() == "queue"
         P, T = self._position()
         now_line = fit_copy("knob.line.tracks.now", LINE_14, title=title) if title else COPY["knob.caption.nothing_playing"]
         skip = self._skip_command()
         transient = self._transient()
-        if index == 1:
+        if self.spaces:
+            # README 2.2 Tracks: at rest the current song / artist / `Turn for previous or next`;
+            # turned `Previous` / `Next`, `Now: {song}`, `Press 4 to skip`.
+            if index == 1:
+                frame["title"] = title or COPY["knob.caption.nothing_playing"]
+                frame["subtitle"] = self.state.get("artist") or ""
+                meta = COPY["knob.meta.tracks.turn"]
+            else:
+                frame["title"] = COPY["knob.title.tracks.next_r3" if index == 2 else "knob.title.tracks.prev_r3"]
+                frame["subtitle"] = now_line
+                meta = COPY["knob.meta.tracks.hint"]
+        elif index == 1:
             frame["title"] = COPY["knob.title.tracks.choose"]
             frame["subtitle"] = now_line
             if queue and T:
@@ -3799,21 +5466,15 @@ class Controller:
                     neighbour = self._neighbour(P + 1)
                     frame["subtitle"] = fit_copy("knob.line.tracks.next", LINE_14, title=neighbour) if neighbour \
                         else COPY["knob.title.tracks.next"]
-                elif self.state.get("repeat") == "all":
-                    frame["subtitle"] = COPY["knob.line.tracks.next_wrap"]
                 else:
-                    frame["subtitle"] = COPY["knob.line.tracks.end"]
+                    frame["subtitle"] = COPY["knob.line.tracks.end"]   # r4: no wrap (was "Next: back to track 1")
             else:
                 if P > 1:
                     neighbour = self._neighbour(P - 1)
                     frame["subtitle"] = fit_copy("knob.line.tracks.prev", LINE_14, title=neighbour) if neighbour \
                         else COPY["knob.title.tracks.prev"]
-                elif self.state.get("repeat") == "all" and T:
-                    neighbour = self._neighbour(T)
-                    frame["subtitle"] = fit_copy("knob.line.tracks.prev", LINE_14, title=neighbour) if neighbour \
-                        else COPY["knob.title.tracks.prev"]
                 else:
-                    frame["subtitle"] = COPY["knob.line.tracks.start"]
+                    frame["subtitle"] = COPY["knob.line.tracks.start"]   # r4: no wrap to the last track
         if skip is not None:
             meta = COPY["knob.meta.tracks.skipping"]
         if transient is not None:
@@ -3830,7 +5491,7 @@ class Controller:
     def _frame_seek(self, frame, ready):
         seek = self.screen.seek
         now = self.clock()
-        frame["heading"] = COPY["knob.heading.seek"]
+        frame["heading"] = COPY["knob.heading.tracks" if self.spaces else "knob.heading.seek"]
         frame["title"] = self.state.get("title") or ""
         target = _clamp(seek.target_s, 0, max(0, seek.D - 1))
         frame["ring"] = {"style": "lap", "value": 0, "index": target, "count": _clamp(seek.D, 1, SEEK_MAX_DURATION_S)}
@@ -3843,6 +5504,9 @@ class Controller:
             frame["meta"], frame["metaTone"] = transient.text, transient.tone
         elif now < seek.limit_until:
             frame["meta"] = COPY["knob.line.seek.limit"]
+        elif self.spaces:
+            # README 2.2: `of {dur} · 3 sets · 1 cancels` in #FFBE69.
+            frame["meta"], frame["metaTone"] = copy_text("knob.line.seek.r3", **{"m:ss": mmss(seek.D)}), "warm"
         else:
             frame["meta"] = copy_text("knob.line.seek.length", **{"m:ss": mmss(seek.D)})
         frame["activity"] = "pending" if seek.busy else "idle"
@@ -3882,7 +5546,9 @@ class Controller:
                                     "row")
         ring.pop("unavailable", None)   # Up next frames never set `unavailable` (C5-61)
         ring["now"] = upnext.P - 1
-        if upnext.card:
+        if self.spaces and ring.get("style") == "selection":
+            ring["style"] = "queue"   # r3.1 (19.10): Up next shares the Tracks queue ring (no Sonos card mark)
+        elif upnext.card:
             ring["card"] = True
         frame["ring"] = ring
 
@@ -3902,6 +5568,10 @@ class Controller:
         transient = self._transient()
         if transient is not None:
             frame["meta"], frame["metaTone"] = transient.text, transient.tone
+        elif self.spaces and windows.left and not windows.right:
+            frame["meta"], frame["metaTone"] = COPY["knob.meta.snap.left"], "success"   # README 6
+        elif self.spaces and windows.right and not windows.left:
+            frame["meta"], frame["metaTone"] = COPY["knob.meta.snap.right"], "success"
         elif windows.left and not windows.right:
             frame["meta"] = fit_copy("knob.meta.snap.left_set", LINE_META, App=self._window_app(windows.left))
         elif windows.right and not windows.left:
@@ -3910,21 +5580,588 @@ class Controller:
             frame["meta"] = COPY["knob.meta.windows.switching"]
         elif not item.get("available", True):
             frame["meta"] = COPY["knob.meta.windows.closed"]
+        elif self.spaces:
+            frame["meta"] = copy_text("knob.meta.position", i=index + 1, n=len(items))   # README 2.2 `{i} / {n}`
         if not item.get("available", True):
             frame["titleTone"] = "muted"
         frame["activity"] = "pending" if windows.switch_request is not None else "idle"
+        if self.spaces:
+            # README 3: a white marker at the window's position on the arc, the rest warm L 0.1.
+            frame["ring"] = {"style": "marker", "value": 0, "index": index, "count": len(items)}
+            return
         frame["ring"] = self._selection_ring(index, len(items), lambda j: items[j] if j < len(items) else None,
                                              "window", unavailable=lambda entry: not entry.get("available", True))
+
+    # Launcher (r3 Home) --------------------------------------------------------------------------------
+    def _frame_launcher(self, frame, ready):
+        """The r2.2 Home screens (nowPlaying / volume / idle / notice) with the launcher's buttons;
+        r3.1: in the lights domain (hold 4) the Lights frames (heading LIGHTS, the area's level)."""
+        if self._lights_domain():
+            self._frame_lights(frame, ready)
+            return
+        self._frame_home(frame, ready)
+
+    # Lights (r3) -----------------------------------------------------------------------------------------
+    def _lights_title(self):
+        """The scene Desk Dial ran while nothing was adjusted after it; otherwise (r3.1 design: an
+        adjustment returns the title to the area) the area's name, else `Lights`."""
+        lights = self.lights
+        if lights.scene_label and not lights.adjusted:
+            return lights.scene_label
+        return lights.name or COPY["knob.title.lights_default"]
+
+    def _lights_level(self, bri, kelvin, area=False):
+        """`{bri}% · {K} K` (the Lights space); `{area} · {bri}% · {K} K` on Home's lights domain."""
+        name = self.lights.name
+        if area and name:
+            if self.lights.supports_ct:
+                return fit_copy("knob.sub.lights_area_level", LINE_14, name=name, bri=bri, K=kelvin)
+            return fit_copy("knob.sub.lights_area_level_bri", LINE_14, name=name, bri=bri)
+        if self.lights.supports_ct:
+            return copy_text("knob.sub.lights_level", bri=bri, K=kelvin)
+        return copy_text("knob.sub.lights_level_bri", bri=bri)
+
+    def lights_area(self):
+        """Read-only (the knob frames and the Navigator): the area's facts. `count` (None for the
+        single-light setup), `ok` / `on` (available / on lights), `bad` (names of the unavailable
+        lights), `mixed` (some available lights off, or the on lights differ in level or K) and
+        `members` (the per-light rows Job C's adapter reports, [] without them)."""
+        lights = self.lights
+        members = [m for m in lights.members if isinstance(m, dict)]
+        count = lights.count if type(lights.count) is int else (len(members) if members else None)
+        if members:
+            ok = [m for m in members if m.get("available", True) is not False]
+            on = [m for m in ok if m.get("on")]
+            bad = [str(m.get("name") or m.get("entity_id") or "") for m in members if m.get("available", True) is False]
+            kelvins = [m.get("kelvin") for m in on if type(m.get("kelvin")) is int]   # brightness-only lights have none
+            levels = [_int(m.get("bri"), 0) for m in on]
+            # Lights within LIGHTS_NEAR of each other are uniform (reporting drift after a fade), not mixed.
+            spread = (bool(levels) and max(levels) - min(levels) > LIGHTS_NEAR["bri"]) or \
+                (bool(kelvins) and max(kelvins) - min(kelvins) > LIGHTS_NEAR["kelvin"])
+            mixed = self._steady_mixed(bool(on) and (len(on) < len(ok) or spread))
+            return {"count": count, "ok": len(ok), "on": len(on), "bad": bad, "mixed": mixed,
+                    "members": members[:LIGHTS_MEMBERS_DRAWN]}
+        on_count = lights.on_count if type(lights.on_count) is int else None
+        mixed = self._steady_mixed(bool(count and on_count is not None and 0 < on_count < count))
+        return {"count": count, "ok": count, "on": on_count, "bad": [], "mixed": mixed, "members": []}
+
+    def _steady_mixed(self, mixed):
+        """The area's mixed look, held while the knob drives the lights (a write pending or in flight, the
+        big value showing after a turn, or LIGHTS_MIXED_QUIET after the last write)."""
+        busy = bool(self.lights_intent() or self.lights_request is not None or self.lights_command is not None
+                    or self.clock() - self.last_lights_write < LIGHTS_MIXED_QUIET
+                    or (self._lights_reveal_source == "local" and self._lights_reveal() is not None))
+        if self._mixed_shown is None or not busy:
+            self._mixed_shown = mixed
+        return self._mixed_shown
+
+    def lights_block(self):
+        """Why the lights cannot be used (r3.1 design `lightsBlock`), or None: `connecting`,
+        `nc` (Home Assistant not connected), `area` (the area is gone), `empty` (no lights in the
+        area) or `unav` (every light unavailable)."""
+        lights = self.lights
+        detail = lights.detail
+        if detail == "area_missing":
+            return "area"
+        if detail == "no_lights" or (lights.configured and lights.count == 0):
+            return "empty"
+        if detail == "lights_unavailable":
+            return "unav"
+        if not lights.online:
+            if lights.configured and (lights.reason == "connecting" or detail in ("connecting", "registry")
+                                      or (not lights.known and lights.reason in ("", "connecting"))):
+                return "connecting"
+            return "nc"
+        area = self.lights_area()
+        if area["members"] and not area["ok"]:
+            return "unav"
+        return None
+
+    def _lights_words(self, n):
+        return COPY["knob.title.lights_count_one"] if n == 1 else copy_text("knob.title.lights_count", n=n)
+
+    def _lights_status(self, home=False):
+        """The unavailable / mixed line of the lights (r3.1): (text, tone) or None. Home's domain
+        drops ` · average`."""
+        area = self.lights_area()
+        if area["bad"]:
+            text = (copy_text("knob.meta.lights.one_unavailable", name=area["bad"][0]) if len(area["bad"]) == 1
+                    else copy_text("knob.meta.lights.n_unavailable", n=len(area["bad"])))
+            return fit_copy("knob.meta.lights.raw", LINE_R3, text=text), "error"
+        if area["mixed"]:
+            if area["on"] is not None and area["ok"] and area["on"] < area["ok"]:
+                text = copy_text("knob.meta.lights.some_on", on=area["on"], ok=area["ok"])
+            else:
+                text = self._lights_words(area["ok"] or 0)
+            return (text if home else text + COPY["knob.meta.lights.average"]), "secondary"
+        return None
+
+    def _lights_area_line(self):
+        """`{area} · 3 lights` (meta), or '' for the single-light setup."""
+        area = self.lights_area()
+        if area["count"] is None or not self.lights.name:
+            return ""
+        return fit_copy("knob.meta.lights.area", LINE_R3, name=self.lights.name, lights=self._lights_words(area["count"]))
+
+    def _ring_kelvin(self, kelvin):
+        return _clamp(kelvin if type(kelvin) is int else KELVIN_DEFAULT, KELVIN_MIN, KELVIN_MAX)
+
+    def _bri_ring(self, bri, kelvin):
+        return {"style": "bri", "value": _clamp(bri, 0, 100), "index": 0, "count": 0,
+                "kelvin": self._ring_kelvin(kelvin)}
+
+    def _ctemp_ring(self, kelvin):
+        kelvin = self._ring_kelvin(kelvin)
+        return {"style": "ctemp", "value": _clamp(int(round((kelvin - KELVIN_MIN) * 100 / (KELVIN_MAX - KELVIN_MIN))), 0, 100),
+                "index": 0, "count": 0, "kelvin": kelvin}
+
+    def _frame_lights_blocked(self, frame, block):
+        """r3.1 blocked Lights screens (the design's `blockedView`): ring off, dimmed buttons."""
+        lights = self.lights
+        name = lights.name
+        if block == "connecting":
+            frame.update(title=COPY["knob.title.lights_connecting"], subtitle=COPY["knob.sub.lights_connecting"],
+                         activity="loading")
+        elif block == "empty":
+            frame.update(title=copy_text("knob.title.lights_none", name=name) if name else COPY["knob.title.lights_none_area"],
+                         subtitle=COPY["knob.sub.lights_none"], activity="unavailable")
+        elif block == "unav":
+            area = self.lights_area()
+            sub = (fit_copy("knob.meta.lights.area", LINE_14, name=name, lights=self._lights_words(area["count"] or 0))
+                   if name and area["count"] is not None else "")
+            frame.update(title=COPY["knob.title.lights_offline"], subtitle=sub, activity="offline",
+                         meta=COPY["knob.meta.lights.check"], metaTone="error")
+        elif block == "area":
+            frame.update(title=COPY["knob.title.lights_area_missing"], subtitle=COPY["knob.sub.lights_area_missing"],
+                         activity="unavailable")
+        else:   # nc: not configured, offline, the token refused
+            frame.update(title=COPY["knob.title.lights_nc"], subtitle=COPY["knob.sub.lights_nc"],
+                         meta=COPY["knob.meta.lights.open_settings"], metaTone="error",
+                         activity="error" if lights.reason in ("auth", "forbidden") else "offline")
+
+    def _frame_lights(self, frame, ready):
+        """Lights (r3 1e; r3.1 design): the Lights space and Home's lights domain (`home`: the
+        area's name on the level line, the big value captioned with it, no temperature mode)."""
+        lights = self.lights
+        home = self.screen.mode == "launcher"
+        frame["layout"] = "lights"
+        frame["heading"] = COPY["knob.heading.lights"]
+        frame["ring"] = {"style": "off", "value": 0, "index": 0, "count": 0}
+        block = self.lights_block()
+        if block is not None:
+            self._frame_lights_blocked(frame, block)
+            transient = self._transient()
+            if transient is not None:
+                frame["meta"], frame["metaTone"] = transient.text, transient.tone
+            return
+        bri, kelvin, on = self.display_bri, self.display_kelvin, self.lights_display_on()
+        pending = bool(self.lights_intent() or self.lights_request is not None or self.lights_command is not None)
+        frame["activity"] = "pending" if pending else "idle"
+        reveal = self._lights_reveal() if on else None
+        temp_mode = self._lights_knob_mode() == "temp"
+        mixed = self.lights_area()["mixed"]
+        if reveal is not None:
+            # The big value (README 2.2 "Lights (turning)"): caption + digits + unit.
+            frame["layout"] = "lightsbig"
+            if reveal == "temp":
+                frame.update(volumeCaption=COPY["knob.caption.temperature"], value=str(kelvin), valueUnit="K")
+                frame["ring"] = self._ctemp_ring(kelvin)
+            else:
+                caption = (lights.name or COPY["knob.caption.brightness"]) if home else \
+                    COPY["knob.caption.brightness_average" if mixed else "knob.caption.brightness"]
+                frame.update(volumeCaption=caption, value=str(bri), valueUnit="%")
+                frame["ring"] = self._bri_ring(bri, kelvin)
+            frame["title"] = self._lights_title()
+            frame["subtitle"] = self._lights_level(bri, kelvin, area=home)
+            # The firmware draws a lights / lightsbig frame's 12 px line from `meta` (not `status`).
+            transient = self._transient()
+            if transient is not None:
+                frame["meta"], frame["metaTone"] = transient.text, transient.tone
+            elif self._lights_reveal_source == "external" and not pending:
+                frame["meta"], frame["metaTone"] = COPY["knob.status.lights_changed"], "secondary"
+            return
+        if not on:
+            frame.update(title=COPY["knob.title.lights_off"], subtitle=COPY["knob.sub.lights_off"])
+            line = "" if home else self._lights_area_line()
+            if line:
+                frame["meta"], frame["metaTone"] = line, "meta"
+        else:
+            frame["title"] = self._lights_title()
+            frame["subtitle"] = self._lights_level(bri, kelvin, area=home)
+            status = self._lights_status(home=home)
+            if temp_mode:
+                frame["meta"], frame["metaTone"] = COPY["knob.meta.lights.knob_temperature"], "warm"
+            elif status is not None:
+                frame["meta"], frame["metaTone"] = status
+            elif not home and self._lights_area_line():
+                frame["meta"], frame["metaTone"] = self._lights_area_line(), "meta"
+            frame["ring"] = self._ctemp_ring(kelvin) if temp_mode else self._bri_ring(bri, kelvin)
+        transient = self._transient()
+        if transient is not None:
+            frame["meta"], frame["metaTone"] = transient.text, transient.tone
+
+    def _scene_label(self, scene):
+        if not isinstance(scene, dict):
+            return ""
+        return scene.get("label") or scene.get("entity_id", "").split(".")[-1].replace("_", " ").capitalize()
+
+    def _frame_scenes(self, frame, ready):
+        lights = self.lights
+        scenes = lights.scenes[:SCENES_MAX]
+        frame["layout"] = "scenes"
+        frame["heading"] = COPY["knob.heading.scenes"]
+        if not scenes:
+            frame.update(title=COPY["knob.meta.lights.no_scenes"], subtitle=COPY["knob.sub.lights_not_set_up"])
+            frame["ring"] = {"style": "off", "value": 0, "index": 0, "count": 0}
+            return
+        count = len(scenes)
+        index = _clamp(self.screen.index, 0, count - 1)
+        scene = scenes[index]
+        frame["title"] = self._scene_label(scene)
+        frame["prevTitle"] = self._scene_label(scenes[index - 1]) if index > 0 else ""
+        frame["nextTitle"] = self._scene_label(scenes[index + 1]) if index < count - 1 else ""
+        running = bool(scene.get("running")) or (scene.get("entity_id") == lights.scene_id and not lights.adjusted
+                                                  and lights.on)
+        if running:
+            meta = copy_text("knob.meta.scenes.running", i=index + 1, n=count)
+        elif type(scene.get("bri")) is int and type(scene.get("kelvin")) is int:
+            meta = copy_text("knob.meta.scenes.preview", i=index + 1, n=count, bri=scene["bri"], K=scene["kelvin"])
+        elif type(scene.get("bri")) is int:
+            meta = copy_text("knob.meta.scenes.preview_bri", i=index + 1, n=count, bri=scene["bri"])
+        else:
+            meta = copy_text("knob.meta.scenes.position", i=index + 1, n=count)
+        frame["meta"] = meta
+        transient = self._transient()
+        if transient is not None:
+            frame["meta"], frame["metaTone"] = transient.text, transient.tone
+        frame["activity"] = "pending" if self.lights_command is not None else "idle"
+        frame["ring"] = {"style": "clusters", "value": 0, "index": index, "count": count}
+
+    # ------------------------------------------------------------------ A0 Onshape mode (ONSHAPE.md)
+    def can_enter_onshape(self):
+        """Presentation >= 6 only (the r3 navigation), and never over an overlay or Seek."""
+        if not self.spaces:
+            return False
+        if self.screen.mode == "onshape":
+            return True
+        return self.screen.mode not in OVERLAY_MODES + ("seek",) and not self._overlay_open()
+
+    def enter_onshape(self, cause="onshape"):
+        """The Onshape mode (Auto, the tray or Settings' Manual). Re-centred (a new control at
+        30000); an unsent Sonos volume target is dropped (the knob no longer sets volume)."""
+        if self.screen.mode == "onshape":
+            return True
+        if not self.can_enter_onshape():
+            return False
+        self.desired_volume = None
+        self._volume_reveal_until = 0.0
+        self.onshape_keys.clear()
+        self._onshape_swallowed.clear()
+        self._onshape_wheel = None
+        self._onshape_param_left_at = None
+        self._onshape_refused_until = 0.0
+        self._onshape_refused_kind = "refused"
+        self._onshape_chord_at = None
+        self._new_screen("onshape", ONSHAPE_BOUNDS[2], cause)
+        return True
+
+    def exit_onshape(self, cause="onshape exit"):
+        """Back to Home (Auto after the focus loss, the tray, Settings Off). Not a user exit."""
+        if self.screen.mode != "onshape":
+            return False
+        self._onshape_reset()
+        self._go_root(cause)
+        return True
+
+    def _onshape_reset(self):
+        """Onshape mode's key grammar and app state, cleared on every way out."""
+        self.onshape_keys.clear()
+        self._onshape_swallowed.clear()
+        self._onshape_wheel = None
+        self._onshape_param_left_at = None
+        self._onshape_chord_at = None
+        self.onshape_app = None
+
+    def _onshape_exit_by_user(self, cause):
+        """All four buttons held (onshape_home_chord; the tray's Leave counts too, in the runtime): Home, and
+        Auto waits until Onshape loses and regains the foreground."""
+        self.onshape_user_exits += 1
+        self.last_knob_input = self.clock()
+        self.exit_onshape(cause)
+
+    def onshape_input(self, kind, logical=None, delta=0):
+        """The knob's events in Onshape mode (Tk thread, from the runtime): ``down`` / ``up`` /
+        ``hold`` (logical slot), ``turn`` (delta), ``ready`` (``logical`` = the held mask), and the
+        injector's results ``refused`` / ``undo``. Presentation only: the injector does the input; the
+        runtime fires the Home chord (onshape_chord_due / onshape_home_chord)."""
+        if self.screen.mode != "onshape":
+            return
+        now = self.clock()
+        keys = self.onshape_keys
+        feel_before = self.feel() if kind in ("down", "up") else None
+        if kind == "down":
+            self.last_knob_input = now
+            # A2: mirror OnshapeApp.down. In parameter mode 1 / 2 / 4 are a step (3 is OK / cancel); with the wheel
+            # open they switch rings; 3 opens the wheel only with none of 1 / 2 / 4 down (else it does nothing and a
+            # modifier pressed next still drags).
+            wheel = self._app_wheel_button()
+            if self.onshape_app is not None and logical in range(4):
+                if self._onshape_param_on():
+                    if logical != wheel:
+                        self._onshape_swallowed.add(logical)
+                elif self._onshape_wheel_open():
+                    if logical != wheel:
+                        self._onshape_swallowed.add(logical)
+                elif logical == wheel and not any(keys.is_down(s) for s in range(4) if s != wheel):
+                    self._onshape_wheel = self.control_id
+            keys.down(logical)
+            if keys.chording:
+                self._onshape_wheel = None             # the Home chord closes an open wheel unrun (OnshapeApp.chord)
+            self._haptic("confirm.tick")               # 2026-09-30: every press ticks (a modifier, Undo, the chord)
+            if keys.mask == 0xF:
+                if self._onshape_chord_at is None:
+                    self._onshape_chord_at = now       # the 4th button: the Home chord's 1.0 s starts
+            else:
+                self._onshape_chord_at = None
+        elif kind == "turn":
+            self.last_knob_input = now
+            keys.turn()
+        elif kind == "up":
+            self._onshape_chord_at = None              # a release before 1.0 s cancels the Home chord
+            if logical == self._app_wheel_button():
+                if self._onshape_param_on() and keys.is_down(logical):
+                    self._onshape_param_left_at = now  # OK / cancel: parameter mode ends (the snapshot catches up)
+                self._onshape_wheel = None             # the wheel closes (it runs its entry or sends Undo)
+            if logical in self._onshape_swallowed:
+                self._onshape_swallowed.discard(logical)
+                keys.up(logical)
+            elif keys.up(logical) == "tap" and logical == 0 and self.app_profile is None:
+                # Button 1 is ZOOM (hold + turn, Karl's F1): a tap sends nothing and only says how to leave.
+                self._set_transient("knob.status.onshape.home", tone="meta", ms=REASON_META)
+        if feel_before is not None and self.feel_supported and self.feel() != feel_before:
+            # r4 (an r4 knob only): orbit / pan / tilt turn fluid (fluid.light), the knob alone zooms in detents; the
+            # new control re-anchors under the finger (feel.fade), so no detent drops.
+            self._reenter("onshape feel")
+        elif kind == "hold":
+            if logical not in self._onshape_swallowed:
+                keys.hold(logical)                     # no hold acts here (it only drops that press's tap)
+        elif kind == "ready":
+            keys.seed(logical)
+            mask = logical if type(logical) is int else 0
+            self._onshape_swallowed.intersection_update(s for s in range(4) if mask & (1 << s))
+            if not mask & (1 << 2):
+                self._onshape_wheel = None             # 3's release was lost: the wheel closes (OnshapeApp.seed)
+            if keys.mask != 0xF:
+                self._onshape_chord_at = None          # a mask seen only on re-entry never starts the chord
+        elif kind in REFUSALS:
+            # DD-SEC-001: `focus_refused` (onshape.FOCUS_REFUSED) is the same refusal (sound, buzz, red flash) with
+            # its own words: the cursor is on the model but the keys would land outside the page.
+            self._onshape_refused_until = now + ONSHAPE_REFUSED_META
+            self._onshape_refused_kind = kind
+            self._feedback("err", moment="refused")
+        elif kind == "undo":
+            self._set_transient("knob.status.onshape.undo", tone="meta", ms=ONSHAPE_UNDO_META)
+            self._feedback("ok")
+
+    def onshape_chord_due(self, now=None):
+        """All four buttons have been down together for HOME_CHORD_SECONDS (from the 4th press)."""
+        if self.screen.mode != "onshape" or self._onshape_chord_at is None or self.onshape_keys.mask != 0xF:
+            return False
+        now = self.clock() if now is None else now
+        return now - self._onshape_chord_at >= HOME_CHORD_SECONDS
+
+    def onshape_home_chord(self):
+        """The Home chord matured (the runtime has already released every injected input and swallows the four
+        buttons' later holds and releases): Home, and Auto waits for Onshape to lose and regain the foreground."""
+        if not self.onshape_chord_due():
+            return False
+        self._onshape_exit_by_user("chord")
+        return True
+
+    def onshape_action(self):
+        """zoom | tilt | orbit | pan | refused | focus_refused: the knob's title now."""
+        if self.screen.mode != "onshape":
+            return ""
+        if self.clock() < self._onshape_refused_until:
+            return self._onshape_refused_kind
+        return self.onshape_keys.action()
+
+    def _buttons_onshape(self):
+        if self.app_profile is not None:
+            return self._buttons_app()
+        return self._buttons_onshape_legacy()
+
+    def _buttons_app(self):
+        """App profiles: each button's legend word (title case; a blank legend shows a dash), the held slot lit."""
+        live = self.onshape_keys.modifier_slot()
+        legend = tuple(self.app_profile.legend) + ("",) * 4
+        out = []
+        for button in range(4):
+            spec = slot_of_button(self.app_profile, button)
+            word = (legend[button] or "").strip()
+            label = word[:1].upper() + word[1:].lower() if word else "—"
+            icon = "expand" if spec is not None and spec.kind in ("drag", "wheel", "keys") else "back"
+            out.append(self._btn(icon, label, lit="on" if live == button else None))
+        return out
+
+    def _buttons_onshape_legacy(self):
+        """1 Tilt (hold + turn: the vertical orbit; 7.2.2.0) · 2 Orbit (hold + turn) · 3 Undo (tap) · 4 Pan
+        (hold + turn); the held modifier is lit; the knob alone zooms. Home is all four held (no button of its own).
+        No v6 icon reads as a vertical rotation, so Tilt borrows Pan's arrows (`expand`; ONSHAPE.md section 2)."""
+        slot = self.onshape_keys.modifier_slot()
+        return [self._btn("expand", "Tilt", lit="on" if slot == 0 else None),
+                self._btn("shuffle", "Orbit", lit="on" if slot == 1 else None),
+                self._btn("back", "Undo"), self._btn("expand", "Pan", lit="on" if slot == 3 else None)]
+
+    def _press_onshape(self, logical, now):
+        """Host-side presses (the simulator window): the knob's keys arrive through onshape_input."""
+        if logical == 0:
+            self._set_transient("knob.status.onshape.home", tone="meta", ms=REASON_META)
+
+    def _frame_onshape(self, frame, ready):
+        if self.app_profile is not None:
+            self._frame_app(frame)
+            return
+        action = self.onshape_action()
+        frame["layout"] = "nowPlaying"
+        frame["heading"] = COPY["knob.heading.onshape"]
+        frame["title"] = COPY["knob.title.onshape." + action]
+        frame["subtitle"] = COPY["knob.sub.onshape." + action]
+        frame["ring"] = {"style": "off", "value": 0, "index": 0, "count": 0}
+        frame["activity"] = "idle"
+        transient = self._transient()
+        if self.onshape_keys.chording:
+            # The Home chord is building (3+ buttons down): say what finishes it.
+            frame["status"], frame["statusTone"] = COPY["knob.status.onshape.home"], "meta"
+        elif transient is not None:
+            frame["status"], frame["statusTone"] = transient.text, transient.tone
+        app = self.onshape_app
+        if isinstance(app, dict):
+            # A2: the knob's own Onshape UI (device._frame keeps it only for an appCanvas knob; an older knob
+            # shows the text above). slot = the cube scene; the wheel, parameter mode and echo come from the injector.
+            slot = self.onshape_keys.action()
+            frame["app"] = {"id": "onshape", "slot": slot if slot in ("zoom", "orbit", "pan", "tilt") else "zoom"}
+            if action in ("refused", "focus_refused"):
+                frame["app"]["refused"] = True
+            if action == "focus_refused":
+                # DD-SEC-001: the keys would land outside the page; the knob's canvas says CLICK MODEL FIRST
+                # (a firmware without it ignores the unknown key and keeps POINT AT MODEL).
+                frame["app"]["refusedFocus"] = True
+            for name in ("flash", "wheel", "param", "echo"):
+                if name in app:
+                    frame["app"][name] = deepcopy(app[name])
+            if action in (KEYBOARD_REFUSED, DISABLED_REFUSED):
+                del frame["app"]           # app profiles: the text screen says why for the moment
+
+    # ------------------------------------------------------------------ app profiles (plan 3, S1 DD-B)
+    def enter_app(self, profile, cause="app"):
+        """The app mode for `profile` (an app_profiles.AppProfile; None or id "onshape" = Onshape as before). A switch
+        from another app re-enters (a new control: the new profile's feel and an empty key grammar)."""
+        target = None if profile is None or getattr(profile, "id", None) == "onshape" else profile
+        if self.screen.mode == "onshape":
+            if target is self.app_profile or (target is not None and self.app_profile is not None
+                                              and target.id == self.app_profile.id):
+                self.app_profile = target
+                return True
+            self._set_app_profile(target)
+            self._onshape_reset()
+            self.app_canvas_ref = None
+            self._onshape_refused_until = 0.0
+            self._new_screen("onshape", ONSHAPE_BOUNDS[2], cause)
+            return True
+        if not self.can_enter_onshape():
+            return False
+        self._set_app_profile(target)
+        self.app_canvas_ref = None
+        return self.enter_onshape(cause)
+
+    def exit_app(self, cause="app exit"):
+        return self.exit_onshape(cause)
+
+    def _set_app_profile(self, profile):
+        self.app_profile = profile
+        self.onshape_keys = KeyTracker() if profile is None else SlotTracker(turn_buttons(profile),
+                                                                             knob_label(profile))
+
+    def app_id(self):
+        """The active app's profile id ("onshape" for Onshape), or None outside the app mode."""
+        if self.screen.mode != "onshape":
+            return None
+        return self.app_profile.id if self.app_profile is not None else "onshape"
+
+    def app_slot_token(self):
+        """The frame's `app.slot` for a profile app: the held turn slot's name (f1..f4), else knob."""
+        held = self.onshape_keys.modifier_slot()
+        spec = slot_of_button(self.app_profile, held) if held is not None and self.app_profile is not None else None
+        return spec.name if spec is not None else "knob"
+
+    def _app_live_label(self):
+        held = self.onshape_keys.modifier_slot()
+        profile = self.app_profile
+        spec = profile.slots.get("knob") if held is None else slot_of_button(profile, held)
+        return (spec.label if spec is not None and spec.label else profile.name).upper()
+
+    def _frame_app(self, frame):
+        """App profiles: the text screen (heading = the profile's name, title = the live action or the wheel's command,
+        subtitle = the legend) and, once the knob has the profile, the `app` object for its canvas."""
+        profile = self.app_profile
+        action = self.onshape_action()
+        app = self.onshape_app if isinstance(self.onshape_app, dict) else {}
+        legend = " · ".join(word for word in profile.legend if word and word.strip())
+        frame["layout"] = "nowPlaying"
+        frame["mode"] = profile.name
+        frame["heading"] = profile.name
+        frame["ring"] = {"style": "off", "value": 0, "index": 0, "count": 0}
+        frame["activity"] = "idle"
+        if action in REFUSALS:
+            frame["title"], frame["subtitle"] = COPY["knob.title.app." + action], COPY["knob.sub.app." + action]
+        elif "param" in app:
+            param = app["param"]
+            cmd = self._app_command(param.get("ring"), param.get("index"))
+            name = cmd.param.label if cmd is not None and cmd.param is not None else ""
+            frame["title"] = f"{name} {param.get('value', 0) / 1000:.2f}".strip()
+            frame["subtitle"] = copy_text("knob.sub.app.param", n=(self._app_wheel_button() or 2) + 1)
+        elif "wheel" in app:
+            wheel = app["wheel"]
+            cmd = self._app_command(wheel.get("ring"), wheel.get("index"))
+            ring = wheel.get("ring", 0)
+            rings = profile.rings
+            frame["title"] = cmd.name if cmd is not None else COPY["knob.title.app.cancel"]
+            frame["subtitle"] = rings[ring].name if 0 <= ring < len(rings) else ""
+        else:
+            frame["title"], frame["subtitle"] = self._app_live_label(), legend
+        transient = self._transient()
+        if self.onshape_keys.chording:
+            frame["status"], frame["statusTone"] = COPY["knob.status.app.home"], "meta"
+        elif transient is not None:
+            frame["status"], frame["statusTone"] = transient.text, transient.tone
+        ref = self.app_canvas_ref
+        if ref is not None and isinstance(self.onshape_app, dict) and action not in (KEYBOARD_REFUSED,
+                                                                                     DISABLED_REFUSED):
+            pid, crc = ref
+            frame["app"] = {"id": pid, "crc": crc, "slot": self.app_slot_token()}
+            if action in (REFUSED, FOCUS_REFUSED):
+                frame["app"]["refused"] = True
+            if action == FOCUS_REFUSED:
+                frame["app"]["refusedFocus"] = True
+            for name in ("flash", "wheel", "param", "echo"):
+                if name in app:
+                    frame["app"][name] = deepcopy(app[name])
+
+    def _app_command(self, ring, index):
+        rings = self.app_profile.rings if self.app_profile is not None else ()
+        if type(ring) is not int or type(index) is not int or not 0 <= ring < len(rings):
+            return None
+        commands = rings[ring].commands
+        return commands[index - 1] if 1 <= index <= len(commands) else None
 
     # ------------------------------------------------------------------ compat and view models (section 11.2)
     def items(self):
         mode = self.screen.mode
         if mode == "windows":
             return list(self.screen.windows.items) if self.screen.windows else []
-        if mode == "recent" or (mode == "explorer" and self.screen.explorer.source == "recent"):
-            return list(self.recent.items)
-        if mode == "explorer":
-            return list(self.favourites.items)
+        if mode in ("recent", "explorer"):
+            return list(self.recent.items if self._shown_source() == "recent" else self.favourites.items)
         if mode == "upnext":
             upnext = self.screen.upnext
             return [upnext.rows.get(n) for n in range(1, self._upnext_count() + 1)]
@@ -3956,10 +6193,10 @@ class Controller:
     def art_item(self):
         """(kind, item) whose cover the knob shows (section 10.4 art identity), or (kind, None)."""
         mode = self.screen.mode
-        if mode == "recent":
+        if mode == "recent" and self._recent_source() == "recent":
             return "recent", self.recent.item(self.screen.index) if self.recent.state == "ready" else None
-        if mode == "explorer":
-            source = self.screen.explorer.source
+        if mode in ("recent", "explorer"):
+            source = self._shown_source()
             if source == "recent":
                 return "recent", self.recent.item(self.screen.index) if self.recent.state == "ready" else None
             item = self._source_item("favourites", self.screen.index) if self.favourites.state == "ready" else None
@@ -3969,7 +6206,9 @@ class Controller:
             return "playlist", item
         if mode == "upnext":
             return "row", self._upnext_focus_row()
-        if mode in ("home", "tracks", "seek"):
+        if mode == "launcher" and self._lights_domain():
+            return "lights", None
+        if mode in ("home", "launcher", "tracks", "seek"):
             return "playing", None
         return mode, None
 

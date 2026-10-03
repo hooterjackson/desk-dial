@@ -1,0 +1,41 @@
+{
+  "overlay": 1,
+  "status": "tested",
+  "detect": {
+    "host": ["cad.onshape.com", "*.onshape.com"],
+    "exclude_host": ["www.onshape.com", "onshape.com", "learn.onshape.com", "forum.onshape.com",
+                     "status.onshape.com", "partners.onshape.com", "appstore.onshape.com"],
+    "content_class": ["Chrome_RenderWidgetHostHWND"]
+  },
+  "legend": ["TILT", "ORBIT", "WHEEL", "PAN"],
+  "slots": {
+    "knob": {"kind": "wheel", "label": "ZOOM", "sign": 1, "fx": "zoom",
+             "notches_per_turn": 24, "feel": "BINARIS BEER", "detents": 67},
+    "f1": {"kind": "drag", "label": "TILT", "buttons": 2, "axis_y": true, "px_per_rad": 120.9578, "sign": 1,
+           "fx": "orbit", "haptic": "viscose", "detents": 0, "tap": null, "button": 0},
+    "f2": {"kind": "drag", "label": "ORBIT", "buttons": 2, "axis_y": false, "px_per_rad": 120.9578, "sign": 1,
+           "fx": "orbit", "button": 1},
+    "f3": {"kind": "commands", "label": "UNDO", "tap": "ctrl+z", "fx": "flash", "button": 2},
+    "f4": {"kind": "drag", "label": "PAN", "buttons": 4, "px_per_rad": 120.9578, "sign": 1, "fx": "pan",
+           "button": 3}
+  },
+  "keys": {
+    "@search": "alt+c",
+    "@param_keys.select_all": "ctrl+a"
+  },
+  "params": {
+    "MODEL/EXTRUDE": {"unit": "mm"},
+    "MODEL/FILLET": {"unit": "mm"},
+    "MODEL/CHAMFER": {"unit": "mm"},
+    "MODEL/SHELL": {"unit": "mm"},
+    "MODIFY/TRANSFORM": {"unit": "mm"},
+    "MODIFY/MOVE FACE": {"unit": "mm"}
+  },
+  "notes": [
+    "Desk Dial's tuned Onshape layout (ONSHAPE.md sections 1, 5, 13, 15, 16), kept over Karl's F1 ZOOM.",
+    "Knob alone: wheel zoom, 24 notches per turn on BINARIS BEER (67 detents). Hold 1 + turn: TILT (right-drag on y).",
+    "Hold 2 + turn: ORBIT (right-drag on x). Hold 4 + turn: PAN (middle-drag). 760 px per turn (px_per_rad 760 / 2 pi).",
+    "Tap 3: Undo (Ctrl+Z). Hold 3: the command wheel. Tap 1: nothing. All four buttons held 1 s: Home.",
+    "Tool search is Alt+C (Onshape help, Keyboard shortcuts). Parameter values are typed in mm."
+  ]
+}

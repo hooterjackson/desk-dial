@@ -107,16 +107,16 @@ class KnobArtStateTests(unittest.TestCase):
         self.assertEqual(len(set(empty.preview.crop((0, 0, 240, 1)).getdata())), 1, "no text")
 
     def test_generated_is_the_gen_gradient_without_text(self):
-        prepared = knob_generated_cover("Night Drive", "Sample library")
-        g0, g1 = GEN_PALETTE[gen_index("Night Drive", "Sample library")][:2]
+        prepared = knob_generated_cover("Night Channel", "Sample library")
+        g0, g1 = GEN_PALETTE[gen_index("Night Channel", "Sample library")][:2]
         top_left = prepared.preview.getpixel((0, 0))
         bottom = prepared.preview.getpixel((239, 120))
         start = [(g0 >> s) & 255 for s in (16, 8, 0)]
         self.assertTrue(all(abs(a - round(b * k1_factor(0))) <= 3 for a, b in zip(top_left, start)))
         self.assertNotEqual(top_left, prepared.preview.getpixel((239, 0)), "a gradient, not a fill")
         self.assertIsNotNone(bottom)
-        self.assertIs(knob_generated_cover("Night Drive", "Sample library").jpeg,
-                      knob_generated_cover("Night Drive", "Sample library").jpeg, "cached")
+        self.assertIs(knob_generated_cover("Night Channel", "Sample library").jpeg,
+                      knob_generated_cover("Night Channel", "Sample library").jpeg, "cached")
 
     def test_every_state_is_a_baseline_jpeg_keyed_by_its_content(self):
         detail = Image.new("RGB", (600, 600), (0x12, 0x34, 0x56))
@@ -139,8 +139,8 @@ class KnobArtStateTests(unittest.TestCase):
 
 class GeneratedSleeveTests(unittest.TestCase):
     # BS genOf (Browse and Snap.dc.html:537) evaluated with node 24 on 2026-09-25.
-    GOLDEN = [("Night Drive", "Sample library", 5), ("PAPER LANTERN Ep. 1", "", 5), ("Kind of Blue", "Miles Davis", 6),
-              ("Björk – Début", "Björk", 2), ("🎵 Emoji 🎶", "Ārtist", 4), ("", "", 5),
+    GOLDEN = [("Night Channel", "Sample library", 0), ("PAPER LANTERN Ep. 1", "", 5), ("Tidal Glass", "Oskar Lind Trio", 4),
+              ("Linnéa Holm – Début", "Linnéa Holm", 7), ("🎵 Emoji 🎶", "Ārtist", 4), ("", "", 5),
               ("Untitled playlist", "", 7), ("Favorite Songs", "Apple Music", 4), ("東京", "宇多田ヒカル", 2)]
 
     def test_the_hash_matches_bs(self):
@@ -151,7 +151,7 @@ class GeneratedSleeveTests(unittest.TestCase):
     def test_the_sleeve_and_its_ring_accent(self):
         sleeve = gen_sleeve("Untitled playlist", "")
         self.assertEqual((sleeve["index"], sleeve["ring_accent"], sleeve["accent"]), (7, 0, 0xFFBE69))
-        sleeve = gen_sleeve("Night Drive", "Sample library")
+        sleeve = gen_sleeve("PAPER LANTERN Ep. 1", "")   # genOf index 5
         self.assertEqual((sleeve["g0"], sleeve["g1"], sleeve["ink"], sleeve["ring_accent"]),
                          (0x2A4F57, 0x112326, 0xE9F4F5, (40 << 16) | (210 << 8) | 230))
 

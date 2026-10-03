@@ -1085,7 +1085,8 @@ class CompanionShuffleTests(unittest.TestCase):
         rig.shuffle.saved = {"room_uid": "OTHER", "base_rows": [["x", "1"]]}
         self.assertEqual(rig.adapter.load_shuffle_record(), {})
         self.assertFalse(rig.refresh()["companion_shuffle"])
-        rig.shuffle.saved = {"room_uid": "ROOM", "base_rows": [["x", "1"]]}
+        # DD-BUG-034: the record must still describe the queue, so it holds a real row's digest.
+        rig.shuffle.saved = {"room_uid": "ROOM", "base_rows": [[row_signature(rig.speaker.items[5]), "95"]]}
         rig.adapter.load_shuffle_record()
         self.assertTrue(rig.refresh()["companion_shuffle"])
 

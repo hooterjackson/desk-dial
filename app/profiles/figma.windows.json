@@ -1,0 +1,23 @@
+{
+  "overlay": 1,
+  "status": "community",
+  "detect": {
+    "exe": ["Figma.exe"],
+    "host": ["figma.com", "www.figma.com"],
+    "content_class": ["Chrome_RenderWidgetHostHWND"]
+  },
+  "notes": [
+    "Karl's macOS chords with Cmd -> Ctrl and Option -> Alt; no override was needed.",
+    "Verified against Figma's Windows shortcuts in the Figma Help Center (help.figma.com, read 2026-10-03):",
+    "  ADD AUTO LAYOUT Shift+A, REMOVE AUTO LAYOUT Alt+Shift+A: 'Guide to auto layout' / 'Toggle on auto layout in designs'.",
+    "  WRAP IN FRAME Ctrl+Alt+G, GROUP Ctrl+G: 'The difference between frames and groups'.",
+    "  ALIGN LEFT/CENTER/RIGHT/TOP/MIDDLE/BOTTOM Alt+A/H/D/W/V/S: 'Adjust alignment, rotation, position, and dimensions'.",
+    "  CREATE COMPONENT Ctrl+Alt+K: 'Create components to reuse in designs'. DETACH INSTANCE Ctrl+Alt+B: 'Detach an instance from the component'.",
+    "  COPY / PASTE PROPERTIES Ctrl+Alt+C / Ctrl+Alt+V: 'Copy and paste properties between layers'.",
+    "  RENAME Ctrl+R: 'Rename Layers'. RUN LAST PLUGIN Ctrl+Alt+P: 'Use plugins in files'.",
+    "  Search (GO TO MAIN, RESET INSTANCE) Ctrl+K: 'Use the actions menu in Figma Design'.",
+    "  Knob zoom Ctrl+scroll: 'Adjust your zoom and view options'. F2 Enter / Shift+Enter (child / parent): 'Select layers and objects'.",
+    "Unverified (default mapping kept): TIDY UP Ctrl+Alt+T; F1 undo / redo Ctrl+Z / Ctrl+Shift+Z; F2 tap Shift+2; F4 N / Shift+N (next / previous frame).",
+    "Unverified: that the search phrases 'go to main component' and 'reset all changes' pick the right action first."
+  ]
+}

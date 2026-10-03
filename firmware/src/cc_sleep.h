@@ -149,6 +149,34 @@ private:
     uint32_t offAt_, movedAt_, wakeAt_;
 };
 
+// The LCD while asleep (FW-BUG-016; LCD thread, once per pass before the host frame). The panel is dark,
+// so nothing may be drawn or flushed: host frames are still rendered into the LVGL tree (it stays current)
+// but no lv_refr_now() runs and the display refresh timer is paused. On the wake the screen is invalidated
+// and refreshed once, and only then may the backlight return: dark() stays true through the wake pass
+// until refreshed() is called, and backlightState() keeps the backlight at 0 until then.
+enum CCSleepLcdStep : uint8_t { CC_SLEEP_LCD_KEEP = 0, CC_SLEEP_LCD_PAUSE = 1, CC_SLEEP_LCD_RESUME = 2 };
+class CCSleepLcdGate {
+public:
+    CCSleepLcdGate() : dark_(false) {}
+    // `state`: cc_sleep_state() read once for this pass. PAUSE: pause the refresh timer (now dark).
+    // RESUME: resume it, render the latest frame, invalidate + refresh the whole screen, refreshed().
+    uint8_t step(uint8_t state) {
+        const bool asleep = state == CC_SLEEP_ASLEEP;
+        if (asleep && !dark_) { dark_ = true; return CC_SLEEP_LCD_PAUSE; }
+        if (!asleep && dark_) return CC_SLEEP_LCD_RESUME;
+        return CC_SLEEP_LCD_KEEP;
+    }
+    // The wake refresh reached the panel.
+    void refreshed() { dark_ = false; }
+    // True: skip every lv_refr_now() (the panel is dark, or the wake refresh has not run yet).
+    bool dark() const { return dark_; }
+    // The sleep state the backlight follows: asleep until the wake refresh has run.
+    uint8_t backlightState(uint8_t live) const { return dark_ ? static_cast<uint8_t>(CC_SLEEP_ASLEEP) : live; }
+
+private:
+    bool dark_;
+};
+
 // Button wake-swallow bookkeeping (HMI thread): a press that woke the knob is swallowed with its
 // long press and its release, so the host never sees a hold or a key up without its key down.
 // kind: CC_SLEEP_KEY_PRESS, _RELEASE or _OTHER (long press ...). True: drop this event.

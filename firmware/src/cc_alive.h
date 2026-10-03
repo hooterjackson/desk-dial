@@ -41,6 +41,12 @@
 // engine (12.3), [r2.2] M32 (the liked heart PINK 0.30, `unlike` reserved) and M33 (the Working
 // comet reads seek- / play-next-in-flight as activity pending; nothing new in the engine), and
 // Q1 (12.5: the End stop on every push, in CCAliveKnob).
+//
+// Presentation 6 (ALIVE.md section 15, Desk Dial r3 release 1): the family LIGHTS (layouts lights, lightsbig,
+// scenes), the ring styles bri / ctemp / clusters on the r3 arc (45 segments from 38 clockwise through the top
+// to 22; 23..37 stay free), the Kelvin colour as an ACCENT drawn as is (never sat(), no WARM fallback, no
+// volume amber / red, no near-max embers), the classes T / R / O / L / F, the LIGHTS ok = a 700 ms green
+// wash of the whole ring (CC_FLASH_WASH) and the active-mode button (lit on) at 0.90 in LIGHTS.
 
 // ------------------------------------------------------------------ constants
 namespace CCAliveSpec {
@@ -66,13 +72,23 @@ constexpr uint8_t satMinSpread = 30;        // sat(): max - min below this -> WA
 
 // Section 5.2 alpha per CCAliveClass (none, 1, 2, S, 3, 4, P, N, Q). [r2][M1] the semantic body
 // (class 2) and half-step (S) are 0.62 / 0.81 like warm; ledVolFull restores AL's 1.00.
-constexpr float alphaAwakeWarm[9] = {0.0f, 0.30f, 0.62f, 0.81f, 1.00f, 1.00f, 0.14f, 0.70f, 0.45f};
-constexpr float alphaAwakeSemantic[9] = {0.0f, 0.45f, 0.62f, 0.81f, 1.00f, 1.00f, 0.14f, 0.70f, 0.45f};
+// [r3] (15.3) T 0.08, R 0.12 (unused since the user ruling of 2026-09-29: the unfilled arc is off; kept, append-only), O 0.18 (clusters not selected), L 0.34 (bri
+// filled at rest), F 0.50 (ctemp filled at rest): the same in both tables (the Kelvin cells are ACCENT).
+// [r3] (15.7) M 0.10: the r3 marker ring's rest of the arc (the Windows ring, README r3 section 3).
+// [r3.1] (15.9) W 0.60: the queue ring's playing row (warm white); it rests at 0.34 like every lit mark.
+constexpr float alphaAwakeWarm[16] = {0.0f, 0.30f, 0.62f, 0.81f, 1.00f, 1.00f, 0.14f, 0.70f, 0.45f,
+                                      0.08f, 0.12f, 0.18f, 0.34f, 0.50f, 0.10f, 0.60f};
+constexpr float alphaAwakeSemantic[16] = {0.0f, 0.45f, 0.62f, 0.81f, 1.00f, 1.00f, 0.14f, 0.70f, 0.45f,
+                                          0.08f, 0.12f, 0.18f, 0.34f, 0.50f, 0.10f, 0.60f};
 constexpr float alphaVolFull = 1.00f;       // [M24] semantic class 2 / S with ledVolFull
 // Resting: BS's thresholds (>= 0.99 -> 0.16, >= 0.5 -> 0.10, else 0.05) except S (D10: 0.13).
 // [user 2026-09-26] resting = one steady dim warm white. 0.34 keeps ~(8..11, 5..6, 1..2) counts at drive 150,
 // enough for the LEDs to show the warm hue (0.05-0.16 gave 0-3 counts, which shifted colour).
-constexpr float alphaResting[9] = {0.0f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f};
+// [r3] (15.3) resting keeps the one steady warm white: L and F (the filled arc) rest at 0.34 like every other
+// lit class; T, R and O (the unfilled track, the ctemp remainder, the scenes not selected) rest dark, so the
+// resting ring still reads as the level / the selected scene.
+constexpr float alphaResting[16] = {0.0f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f, 0.34f,
+                                    0.0f, 0.0f, 0.0f, 0.34f, 0.34f, 0.0f, 0.34f};
 constexpr float restTodMin = 0.80f;         // time of day dims resting, never below this (hue floor)
 constexpr float alphaOverride = 1.0f;       // external / flash |k| <= 1
 constexpr float alphaFlashEdge = 0.5f;      // flash |k| == 2
@@ -83,6 +99,43 @@ constexpr uint8_t offlinePitch = 5;
 constexpr float buttonNav = 0.70f, buttonDim = 0.14f, buttonGo = 1.0f, buttonStop = 1.0f;
 constexpr float buttonOn = 1.0f, buttonOff = 0.30f, buttonLiked = 0.30f;
 constexpr float buttonRestHigh = 0.34f, buttonRestLow = 0.26f, buttonRestSplit = 0.5f;   // [user 2026-09-26]
+// [r3] (15.4) README r3 section 3 "active mode warm L 0.9": a lit-on button of the LIGHTS family.
+constexpr float buttonActive = 0.90f;
+
+// [r3] (15.2) the Lights arc: 45 segments clockwise from 38 (7:30) through the top to 22; clusters: 3 each.
+constexpr uint8_t arcStart = 38, arcLength = 45, clusterWidth = 3;
+// [r3] (15.5) LIGHTS ok: the whole ring GREEN at 0.68 for 700 ms (README r3 section 3 "Scene ran").
+constexpr uint32_t lightsWashMs = 700;
+constexpr float lightsWashAlpha = 0.68f;
+// [r3] (15.7, README r3 sections 1 and 3) the unavailable press: segments 26..34 RED 0.9 for 320 ms (no fail
+// shake); the matured hold 1: the whole ring WARM 0.68 for 400 ms; the hold-1 progress ring: the r3 arc fills
+// WARM (class 4, 1.0) 0 -> 45 over the 600 ms hold, shown from 12 %, on a frame with a crumb only.
+// r4 (design_handoff_nano_d_r4 README 3.4, ALIVE.md 16): the deny glow is 480 ms in 255,60,40 (was 320 ms RED).
+constexpr uint32_t refusedFlashMs = 480;
+constexpr uint32_t refusedRgb = 0xFF3C28u;
+constexpr float refusedAlpha = 0.9f;
+constexpr uint8_t refusedFirst = 26, refusedLast = 34;
+constexpr uint32_t homeFlashMs = 400;
+constexpr float homeFlashAlpha = 0.68f;
+constexpr uint32_t holdRingMs = 600, holdShowPct = 12;
+// Desk Dial r3.1: the button-4 hold ring. While physical slot 3 is held (enabled on the frame, any screen incl.
+// the launcher Home), the same r3 arc fills WARM 0 -> 45 over the 1000 ms hold (the kh of every button but
+// slot 0), shown from 12 %, then (once) the same WARM home flash; the release cancels it.
+constexpr uint32_t hold4RingMs = 1000;
+// [r3.1] design delta (r3.1 prototype L922-924, L667-672): the button-4 ring shows from 15 % (150 ms), only on a
+// frame with holdMarker; at 1000 ms the full arc waits (<= 600 ms) for the host's landing: the first new feedback
+// seq within 1500 ms of the maturity lands it. A plain ok is CC_FLASH_LAND (the whole ring 0.68 for 450 ms in the
+// Kelvin colour of a bri / ctemp frame, else WARM: the Home domain swap), ok + moment queued is CC_FLASH_QUEUE
+// (the whole ring GREEN 0.68 for 600 ms, instead of the queued sweep). Anything else lands as usual.
+constexpr uint32_t hold4ShowPct = 15;
+constexpr uint32_t landingWindowMs = 1500, landingWaitMs = 600;
+// r4 M12: a plain-ok landing is the domain-swap sweep (no wash); landFlashMs is its window (the prototype's 800 ms).
+constexpr uint32_t landFlashMs = 800, queueFlashMs = 600;
+constexpr float landFlashAlpha = 0.68f;
+// [r3.1] (15.9) the queue ring's playing row: warm white 255,232,205 (the r3.1 prototype's WW).
+constexpr uint32_t queueNowRgb = 0xFFE8CDu;
+// [r3] (15.7) the marker ring: a white marker (240,240,240) +-1 on the arc, the rest class M.
+constexpr uint32_t markerRgb = 0xF0F0F0u;
 
 // Section 6 timing (ms).
 constexpr uint32_t sleepInputMs = 5000;
@@ -155,6 +208,20 @@ constexpr bool defaultDither = false;
 constexpr float powerBudget = 16920.0f;
 constexpr uint8_t buttonLedsPerSlot = 2;
 
+// r4 (design_handoff_nano_d_r4 README 3.3 / 3.4; ALIVE.md section 16), after the animator:
+// - every ring and button LED eases towards the animator's e, exponential tau 50 ms: nothing ever steps;
+// - a wall (limit) glows the 5 LEDs at that end of the arc (the cursor +-2) warm white 255,232,205 at L 0.9, a bloom
+//   (rise 90 ms E.out, fall 420 ms E.io) blended over whatever they show;
+// - M12 the domain swap: after a plain-ok hold-4 landing each LED starts easing to the new ring i x 8.7 ms after the
+//   landing (clockwise from 12 o'clock), 200 ms each (the 50 ms easer).
+constexpr float easeTauMs = 50.0f;
+constexpr float easeSnap = 1.0e-6f;         // |target - shown| below this lands on the target
+constexpr uint32_t wallGlowRgb = 0xFFE8CDu;
+constexpr float wallGlowAlpha = 0.9f;
+constexpr int wallGlowHalf = 2;
+constexpr float glowRiseMs = 90.0f, glowFallMs = 420.0f;
+constexpr float sweepStepMs = 8.7f;
+
 // [Q1] (12.5) the End stop on every push: the re-arm hold-off (tuned in the turning test,
 // 40-150 ms) and the spacing of the ring's bound / the wire lim.
 constexpr uint32_t limRearmMs = 75;
@@ -168,15 +235,20 @@ enum CCAliveRole : uint8_t {
 };
 // Classes (section 5.2), append-only: 0 none, 1, 2, S (half-step), 3, 4; [r2] P (Up next played
 // 0.14), N (now playing 0.70), Q (Up next upcoming, the unavailable list cursor: 0.45).
+// [r3] T 9 (0.08), R 10 (0.12), O 11 (0.18), L 12 (0.34), F 13 (0.50): the Lights rings (ALIVE.md 15.3).
 enum CCAliveClass : uint8_t {
     CC_ALIVE_CLASS_NONE, CC_ALIVE_CLASS_1, CC_ALIVE_CLASS_2, CC_ALIVE_CLASS_S, CC_ALIVE_CLASS_3, CC_ALIVE_CLASS_4,
-    CC_ALIVE_CLASS_P, CC_ALIVE_CLASS_N, CC_ALIVE_CLASS_Q
+    CC_ALIVE_CLASS_P, CC_ALIVE_CLASS_N, CC_ALIVE_CLASS_Q,
+    CC_ALIVE_CLASS_T, CC_ALIVE_CLASS_R, CC_ALIVE_CLASS_O, CC_ALIVE_CLASS_L, CC_ALIVE_CLASS_F,
+    CC_ALIVE_CLASS_M,    // [r3] 14 (0.10): the marker ring's rest (ALIVE.md 15.7)
+    CC_ALIVE_CLASS_W     // [r3.1] 15 (0.60): the queue ring's playing row (ALIVE.md 15.9)
 };
 // Layout families (Home = nowPlaying/volume/idle/notice; tracks = tracks/seek). OFFLINE = unclaimed.
 // [r2] explorer 5, upnext 6 (append-only).
+// [r3] LIGHTS 7 (lights, lightsbig, scenes; ALIVE.md 15.1).
 enum CCAliveFamily : uint8_t {
     CC_ALIVE_HOME, CC_ALIVE_RECENT, CC_ALIVE_TRACKS, CC_ALIVE_WINDOWS, CC_ALIVE_OFFLINE,
-    CC_ALIVE_EXPLORER, CC_ALIVE_UPNEXT
+    CC_ALIVE_EXPLORER, CC_ALIVE_UPNEXT, CC_ALIVE_LIGHTS
 };
 // Section 7 effects, in the order of CCAliveSpec::durations. [r2] half 15, scatter 16.
 enum CCAliveEffectType : uint8_t {
@@ -267,7 +339,8 @@ bool cc_alive_pending(const CCFrame& frame, int32_t localValue = -1);
 uint8_t cc_alive_displayed_volume(const CCFrame& frame, int32_t localValue = -1);
 // 6.3 local cursor [D14], for the LEDs only, without copying the frame: value >= 0 is the level
 // ring's displayed value, index >= 0 the selection / transport ring's index (both -1 when the
-// rules do not apply; never on the [r2] lap ring [M11]). localMax < 0 means "no local
+// rules do not apply; never on the [r2] lap ring [M11]; [r3] the bri ring takes value with localMax 100, the
+// clusters ring index with localMax count - 1, the ctemp ring never). localMax < 0 means "no local
 // position". Returns true when applied. The selection ring keeps the host frame's window: the
 // targets re-centre on the local index [M15].
 bool cc_alive_local(const CCFrame& frame, int32_t localPos, int32_t localMax, int32_t& value, int32_t& index);
@@ -299,6 +372,7 @@ struct CCAliveTargetState {
     int32_t localIndex;  // 6.3: the selection / transport ring's local index, -1 = the frame's;
                          // a selection ring re-centres on it [M15]
     bool volFull;        // [M24] latched ledVolFull
+    int16_t holdFill;    // [r3] 15.7: the hold-1 (or [r3.1] button-4) progress ring's filled arc segments, 0 = none
 };
 // Pure targets function (sections 5.1-5.4) of the host frame with the local cursor of `state`
 // (cc_alive_local); `frame` may be null (dark, or offline). songProg = -1, todB = 1: the engine
@@ -417,6 +491,9 @@ public:
     void detent(uint32_t now, int32_t delta);
     void limit(uint32_t now, int8_t dir);           // end stop, -1 at 0, +1 at max
     void press(uint32_t now, uint8_t slot);         // physical slot 0..3
+    // [r3] 15.7: the release of physical slot `slot` (hmi_thread's kEventReleased while claimed). Slot 0's
+    // press and release bound the hold-1 progress ring; [r3.1] slot 3's the button-4 hold ring.
+    void keyUp(uint32_t now, uint8_t slot);
     // Latched host fields (section 3). minute 0..1439; dur 0 clears progress.
     void setClock(uint32_t now, uint16_t minute);
     void setProgress(uint32_t now, uint32_t pos, uint32_t dur);
@@ -445,7 +522,11 @@ public:
     const CCAlivePalette& palette() const { return palette_; }
     bool asleep() const { return targets_.asleep; }
     uint8_t cursor() const { return targets_.cursor; }
-    bool animating() const { return animator_.animating(); }
+    // The animator, or the r4 output easer still moving, or a wall glow / domain sweep running.
+    bool animating() const { return animator_.animating() || easeResidue_ > 1.0f / 1024.0f || wallOn_ || sweepOn_; }
+    float easeResidue() const { return easeResidue_; }    // r4: the largest |target - eased| of the last render
+    bool wallGlow() const { return wallOn_; }
+    bool sweeping() const { return sweepOn_; }
     bool claimed() const { return claimed_; }
     uint8_t flash() const { return flash_; }
     // [M22] the running moment hold's length (0 = none).
@@ -504,7 +585,24 @@ private:
     uint32_t clockAt_;
     uint32_t progPos_, progDur_, progAt_;
     int8_t homePlaying_;                 // the last Home frame's playing (-1 absent = not playing [R3])
+    // [r3] 15.7 the hold-1 progress ring: slot 0 down since holdAt_ (holdDown_), the home flash played.
+    bool holdDown_, holdMatured_, feedbackRefused_;
+    uint32_t holdAt_;
+    // [r3.1] the button-4 hold ring: slot 3 down since hold4At_ (hold4Down_), its home flash played.
+    bool hold4Down_, hold4Matured_;
+    uint32_t hold4At_;
+    // [r3.1] the landing window of a matured button-4 hold (open since landingAt_).
+    bool landingOpen_;
+    uint32_t landingAt_;
     uint32_t rng_;                       // [M5] the scatter PRNG (xorshift32)
+    // r4 (ALIVE.md 16): the eased output, the wall glow and the domain-swap sweep.
+    void r4Layer(uint32_t now, uint32_t dt);
+    float eased_[CC_RING_LEDS][3], easedB_[4][3];
+    float prevE_[CC_RING_LEDS][3], prevEB_[4][3];   // the previous render's animator e (the easer's first-order hold)
+    float easeResidue_;
+    bool wallOn_, sweepOn_;
+    uint32_t wallAt_, sweepAt_;
+    uint8_t wallSeg_;
 };
 
 // ------------------------------------------------------------------ local input (firmware HMI)

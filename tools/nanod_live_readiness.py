@@ -1,7 +1,5 @@
 """Read current Sonos/library readiness; no playback, volume, queue, or device writes."""
-import argparse
 from concurrent.futures import ThreadPoolExecutor
-import os
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -13,17 +11,8 @@ from control_center.sonos import SonosAdapter
 from control_center.apple_music import AppleMusicClient
 from control_center.credentials import CredentialStore
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--speaker-ip", default=os.environ.get("DESKDIAL_SPEAKER_IP", ""),
-                    help="the Sonos speaker to read (or set DESKDIAL_SPEAKER_IP)")
-parser.add_argument("--room-uid", default=os.environ.get("DESKDIAL_ROOM_UID") or None,
-                    help="optional RINCON_... room UID to pin (or set DESKDIAL_ROOM_UID)")
-ARGS = parser.parse_args()
-if not ARGS.speaker_ip:
-    parser.error("give --speaker-ip or set DESKDIAL_SPEAKER_IP")
-
 def sonos():
-    state = SonosAdapter(ARGS.speaker_ip, room_uid=ARGS.room_uid).read_state()
+    state = SonosAdapter("192.168.1.50", room_uid="RINCON_000000000000001400").read_state()
     return {key: state.get(key) for key in ("online", "group_label", "group_room_count", "volume", "playback", "can_previous", "can_next")}
 
 def music():

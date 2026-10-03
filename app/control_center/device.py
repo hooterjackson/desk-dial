@@ -71,19 +71,64 @@ def _integer(value, minimum, maximum):
     return type(value) is int and minimum <= value <= maximum
 
 
-def _lcd_text(text):
-    """Readable fallback for the installed ASCII Montserrat glyph set.
+_LCD_PUNCTUATION = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"',
+    "–": "-", "—": "-", "…": "...", "·": "/", "•": "/", "×": "x", "⁄": "/",
+    "œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE", "ø": "o", "Ø": "O", "ß": "ss"})
+_LCD_MARKS = frozenset(("Mn", "Mc", "Me", "Cf"))
+_ZWJ = "‍"
+
+
+def _ascii_glyph(c):
+    """The installed ASCII Montserrat set: printable ASCII (U+0020-007E) only."""
+    return " " <= c <= "~"
+
+
+def _lcd_dropped(c):
+    """Invisible parts of a character: combining marks, format characters (joiners, tags), variation
+    selectors and emoji skin-tone modifiers."""
+    code = ord(c)
+    return (unicodedata.category(c) in _LCD_MARKS or 0xFE00 <= code <= 0xFE0F or 0xE0100 <= code <= 0xE01EF
+            or 0x1F3FB <= code <= 0x1F3FF)
+
+
+def _lcd_text(text, glyph=_ascii_glyph):
+    """Readable fallback for the knob's glyph set (``glyph``: ASCII by default).
 
     Only the copied device presentation is adapted; item identity, playback
     resolution and the companion's full Unicode strings remain untouched.
+    DD-DES-002: each source character is adapted on its own: kept when it is a glyph, its
+    punctuation or compatibility (NFKD) form when every part of that is a glyph, otherwise ONE
+    "?" (a Hangul syllable, an Arabic ligature, an emoji with its modifiers, joiners and flag pair
+    each count once), never a run of "?" for one character.
     """
-    punctuation = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"',
-        "–": "-", "—": "-", "…": "...", "·": "/", "•": "/", "×": "x",
-        "œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE", "ø": "o", "Ø": "O", "ß": "ss"})
-    normalized = unicodedata.normalize("NFKD", text.translate(punctuation))
-    # Only printable ASCII (U+0020-007E) is a glyph: DEL, controls and every
-    # non-ASCII remainder become "?".
-    return "".join(c if " " <= c <= "~" else "?" for c in normalized if not unicodedata.combining(c))
+    out = []
+    joined = regional = False
+    for c in text:
+        if glyph(c):
+            out.append(c)
+            joined = regional = False
+            continue
+        if c == _ZWJ:
+            joined = bool(out) and out[-1] == "?"     # an emoji ZWJ sequence stays one character
+            continue
+        if _lcd_dropped(c):
+            continue
+        code = ord(c)
+        if joined:
+            joined = False
+            continue
+        if 0x1F1E6 <= code <= 0x1F1FF:                  # regional indicators: a flag is a pair
+            regional = not regional
+            if not regional:
+                continue
+        else:
+            regional = False
+        mapped = c.translate(_LCD_PUNCTUATION)
+        if mapped == c:
+            mapped = "".join(p for p in unicodedata.normalize("NFKD", c)
+                             if unicodedata.category(p) not in _LCD_MARKS).translate(_LCD_PUNCTUATION)
+        out.append(mapped if mapped and all(glyph(p) for p in mapped) else "?")
+    return "".join(out)
 
 
 # ---------------------------------------------------------------------------
@@ -114,14 +159,17 @@ _ALIVE_FIELDS = frozenset((*presentation.ALIVE_CONTENT_FIELDS, *presentation.ALI
 _V5_FIELDS = frozenset(presentation.V5_LATCHED_FIELDS)
 _TUNING_FIELDS = frozenset(presentation.ALIVE_TUNING_FIELDS)
 _V5_RING_FIELDS = ("now", "card")
+# Presentation 6 (Desk Dial r3): `valueUnit`, `prevTitle`, `nextTitle` and `ring.kelvin`.
+_V6_FIELDS = frozenset(presentation.V6_FIELDS)
+_V6_RING_FIELDS = ("kelvin",)
 _KNOWN_FIELDS = frozenset(("id", "buttons", "ring", "activity", "layout", "ledStyle", "artKey",
                            "volumeVisible", "confirmedVolume", "iconKey", *_REQUIRED_TEXT, *_OPTIONAL_TEXT,
-                           *_V4_FIELDS, *_ALIVE_FIELDS, *_V5_FIELDS, *_TUNING_FIELDS))
+                           *_V4_FIELDS, *_ALIVE_FIELDS, *_V5_FIELDS, *_TUNING_FIELDS, *_V6_FIELDS, "app"))
 
 
 _KNOWN_SUBFIELDS = frozenset(["frame", "button.icon", "button.color", "button.lit", "ring.index", "feedback.skip",
                               "feedback.moment", "feedback.side", "feedback.color"] + [
-    "ring." + name for name in _V4_RING_FIELDS + _V5_RING_FIELDS + ("available",)])
+    "ring." + name for name in _V4_RING_FIELDS + _V5_RING_FIELDS + _V6_RING_FIELDS + ("available",)])
 # Legacy text that v4 renderers never draw; emptied (in this order) only when a
 # v4 frame would otherwise exceed presentation.FRAME_BUDGET_BYTES. `value` is drawn
 # only as the Home volume digits, so it is kept on Home layouts; elsewhere it is a
@@ -198,6 +246,219 @@ def artwork2_capability(capabilities):
     if not _exact((capabilities or {}).get("artwork2"), presentation.ARTWORK2_CAPABILITY):
         return None
     return deepcopy(presentation.ARTWORK2_CAPABILITY)
+
+
+# A2 app canvas (1.0.0-cc5.6; ONSHAPE.md section 10, CONTROL_CENTER.md "App canvas"): the frame's `app` object,
+# sent only to a presentation-6 knob whose capabilities carry appCanvas 1. The knob then draws the app's own UI
+# (Karl Malota's Onshape screens) instead of the text frame; an older knob never sees `app` (dropped silently)
+# and shows A0's text screens.
+# App profiles (APP_PROFILES.md sections 7-8; plan section 1c, S1 DD-B): `id` is any profile id (1..11 of
+# [a-z0-9_-]), an optional `crc` (u32) names the uploaded copy (0 / absent = the built-in Onshape), the slot tokens
+# knob / f1..f4 follow the legacy four, `index` goes to 32 and `param` carries the live constraint (`axis` 0..3,
+# `plane`). A knob without `appProfiles` gets the legacy object only (_legacy_app): its parser never sees new fields.
+APP_CAPABILITY = "appCanvas"
+APP_PROFILES_CAPABILITY = "appProfiles"
+WIRE_VERSION_APP = 1                                       # the DDAP wire version (APP_PROFILES.md)
+APP_IDS = {"onshape": 1}                                   # the cc5.6 built-in (index 1); kept for older readers
+APP_SLOTS = {"zoom": 0, "orbit": 1, "pan": 2, "tilt": 3,  # append-only (CCAppSlot); tilt: Desk Dial 7.2.2.0
+             "knob": 4, "f1": 5, "f2": 6, "f3": 7, "f4": 8}
+APP_LEGACY_SLOTS = ("zoom", "orbit", "pan", "tilt")
+APP_MODES = {"A": False, "B": True}
+APP_RING_MAX = 7
+APP_INDEX_MAX = 32
+APP_LEGACY_INDEX_MAX = 15
+APP_VALUE_MAX = 99_999_999
+APP_CRC_MAX = 0xFFFFFFFF
+APP_AXIS_MAX = 3
+_APP_SEQ_MAX = 0x7FFFFFFF
+_APP_ID = re.compile(r"[a-z0-9_-]{1,11}")
+
+
+def app_capability(capabilities):
+    """True when the knob draws the frame's `app` object: presentation >= 6 and capabilities.appCanvas == 1."""
+    caps = capabilities if isinstance(capabilities, dict) else {}
+    value = caps.get(APP_CAPABILITY)
+    return presentation_level(caps) >= presentation.PRESENTATION_V6 and type(value) is int and value == 1
+
+
+def app_profiles_capability(capabilities):
+    """{"slots", "maxBytes", "features"} when the knob takes uploaded app profiles (APP_PROFILES.md section 7:
+    appProfiles 1 on an appCanvas knob, the three sizes as ints), else None."""
+    caps = capabilities if isinstance(capabilities, dict) else {}
+    if not app_capability(caps) or not _integer(caps.get(APP_PROFILES_CAPABILITY), 1, 1):
+        return None
+    slots, size, features = caps.get("appProfileSlots"), caps.get("appProfileMaxBytes"), caps.get("appProfileFeatures")
+    if not (_integer(slots, 1, 64) and _integer(size, 1, 1 << 24) and _integer(features, 0, APP_CRC_MAX)):
+        return None
+    return {"slots": slots, "maxBytes": size, "features": features}
+
+
+def app_parse(value):
+    """The firmware's reading of a frame's `app` object (cc_frame_parse.cpp parse_app): (stored, ok).
+
+    `stored` mirrors CCAppState as the harness prints it (the id as text, the crc, the slot as its number, defaults
+    for what is absent); `ok` False means the firmware rejects the whole frame (the strict rule), and `stored` is
+    None. Unknown keys are ignored; a well-formed id that is not loaded is accepted (the knob draws "Loading").
+    `param.axis` (0..3, never a bool) and `param.plane` (a bool) are checked, not stored (the harness doesn't print
+    them). harness/app_canvas_tests.py holds both readings to one table."""
+    if not isinstance(value, dict):
+        return None, False
+    ident, slot = value.get("id"), value.get("slot")
+    if not isinstance(ident, str) or _APP_ID.fullmatch(ident) is None or not isinstance(slot, str) \
+            or slot not in APP_SLOTS:
+        return None, False
+    stored = {"id": ident, "crc": 0, "slot": APP_SLOTS[slot], "refused": False, "flash": 0, "wheel": False,
+              "wheelRing": 0, "wheelIndex": 0, "param": False, "paramRing": 0, "paramIndex": 1, "paramTyped": False,
+              "paramStep": 1, "paramValue": 0, "paramBump": 0, "echoSeq": 0, "echoRing": 0, "echoIndex": 1}
+    if "crc" in value:
+        if not _integer(value["crc"], 0, APP_CRC_MAX):
+            return None, False
+        stored["crc"] = value["crc"]
+    if "refused" in value:
+        if type(value["refused"]) is not bool:
+            return None, False
+        stored["refused"] = value["refused"]
+    if "flash" in value:
+        if not _integer(value["flash"], 0, _APP_SEQ_MAX):
+            return None, False
+        stored["flash"] = value["flash"]
+    if "wheel" in value:
+        wheel = value["wheel"]
+        if not isinstance(wheel, dict) or not _integer(wheel.get("ring"), 0, APP_RING_MAX) \
+                or not _integer(wheel.get("index"), 0, APP_INDEX_MAX):
+            return None, False
+        stored.update(wheel=True, wheelRing=wheel["ring"], wheelIndex=wheel["index"])
+    if "param" in value:
+        param = value["param"]
+        if not isinstance(param, dict) or not _integer(param.get("ring"), 0, APP_RING_MAX) \
+                or not _integer(param.get("index"), 1, APP_INDEX_MAX) or param.get("mode") not in APP_MODES \
+                or not isinstance(param.get("mode"), str) or not _integer(param.get("step"), 0, 2) \
+                or not _integer(param.get("value"), -APP_VALUE_MAX, APP_VALUE_MAX):
+            return None, False
+        if "bump" in param and not _integer(param["bump"], 0, _APP_SEQ_MAX):
+            return None, False
+        if "axis" in param and not _integer(param["axis"], 0, APP_AXIS_MAX):
+            return None, False
+        if "plane" in param and type(param["plane"]) is not bool:
+            return None, False
+        stored.update(param=True, paramRing=param["ring"], paramIndex=param["index"],
+                      paramTyped=APP_MODES[param["mode"]], paramStep=param["step"], paramValue=param["value"],
+                      paramBump=param.get("bump", 0))
+    if "echo" in value:
+        echo = value["echo"]
+        if not isinstance(echo, dict) or not _integer(echo.get("ring"), 0, APP_RING_MAX) \
+                or not _integer(echo.get("index"), 1, APP_INDEX_MAX) or not _integer(echo.get("seq"), 1, _APP_SEQ_MAX):
+            return None, False
+        stored.update(echoSeq=echo["seq"], echoRing=echo["ring"], echoIndex=echo["index"])
+    return stored, True
+
+
+# App profiles upload (APP_PROFILES.md section 7): stop-and-wait, one data line per bridge pass, each acked.
+APP_PROFILE_CHUNK_B64 = 3000                     # b64 characters a data line carries at most (2,250 bytes)
+APP_PROFILE_CHUNK_BYTES = APP_PROFILE_CHUNK_B64 // 4 * 3
+APP_PROFILE_REPLY_SECONDS = 1.0                  # per line: list, each data ack, end
+APP_PROFILE_ERRORS = re.compile(r"(crc|size|order|busy|wire|decode:\d{1,3}@\d{1,6})")
+
+
+def legacy_app_parse(value):
+    """The cc5.6 / cc5.7 reading (before app profiles): id "onshape" only, the legacy slots, no crc, index <= 15,
+    no axis / plane. (stored, ok)."""
+    stored, ok = app_parse(value)
+    if not ok or value.get("id") != "onshape" or value.get("slot") not in APP_LEGACY_SLOTS or "crc" in value:
+        return None, False
+    for name in ("wheel", "param", "echo"):
+        part = value.get(name)
+        if isinstance(part, dict) and (part.get("index", 0) > APP_LEGACY_INDEX_MAX or "axis" in part
+                                       or "plane" in part):
+            return None, False
+    return stored, True
+
+
+def _legacy_app(raw):
+    """The `app` object as a knob without appProfiles may see it, or None: the built-in Onshape's crc 0 is dropped
+    (the default), a param's axis / plane removed; anything else new (a profile id or slot, an index past 15, an
+    upload's crc) strips the whole object."""
+    if not isinstance(raw, dict):
+        return None
+    value = deepcopy(raw)
+    if type(value.get("crc")) is int and value["crc"] == 0:
+        value.pop("crc")
+    if isinstance(value.get("param"), dict):
+        value["param"].pop("axis", None)
+        value["param"].pop("plane", None)
+    return value if legacy_app_parse(value)[1] else None
+
+
+# r4 FEEL + SOUND (firmware 1.0.0-cc5.7, plan F2 / F3; firmware HAPTICS.md, CONTROL_CENTER.md "Feel and sound"). Each
+# is its own capability (an int 1): `feel` (control `feel` and `reducedHaptics`), `hapticFx` (the frame's `haptic`
+# event), `knobSound` (control `sound` 0..3), `offlineVolume` (informational: the knob is the PC's volume while no
+# host has the port) and `recalibration` (the calibrating / calibrated protocol). A knob without one never sees the
+# fields it names (dropped silently): cc5.6 and older keep today's feel and stay silent.
+# `knobVolume` (Desk Dial 7.3.1): control `soundVolume` 0..100, the speaker's master volume in percent (0 silent,
+# 100 the loudest sound at the speaker's full range); the knob then ignores `sound`, which still goes with it.
+FEEL_CAPABILITY, HAPTIC_CAPABILITY, SOUND_CAPABILITY = "feel", "hapticFx", "knobSound"
+KNOB_VOLUME_CAPABILITY = "knobVolume"
+OFFLINE_VOLUME_CAPABILITY, RECALIBRATION_CAPABILITY = "offlineVolume", "recalibration"
+FEEL_TOKENS = ("detent.value", "detent.dimmer", "detent.list", "detent.coarse", "detent.fine", "fluid.scrub",
+               "fluid.light", "free.spin")
+# The firmware's CCFx order (cc_haptic_fx.h): the stored `fx` number of each wire token.
+HAPTIC_TOKENS = {"confirm.tick": 1, "confirm.thump": 2, "nudge.left": 3, "nudge.right": 4, "refuse.buzz": 5,
+                 "error.buzz": 6, "confirm.off": 7}
+SOUND_LEVELS = ("off", "low", "medium", "high")         # control `sound` 0..3 (settings.json `knob_sound`)
+KNOB_VOLUME_MAX = 100                                    # control `soundVolume` 0..100 (percent)
+SOUND_LEVEL_VOLUMES = (0, 40, 70, 100)                   # the top volume of each `sound` level (Low 1..40, …)
+_HAPTIC_SEQ_MAX = 0x7FFFFFFF
+
+
+def _capability_one(capabilities, name):
+    caps = capabilities if isinstance(capabilities, dict) else {}
+    value = caps.get(name)
+    return type(value) is int and value == 1
+
+
+def feel_capability(capabilities):
+    """True when the knob runs the r4 feel tokens (capabilities.feel == 1)."""
+    return _capability_one(capabilities, FEEL_CAPABILITY)
+
+
+def haptic_capability(capabilities):
+    """True when the knob plays the frame's `haptic` events (capabilities.hapticFx == 1)."""
+    return _capability_one(capabilities, HAPTIC_CAPABILITY)
+
+
+def sound_capability(capabilities):
+    """True when the knob makes the r4 click sounds (capabilities.knobSound == 1)."""
+    return _capability_one(capabilities, SOUND_CAPABILITY)
+
+
+def knob_volume_capability(capabilities):
+    """True when the knob takes the speaker volume in percent (capabilities.knobVolume == 1)."""
+    return _capability_one(capabilities, KNOB_VOLUME_CAPABILITY)
+
+
+def sound_level_for_volume(volume):
+    """The `sound` level (0..3) a knob without knobVolume gets for a volume: 0 off, 1..40 Low, 41..70 Medium,
+    71..100 High."""
+    return next(level for level, top in enumerate(SOUND_LEVEL_VOLUMES) if volume <= top)
+
+
+def recalibration_capability(capabilities):
+    """True when {"recalibrate":...} answers calibrating / calibrated lines (capabilities.recalibration == 1)."""
+    return _capability_one(capabilities, RECALIBRATION_CAPABILITY)
+
+
+def haptic_parse(value):
+    """The firmware's reading of a frame's `haptic` object (cc_frame_parse.cpp parse_haptic): (stored, ok).
+
+    `stored` is {"fx": CCFx number, "seq": int}; `ok` False means the firmware rejects the whole frame (the strict
+    rule): the token must be one of HAPTIC_TOKENS, the seq a JSON integer 1..0x7FFFFFFF (never a bool or a float).
+    Unknown keys are ignored. harness/haptic_fx_tests.py holds both readings to one table."""
+    if not isinstance(value, dict):
+        return None, False
+    token, seq = value.get("token"), value.get("seq")
+    if not isinstance(token, str) or token not in HAPTIC_TOKENS or not _integer(seq, 1, _HAPTIC_SEQ_MAX):
+        return None, False
+    return {"fx": HAPTIC_TOKENS[token], "seq": seq}, True
 
 
 def alive_capability(capabilities):
@@ -304,16 +565,46 @@ DIAG_LCD_FIELDS = ("lcdFps", "lcdFpsAnimMin", "lcdRefrUsMax", "lcdRefrUsAvg", "l
 DIAG_LED_FIELDS = ("ledFps", "ledRenderUsMax", "ledRenderUsAvg", "ledMode", "ledShowGapMsMax", "ledLateShows")
 DIAG_MEMORY_FIELDS = ("heapMinFree", "heapFree", "lvglFree", "lvglMinFree", "lcdAgeMs", "jpegDecodeMsMax",
                       "jpegDecodeMsLast")
-DIAG_FIELDS = DIAG_LCD_FIELDS + DIAG_LED_FIELDS + DIAG_MEMORY_FIELDS
+# The fix binaries' fields (1.0.0-cc5.4 D and E, and 1.0.0-cc5.5): the LCD data line's output signal and the
+# binary's letter ("build", a string "A".."F"; absent on an image without a ladder id). The same pair as the
+# tooling's nanod_cc5_tooling.LCD_FIX_DIAG_FIELDS.
+DIAG_BUILD_FIELDS = ("lcdMosiSig", "build")
+# 1.0.0-cc5.5 (F1, safety and measurement; cc_diag.h): the FOC loop rate and its longest gap (µs, reset on
+# read), the largest |Uq| (mV, reset on read), the time at the 2.2 V motor cap (ms since boot) and that cap
+# (mV), the PD contract read once at boot (pdRead; pdPdo, the requested source PDO's position, 0 = none or
+# unknown; pdVolts, that PDO's voltage from the knob's sink PDO table, 5 / 9, 0 = unknown; pdRdo, the raw
+# RDO, only when the read worked), the USB interfaces TinyUSB accepted and the HID reports retried. The
+# tooling's nanod_cc5_tooling.F1_DIAG_FIELDS.
+DIAG_F1_FIELDS = ("focLoopHz", "focLoopUsMax", "uqAbsMax", "uqCapMs", "uqCapMv", "pdRead", "pdPdo", "pdVolts",
+                  "pdRdo", "usbMidiOk", "usbHidOk", "hidRetries")
+# 1.0.0-cc5.7 (r4 FEEL + SOUND; firmware cc_diag.h): the supply the driver scales with (5 / 9 V), the claim's feel,
+# reduced haptics and sound level, the effect player's counters, the wall hits and their direction, the wall's
+# fold-back (percent of force, events), the self-spin trip, the offline volume mode, recalibration and audio.
+DIAG_R4_FIELDS = ("supplyVolts", "feel", "reducedHaptics", "soundLevel", "fxPlayed", "fxPulses", "fxDropped",
+                  "wallHits", "wallDir", "foldbackPct", "foldbackEvents", "tripLatched", "spinTrips", "offlineVolume",
+                  "calState", "calOutcome", "audioReady", "audioPlayed", "audioUnderruns", "audioDropped")
+# knobVolume (Desk Dial 7.3.1): the speaker volume the claim sent (percent).
+DIAG_VOLUME_FIELDS = ("soundVolume",)
+DIAG_FIELDS = (DIAG_LCD_FIELDS + DIAG_LED_FIELDS + DIAG_MEMORY_FIELDS + DIAG_BUILD_FIELDS + DIAG_F1_FIELDS +
+               DIAG_R4_FIELDS + DIAG_VOLUME_FIELDS)
 DIAG_LED_MODES = ("offline", "alive", "native")          # cc_diag.cpp kLedModes (ALIVE.md 10.1)
-_DIAG_BOOLS = frozenset(("lcdDma", "artAsync"))           # JSON booleans (cc_diag.h cc_diag_lcd_perf_fields)
+_DIAG_BOOLS = frozenset(("lcdDma", "artAsync", "pdRead", "usbMidiOk", "usbHidOk",   # JSON booleans (cc_diag)
+                         "reducedHaptics", "tripLatched", "offlineVolume", "audioReady"))
+DIAG_CAL_STATES = ("idle", "running", "saving")
+DIAG_CAL_OUTCOMES = ("", "ok", "init-failed", "pole-check-failed", "direction-changed", "save-timeout", "claimed")
 _DIAG_PERCENT = frozenset(("lcdBusyPct", "core0IdlePct"))
 _DIAG_UINT32 = 0xFFFFFFFF
 # PRESENTATION_V5.md 12.6: the pipeline flags that identify the binary (the same table as the
-# hardware-window tooling's nanod_cc5_tooling.LCD_BINARIES).
+# hardware-window tooling's nanod_cc5_tooling.LCD_BINARIES). A, B and C carry no "build" field and are
+# told by their flags alone; D, E (1.0.0-cc5.4) and F (1.0.0-cc5.5: D's pipeline at a 12 ms period) name
+# themselves in "build" and are accepted only with their own pipeline (D and F, like A, at any period).
 DIAG_BINARIES = {"A": {"lcdDma": True, "lcdPeriodMs": 16, "artAsync": True},
                  "B": {"lcdDma": True, "lcdPeriodMs": 33, "artAsync": False},
-                 "C": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False}}
+                 "C": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False},
+                 "D": {"lcdDma": True, "lcdPeriodMs": 16, "artAsync": True},
+                 "E": {"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False},
+                 "F": {"lcdDma": True, "lcdPeriodMs": 12, "artAsync": True}}
+DIAG_LEGACY_BINARIES = ("A", "B", "C")                   # images without a "build" field
 
 
 def _diag_value_ok(name, raw):
@@ -321,8 +612,30 @@ def _diag_value_ok(name, raw):
         return type(raw) is bool
     if name == "ledMode":
         return isinstance(raw, str) and raw in DIAG_LED_MODES
+    if name == "build":
+        return isinstance(raw, str) and raw in DIAG_BINARIES
     if name in _DIAG_PERCENT:
         return _integer(raw, 0, 100)
+    if name == "pdPdo":
+        return _integer(raw, 0, 7)
+    if name == "pdVolts":
+        return _integer(raw, 0, 48)
+    if name == "supplyVolts":
+        return _integer(raw, 0, 48)
+    if name == "feel":
+        return isinstance(raw, str) and (raw == "" or raw in FEEL_TOKENS)
+    if name == "soundLevel":
+        return _integer(raw, 0, len(SOUND_LEVELS) - 1)
+    if name == "soundVolume":
+        return _integer(raw, 0, KNOB_VOLUME_MAX)
+    if name == "wallDir":
+        return type(raw) is int and raw in (-1, 0, 1)
+    if name == "foldbackPct":
+        return _integer(raw, 0, 100)
+    if name == "calState":
+        return isinstance(raw, str) and raw in DIAG_CAL_STATES
+    if name == "calOutcome":
+        return isinstance(raw, str) and raw in DIAG_CAL_OUTCOMES
     return _integer(raw, 0, _DIAG_UINT32)
 
 
@@ -330,10 +643,12 @@ def diag_parse(diag):
     """The typed read of a knob's `{"diag":{…}}` object (the value of the `diag` key).
 
     Returns (fields, invalid): `fields` maps each DIAG_FIELDS name present with a valid value to
-    it (uint32 JSON integers, never bools or floats; the two percentages 0..100; `lcdDma` and
-    `artAsync` JSON booleans; `ledMode` one of DIAG_LED_MODES); `invalid` names, in DIAG_FIELDS
+    it (uint32 JSON integers, never bools or floats; the two percentages 0..100; `pdPdo` 0..7 and
+    `pdVolts` 0..48; `lcdDma`, `artAsync`, `pdRead`, `usbMidiOk` and `usbHidOk` JSON booleans;
+    `ledMode` one of DIAG_LED_MODES; `build` a DIAG_BINARIES letter); `invalid` names, in DIAG_FIELDS
     order, the present fields whose value is malformed (dropped, never raised, never echoed).
-    Fields outside DIAG_FIELDS are ignored. A cc5.3 or older knob simply has none of the v5 ones."""
+    Fields outside DIAG_FIELDS are ignored. A cc5.3 or older knob simply has none of the v5 ones, a
+    cc5.4 knob none of the 1.0.0-cc5.5 DIAG_F1_FIELDS."""
     fields, invalid = {}, []
     if not isinstance(diag, dict):
         return fields, invalid
@@ -348,18 +663,31 @@ def diag_parse(diag):
     return fields, invalid
 
 
+def _diag_pipeline_matches(fields, name):
+    """`fields` report binary `name`'s pipeline; a DMA + R5 pipeline (A, D, F) at any integer period (P5-R12)."""
+    flags = DIAG_BINARIES[name]
+    if all(fields.get(key) == value and type(fields.get(key)) is type(value) for key, value in flags.items()):
+        return True
+    return (flags["lcdDma"] and flags["artAsync"] and fields.get("lcdDma") is True and fields.get("artAsync") is True
+            and type(fields.get("lcdPeriodMs")) is int)
+
+
 def diag_binary(fields):
-    """"A", "B" or "C" (PRESENTATION_V5.md 12.6) from `lcdDma` / `lcdPeriodMs` / `artAsync`, else None.
-    Binary A may run R4 at the measured scan period instead of 16 ms (P5-R12): DMA and R5 at any
-    integer period is A."""
+    """The PRESENTATION_V5.md 12.6 binary ("A".."F") a diag read identifies, else None (the same reading as the
+    tooling's nanod_cc5_tooling.lcd_binary). A numbered image (D, E, F) names itself in `build`: that letter,
+    accepted only with its own pipeline (`lcdDma` / `lcdPeriodMs` / `artAsync`), else None. An image without
+    the field is A, B or C by its flags alone; binary A may run R4 at the measured scan period instead of
+    16 ms (P5-R12): DMA and R5 at any integer period is A."""
     if not isinstance(fields, dict):
         return None
-    for name, flags in DIAG_BINARIES.items():
-        if all(fields.get(key) == value and type(fields.get(key)) is type(value) for key, value in flags.items()):
+    if "build" in fields:
+        build = fields.get("build")
+        return build if build in DIAG_BINARIES and _diag_pipeline_matches(fields, build) else None
+    for name in DIAG_LEGACY_BINARIES:
+        if all(fields.get(key) == value and type(fields.get(key)) is type(value)
+               for key, value in DIAG_BINARIES[name].items()):
             return name
-    if fields.get("lcdDma") is True and fields.get("artAsync") is True and type(fields.get("lcdPeriodMs")) is int:
-        return "A"
-    return None
+    return next((name for name in DIAG_LEGACY_BINARIES if _diag_pipeline_matches(fields, name)), None)
 
 
 def _local_minute():
@@ -382,10 +710,14 @@ def _device_text(text, capabilities, capacity):
     if presentation_level(capabilities) >= presentation.PRESENTATION_V4 and (
             capabilities.get("glyphs") == "latin-ext-a"):
         text = unicodedata.normalize("NFC", text)
-        text = "".join(c if presentation.supported_glyph(c) else _lcd_text(c) for c in text)
+        text = _lcd_text(text, presentation.supported_glyph)
     else:
         text = _lcd_text(text)
     return presentation.utf8_truncate(text, capacity)
+
+
+def _lights_big(frame):
+    return frame.get("layout") == "lightsbig"
 
 
 def _home(frame):
@@ -399,7 +731,7 @@ def _layout_of(frame):
     """The layout a parser gives `frame`: a valid `layout` token, else the legacy one derived
     from `mode` (an invalid `layout` is stripped by the host, so the parser derives it too)."""
     layout = frame.get("layout")
-    if isinstance(layout, str) and layout in presentation.LAYOUTS:
+    if isinstance(layout, str) and layout in presentation.LAYOUTS_V6:
         return layout
     mode = frame.get("mode")
     return presentation.LEGACY_LAYOUT.get(mode, "nowPlaying") if isinstance(mode, str) else "nowPlaying"
@@ -419,7 +751,7 @@ def _buttons(value, capabilities, v4):
             if name in ("label", "enabled"):
                 continue
             if name == "icon":
-                if isinstance(raw, str) and raw in presentation.ICONS:
+                if isinstance(raw, str) and raw in presentation.ICONS_V6:
                     out["icon"] = raw
                 else:
                     _strip("button.icon", "invalid", "replaced by no icon" if v4 else "stripped")
@@ -462,7 +794,7 @@ def _ring(value, v4, layout="nowPlaying", v5=False):
     clamp(index-10, 0, count-20), always sent when count > 20 (4.2, P5-R9); V4's clamp(index-9, ...)
     otherwise.
     """
-    if (not isinstance(value, dict) or value.get("style") not in presentation.RING_STYLES
+    if (not isinstance(value, dict) or value.get("style") not in presentation.RING_STYLES_V6
             or not _integer(value.get("value"), 0, 100) or not _integer(value.get("index"), 0, 65535)
             or not _integer(value.get("count"), 0, 65535)):
         raise ValueError("Invalid ring frame")
@@ -471,9 +803,28 @@ def _ring(value, v4, layout="nowPlaying", v5=False):
         raise ValueError("Selection ring index is outside its candidates")
     if style == "lap" and not (1 <= count <= presentation.LAP_COUNT_MAX and index < count):
         raise ValueError("Seek lap ring needs a duration of 1..59999 s and a target before its end")
+    if style == "clusters" and not (1 <= count <= presentation.CLUSTERS_MAX and index < count):
+        raise ValueError("Scene clusters need 1..20 scenes and a selection among them")
+    if style == "marker" and not (1 <= count and index < count):
+        raise ValueError("A marker ring needs 1.. entries and an index among them")
+    if style == "queue" and not (1 <= count and index < count):
+        raise ValueError("A queue ring needs 1.. rows and a focus among them")   # r3.1 (19.10)
     out = {"style": style, "value": value["value"], "index": index, "count": count}
+    if "kelvin" in value:
+        # Presentation 6: the colour temperature of a bri / ctemp arc; dropped silently elsewhere.
+        if _integer(value["kelvin"], presentation.RING_KELVIN_MIN, presentation.RING_KELVIN_MAX):
+            if style in ("bri", "ctemp"):
+                out["kelvin"] = value["kelvin"]
+        else:
+            _strip("ring.kelvin", "invalid", "replaced by the default" if style in ("bri", "ctemp") else "stripped")
+    if style in ("bri", "ctemp") and "kelvin" not in out:
+        # The knob requires ring.kelvin on bri / ctemp (it rejects the frame without one).
+        if "kelvin" not in value:
+            _strip("ring.kelvin", "missing", "replaced by the default")
+        out["kelvin"] = presentation.RING_KELVIN_DEFAULT
     for name in value:
-        if name not in out and name not in _V4_RING_FIELDS and name not in _V5_RING_FIELDS:
+        if (name not in out and name not in _V4_RING_FIELDS and name not in _V5_RING_FIELDS
+                and name not in _V6_RING_FIELDS):
             _strip("ring." + str(name), "unsupported")  # includes the removed v2 `available` list
     if not v4:
         return out
@@ -532,7 +883,7 @@ def _ring(value, v4, layout="nowPlaying", v5=False):
     if "now" in value:
         if _integer(value["now"], -1, count - 1):
             now = value["now"]
-            if upnext:
+            if upnext or style == "queue":   # r3.1: the queue ring's playing row
                 out["now"] = now
         else:
             _strip("ring.now", "invalid")
@@ -556,13 +907,22 @@ def _optional(name, raw, capabilities):
     if name == "activity":
         return raw in presentation.ACTIVITIES, raw
     if name == "layout":
-        return raw in presentation.LAYOUTS, raw
+        return raw in presentation.LAYOUTS_V6, raw
     if name == "restLayout":
         return raw in presentation.REST_LAYOUTS, raw
     if name == "titleTone":
         return raw in presentation.TITLE_TONES, raw
     if name in ("metaTone", "statusTone"):
-        return raw in presentation.LINE_TONES, raw
+        return raw in presentation.LINE_TONES_V6, raw   # `warm`: presentation 6 (downgraded below)
+    if name == "crumb":
+        return isinstance(raw, str) and raw in presentation.CRUMBS, raw
+    if name == "holdMarker":
+        return type(raw) is bool, raw   # r3.1 (PRESENTATION_V5.md 19.10): button 4 has a hold action here
+    if name == "valueUnit":
+        return raw in presentation.VALUE_UNITS, raw
+    if name in presentation.V6_TEXT_CAPACITY:
+        capacity = presentation.V6_TEXT_CAPACITY[name]
+        return (True, _device_text(raw, capabilities, capacity)) if _valid_text(raw) else (False, None)
     if name == "ledStyle":
         return raw in presentation.LED_STYLES, raw
     if name == "artKey":
@@ -603,7 +963,7 @@ def _feedback_v5(feedback, raw):
     "ok", `side` only with a kept `snap`, `color` only with a kept `snap` or `started`."""
     moment = side = color = None
     if "moment" in raw:
-        if isinstance(raw["moment"], str) and raw["moment"] in presentation.FEEDBACK_MOMENTS:
+        if isinstance(raw["moment"], str) and raw["moment"] in presentation.FEEDBACK_MOMENTS_V6:
             moment = raw["moment"]
         else:
             _strip("feedback.moment", "invalid")
@@ -617,6 +977,12 @@ def _feedback_v5(feedback, raw):
             color = raw["color"]
         else:
             _strip("feedback.color", "invalid")
+    if moment == "refused":
+        # Presentation 6: the unavailable-press flash, with kind "err" only (dropped silently otherwise;
+        # a presentation-5 knob never gets it: _downgrade_v6).
+        if feedback["kind"] == "err":
+            feedback["moment"] = moment
+        return
     if feedback["kind"] != "ok" or moment is None:
         return
     if "skip" in feedback:
@@ -676,6 +1042,38 @@ def _downgrade(frame, v4=True):
     return frame
 
 
+def _downgrade_v6(frame):
+    """A validated presentation-6 frame for a presentation-5 (or older) knob, in place: the r3 Lights
+    layouts become `recent`, their rings `off`, the six r3 icons their nearest v5 token;
+    `valueUnit`, `prevTitle`, `nextTitle` and `ring.kelvin` are dropped. The
+    controller never builds these for such a knob (r3 needs presentation >= 6); this keeps a stray one
+    from being rejected (a rejected frame is fatal on the host)."""
+    if frame.get("layout") in presentation.LAYOUT_DOWNGRADE_V6:
+        frame["layout"] = presentation.LAYOUT_DOWNGRADE_V6[frame["layout"]]
+    ring = frame.get("ring")
+    if isinstance(ring, dict):
+        if ring.get("style") in presentation.LIGHTS_RING_STYLES:
+            frame["ring"] = ring = dict(presentation.LIGHTS_DOWNGRADE_RING)
+        elif ring.get("style") == "marker":
+            ring["style"] = "selection"   # the same index / count, warm (no colours)
+        elif ring.get("style") == "queue":
+            ring["style"] = "selection"   # r3.1: the same focus / count / window
+            ring.pop("now", None)
+        ring.pop("kelvin", None)
+    for name in ("metaTone", "statusTone"):
+        if frame.get(name) == "warm":
+            frame[name] = "secondary"
+    feedback = frame.get("feedback")
+    if isinstance(feedback, dict) and feedback.get("moment") == "refused":
+        del feedback["moment"]
+    for button in frame.get("buttons") or ():
+        if button.get("icon") in presentation.ICON_DOWNGRADE_V6:
+            button["icon"] = presentation.ICON_DOWNGRADE_V6[button["icon"]]
+    for name in presentation.V6_FIELDS:
+        frame.pop(name, None)
+    return frame
+
+
 def _slim(frame, v5=False):
     """Section 8 (V4) / PRESENTATION_V5.md section 14.2: omit defaults and legacy fields for
     presentation >= 4."""
@@ -689,6 +1087,8 @@ def _slim(frame, v5=False):
     frame.pop("counter", None)
     if not _home(frame):
         for name in ("volumeCaption", "confirmedVolume", "restLayout", "volumeVisible"):
+            if name == "volumeCaption" and _lights_big(frame):
+                continue   # presentation 6: the lightsbig caption (`Brightness` / `Colour temperature`)
             frame.pop(name, None)
     for button in frame["buttons"]:
         # V4 strips every button colour; presentation 5 keeps the one that means something: an
@@ -785,7 +1185,7 @@ def _budget(frame, reserve=None, limit=None):
 
     def size():
         return frame_line_bytes({**frame, **reserve} if reserve else frame)
-    home = _home(frame)
+    home = _home(frame) or _lights_big(frame)   # both draw `value` as the big digits
     for name in _BUDGET_TRIM:
         if size() <= limit:
             return frame
@@ -830,6 +1230,7 @@ def _frame(value, capabilities=None):
     level = presentation_level(capabilities)
     v4 = level >= presentation.PRESENTATION_V4
     v5 = level >= presentation.PRESENTATION_V5
+    v6 = level >= presentation.PRESENTATION_V6
     alive = alive_capability(capabilities) is not None  # implies v4
     layout = _layout_of(value)  # scope of the ring's now / card / unavailable (section 4.4)
     result = {}
@@ -863,8 +1264,34 @@ def _frame(value, capabilities=None):
                 result[name] = normalized
             else:
                 _strip(name, "invalid")
+        elif name == "haptic":
+            # r4: only for a knob that plays it (hapticFx); older firmware never sees it, silently.
+            if not haptic_capability(capabilities):
+                continue
+            if haptic_parse(raw)[1]:
+                result[name] = {"token": raw["token"], "seq": raw["seq"]}
+            else:
+                _strip(name, "invalid")
+        elif name == "app":
+            # A2: only for a knob that draws it (appCanvas); older firmware keeps A0's text frame, silently.
+            if not app_capability(capabilities):
+                continue
+            if not app_parse(raw)[1]:
+                _strip(name, "invalid")
+            elif app_profiles_capability(capabilities) is not None:
+                result[name] = deepcopy(raw)
+            else:
+                # App profiles: a knob without appProfiles never receives the new fields (a profile id, crc, slot,
+                # index past 15, axis / plane); a legacy Onshape object passes as before.
+                legacy = _legacy_app(raw)
+                if legacy is not None:
+                    result[name] = legacy
+                else:
+                    _strip(name, "needs appProfiles")
         elif name in _V4_FIELDS and not v4:
             continue  # Legacy firmware: v4-only presentation is not an error.
+        elif name in _V6_FIELDS and not v6:
+            continue  # presentation 5 and older: the r3 fields are never sent, and not an error
         elif name in _KNOWN_FIELDS:
             keep, normalized = _optional(name, raw, capabilities)
             if keep:
@@ -898,6 +1325,8 @@ def _frame(value, capabilities=None):
         layout = result.get("layout") or presentation.LEGACY_LAYOUT.get(result.get("mode"), "nowPlaying")
         if layout != "windows" or artwork2_capability(capabilities) is None:
             del result["iconKey"]
+    if not v6:
+        _downgrade_v6(result)
     if not v5:
         _downgrade(result, v4)
     if not v4:
@@ -1192,6 +1621,19 @@ class _MediaKind:
                 "lastError": self.last_error, "dropped": self.dropped}
 
 
+class ControlRefused(ValueError):
+    """DD-BUG-004: _enter refused the control payload itself (a profile missing from this knob's inventory, or
+    malformed fields). Sending the same control again, or reconnecting, cannot fix it, so the bridge marks the
+    `error` event retry=False (with the missing profile's name when that is the cause). The event keeps
+    error="ValueError" so existing consumers see the same name."""
+
+    error_name = "ValueError"
+
+    def __init__(self, message, **details):
+        super().__init__(message)
+        self.details = details
+
+
 class DeviceBridge:
     """Daemon worker API: submit(connect/enter/frame/disconnect/close, value).
 
@@ -1236,8 +1678,9 @@ class DeviceBridge:
     Knob events (section 11): `ready` carries `held`, the logical mask of the `ks` it reports (the
     raw mask re-seeds the pressed state; absent = 0); `button` carries `hid` (True when that `kd`
     also sent F24); `{"id","ks","kh":raw}` of the ready control emits {"kind": "hold", "id": id,
-    "button": <logical>, "raw": raw} (the firmware times it, once per press; the host never does).
-    A `kh` outside 0..3 or a `ks` outside 0..15 is ignored.
+    "button": <logical>, "raw": raw} (the firmware times it, once per press; the host never does;
+    r3.1 firmware sends it for every button: slot 0 at 600 ms, the others at 1000 ms, and the host
+    uses slot 0 and slot 3). A `kh` outside 0..3 or a `ks` outside 0..15 is ignored.
 
     diag (PRESENTATION_V5.md 12.3, VOC-K1c; K3 section 6.5): request_diag() asks a connected knob
     that advertises `diag: 1` for one `{"diag":"?"}` (thread-safe; written by the bridge thread on
@@ -1247,6 +1690,7 @@ class DeviceBridge:
     is never an `error`.
     """
     HEARTBEAT_SECONDS = 0.5
+    RECALIBRATE_SECONDS = 30.0      # r4: a recalibration (alignment, pole check, save) answers within this
     READ_LIMIT = 4096
     # An art line's single reply may arrive after its transfer was dropped or
     # timed out; it stays attributable for this many request timeouts.
@@ -1290,6 +1734,12 @@ class DeviceBridge:
         # carried it sent (None: none since connect; every control frame sends it anyway).
         self._motion = False
         self._motion_sent = None
+        # r4 (firmware 1.0.0-cc5.7): the Knob sounds volume (0 off .. 100 %) and Reduced haptics, sent in every
+        # control of a knob with knobVolume / knobSound / feel (never stored on the knob: a claim without them is
+        # silent). A knobSound knob without knobVolume gets the volume's level (sound_level_for_volume).
+        self._knob_volume = 0
+        self._reduced_haptics = False
+        self.calibrating = False                    # a recalibration runs on the knob (calibrating line seen)
         self._button_order = [0, 1, 2, 3]           # the ready control's buttonOrder (raw -> logical)
         # diag (PRESENTATION_V5.md 12.3): request_diag() calls (only the caller's thread writes it),
         # the count of them the bridge thread has written or dropped (only the bridge writes it), so
@@ -1336,6 +1786,10 @@ class DeviceBridge:
         self.last_heartbeat = 0.0
         self.closed = False
         self._pressed = 0
+        self._ready_held = 0
+        # App profiles (APP_PROFILES.md section 7): the upload in progress and the ones waiting (bridge thread only).
+        self._app_upload = None
+        self._app_uploads = deque()
         self._closing = False
         self._thread = threading.Thread(target=self._run, name="NanoD-control-center", daemon=True)
         if autostart:
@@ -1344,7 +1798,8 @@ class DeviceBridge:
     def submit(self, command, value=None):
         if self.closed:
             raise RuntimeError("Device bridge is closed")
-        if command not in ("connect", "inventory", "enter", "frame", "artwork", "disconnect", "close"):
+        if command not in ("connect", "inventory", "enter", "frame", "artwork", "disconnect", "close", "recalibrate",
+                           "app_profile"):
             raise ValueError("Unknown device command")
         self.commands.put((command, deepcopy(value)))
 
@@ -1484,6 +1939,77 @@ class DeviceBridge:
         with self._alive_lock:
             self._motion = on
 
+    def set_knob_feel(self, sound=None, reduced_haptics=None, volume=None):
+        """Settings > Knob (thread-safe): the Knob sounds volume (int 0..100 %; or an older host's level: 0 off,
+        1 Low, 2 Medium, 3 High, or one of SOUND_LEVELS, taken as that level's top volume; a volume wins) and
+        Reduced haptics (bool). They ride in the next control (the runtime re-enters after a change); anything
+        invalid is ignored (logged)."""
+        if sound is not None:
+            level = SOUND_LEVELS.index(sound) if isinstance(sound, str) and sound in SOUND_LEVELS else sound
+            if _integer(level, 0, len(SOUND_LEVELS) - 1):
+                self._knob_volume = SOUND_LEVEL_VOLUMES[level]
+            else:
+                _strip("sound", "invalid", "not sent")
+        if volume is not None:
+            if _integer(volume, 0, KNOB_VOLUME_MAX):
+                self._knob_volume = volume
+            else:
+                _strip("soundVolume", "invalid", "not sent")
+        if reduced_haptics is not None:
+            if type(reduced_haptics) is bool:
+                self._reduced_haptics = reduced_haptics
+            else:
+                _strip("reducedHaptics", "invalid", "not sent")
+
+    def _feel_fields(self, value):
+        """A control's r4 fields for this knob, in place: `feel` kept (a valid token) only with the feel capability,
+        `reducedHaptics` added with it; with knobVolume `soundVolume` (the volume) and `sound` (0 when silent, else
+        High), with knobSound alone `sound` (the volume's level); everything dropped for an older knob (its control
+        line stays byte-identical to Desk Dial 7.2's)."""
+        feel = value.pop("feel", None)
+        value.pop("reducedHaptics", None)
+        value.pop("sound", None)
+        value.pop("soundVolume", None)
+        if feel_capability(self.capabilities):
+            if isinstance(feel, str) and feel in FEEL_TOKENS:
+                value["feel"] = feel
+            elif feel is not None:
+                _strip("feel", "invalid", "not sent")
+            value["reducedHaptics"] = bool(self._reduced_haptics)
+        volume = int(self._knob_volume)
+        if knob_volume_capability(self.capabilities):
+            value["sound"] = 0 if volume == 0 else len(SOUND_LEVELS) - 1
+            value["soundVolume"] = volume
+        elif sound_capability(self.capabilities):
+            value["sound"] = sound_level_for_volume(volume)
+
+    def _recalibrate(self, value):
+        """Settings > Knob > Recalibrate motor (bridge thread; firmware HAPTICS.md "Recalibration"). A knob with the
+        recalibration capability: any control is released first (the knob refuses while claimed), then
+        {"recalibrate":true} (or {"acceptDirection":true} once the user confirmed a direction change) and the wait
+        for its `calibrated` line (up to RECALIBRATE_SECONDS: aligning takes seconds and is not a timeout of the
+        link). The events `calibrating` / `calibrated` tell the runtime; the runtime enters again afterwards."""
+        if self.serial is None:
+            raise RuntimeError("Connect the knob first")
+        if not recalibration_capability(self.capabilities):
+            raise RuntimeError("This knob's firmware cannot recalibrate from Desk Dial")
+        accept = isinstance(value, dict) and value.get("acceptDirection") is True
+        if self.control_id is not None:
+            # Released quietly: the control is forgotten first, so the knob's `released` line is no `released` event
+            # (the runtime would take the knob for lost); the runtime enters again after `calibrated`.
+            self._reset_control()
+            self._request({"release": True}, lambda m: m.get("released") is True)
+        self.calibrating = True
+        self._emit("calibrating")
+        self._write({"recalibrate": {"acceptDirection": True} if accept else True})
+        deadline = self.clock() + self.RECALIBRATE_SECONDS
+        while self.clock() < deadline:
+            for reply in self._read():
+                if isinstance(reply.get("calibrated"), dict):
+                    return
+        self.calibrating = False
+        self._emit("calibrated", ok=False, reason="")
+
     def request_diag(self):
         """Ask the connected knob for its diagnostics once (thread-safe; PRESENTATION_V5.md 12.3).
 
@@ -1531,6 +2057,136 @@ class DeviceBridge:
         if invalid:
             _log.debug("Knob diag: malformed %s dropped", ", ".join(invalid))   # names only (DIAG_FIELDS)
         self._emit("diag", diag=fields, binary=diag_binary(fields), invalid=invalid)
+
+    # ------------------------------------------------------------------
+    # App profiles (APP_PROFILES.md section 7; plan 1c, S1 DD-B): the upload, stop-and-wait, interleaved with the
+    # heartbeat (one line per pass, so input and frames never stall). `list` first (an id + crc already loaded is
+    # not sent again), then begin (no reply), data lines of <= 3000 b64 characters each waiting for its ack (1 s),
+    # end waiting for ok. A failure retries the whole upload once, then the `app-profile` event says failed (the
+    # runtime keeps the text screen). The retry drains first (S3 review DD-6): a `list` line, and every reply ignored
+    # until the list's answer. The knob answers its lines in order, so a stale reply (the "order" to the data line
+    # written after a failed begin, a late ack or ok) is behind us then; with no answer in a second it begins anyway. Events: {"kind": "app-profile", "id", "crc", "state": "present" | "loaded" |
+    # "failed", "bytes", "ms", "error"}. The knob's store is RAM only: the runtime uploads again after a reconnect.
+
+    def _app_profile_reset(self):
+        self._app_upload = None
+        self._app_uploads.clear()
+
+    def _app_profile_queue(self, value):
+        """An upload request {"id", "crc", "wire": bytes} (the runtime's, once per (id, crc) and connection)."""
+        if not isinstance(value, dict):
+            return
+        pid, crc, wire = value.get("id"), value.get("crc"), value.get("wire")
+        if (not isinstance(pid, str) or _APP_ID.fullmatch(pid) is None or not _integer(crc, 0, APP_CRC_MAX)
+                or not isinstance(wire, (bytes, bytearray)) or not wire):
+            return
+        busy = [u for u in ([self._app_upload] if self._app_upload else []) + list(self._app_uploads)]
+        if any(u["id"] == pid and u["crc"] == crc for u in busy):
+            return
+        cap = app_profiles_capability(self.capabilities)
+        if self.serial is None or cap is None or len(wire) > cap["maxBytes"]:
+            self._emit("app-profile", id=pid, crc=crc, state="failed", bytes=len(wire), ms=0,
+                       error="unsupported" if cap is None else "size")
+            return
+        self._app_uploads.append({"id": pid, "crc": crc, "wire": bytes(wire)})
+
+    def _app_profile_start(self, item, retried=False, stage="list"):
+        self._app_upload = {**item, "stage": stage, "offset": 0, "waiting": None, "deadline": 0.0,
+                            "retried": retried, "started": item.get("started", self.clock())}
+
+    def _app_profile_done(self, state, error=None):
+        upload, self._app_upload = self._app_upload, None
+        ms = int(round((self.clock() - upload["started"]) * 1000))
+        self._emit("app-profile", id=upload["id"], crc=upload["crc"], state=state, bytes=len(upload["wire"]),
+                   ms=max(0, ms), error=error)
+
+    def _app_profile_fail(self, reason):
+        """Retry the whole upload once (from begin), then report it failed."""
+        upload = self._app_upload
+        if upload is None:
+            return
+        if not upload["retried"]:
+            self._app_profile_start(upload, retried=True, stage="drain")
+            return
+        self._app_profile_done("failed", reason)
+
+    def _app_profile_step(self):
+        """Bridge thread: at most one upload line per pass."""
+        if self._app_upload is None:
+            if not self._app_uploads or self.serial is None:
+                return
+            self._app_profile_start(self._app_uploads.popleft())
+        upload = self._app_upload
+        if upload["waiting"] is not None:
+            if self.clock() >= upload["deadline"]:
+                if upload["waiting"] in ("list", "drain"):
+                    upload["waiting"], upload["stage"] = None, "begin"     # no list answer: upload anyway
+                else:
+                    self._app_profile_fail("timeout")
+            return
+        stage, wire = upload["stage"], upload["wire"]
+        if stage in ("list", "drain"):
+            message, waiting = {"op": "list"}, stage
+        elif stage == "begin":
+            message, waiting = {"op": "begin", "id": upload["id"], "bytes": len(wire), "crc": upload["crc"],
+                                "wire": WIRE_VERSION_APP}, None
+        elif stage == "data":
+            part = wire[upload["offset"]:upload["offset"] + APP_PROFILE_CHUNK_BYTES]
+            message = {"op": "data", "off": upload["offset"], "b64": base64.b64encode(part).decode("ascii")}
+            waiting = ("ack", upload["offset"] + len(part))
+        else:
+            message, waiting = {"op": "end"}, "end"
+        data = self._encode({"appProfile": message})
+        if not self._tx_room(len(data)):
+            return                                   # artwork2 flow control: wait like a frame line
+        self._write_line(data)
+        if stage == "begin":
+            upload["stage"] = "data"                 # a successful begin gets no reply (the first ack follows)
+            upload["offset"] = 0
+        upload["waiting"] = waiting
+        upload["deadline"] = self.clock() + APP_PROFILE_REPLY_SECONDS
+
+    def _app_profile_reply(self, reply):
+        """A `{"appProfile": {...}}` line: list / ack / ok / error for the upload in progress (never an `error`)."""
+        upload = self._app_upload
+        if upload is None:
+            return
+        waiting = upload["waiting"]
+        if upload["stage"] == "drain" and not (waiting == "drain" and isinstance(reply.get("loaded"), list)):
+            return                                   # DD-6: a stale reply to a line sent before the retry
+        if "error" in reply:
+            error = reply.get("error")
+            error = error if isinstance(error, str) and APP_PROFILE_ERRORS.fullmatch(error) else "error"
+            self._app_profile_fail(error)
+            return
+        if waiting in ("list", "drain") and isinstance(reply.get("loaded"), list):
+            present = any(isinstance(e, dict) and e.get("id") == upload["id"] and e.get("crc") == upload["crc"]
+                          for e in reply["loaded"])
+            if present:
+                self._app_profile_done("present")
+            else:
+                upload["waiting"], upload["stage"] = None, "begin"
+            return
+        if isinstance(waiting, tuple) and "ack" in reply:
+            if not _integer(reply["ack"], 0, APP_CRC_MAX) or reply["ack"] != waiting[1]:
+                self._app_profile_fail("order")
+                return
+            upload["offset"] = reply["ack"]
+            upload["waiting"] = None
+            upload["stage"] = "end" if upload["offset"] >= len(upload["wire"]) else "data"
+            return
+        if waiting == "end" and reply.get("ok") is True:
+            if reply.get("id") == upload["id"] and reply.get("crc") == upload["crc"]:
+                self._app_profile_done("loaded")
+            else:
+                self._app_profile_fail("order")
+
+    def app_profile_status(self):
+        """The upload in progress (id, bytes, offset), or None. Any thread (a snapshot)."""
+        upload = self._app_upload
+        if upload is None:
+            return None
+        return {"id": upload["id"], "bytes": len(upload["wire"]), "offset": upload["offset"]}
 
     def _alive_reset(self):
         """(Re)connect or disconnect: the next control frame carries everything anew."""
@@ -1682,6 +2338,9 @@ class DeviceBridge:
                 pass
 
     def _consume(self, message):
+        if isinstance(message.get("appProfile"), dict):
+            self._app_profile_reply(message["appProfile"])
+            return
         if isinstance(message.get("mediaAck"), dict):
             try:
                 self._media_ack(message["mediaAck"])
@@ -1701,6 +2360,18 @@ class DeviceBridge:
                 return
             # Do not echo arbitrary serial payloads, which may contain settings.
             raise OSError("The knob rejected the command; check capability, profile and control ID")
+        if message.get("calibrating") is True:
+            # r4 (recalibration 1): the knob's motor is aligning (seconds, not a timeout; no control meanwhile).
+            self.calibrating = True
+            self._emit("calibrating")
+            return
+        if isinstance(message.get("calibrated"), dict):
+            result = message["calibrated"]
+            self.calibrating = False
+            ok = result.get("ok") is True
+            reason = result.get("reason") if isinstance(result.get("reason"), str) else ""
+            self._emit("calibrated", ok=ok, reason=reason if reason in DIAG_CAL_OUTCOMES else "")
+            return
         if message.get("released") is True:
             was_active = self.control_id is not None
             self._reset_control()
@@ -1716,11 +2387,39 @@ class DeviceBridge:
                 # edge lost while entering never leaves a stale bit; absent or invalid = 0.
                 held = message.get("ks")
                 self._pressed = held if _integer(held, 0, 15) else 0
+                # DD-BUG-006: a button down as `ready` was built may still send its kd with this id (the HMI
+                # publishes the press, then queues the kd): that first key line is not a second press.
+                self._ready_held = self._pressed
                 self._emit("ready", id=self.ready_id, p=self.position, position=self.position,
                            held=self._logical_mask(self._pressed))
             return
         if self.ready_id is None or message.get("id") != self.ready_id:
             return
+        state = message.get("ks")
+        state = state if _integer(state, 0, 15) else None
+        up, down, hold = message.get("ku"), message.get("kd"), message.get("kh")
+        key_line = _integer(up, 0, 3) or _integer(down, 0, 3) or _integer(hold, 0, 3)
+        if state is not None and not key_line:
+            # 1.0.0-cc5.5 (F1): a position line's `ks` is the mask the knob last reported AND its live mask,
+            # so it can only clear bits: a key-up lost to a full key queue. Clear-only here too, before the
+            # turn it carries (the release came first): each cleared bit is that button's release; a bit
+            # is never set from it (a press always arrives as its own kd, even when this line came first).
+            cleared = self._pressed & ~state
+            self._pressed &= state
+            for raw in range(4):
+                if cleared & (1 << raw):
+                    self._emit("release", id=self.ready_id, index=raw, button=raw)
+        elif state is not None:
+            # DD-BUG-006: a key line's `ks` is the knob's mask as that edge was queued, so a bit set here and
+            # missing there is a key-up lost to a full key queue: release it before the edge (and before the
+            # re-seed below drops it silently). The line's own `ku` bit is left to the `ku` path.
+            stale = self._pressed & ~state
+            if _integer(up, 0, 3):
+                stale &= ~(1 << up)
+            self._pressed &= ~stale
+            for raw in range(4):
+                if stale & (1 << raw):
+                    self._emit("release", id=self.ready_id, index=raw, button=raw)
         limit = message.get("lim")
         if type(limit) is int and limit in presentation.ALIVE_LIMIT_VALUES:
             # ALIVE.md section 3: an end-stop push of the ready control (a touch, like a turn).
@@ -1730,25 +2429,36 @@ class DeviceBridge:
             self.position = message["p"]
             if previous is not None and previous != self.position:
                 self._emit("position", id=self.ready_id, p=self.position, position=self.position, delta=self.position - previous)
-        state = message.get("ks")
-        state = state if _integer(state, 0, 15) else None
-        up, down = message.get("ku"), message.get("kd")
         if _integer(up, 0, 3):
+            was_down = self._pressed & (1 << up)
             self._pressed &= ~(1 << up)
+            if was_down:
+                # The release of a press this control saw (r3: button 1 acts on release, README 1).
+                # Its own kind, so input fast paths that count `button` as a press never see it.
+                self._emit("release", id=self.ready_id, index=up, button=up)
         if _integer(down, 0, 3):
             mask = 1 << down
-            if (state is None or state & mask) and not self._pressed & mask:
+            if self._ready_held & mask:
+                pass        # the kd of a press `ready` already reported as held: no second press
+            elif state is None or state & mask:
+                if self._pressed & mask:
+                    # DD-BUG-006: a new press of a button still marked down (its ku was lost): the missing
+                    # release first, then this press, instead of swallowing it.
+                    self._emit("release", id=self.ready_id, index=down, button=down)
                 self._pressed |= mask
                 # PRESENTATION_V5.md 11.1: `hid:1` when that press also sent F24 (the host drops it).
                 hid = type(message.get("hid")) is int and message["hid"] == 1
                 self._emit("button", id=self.ready_id, index=down, button=down, pressed=True, hid=hid)
-        hold = message.get("kh")
         if _integer(hold, 0, 3):
             # PRESENTATION_V5.md 11.2: the firmware's 600 ms long press of the raw button at slot 0,
             # at most one per physical press (a deferred one arrives right after `ready`, with no
-            # `kd` in that control). The host never times a hold (VOC-D06).
+            # `kd` in that control). The host never times a hold (VOC-D06). r3.1: every button's
+            # hold arrives here (the others at 1000 ms); the runtime acts on slots 0 and 3 only.
             self._emit("hold", id=self.ready_id, button=self._button_order.index(hold), raw=hold)
-        if state is not None:
+        if key_line:
+            self._ready_held = 0    # only the first key line after `ready` can be that press's kd
+        if state is not None and key_line:
+            # A key line's `ks` is the knob's mask as that edge was queued: it re-seeds the pressed state.
             self._pressed = state
 
     def _logical_mask(self, raw_mask):
@@ -1783,6 +2493,7 @@ class DeviceBridge:
         self._artwork = None
         self._artwork_loaded = None
         self._pressed = 0
+        self._ready_held = 0
         self._frame_pending = False
         self._media_control_changed()
 
@@ -1795,6 +2506,7 @@ class DeviceBridge:
         self._reset_control()
         self._alive_reset()
         self._diag_reset()
+        self._app_profile_reset()
         self.profiles = {}
         self.capabilities = {}
         self.backup_path = None
@@ -1815,12 +2527,8 @@ class DeviceBridge:
             capabilities = self._request({"capabilities": "?"}, lambda m: isinstance(m.get("capabilities"), dict), optional=True)
             self.capabilities = deepcopy(capabilities["capabilities"]) if capabilities else {}
             self._media_negotiate()
-            self.backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            path = self.backup_dir / f"control-center-inventory-{timestamp}-{uuid.uuid4().hex[:8]}.json"
-            with path.open("x", encoding="utf-8") as output:
-                json.dump({"createdUtc": timestamp, "port": self.port, "current": self.current,
-                           "settings": filtered, "profiles": self.profiles, "capabilities": self.capabilities}, output, indent=2, ensure_ascii=False, allow_nan=False)
+            path = self._inventory_backup({"current": self.current, "settings": filtered, "profiles": self.profiles,
+                                           "capabilities": self.capabilities})
             self.backup_path = path
             self._emit("connected", profiles=deepcopy(self.profiles), current=self.current,
                        capabilities=deepcopy(self.capabilities), port=self.port, backup=str(path))
@@ -1832,6 +2540,40 @@ class DeviceBridge:
             self._media_reset()
             raise
 
+    INVENTORY_DEDUPE_SCAN = 8   # DD-BUG-005: how many of the newest backups an unchanged inventory is matched against
+
+    def _inventory_backup(self, content):
+        """The inventory backup of this connect: a new control-center-inventory-*.json, or (DD-BUG-005) the
+        newest existing one with the same content (current, settings, profiles, capabilities; not the time or
+        the port), touched so it is the newest again. A replug or a reconnect loop then adds no file; a
+        changed inventory (firmware, settings, profiles) always gets its own. Existing backups are never
+        deleted."""
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        wanted = json.loads(json.dumps(content, ensure_ascii=False, allow_nan=False))
+        try:
+            existing = sorted(((entry.stat().st_mtime, entry.name, entry)
+                               for entry in self.backup_dir.glob("control-center-inventory-*.json")
+                               if entry.is_file()), reverse=True)[:self.INVENTORY_DEDUPE_SCAN]
+        except OSError:
+            existing = []
+        for _, _, entry in existing:
+            try:
+                saved = json.loads(entry.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(saved, dict) and {key: saved.get(key) for key in wanted} == wanted:
+                try:
+                    entry.touch()       # the newest again (tooling orders inventories by time)
+                except OSError:
+                    continue
+                return entry
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        path = self.backup_dir / f"control-center-inventory-{timestamp}-{uuid.uuid4().hex[:8]}.json"
+        with path.open("x", encoding="utf-8") as output:
+            json.dump({"createdUtc": timestamp, "port": self.port, **content}, output, indent=2,
+                      ensure_ascii=False, allow_nan=False)
+        return path
+
     def _enter(self, payload):
         if self.serial is None:
             raise RuntimeError("Connect the knob first")
@@ -1840,20 +2582,22 @@ class DeviceBridge:
         if self.backup_path is None or not self.backup_path.is_file():
             raise RuntimeError("A complete device inventory backup is required before control")
         if not isinstance(payload, dict) or payload.get("profile") not in self.profiles:
-            raise ValueError("Choose an inventoried existing profile")
+            raise ControlRefused("Choose an inventoried existing profile",
+                                  profile=payload.get("profile") if isinstance(payload, dict) else None)
         value = deepcopy(payload)
         if type(value.get("windowsHidEnabled", True)) is not bool:
-            raise ValueError("Windows HID enable must be a boolean")
+            raise ControlRefused("Windows HID enable must be a boolean")
         value.setdefault("windowsHidEnabled", True)
         order = value.get("buttonOrder", [0, 1, 2, 3])
         if not isinstance(order, list) or len(order) != 4 or any(type(i) is not int for i in order) or set(order) != {0, 1, 2, 3}:
-            raise ValueError("Button order must be a physical-to-raw permutation")
+            raise ControlRefused("Button order must be a physical-to-raw permutation")
         if (not _integer(value.get("id"), 1, 0x7FFFFFFF) or not _integer(value.get("min"), 0, 0)
                 or not _integer(value.get("max"), 0, 65535) or not _integer(value.get("position"), 0, value["max"])
                 or not _integer(value.get("windowsButton"), 0, 3)):
-            raise ValueError("Invalid control bounds, index or button mapping")
+            raise ControlRefused("Invalid control bounds, index or button mapping")
         if self.control_id is not None and value["id"] <= self.control_id:
             raise ValueError("Control IDs must increase within a connection")
+        self._feel_fields(value)
         value["frame"] = _frame(self._content(value.get("frame")), self.capabilities)
         self.control_id = value["id"]
         self._artwork = None
@@ -1863,6 +2607,7 @@ class DeviceBridge:
         self._expected_position = value["position"]
         self.ready_id = self.position = None
         self._pressed = 0
+        self._ready_held = 0
         self._button_order = list(order)  # raw -> logical for this control's events (VOC-N11)
         self.latest_frame = {**value["frame"], "id": self.control_id}
         try:
@@ -2525,6 +3270,7 @@ class DeviceBridge:
             self._media_reset()
             self._alive_reset()
             self._diag_reset()
+            self._app_profile_reset()
             self._emit("disconnected")
         if error:
             raise error
@@ -2542,6 +3288,10 @@ class DeviceBridge:
             self._frame(value)
         elif command == "artwork":
             self._queue_artwork(value)
+        elif command == "recalibrate":
+            self._recalibrate(value)
+        elif command == "app_profile":
+            self._app_profile_queue(value)
         elif command == "media":
             self._media_wanted(*value)
             self._media_publish()
@@ -2558,6 +3308,7 @@ class DeviceBridge:
             self._read()
             self._diag_step()
             self._artwork_step()
+            self._app_profile_step()
             if self.media_capability is not None:
                 try:
                     self._media_step()
@@ -2577,7 +3328,9 @@ class DeviceBridge:
                 self._dispatch(command, value)
                 self._service()
             except Exception as exc:
-                self._emit("error", message=str(exc), error=type(exc).__name__)
+                # DD-BUG-004: a refused control is not a link failure; say so, so no consumer retries it.
+                details = {"retry": False, **exc.details} if isinstance(exc, ControlRefused) else {}
+                self._emit("error", message=str(exc), error=getattr(exc, "error_name", type(exc).__name__), **details)
                 if isinstance(exc, (OSError, TimeoutError)) and self.serial is not None:
                     try:
                         self._disconnect()

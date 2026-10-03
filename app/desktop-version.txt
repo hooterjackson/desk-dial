@@ -2,11 +2,14 @@
 #
 # Desk Dial's exe version resource (rename-desk-dial.md 3.1), read by Build-Desktop.ps1 through
 # PyInstaller's --version-file. With it Task Manager, the notification source and Settings > Taskbar
-# show "Desk Dial" instead of the exe name. Desktop v7 = 7.0.0.0.
+# show "Desk Dial" instead of the exe name. Desktop v7 = 7.0.0.0; v7-b (A0, Onshape mode) = 7.1.0.0; v7-c (Settings page fit, HA resync) = 7.1.1.0; v7-d (Onshape Auto via the address bar) = 7.1.2.0; v7-e (A2, the Onshape command wheel and app canvas) = 7.2.0.0; v7-f (Onshape on BINARIS BEER, no buzz; button 1 = ZOOM, Home = all four buttons held 1 s) = 7.2.1.0; v7-g (Onshape: hold 1 + turn = TILT, the vertical orbit) = 7.2.2.0; v7-h (r4 FEEL + SOUND: feel tokens, haptic events, knob sounds, reduced haptics, recalibration, walls without wrap) = 7.3.0.0; v7-i (the knob speaker volume 0-100 % in Settings > Knob, control soundVolume) = 7.3.1.0; v7-j (every press ticks; volume and brightness detents click) = 7.3.2.0; v7-k (the v2.0.0 release candidate: app profiles and the Phase 2 audit fixes) = 7.4.0.0; v7-l (the v2.0.0 release: Recalibrate motor hidden, Uninstall-Desktop.ps1, no fixtures in the bundle) = 7.4.1.0.
+# FW-PUB-004: ProductVersion (and prodvers) is the public version of the Desk Dial + knob pair, the one the knob's
+# firmware string starts with ("<public>+<build id>.<binary letter>") and firmware/release.json records; FileVersion
+# keeps the series above. Build-Desktop.ps1 also bundles this file so the Settings status strip shows the version.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(7, 0, 0, 0),
-    prodvers=(7, 0, 0, 0),
+    filevers=(7, 4, 1, 0),
+    prodvers=(2, 0, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -20,11 +23,11 @@ VSVersionInfo(
       StringTable(
         '040904B0',
         [StringStruct('FileDescription', 'Desk Dial'),
-        StringStruct('FileVersion', '7.0.0.0'),
+        StringStruct('FileVersion', '7.4.1.0'),
         StringStruct('InternalName', 'DeskDial'),
         StringStruct('OriginalFilename', 'DeskDial.exe'),
         StringStruct('ProductName', 'Desk Dial'),
-        StringStruct('ProductVersion', '7.0.0.0')])
+        StringStruct('ProductVersion', '2.0.0')])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

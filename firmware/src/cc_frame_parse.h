@@ -31,10 +31,32 @@
 // on every layout; then now/card are kept only on selection + upnext, a valid ring.unavailable is
 // stripped on upnext, moment only with ok, side only with snap, color only with snap/started.
 // device.py v5_parse() is the Python reading (parity: tests/fixtures/frames_v5.json).
+// Presentation 6 (PRESENTATION_V5.md section 19, Desk Dial r3 release 1) follows the same rules: the layouts
+// lights / lightsbig / scenes, the ring styles bri / ctemp (ring.kelvin int 2200..6500 required) and clusters
+// (1 <= count <= 20, index < count), ring.kelvin validated on every style and kept only on bri / ctemp,
+// valueUnit ("%" | "K", kept on lightsbig), prevTitle / nextTitle (text <= 64 B, kept on scenes) and the six
+// icons bulb thermo power wand house album. The Python reading is lcd_preview.v6_parse() (parity:
+// harness/fixtures/frames_v6.json, parse_tests.py).
+// A2 (1.0.0-cc5.6, CONTROL_CENTER.md "App canvas"): the optional `app` object (CCFrame::app, CCAppState) follows
+// the strict rule on any layout; device.py app_parse() is the Python reading (parity: harness/
+// app_canvas_tests.py).
+// App profiles (APP_PROFILES.md section 8): app.id is any 1..11 characters of [a-z0-9_-] and app.crc an optional
+// u32; an id that is not loaded (or a crc that differs) is accepted and drawn as "Loading..." by the LCD thread --
+// the one exception to the strict rule. Slots knob / f1..f4 follow the legacy tokens; index goes to 32; param gains axis (0..3) and
+// plane (bool). The frame
+// cases are in harness/app_store_tests.py.
+// r4 FEEL (1.0.0-cc5.7, HAPTICS.md "Events"): the optional `haptic` object ({"token", "seq"}; CCFrame::hapticFx /
+// hapticSeq) follows the strict rule on any layout; device.py haptic_parse() is the Python reading (parity:
+// harness/haptic_fx_tests.py).
 
 // A JSON integer (never a bool or float) within [lo, hi]. `out` is written
 // only on success.
 bool cc_json_uint(JsonVariantConst value, uint32_t lo, uint32_t hi, uint32_t& out);
+
+// FW-RES-007: a JSON string as a C token for cc_fx_parse() / cc_feel_parse(), or nullptr when the value is not a
+// string or holds an embedded NUL (strcmp would read "confirm.tick\u0000junk" as "confirm.tick"). Length-aware,
+// like every other token match in cc_frame_parse.cpp; device.py rejects the same values.
+const char* cc_json_token(JsonVariantConst value);
 
 // UTF-8 text into a NUL-terminated buffer of `capacity` bytes. Rejects
 // non-strings, malformed UTF-8 (overlong, surrogates, > U+10FFFF, truncated
@@ -51,6 +73,8 @@ bool cc_parse_frame(JsonVariantConst value, CCFrame& frame);
 enum CCTokenSet : uint8_t {
     CC_TOKENS_ACTIVITY, CC_TOKENS_LAYOUT, CC_TOKENS_TITLE_TONE, CC_TOKENS_LINE_TONE,
     CC_TOKENS_RING_STYLE, CC_TOKENS_ICON, CC_TOKENS_FEEDBACK, CC_TOKENS_TONE,
-    CC_TOKENS_LIT, CC_TOKENS_MOMENT   // presentation 5: CCButtonLit, CCFeedbackMoment
+    CC_TOKENS_LIT, CC_TOKENS_MOMENT,  // presentation 5: CCButtonLit, CCFeedbackMoment
+    CC_TOKENS_UNIT,                   // presentation 6: CCValueUnit
+    CC_TOKENS_CRUMB                   // presentation 6 (section 19.9): CCCrumb
 };
 const char* cc_token_name(CCTokenSet set, uint8_t value);

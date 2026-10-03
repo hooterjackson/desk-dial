@@ -53,6 +53,8 @@
 #include "cc_serial_out.h"
 #include "control_center.h"
 #include "foc_thread.h"             // the stub
+#include "haptic_bounds.h"          // 1.0.0-cc5.5 F1: haptic_profile_sanitize()
+#include "cc_haptic_fx.h"           // FW-BUG-029: the recalibration words (cc_haptic_detail::shared())
 #endif
 
 #include <algorithm>
@@ -892,6 +894,39 @@ std::vector<std::string> com_route(const std::string& bytes) {
     return wiring_state::sent;
 }
 
+// FW-BUG-029: a recalibration owns the motor for 5-6 s. From {"recalibrate":true} (com_thread.cpp calls
+// cc_cal_requested() after cc_cal_request()) until the FOC task reports the run finished, and while it reports
+// running or saving, a control is refused and the session stays idle (phase 0): it never sits in "entering" while
+// the motor sweeps, nor loses its lease before it is applied.
+void test_control_refused_while_calibrating(CCControl& request) {
+    cc_haptic_detail::Shared& cal = cc_haptic_detail::shared();
+    require(!cc_claimed(), "wiring FW-BUG-029: starts idle");
+    wiring_state::now = 400000;
+    cc_cal_request(false);
+    cc_cal_requested();                                  // the FOC task has not started the run yet
+    expect(control_line(10, "cv0", ""), "{\"error\":\"Recalibrating; wait for calibrated\"}",
+           "FW-BUG-029: a control between the request and the run is refused");
+    cal.calState = CC_CAL_RUNNING;
+    wiring_state::now = 403000;
+    expect(control_line(10, "cv0", ""), "{\"error\":\"Recalibrating; wait for calibrated\"}",
+           "FW-BUG-029: a control during the motor alignment is refused");
+    require(!cc_claimed() && !cc_take_request(request), "wiring FW-BUG-029: phase stays 0, nothing requested");
+    cal.calState = CC_CAL_SAVING;
+    expect(control_line(10, "cv0", ""), "{\"error\":\"Recalibrating; wait for calibrated\"}",
+           "FW-BUG-029: a control while the calibration is saved is refused");
+    cal.calState = CC_CAL_IDLE;                          // FocThread::recalibrate() ends: outcome, result, idle
+    cal.calOutcome = CC_CAL_OK;
+    cal.calResult = cal.calResult + 1u;
+    wiring_state::now = 406000;
+    silent(control_line(10, "cv0", ""), "FW-BUG-029: once calibrated, a control is accepted");
+    require(cc_take_request(request) && request.id == 10 && !request.release && cc_claimed(),
+            "wiring FW-BUG-029: control 10 entering after the run");
+    silent("{\"release\":true}", "FW-BUG-029: release control 10");
+    require(cc_take_request(request) && request.release, "wiring FW-BUG-029: release requested");
+    service_expect("{\"released\":true}", "FW-BUG-029: release completes");
+    require(!cc_claimed(), "wiring FW-BUG-029: idle again");
+}
+
 void wiring_tests(const std::string& capability) {
     const long long before = checks;
     HapticProfile& preset = wiring_state::regular;   // what control_center.cpp requires of a preset
@@ -959,6 +994,11 @@ void wiring_tests(const std::string& capability) {
            "unknown preset");
     expect(control_line(6, "cv0", "ic9", "Regular", ",\"windowsHidEnabled\":5"),
            "{\"error\":\"Windows HID enable must be a boolean\"}", "invalid control field");
+    // FW-RES-007: the feel token is matched length-aware, like device.py (FEEL_TOKENS): a NUL suffix is no token.
+    expect(control_line(6, "cv0", "ic9", "Regular", ",\"feel\":\"detent.value\\u0000zz\""),
+           "{\"error\":\"Invalid feel token\"}", "FW-RES-007: a NUL-suffixed feel token is refused");
+    expect(control_line(6, "cv0", "ic9", "Regular", ",\"feel\":\"detent.value\\u0000\""),
+           "{\"error\":\"Invalid feel token\"}", "FW-RES-007: a feel token with a trailing NUL is refused");
     require(!cc_take_request(request), "wiring: rejected controls request nothing");
     expect(media(data_body(4, "icon", "ic52", 0, ic52)), ack(4, "data", "icon", "ic52", 0, "Stale media control"),
            "a stale media ID");
@@ -1055,6 +1095,7 @@ void wiring_tests(const std::string& capability) {
            ack(9, "data", "cover", "cz2", 0, "Stale media control"), "media after the expiry");
     require(!cc_media_receiving(), "wiring: the media line after an expiry ended the upload");
     service_expect("{\"released\":true,\"reason\":\"lease-expired\"}", "control 9 released");
+    test_control_refused_while_calibrating(request);
     const CCMediaCounters counters = cc_media_counters();
     require(counters.commits == 25 + 49 + 4 && counters.evictions == 6,
             "wiring: counters commits " + num(counters.commits) + ", evictions " + num(counters.evictions));
@@ -1098,7 +1139,9 @@ void wiring_tests(const std::string& capability) {
         "enterMsMax", "holdEvents", "holdDeferred", "lcdDma", "lcdPeriodMs", "artAsync", "artDecodeRequests",
         "artDecodeAborts", "artDecodeStale", "stackArtDec", "lcdMosiSig", "build"};
     struct DiagBinary { uint32_t dma, periodMs, async, mosiSig, build; const char* letter; const char* label; };
+    // 1.0.0-cc5.5 adds binary F (CC_BUILD_BINARY 6: D's pipeline at a 12 ms LCD period, diag build "F").
     static const DiagBinary kBinaries[] = {{1, 16, 1, 103, 4, "D", "binary D"}, {0, 33, 0, 103, 5, "E", "binary E"},
+                                           {1, 12, 1, 103, 6, "F", "binary F"},
                                            {1, 16, 1, 102, 0, nullptr, "no ladder id"}};
     for (const DiagBinary& binary : kBinaries) {
         wiring_state::LcdPerf& p = wiring_state::lcdPerf;
@@ -1153,9 +1196,99 @@ void wiring_tests(const std::string& capability) {
     cc_native_button_edge();
     one("{\"diag\":\"?\"}");
     require(cc_native_button_seq() == edges + 2u, "wiring: one step per edge; a diag line moves nothing");
+
+    // 16. 1.0.0-cc5.5 F1: the `ks` of the ready control's position lines (com_thread.cpp handleEvents()) is the
+    // mask last reported on a key line AND the live mask, so it only clears bits; while a key event is still
+    // queued it is the last reported mask unchanged (a ku on its way is never pre-empted).
+    cc_publish_key_state(0x3);
+    cc_key_line_sent(0x3);                                              // kd 0, kd 1 went out (ks 3)
+    require(cc_position_key_state(cc_live_key_state(), false) == 0x3, "wiring F1: position ks = reported & live");
+    cc_publish_key_state(0x1);                                          // raw 1 released; its ku still queued
+    require(cc_position_key_state(cc_live_key_state(), true) == 0x3, "wiring F1: a queued key event holds the mask");
+    require(cc_position_key_state(cc_live_key_state(), false) == 0x1,
+            "wiring F1: no event queued: a lost key-up is cleared");
+    cc_publish_key_state(0x5);                                          // raw 2 pressed; its kd not sent yet
+    require(cc_position_key_state(cc_live_key_state(), false) == 0x1, "wiring F1: a position line never sets a bit");
+    cc_key_line_sent(0x5);                                              // kd 2 went out
+    require(cc_position_key_state(cc_live_key_state(), false) == 0x5, "wiring F1: the kd's mask is reported next");
+    cc_publish_key_state(0x10 | 0x4);                                   // only the four raw bits count
+    require(cc_live_key_state() == 0x4 && cc_position_key_state(cc_live_key_state(), false) == 0x4,
+            "wiring F1: the live mask is the four raw buttons");
+    cc_publish_key_state(0);
+    cc_key_line_sent(0);
+    require(cc_position_key_state(cc_live_key_state(), false) == 0, "wiring F1: all up");
+
+    // 17. 1.0.0-cc5.5 F1: haptic profile validation (haptic_bounds.h, applied in HapticState::load_profile() and
+    // HapticProfile's JSON load): detent_count >= 1, vernier >= 1, end_pos >= start_pos; a valid profile unchanged.
+    DetentProfile valid{};
+    valid.mode = REGULAR; valid.start_pos = 0; valid.end_pos = 255; valid.detent_count = 60; valid.vernier = 5;
+    DetentProfile copy = valid;
+    require(!haptic_profile_sanitize(copy) && copy.detent_count == 60 && copy.vernier == 5 && copy.start_pos == 0 &&
+                copy.end_pos == 255 && copy.mode == REGULAR,
+            "wiring F1: a valid profile is left exactly as it was");
+    DetentProfile broken = valid;
+    broken.detent_count = 0; broken.vernier = 0; broken.start_pos = 40; broken.end_pos = 10;
+    require(haptic_profile_sanitize(broken) && broken.detent_count == 1 && broken.vernier == 1 &&
+                broken.start_pos == 40 && broken.end_pos == 40 && broken.mode == REGULAR,
+            "wiring F1: detentCount 0, vernier 0 and endPos < startPos are repaired");
+    require(!haptic_profile_sanitize(broken), "wiring F1: sanitizing twice changes nothing");
     wiringChecks = checks - before;
 }
 }  // namespace
+// FW-RES-006: art_ack_never_echoes_invalid_op_or_key. cc_artwork.cpp's artAck goes through
+// cc_art_ack() (src/cc_artwork.h): op is echoed only when it is begin/data/commit and key only
+// when it is a valid content key, else "". For an op/key with \u0001, 0xFF or 300 B, the reply
+// must be strict JSON (strict UTF-8, no byte < 0x20) and echo neither.
+bool strict_utf8_line(const std::string& s) {
+    for (size_t i = 0; i < s.size();) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < 0x20 || c == 0x7F) return false;
+        size_t n = c < 0x80 ? 0 : (c & 0xE0) == 0xC0 && c >= 0xC2 ? 1 : (c & 0xF0) == 0xE0 ? 2
+                 : (c & 0xF8) == 0xF0 && c <= 0xF4 ? 3 : 99;
+        if (n == 99 || i + n >= s.size()) return false;
+        for (size_t k = 1; k <= n; ++k)
+            if ((static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) return false;
+        i += n + 1;
+    }
+    return true;
+}
+std::string art_ack_line(uint32_t id, const char* key, const char* op, const char* error) {
+    JsonDocument out;
+    cc_art_ack(out["artAck"].to<JsonObject>(), id, key, op, 0, error);
+    std::string line;
+    serializeJson(out, line);
+    return line;
+}
+void art_ack_never_echoes_invalid_op_or_key() {
+    const std::string big(300, 'a');
+    const std::string ctl = std::string("be\x01gin");
+    const std::string ff = std::string("k\xFFy");
+    const char* bad[] = {ctl.c_str(), ff.c_str(), big.c_str(), "art key", "", "\x1f"};
+    for (const char* b : bad) {
+        const std::string asOp = art_ack_line(7, "cover_1", b, "Unknown artwork operation");
+        const std::string asKey = art_ack_line(7, b, "data", "Stale artwork selection");
+        require(asOp == "{\"artAck\":{\"id\":7,\"key\":\"cover_1\",\"op\":\"\",\"offset\":0,"
+                        "\"error\":\"Unknown artwork operation\"}}", "art ack: invalid op not echoed: " + asOp);
+        require(asKey == "{\"artAck\":{\"id\":7,\"key\":\"\",\"op\":\"data\",\"offset\":0,"
+                         "\"error\":\"Stale artwork selection\"}}", "art ack: invalid key not echoed: " + asKey);
+        const std::string both = art_ack_line(0, b, b, "Stale artwork selection");
+        for (const std::string* line : {&asOp, &asKey, &both}) {
+            JsonDocument back;
+            require(strict_utf8_line(*line) && !deserializeJson(back, *line) && back["artAck"].is<JsonObject>(),
+                    "art ack: strict JSON line");
+        }
+    }
+    require(art_ack_line(3, "cover_1", "Begin", "Unknown artwork operation").find("\"op\":\"\"") != std::string::npos,
+            "art ack: op match is exact");
+    const std::string key64(64, 'k');
+    for (const char* op : {"begin", "data", "commit"})
+        require(art_ack_line(3, key64.c_str(), op, nullptr) ==
+                    "{\"artAck\":{\"id\":3,\"key\":\"" + key64 + "\",\"op\":\"" + op + "\",\"offset\":0}}",
+                std::string("art ack: valid op/key echoed for ") + op);
+    require(art_ack_line(3, (key64 + "k").c_str(), "begin", nullptr).find("\"key\":\"\"") != std::string::npos,
+            "art ack: 65-byte key not echoed");
+    require(cc_art_valid_key("Ab-9_z") && !cc_art_valid_key(nullptr) && !cc_art_valid_key("a.b"), "art key rule");
+}
 #endif  // CC_MEDIA_WIRING
 
 int main(int argc, char** argv) {
@@ -1200,6 +1333,7 @@ int main(int argc, char** argv) {
         coverJpeg = read_file(argv[4]);
         wiring_tests(argv[2]);
     }
+    art_ack_never_echoes_invalid_op_or_key();
     std::printf("media_tests: control_center.cpp media wiring: %lld check(s)\n", wiringChecks);
 #endif
     std::printf("media_tests: %lld case(s): %lld media ack(s), %lld check step(s), %lld other step(s); "

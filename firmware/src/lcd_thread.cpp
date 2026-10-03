@@ -8,6 +8,13 @@
 #include "cc_diag.h"
 #include "cc_art_decode.h"
 #include "cc_sleep.h"
+#include "cc_sleep_lcd.h"
+#include "cc_app_canvas.h"
+#include "cc_wall.h"
+#include "cc_lcd_logic.h"
+#include "cc_haptic_fx.h"   // cc_offline_wanted(), cc_offline_steps() (FW-BUG-042)
+#include "cc_boot_cal.h"    // cc_motor_cal_state() (FW-PUB-006, FW-BUG-030)
+#include "nanofoc_d.h"       // cc_lvgl_layout_ok() (FW-BUG-017, main.cpp)
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_freertos_hooks.h>
@@ -33,10 +40,11 @@
 //   CC_LCD_PERIOD_MS  R4: LVGL refresh and animation period (16 in A; 33 in B and C). Only with R2+R3.
 //   CC_ART_ASYNC      R5: cover JPEG decode in the ArtDecode task (cc_art_decode.h) (1 in A only).
 //   CC_BUILD_BINARY   the ladder binary this image is (12.6 errata E-lcd): 0 = no ladder id (the
-//                     source default), 1..5 = A..E. Reported as diag "build" ("A".."E"; absent at 0)
+//                     source default), 1..6 = A..F. Reported as diag "build" ("A".."F"; absent at 0)
 //                     and kept in the image as the marker "cc-build-binary:<n>" (cc_build_binary_marker
-//                     below). build_nanod_cc5.py passes it for D (4) and E (5); A, B and C were built
-//                     before it existed and carry neither.
+//                     below). build_nanod_cc5.py passes it for D (4), E (5) and, since 1.0.0-cc5.5, F (6:
+//                     D's pipeline with CC_LCD_PERIOD_MS 12); A, B and C were built before it existed and
+//                     carry neither.
 #ifndef CC_LCD_DMA
 #define CC_LCD_DMA 1
 #endif
@@ -49,11 +57,11 @@
 #ifndef CC_BUILD_BINARY
 #define CC_BUILD_BINARY 0
 #endif
-#if CC_BUILD_BINARY < 0 || CC_BUILD_BINARY > 5
-#error "CC_BUILD_BINARY must be 0 (no ladder id) or 1..5 (binary A..E)"
+#if CC_BUILD_BINARY < 0 || CC_BUILD_BINARY > 6
+#error "CC_BUILD_BINARY must be 0 (no ladder id) or 1..6 (binary A..F)"
 #endif
 // A letter (-DCC_BUILD_BINARY=D) reads as 0 in #if; as C++ it is an unknown name and fails here.
-static_assert(CC_BUILD_BINARY >= 0 && CC_BUILD_BINARY <= 5, "CC_BUILD_BINARY: a number 0..5");
+static_assert(CC_BUILD_BINARY >= 0 && CC_BUILD_BINARY <= 6, "CC_BUILD_BINARY: a number 0..6");
 
 // TODO: See if can do it more elegantly from LVGL tfteSPI driver
 #include <TFT_eSPI.h>
@@ -112,7 +120,7 @@ static_assert(sizeof(cc_build_binary_marker) == sizeof("cc-build-binary:") + 1,
 static uint32_t cc_build_binary() {
     const char* volatile marker = cc_build_binary_marker;
     const char digit = marker[sizeof("cc-build-binary:") - 1];
-    return digit >= '1' && digit <= '5' ? static_cast<uint32_t>(digit - '0') : 0u;
+    return digit >= '1' && digit <= '6' ? static_cast<uint32_t>(digit - '0') : 0u;
 }
 
 
@@ -126,10 +134,15 @@ static uint16_t LEDC_MIN_BLK = LEDC_MAX_BLK / 10; // Minimum Brightness for Idle
 // PC-driven render's LEDC_MAX_BLK) and writes that duty clamped by the sleep state (dim:
 // CC_SLEEP_DIM_DUTY at most, asleep: 0). lcd_backlight_apply() runs every LCD pass so a state change
 // reaches the panel within one pass; the LEDC register is written only when the duty changes.
+// FW-BUG-016: asleep, nothing is drawn or flushed (lcd_sleep_gate, cc_sleep.h); the backlight returns only
+// after the wake refresh (backlightState()). lcd_sleep_lvgl (cc_sleep_lcd.h) keeps LVGL dark: invalidation off
+// and the refresh timer held paused for as long as the gate is dark, not just on the sleep edge.
+static CCSleepLcdGate lcd_sleep_gate;
+static CCSleepLcd lcd_sleep_lvgl;
 static uint16_t blk_wanted = 0;
 static int32_t blk_written = -1;
 static void lcd_backlight_apply() {
-    const uint16_t duty = cc_sleep_duty(cc_sleep_state(), blk_wanted);
+    const uint16_t duty = cc_sleep_duty(lcd_sleep_gate.backlightState(cc_sleep_state()), blk_wanted);
     if (static_cast<int32_t>(duty) != blk_written) {
         ledcWrite(LEDC_CH_LCD_BKL, duty);
         blk_written = duty;
@@ -139,10 +152,23 @@ static void lcd_backlight(uint16_t duty) {
     blk_wanted = duty;
     lcd_backlight_apply();
 }
+// Every immediate LVGL refresh of this thread: none while the panel is dark (FW-BUG-016).
+static void lcd_refr_now() {
+    if (!lcd_sleep_gate.dark()) lv_refr_now(nullptr);
+}
 
 static uint8_t last_orientation = -1;
 
-#define DRAW_BUF_SIZE (TFT_WIDTH * TFT_HEIGHT / 10 * (LV_COLOR_DEPTH / 8)) // 240*240/10*2 = 11520 bytes for 1/10 screen size
+// r4 render speed (harness/perf.py): LVGL re-walks every object that meets the invalidated area once per
+// draw-buffer chunk, so taller chunks cut that share (host profile of the M1 push with a cover: 24 rows 1.00, 48 rows
+// about 0.8). CC_LCD_DRAW_ROWS (default 24 = 11,520 B per buffer, two buffers with DMA, internal RAM) is the knob a
+// binary variant can raise; the app canvas bounce (app_push) adapts to it.
+#ifndef CC_LCD_DRAW_ROWS
+#define CC_LCD_DRAW_ROWS 24
+#endif
+static_assert(CC_LCD_DRAW_ROWS >= 8 && CC_LCD_DRAW_ROWS <= 120 && TFT_HEIGHT % CC_LCD_DRAW_ROWS == 0,
+              "CC_LCD_DRAW_ROWS: 8..120 rows dividing the panel height");
+#define DRAW_BUF_SIZE (TFT_WIDTH * CC_LCD_DRAW_ROWS * (LV_COLOR_DEPTH / 8)) // 24 rows: 240*24*2 = 11520 bytes
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];   // Declare a buffer for drawing
 #if CC_LCD_DMA
 // R3: LVGL renders into one buffer while DMA sends the other (both static .bss, internal RAM, 12.4).
@@ -165,12 +191,7 @@ static constexpr uint32_t kLcdStackBytes = 12288;
 
 LcdThread::LcdThread(const uint8_t task_core) : Thread("LCD", kLcdStackBytes, 1, task_core) {
     _q_lcd_in = xQueueCreate(2, sizeof( LcdCommand ));
-    last_command.type = LCD_LAYOUT_DEFAULT;
-    last_command.title = nullptr;
-    last_command.data1 = nullptr;
-    last_command.data2 = nullptr;
-    last_command.data3 = nullptr;
-    last_command.data4 = nullptr;
+    last_command = LcdCommand();   // every field "" (FW-BUG-006: text by value)
 };
 
 LcdThread::~LcdThread() {}
@@ -181,13 +202,22 @@ void LcdThread::put_lcd_command(LcdCommand& cmd) {
 };
 
 
+// LcdCommands received since boot (wrapping): lcd_manager applies the value screen's texts when it moved
+// (FW-PERF-009, cc_lcd_logic.h CCLcdManagerGate). This thread only.
+static uint32_t lcd_command_seq = 0;
+
 void LcdThread::handleLcdCommand() {
     LcdCommand cmd;
     if (xQueueReceive(_q_lcd_in, &cmd, (TickType_t)0)) {
         // TODO Implement LCD Command Handling
         last_command = cmd;
+        ++lcd_command_seq;
     }
 };
+
+// A command text field is set (non-empty): the String* form and the by-value form (FW-BUG-006).
+inline bool lcd_text_set(const String* text) { return text != nullptr && text->length() != 0; }
+inline bool lcd_text_set(const char* text) { return text != nullptr && text[0] != 0; }
 
 /* 
     Tasker for Profile data update - updates every 200ms (5Hz)
@@ -222,22 +252,29 @@ static void lcd_manager(lv_timer_t * lcd_cmd_timer) {
 
     lcd_thread.handleLcdCommand();
 
+    // FW-PERF-009: the value screen's texts only when a command arrived since they were applied (or while the
+    // timed modal runs): lv_label_set_text() redraws a label even when its text is unchanged, so re-applying the
+    // same profile name and description every second redrew them once a second at rest.
+    static CCLcdManagerGate manager_gate = {};
+    if (!cc_lcd_manager_due(manager_gate, lv_scr_act() == ui_valueScreen, lcd_command_seq,
+                            lcd_text_set(lcd_thread.last_command.data3))) return;
+
     if (lv_scr_act()==ui_valueScreen){
 
         if (lcd_thread.last_command.type == LCD_LAYOUT_DEFAULT){
-            if (lcd_thread.last_command.title==nullptr || lcd_thread.last_command.title->length()==0) {
+            if (lcd_thread.last_command.title[0]==0) {
                 lv_obj_add_flag(ui_profileName, LV_OBJ_FLAG_HIDDEN); // Hide Profile Name
             } else {
                 lv_obj_remove_flag(ui_profileName, LV_OBJ_FLAG_HIDDEN); // Show Profile Name
-                lv_label_set_text_fmt(ui_profileName, "%s", lcd_thread.last_command.title->c_str()); // Set Profile Name
+                lv_label_set_text_fmt(ui_profileName, "%s", lcd_thread.last_command.title); // Set Profile Name
             }
-            if (lcd_thread.last_command.data1==nullptr  || lcd_thread.last_command.data1->length()==0) {
+            if (lcd_thread.last_command.data1[0]==0) {
                 lv_obj_add_flag(ui_profileDesc, LV_OBJ_FLAG_HIDDEN);    // Hide Profile Description
             } else {
                 lv_obj_remove_flag(ui_profileDesc, LV_OBJ_FLAG_HIDDEN); // Show Profile Description
-                lv_label_set_text_fmt(ui_profileDesc, "%s", lcd_thread.last_command.data1->c_str()); // Set Profile Description
+                lv_label_set_text_fmt(ui_profileDesc, "%s", lcd_thread.last_command.data1); // Set Profile Description
             }
-            if (lcd_thread.last_command.data3==nullptr || lcd_thread.last_command.data3->length()==0) {
+            if (lcd_thread.last_command.data3[0]==0) {
                 lv_obj_add_flag(ui_msgModal2, LV_OBJ_FLAG_HIDDEN); // Hide Modal
             } else {
                 static uint32_t startTime = 0;
@@ -250,13 +287,14 @@ static void lcd_manager(lv_timer_t * lcd_cmd_timer) {
                 } else {
                     if (millis() - startTime >= interval) {
                         lv_obj_add_flag(ui_msgModal2, LV_OBJ_FLAG_HIDDEN); // Hide Modal
-                        lcd_thread.last_command.data3 = nullptr; // Reset Command
+                        lcd_thread.last_command.data3[0] = 0; // Reset Command
                         startTime = 0; // Reset the start time
                     }
                 }
             }
         }    
     }
+    cc_lcd_manager_applied(manager_gate, lcd_command_seq);
 }
 
 /* 
@@ -378,10 +416,13 @@ bool cc_display_visible = false;
 // off); with none the host screen renders text only.
 uint8_t* cc_art240[2] = {nullptr, nullptr};
 bool cc_art_async = false;           // R5 wired into the renderer at run time (diag artAsync)
-// The offline layer (PRESENTATION_V5.md 8.10): the FOC position and the native button edge
+// The offline layer (PRESENTATION_V5.md 8.10): the native motion count and the native button edge
 // counter when it appeared; a change of either is the first native input (AL 8.1: an FOC position
 // change or a button state change while unclaimed). Reset on every claim and handback.
 CCOfflineInput cc_offline_in = {};
+// FW-BUG-042: native motion, not the raw FOC position: the offline volume's enter / exit rebases are not
+// input, its detents (re-centred in the FOC pass that saw them) are (cc_lcd_logic.h CCNativeMotion).
+CCNativeMotion cc_native_motion = {};
 // lcdLateRefrs / lcdMaxGapMs on the animation cadence (cc_display.h CCAnimCadence), sampled after
 // every lv_timer_handler() pass of this thread.
 CCAnimCadence cc_cadence = {};
@@ -393,8 +434,8 @@ CCLcdPerf perf = {};
 // Accumulators of the current 1 s window (this thread only).
 uint32_t winStartMs = 0, winFrames = 0, winFlushUs = 0, winBusyUs = 0;
 bool winAnimated = false;
-uint32_t refrStartUs = 0, refrPx = 0, refrCount = 0;
-uint64_t refrUsSum = 0;
+uint32_t refrStartUs = 0, refrPx = 0;
+CCRefrWindow winRefr = {};   // FW-PERF-010: lcdRefrUsAvg / lcdRefrUsMax of the current window
 // core0IdlePct: the idle hook on core 0 counts the time between its calls while they are close
 // together (the idle task looping between ticks); a gap longer than kIdleGapUs means another task
 // ran. An approximation: time a task spends inside a short gap is counted as idle.
@@ -422,12 +463,9 @@ void perfRefrReady(lv_event_t*) {
     const uint32_t us = micros() - refrStartUs;
     if (refrPx == 0) return;                  // nothing was invalid: no panel refresh
     ++winFrames;
-    ++refrCount;
-    refrUsSum += us;
+    cc_refr_window_add(winRefr, us);     // published per window (perfWindow), like lcdFps
     winAnimated = winAnimated || lv_anim_count_running() > 0;
     portENTER_CRITICAL(&perfLock);
-    if (us > perf.lcdRefrUsMax) perf.lcdRefrUsMax = us;
-    perf.lcdRefrUsAvg = static_cast<uint32_t>(refrUsSum / refrCount);
     perf.lcdPxPerRefr = refrPx;
     if (refrPx >= 240u * 240u) ++perf.lcdFullRefrs;
     portEXIT_CRITICAL(&perfLock);
@@ -435,16 +473,18 @@ void perfRefrReady(lv_event_t*) {
     // so flush-to-flush intervals count them as late (cc_display.h CCAnimCadence; perfCadence()).
 }
 
-// After every lv_timer_handler() pass: the animation cadence (lcdLateRefrs, lcdMaxGapMs).
-void perfCadence() {
-    if (!cc_anim_cadence_poll(cc_cadence)) return;
+// After every pass: the animation cadence (lcdLateRefrs, lcdMaxGapMs). lvglPaused (app_on: lv_timer_handler()
+// did not run) ends the episode, so an app session is not one late interval (FW-BUG-044).
+void perfCadence(bool lvglPaused) {
+    if (!cc_anim_cadence_poll(cc_cadence, lvglPaused)) return;
     portENTER_CRITICAL(&perfLock);
     perf.lcdLateRefrs = cc_cadence.lateRuns;
     perf.lcdMaxGapMs = cc_cadence.maxGapMs;
     portEXIT_CRITICAL(&perfLock);
 }
 
-// Once per second (this thread): fps, the animated minimum, the flush and busy shares, idle share.
+// Once per second (this thread): fps, the animated minimum, the refresh mean and max (FW-PERF-010), the flush and
+// busy shares, idle share.
 void perfWindow(uint32_t nowMs) {
     if (!winStartMs) { winStartMs = nowMs; return; }
     const uint32_t span = nowMs - winStartMs;
@@ -460,8 +500,12 @@ void perfWindow(uint32_t nowMs) {
                    decodeStale = s.artDecodeStale;
     const uint32_t stackArtDec = cc_art_async ? cc_art_decode_stack_free() : 0u;
     const uint32_t mosiSig = cc_lcd_mosi_sig();
+    uint32_t refrAvg = 0, refrMax = 0;
+    cc_refr_window_close(winRefr, refrAvg, refrMax);
     portENTER_CRITICAL(&perfLock);
     perf.lcdFps = winFrames * 1000u / span;
+    perf.lcdRefrUsAvg = refrAvg;
+    perf.lcdRefrUsMax = refrMax;
     if (winAnimated && (perf.lcdFpsAnimMin == 0 || perf.lcdFps < perf.lcdFpsAnimMin)) perf.lcdFpsAnimMin = perf.lcdFps;
     perf.lcdFlushUs = winFlushUs;
     perf.lcdBusyPct = winBusyUs / (span * 10u);
@@ -522,6 +566,85 @@ bool cc_lcd_jpeg_decode(const uint8_t* jpeg, uint32_t bytes, uint16_t* dst) {
     return decoded;
 }
 
+// ------------------------------------------------------------- app canvas (A2) --
+// 1.0.0-cc5.6 (CONTROL_CENTER.md "App canvas"). A frame with an `app` object shows the app's own UI (Karl
+// Malota's Onshape screens, cc_app_canvas.h) instead of the LVGL host screen. While it is up this thread does
+// not run lv_timer_handler() (LVGL is paused: no refresh, no flush, no LVGL heap use); CCAppCanvas draws into a
+// PSRAM 240 x 240 RGB565 buffer, and each frame is pushed through LVGL's own two internal draw buffers, idle
+// meanwhile, as DMA bounce buffers (24 rows each), on the same TFT_eSPI instance, transaction and MOSI routing
+// as the LVGL flush. On exit the active LVGL screen is invalidated and the host frame re-rendered, so LVGL
+// redraws in full. The canvas pushes count toward lcdFps and lcdFlushUs.
+uint16_t* app_frame = nullptr;                 // PSRAM, 115,200 B (allocated once in run())
+ccui::PlasmaTables* app_tables = nullptr;      // PSRAM, the idle plasma's tables
+CCAppCanvas app_canvas;
+bool app_on = false;
+uint32_t app_version = 0;
+// FW-BUG-045: the shaft angle the canvas gets, without the travel made while the motor is off (asleep, and the
+// post-wake settle): the wake turn the FOC swallows does not move the cube (cc_lcd_logic.h CCAppAngleHold).
+// Stepped on every pass (render_host_frame()), the canvas up or not.
+CCAppAngleHold app_angle_hold;
+int32_t app_angle_held = 0;
+
+// The physical buttons held now (bit n = physical button n), from the HMI's raw key mask.
+uint8_t app_buttons() {
+    const uint8_t raw = cc_live_key_state();
+    uint8_t physical = 0;
+    for (uint8_t i = 0; i < 4; ++i)
+        if (raw & (1u << i)) physical |= static_cast<uint8_t>(1u << cc_physical_button(i));
+    return physical;
+}
+
+CCAppInputs app_inputs() {
+    CCAppInputs in;
+    in.nowMs = millis();
+    in.angle = app_angle_held;           // cc_app_angle_read() less the swallowed wake travel (FW-BUG-045)
+    in.buttons = app_buttons();
+    return in;
+}
+
+// One canvas frame to the panel: PSRAM -> internal bounce buffer (LVGL's idle draw buffers) -> SPI.
+void app_push() {
+    const uint32_t t0 = micros();
+    constexpr int32_t kRows = static_cast<int32_t>(DRAW_BUF_SIZE / (TFT_WIDTH * 2));   // 24 rows of 240 px
+#if CC_LCD_DMA
+    uint16_t* bounce[2] = {reinterpret_cast<uint16_t*>(draw_buf), reinterpret_cast<uint16_t*>(draw_buf2)};
+#else
+    uint16_t* bounce[2] = {reinterpret_cast<uint16_t*>(draw_buf), reinterpret_cast<uint16_t*>(draw_buf)};
+#endif
+    int k = 0;
+    for (int32_t y = 0; y < TFT_HEIGHT; y += kRows, ++k) {
+        const int32_t rows = TFT_HEIGHT - y < kRows ? TFT_HEIGHT - y : kRows;
+        uint16_t* buf = bounce[k & 1];
+        // This buffer last went out two chunks ago: pushImageDMA waited for it before it queued the chunk
+        // now in flight (from the other buffer).
+        memcpy(buf, app_frame + y * TFT_WIDTH, static_cast<size_t>(rows) * TFT_WIDTH * 2);
+#if CC_LCD_DMA
+        tft.pushImageDMA(0, y, TFT_WIDTH, rows, buf);   // swaps the bytes in place (setSwapBytes(true))
+#else
+        tft.startWrite();
+        tft.setAddrWindow(0, y, TFT_WIDTH, rows);
+        tft.pushColors(buf, static_cast<uint32_t>(rows * TFT_WIDTH), true);
+        tft.endWrite();
+#endif
+    }
+    cc_panel_wait();                     // on glass, and both bounce buffers free again
+    winFlushUs += micros() - t0;
+    ++winFrames;
+}
+
+void app_enter(const CCFrame& f) {
+    cc_panel_wait();                     // an LVGL flush may still be on the wire
+    app_on = true;
+    app_canvas.enter(f.app, app_inputs());
+}
+
+void app_exit() {
+    if (!app_on) return;
+    app_on = false;
+    app_canvas.leave();
+    lv_obj_invalidate(lv_screen_active());   // LVGL resumes and redraws the whole panel
+}
+
 // cc_display_render() timed for lcdRenderUsMax.
 void timed_render(const CCFrame& frame, const uint8_t* artwork120) {
     const uint32_t t0 = micros();
@@ -532,10 +655,10 @@ void timed_render(const CCFrame& frame, const uint8_t* artwork120) {
     portEXIT_CRITICAL(&perfLock);
 }
 
-// Native handback: the previous (native) screen, the pins released (cc_display.h).
+// Native handback: the previous (native) screen, never the boot splash (FW-BUG-043), the pins released (cc_display.h).
 void hand_back() {
-    lv_screen_load(cc_previous_screen ? cc_previous_screen : ui_valueScreen);
-    lv_refr_now(nullptr);
+    lv_screen_load(cc_handback_screen(cc_previous_screen, ui_bootimg, ui_valueScreen));
+    lcd_refr_now();
     cc_panel_wait();
     cc_display_visible = false; cc_display_version = 0; cc_display_id = 0;
     cc_offline_input_reset(cc_offline_in);
@@ -543,6 +666,8 @@ void hand_back() {
 }
 
 void render_host_frame() {
+    // FW-BUG-045: every pass, asleep included, so the hold sees the whole wake.
+    app_angle_held = app_angle_hold.step(cc_app_angle_read(), cc_sleep_state() == CC_SLEEP_ASLEEP, millis());
     static uint32_t artworkVersion = 0, mediaVersion = 0, decodeVersion = 0;
     // The snapshot lives in static storage (CCFrame is ~1.1 KB; the LCD stack is kLcdStackBytes). It
     // is refreshed only when the presentation state moved: the counter changes on every frame/art
@@ -562,6 +687,7 @@ void render_host_frame() {
         seenState = state; primed = true;
     }
     if (!active) {
+        app_exit();
         if (cc_display_visible) {
             if (cc_claimed()) {
                 // Releasing (PRESENTATION_V5.md 8.10): the host screen stays until the release completes,
@@ -575,8 +701,10 @@ void render_host_frame() {
                 // active underneath and nothing is claimed. Re-applied every pass (inert) for the pin
                 // release after the cover fade and the native-input swap.
                 const uint32_t keyEdges = cc_native_button_seq();
-                cc_display_offline(cc_offline_input_update(cc_offline_in, foc_thread.pass_cur_pos(), keyEdges));
-                if (cc_display_stats().lastChanged) lv_refr_now(nullptr);
+                const uint16_t motion = cc_native_motion_step(cc_native_motion, foc_thread.pass_cur_pos(),
+                                                              cc_offline_wanted(), cc_offline_steps(), millis());
+                cc_display_offline(cc_offline_input_update(cc_offline_in, motion, keyEdges));
+                if (cc_display_stats().lastChanged) lcd_refr_now();
                 cc_lcd_applied(0);
                 return;
             }
@@ -594,6 +722,43 @@ void render_host_frame() {
         lv_screen_load(cc_screen); cc_display_visible = true;
     }
     cc_offline_input_reset(cc_offline_in);   // a claim leaves the offline layer (its first render fades back in)
+    // r4 M13: the FOC's wall counter (cc_wall.h), read on every host pass, the app canvas's too.
+    static bool wallPrimed = false;
+    static uint32_t wallsSeen = 0;
+    const uint32_t walls = cc_wall_count();
+    if (!wallPrimed) { wallPrimed = true; wallsSeen = walls; }
+    const bool newWalls = walls != wallsSeen;
+    wallsSeen = walls;
+    if (cc_app_state_present(frame.app) && app_frame != nullptr) {
+        // A2: the app canvas (LVGL paused). A new frame version updates its state; it draws when something moved.
+        if (!app_on) {
+            app_enter(frame);
+            lcd_backlight(LEDC_MAX_BLK);
+        } else if (version != app_version) {
+            app_canvas.update(frame.app, millis());
+        }
+        app_version = version;
+        cc_display_version = 0;              // leaving the canvas re-renders the host frame in LVGL
+        if (cc_sleep_state() != CC_SLEEP_ASLEEP) {
+            cc_crumb_lcd(CC_LCD_STEP_RENDER);
+            if (app_canvas.step(app_inputs())) {
+                cc_crumb_lcd(CC_LCD_STEP_REFRESH);
+                app_push();
+            }
+        }
+        if (newControl) {
+            cc_panel_wait();
+            cc_display_id = id;
+        }
+        cc_lcd_applied(id);
+        return;
+    }
+    app_exit();
+    // r4 input moments (cc_display_input / cc_display_wall): the physical buttons down now (M7 press squash, M10 hold
+    // fill) every pass, and each new wall hit of the FOC (cc_wall.h: M13 wall stretch) once. A hit seen while the
+    // host screen was entering or the app canvas was up is consumed without a bounce (wallsSeen, above).
+    if (newWalls && !entering) cc_display_wall(cc_wall_dir());
+    cc_display_input(app_buttons());
     bool presentNow = false;
     // Store and decode versions are read before the render's lookups, so a commit (or a finished R5
     // decode) that lands during the render is seen on the next pass.
@@ -614,13 +779,36 @@ void render_host_frame() {
     }
     if (newControl || presentNow) {
         cc_crumb_lcd(CC_LCD_STEP_REFRESH);
-        lv_refr_now(nullptr);
+        lcd_refr_now();
     }
     if (newControl) {
         cc_panel_wait();                 // cc_lcd_applied(id) means "on glass" (R3)
         cc_display_id = id;
     }
     cc_lcd_applied(id);
+}
+
+// FW-PUB-006: "Calibrating - hands off" on LVGL's top layer (over any screen) while the FOC task aligns the motor
+// (cc_lcd_logic.h CCCalCue). Created on the first show; touched only when the alignment starts or ends.
+// FW-BUG-030: the same label reads "Calibration failed - replug" once the alignment has failed for good (after
+// the boot retry).
+CCCalCue cal_cue = {};
+lv_obj_t* cal_cue_label = nullptr;
+void cal_cue_apply(uint8_t action) {
+    if (action == CC_CAL_CUE_KEEP) return;
+    if (cal_cue_label == nullptr) {
+        if (action == CC_CAL_CUE_HIDE) return;
+        cal_cue_label = lv_label_create(lv_layer_top());
+        lv_obj_set_style_text_font(cal_cue_label, &ui_font_SGK100h16, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(cal_cue_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(cal_cue_label, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(cal_cue_label, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(cal_cue_label, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_align(cal_cue_label, LV_ALIGN_BOTTOM_MID, 0, kCCCalCueOffsetY);
+    }
+    if (action == CC_CAL_CUE_HIDE) { lv_obj_add_flag(cal_cue_label, LV_OBJ_FLAG_HIDDEN); return; }
+    lv_label_set_text(cal_cue_label, action == CC_CAL_CUE_SHOW_FAILED ? kCCCalFailedCueText : kCCCalCueText);
+    lv_obj_remove_flag(cal_cue_label, LV_OBJ_FLAG_HIDDEN);
 }
 }
 
@@ -636,6 +824,23 @@ CCLcdPerf cc_lcd_perf_read() {
 // each pass only slept one RTOS tick, so LVGL time ran several times faster than real time.
 static uint32_t cc_tick_ms(void) { return (uint32_t)millis(); }
 
+// FW-BUG-017: an image whose LVGL objects and src/ were compiled with different lv_conf.h files (cc_lvgl_layout_ok()
+// false; setup() names the cause on the console) must not create a single lv_obj: every field after the difference
+// would land in another field. This draws one fixed error with TFT_eSPI alone (no font is built in, so a white "!" on
+// red), holds the backlight on outside the sleep gate and parks the thread, still feeding its watchdog.
+static void cc_lvgl_layout_halt() {
+    tft.begin();
+    tft.setRotation(3);
+    tft.fillScreen(TFT_RED);
+    tft.fillRoundRect(TFT_WIDTH / 2 - 9, 52, 18, 96, 9, TFT_WHITE);
+    tft.fillCircle(TFT_WIDTH / 2, 174, 11, TFT_WHITE);
+    ledcWrite(LEDC_CH_LCD_BKL, LEDC_MAX_BLK);
+    while (1) {
+        cc_wdt_feed();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
 void LcdThread::run() {
     // Task watchdog (1.0.0-cc5.2, cc_diag.h): fed once per pass at the wait step below. A pass is
     // usually tens of milliseconds; with R5 no cover decode runs on this thread (binaries A and D), in
@@ -646,6 +851,7 @@ void LcdThread::run() {
     ledcSetup(0, 5000, 12); // 4096 steps @ 5Khz
     ledcAttachPin(5, 0); // LEDC on Pin 5
     lv_init(); // Initialize LVGL
+    if (!cc_lvgl_layout_ok()) cc_lvgl_layout_halt();   // FW-BUG-017: no host screen, no lv_obj
     lv_tick_set_cb(cc_tick_ms); // Must follow lv_init(), which resets LVGL globals.
 
     // Artwork display buffers: two 240x240 RGB565 (2 x 115,200 B) in PSRAM, front and back, owned for
@@ -653,6 +859,17 @@ void LcdThread::run() {
     // none only artwork is disabled.
     for (uint8_t i = 0; i < 2; ++i)
         cc_art240[i] = static_cast<uint8_t*>(heap_caps_malloc(CC_ART240_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    // A2 app canvas: its frame and the plasma tables in PSRAM (fail-soft: without them an app frame shows the
+    // LVGL host screen, A0's text).
+    app_frame = static_cast<uint16_t*>(heap_caps_malloc(TFT_WIDTH * TFT_HEIGHT * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    app_tables = static_cast<ccui::PlasmaTables*>(heap_caps_malloc(sizeof(ccui::PlasmaTables), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (app_frame == nullptr || app_tables == nullptr) {
+        heap_caps_free(app_frame); heap_caps_free(app_tables);
+        app_frame = nullptr; app_tables = nullptr;
+    } else {
+        app_tables->ready = false;       // ccui::draw_plasma() builds the tables on first use
+        app_canvas.begin(app_frame, app_tables, CC_LCD_PERIOD_MS);
+    }
     CCDisplayMedia lookups = {};
     lookups.adopt = cc_lcd_media_adopt;
     lookups.release = cc_lcd_media_release;
@@ -697,6 +914,7 @@ void LcdThread::run() {
     lv_timer_set_period(lv_anim_get_timer(), CC_LCD_PERIOD_MS);
     lv_display_add_event_cb(disp, perfRefrStart, LV_EVENT_REFR_START, nullptr);
     lv_display_add_event_cb(disp, perfRefrReady, LV_EVENT_REFR_READY, nullptr);
+    cc_sleep_lcd_attach(lcd_sleep_lvgl, disp, lcd_sleep_gate);  // FW-BUG-016: after LVGL's REFR_REQUEST handler
     perf.lcdDma = CC_LCD_DMA;
     perf.lcdPeriodMs = CC_LCD_PERIOD_MS;
     perf.buildBinary = cc_build_binary();
@@ -736,13 +954,29 @@ void LcdThread::run() {
     uint32_t lvglLowestFree = UINT32_MAX;
     while (1) {
         const uint32_t passStart = micros();
+        // FW-BUG-016: asleep, host frames still render into the tree but nothing is drawn or flushed
+        // (cc_sleep_lcd.h: invalidation off and the refresh timer held paused while dark, lcd_refr_now() a
+        // no-op); the wake pass renders the latest frame, then refreshes the whole screen before
+        // lcd_backlight_apply() lets the backlight return.
+        const uint8_t lcdSleepStep = cc_sleep_lcd_step(lcd_sleep_lvgl, cc_sleep_state());
         cc_crumb_lcd(CC_LCD_STEP_HOST);
         render_host_frame();
+        if (lcdSleepStep == CC_SLEEP_LCD_RESUME) {
+            cc_sleep_lcd_dark(lcd_sleep_lvgl, false);
+            if (!app_on) {               // the app canvas owns the panel while it is up (LVGL paused)
+                cc_crumb_lcd(CC_LCD_STEP_REFRESH);
+                lv_obj_invalidate(lv_screen_active());
+                lv_refr_now(nullptr);
+                cc_panel_wait();         // on glass before the backlight returns
+            }
+            lcd_sleep_gate.refreshed();
+        }
+        cal_cue_apply(cc_cal_cue_step(cal_cue, cc_motor_cal_state()));   // FW-PUB-006, FW-BUG-030
 
         cc_crumb_lcd(CC_LCD_STEP_TIMERS);
-        lv_timer_handler();
+        if (!app_on) lv_timer_handler();     // A2: LVGL is paused while the app canvas is up
         lcd_backlight_apply();            // inactivity dim / sleep state changes (cc_sleep.h)
-        perfCadence();
+        perfCadence(app_on);
         // {"diag":"?"} margins, sampled here because LVGL is not thread-safe.
         const uint32_t now = millis();
         if (!diagSampled || now - diagSampledAt >= 1000) {

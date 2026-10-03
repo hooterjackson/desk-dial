@@ -1595,3 +1595,125 @@ recommends the same for PINK.
 *Recommended: pick on the ring in the LED tour among three candidates, via `ledPink`, and freeze the pick as float
 constants (section 2).* Candidates (design sRGB → LED output at full): **255,40,90 → #FF051A** (the design's), **255,60,120
 → #FF0C30** (softer, more magenta), **255,20,70 → #FF0210** (deeper). Ship 255,40,90 until then.
+
+
+---
+
+## 15. [r3] Presentation 6: the Lights family (Desk Dial r3 release 1, 2026-09-28)
+
+Source: README r3 §3 (ring, button LEDs), PRESENTATION_V5.md section 19 (wire). Implemented in `cc_alive.h/.cpp` and its twin `control_center/alive_lights.py`; every rule below is append-only, every earlier family, style, class and effect is unchanged, and the user rulings stand: steady warm-white rest (12.8), HOT = WARM, dither off with the F-T floor (12.7), the inactivity dim/sleep of `cc_sleep.*` (untouched).
+
+### 15.1 Family
+
+`CC_ALIVE_LIGHTS` (7) = layouts `lights`, `lightsbig`, `scenes`. A change into or out of it is a MODE event (reveal, 6.4). No tint (not a list family), no song hand, no heat, no PLAY/PAUSE fill/drain, no EXT shimmer (those stay Home's).
+
+### 15.2 Ring targets (the r3 arc)
+
+Arc position k = 0..44 is logical segment `(38 + k) mod 60`: 38 (7:30) clockwise through the top to 22; 23..37 stay free. "Turning" = the frame's layout is `lightsbig` (the host shows it while the knob turns and 1.4 s after).
+
+| Style | Cells | Cursor |
+|---|---|---|
+| `bri` | n = (45 v + 50) div 100 (v = ring.value, or the local value 15.6): k < n ACCENT `kelvin_rgb(ring.kelvin)` class **3** (1.0) turning, else **L** (0.34); k ≥ n **off** ([user 2026-09-29]) | arc(n − 1), arc(0) when n = 0 |
+| `ctemp` | m = (44 value + 50) div 100: k ≤ m ACCENT `kelvin_rgb`; k = m class 3; k < m class 3 turning, else **F** (0.50); k > m **off** ([user 2026-09-29]) | arc(m) |
+| `clusters` | N = count (1..20), centre c_s = (120 s + N) div 2N (= round(60 s / N)); cells c_s − 1..c_s + 1 (mod 60, wrapping at 0) WARM class **O** (0.18), the selected one (ring.index or the local index) class 3, drawn last | c_index |
+| `off` (lights off) | dark (5.1.7) | 0 |
+
+**[user 2026-09-29] ruling:** the unfilled part of both Lights arcs is OFF, not a dim track. At 0.08 / 0.12 the LEDs showed about one count and drifted to olive / yellow (the same low-level hue shift as the 2026-09-26 resting ruling), so the README's `unfilled L 0.08` (bri) and `remainder L 0.12` (ctemp) are not drawn; the filled part, the marker and the clusters are unchanged. Classes T and R stay in the enum and tables (append-only) but no target uses them.
+
+The Kelvin colour is an ACCENT drawn as is: **never sat()**, no WARM fallback (6500 K = 255,254,250 stays itself), no amber / red volume colours, no near-max embers, in `ledStyle` white and colour alike.
+
+### 15.3 Classes and alphas (append-only CCAliveClass 9..13)
+
+| Class | Awake (warm and semantic) | Resting |
+|---|---|---|
+| T (bri unfilled; unused since [user 2026-09-29]) | 0.08 | 0 (dark) |
+| R (ctemp remainder; unused since [user 2026-09-29]) | 0.12 | 0 |
+| O (clusters not selected) | 0.18 | 0 |
+| L (bri filled at rest) | 0.34 | 0.34 |
+| F (ctemp filled at rest) | 0.50 | 0.34 |
+
+Resting keeps the one steady warm white of 12.8 (every resting cell WARM at 0.34); the unfilled track, the remainder and the other scenes rest dark so the resting ring still reads as the level / the selected scene.
+
+### 15.4 Buttons
+
+5.3 unchanged except row 6 in LIGHTS: a lit-on button (the active knob mode, e.g. Temperature on) is WARM class 3 at **0.90** (`buttonActive`; README r3 "active mode warm L 0.9"); it rests at 0.34 (≥ 0.5, M18). Button 4 `power` is tone nav (WARM 0.70): never red. The scenes list's Run (`switch` on slot 3) is go (GREEN).
+
+### 15.5 Feedback
+
+A plain `ok` (no skip, no moment) on a LIGHTS frame starts the flash kind **`CC_FLASH_WASH`** (3; Python `"wash"`) instead of OK: for **700 ms** every ring segment is GREEN class 4 at **0.68** (a target override, damped like any target), no bloom is queued, and the flash holds sleep like any flash (6.1). `err` keeps rows a (fail) and the red 5-segment flash; moments keep their rows.
+
+### 15.6 Local cursor (6.3)
+
+`bri` takes the local value when the control's max is 100 (the brightness profile, BINARIS BEER like volume); `clusters` takes the local index when max = count − 1 and the activity is not pending / loading; `ctemp` never (the host's bounds follow the group's reported min/max).
+
+### 15.7 Verification
+
+**The marker ring** (`marker`, the r3 Windows screen): pos = (2 index · 44 + span) div 2 span (span = max(1, count − 1), the
+local index when max = count − 1); cells pos − 1..pos + 1 on the arc ACCENT white (`markerRgb`) class **3**; the rest of
+the arc is **off**. **[user 2026-10-03] ruling:** like the Lights arcs (15.2) and the queue ring (15.9), no sub-floor dim
+segments: the design's rest class **M** (WARM 0.10, #020100 at drive 150, hue-shifted) is not drawn. `CC_ALIVE_CLASS_M`
+stays in the enum and tables (append-only) but no target uses it. Cursor: `arc_segment(pos)`.
+
+`alive_tests.py`: the four r3 twin sequences (`r3-lights-bri`, `r3-lights-ctemp`, `r3-scenes-clusters`, `r3-lights-off`, in `tests/tools/make_alive_sequences.py`, fed as Raw presentation-6 frames) replay through the firmware's `cc_parse_frame` + `CCAlive` against the Python engine (e within 2e-3, bytes within 1, cursor / flash / effects / asleep exactly), with every earlier case unchanged. `tests/test_alive_r3.py` writes 15.2–15.6 out. The design oracles (RC, BS) do not model the Lights states. The contact sheet `harness/r3-handoff/contact-sheet-r3.png` shows each state's ring bytes next to the r3 prototype's ring.
+
+### 15.8 [r3.1] The button-4 hold ring and its landings (Desk Dial r3.1, 2026-09-29)
+
+While physical slot 3 is held (`press(now, 3)` .. `keyUp(now, 3)`) on a claimed render whose frame has
+`holdMarker:true` (PRESENTATION_V5 19.10), on any screen (the launcher Home included, no crumb needed), the hold-1 look
+is drawn over the 1000 ms hold (`hold4RingMs`; the firmware's `kh` for every slot but 0 matures then):
+`holdFill = round(held x 45 / 1000)` WARM class 4 at 1.0 on the r3 arc, the rest of the ring dark ([user 2026-09-29] no
+sub-floor tail; the design's 0.08), shown from **15 %** (150 ms; hold 1 keeps 12 % of 600 ms). At 1000 ms the hold has
+no firmware flash: the full arc stays up to 600 ms (`landingWaitMs`) while the **landing window** is open, and the
+first new feedback seq within 1500 ms (`landingWindowMs`) of the maturity lands it:
+
+| feedback | landing |
+|---|---|
+| `ok` (no skip, no moment) | `CC_FLASH_LAND` (6, Python `"land"`): the whole ring 0.68 for **450 ms**, in `cc_kelvin_rgb(ring.kelvin)` (ACCENT) when the landing frame's ring is `bri` / `ctemp` (the Home lights domain), else WARM (back to music) |
+| `ok` + moment `queued` | `CC_FLASH_QUEUE` (7, `"queue"`): the whole ring GREEN 0.68 for **600 ms**, instead of the queued sweep (no moment hold) |
+| anything else (err, refused, skip, other moments) or later than 1500 ms | as usual (rows a-j) |
+
+The landing window closes on its first new seq, after 1500 ms, and at claim / release. A release of button 4, a claim or
+a session release cancels the ring. While the hold-1 ring runs (slot 0 held on a crumb screen) hold 1 wins and the held
+slot 3 is dropped until its next press. Host contract: send the domain-swap frame with a plain `ok`, the queued item
+with `ok` + `queued`, a denial with `err` (+ `refused`). Python: `alive_lights.HOLD4_MS`, `HOLD4_SHOW_PCT`,
+`LANDING_WINDOW_MS`, `LANDING_WAIT_MS`, `LAND_FLASH_MS`, `QUEUE_FLASH_MS`.
+
+### 15.9 [r3.1] The queue ring (whole-queue Tracks and Up next)
+
+Ring style `queue` (PRESENTATION_V5 19.10): row j sits at arc position `pos(j) = round(44 j / max(1, count - 1))` on
+the r3 arc (`arc_segment`). The playing row (`ring.now`, when >= 0) is one segment in warm white `0xFFE8CD` (ACCENT)
+at the new class **W** (15; 0.60 awake in both tables, 0.34 resting); the focus (the local index while turning,
+6.3 like the marker: max = count - 1, not while pending / loading) is `pos(focus) +- 1` at class 3 in its row's album
+colour (`sat(colors[focus - first])`, ACCENT) or WARM without one, drawn over the playing segment. **The rest of the
+arc is OFF**: the r3.1 prototype's `R.queue` draws it at 0.10 in the album colour, which the user ruling of 2026-09-29
+("no sub-floor dim segments", like the unfilled Lights arcs) replaces with off. The queue ring never tints (5.4, like
+the marker). Cursor: `arc_segment(pos(focus))`.
+
+Verification: the `r3-hold4-ring` and `r31-queue-ring` twin sequences (`tests/tools/make_alive_sequences.py`, Raw
+frames) replay through `cc_parse_frame` + `CCAlive` against the Python engine in `alive_tests.py`;
+`tests/test_alive_r3.py` (R31Tests) writes 15.8 / 15.9 out.
+
+## 16. r4 LEDs (design_handoff_nano_d_r4 README 3.3 / 3.4, 2026-09-30; plan stage F4)
+
+A layer after the animator (`CCAlive::r4Layer`; twin `AliveLights._r4_layer`, byte-checked by `alive_tests.py`). The
+animator itself and both design oracles are unchanged; `ringE()` / `buttonE()` and section 9 now read the eased values.
+
+1. **Output easer.** Every ring and button LED eases towards the animator's e (after the wall glow) with τ = 50 ms,
+   integrated with a first-order hold: `s1 = x1 + (s0 - x0) a - (x1 - x0) b`, `a = e^(-dt/τ)`, `b = τ/dt (1 - a)`
+   (x0 / x1: the animator's e at the previous / this render; dt = the real gap since the last render, <= 1000 ms,
+   not the animator's 50 ms cap, so a render after a gap lands where a continuous one would); dt 0 changes nothing;
+   `|x1 - s1| < 1e-6` lands on x1.
+   `animating()` also covers the easer (residue > 1/1024), a wall glow and a sweep. At 16 ms an LED moves ≤ 27.4 % of
+   its gap per frame. 11.5 (frame rates) holds on the animator's e within 0.01; the eased output within 0.12 (the
+   floating knob's mirror vs a 60 Hz twin within 0.2 while an effect edge passes; `test_cc_knob_face`).
+2. **Wall glow (3.3).** Each limit (6.2) also starts the end glow at the cursor: segments cursor ±2 blend towards
+   tone(255,232,205 / 255 × 0.9) by g(t): E.out rise over 90 ms (`eo`), then 1 − E.io fall over 420 ms (`eio`),
+   from the limit's time. The bound comet (7) still plays under it.
+3. **Deny glow.** `CC_FLASH_REFUSED`: segments 26..34 = ACCENT 0xFF3C28 (255,60,40), class 4, 0.9, for **480 ms**
+   (15.7's 320 ms RED superseded); the damping and the easer make it a bloom.
+4. **M12 domain swap (15.8 superseded for plain ok).** A plain-ok landing (`CC_FLASH_LAND`) draws no wash; it starts
+   the sweep: segment i keeps what it shows until `8.7 i` ms after the landing, then eases (200 ms) to the new ring;
+   the window is 800 ms (`landFlashMs`). `CC_FLASH_QUEUE` (ok + queued) is unchanged.
+5. **Unchanged rulings.** Warm-white rest, green Play while paused, the F-T floor (below-floor LEDs stay off unless
+   their target is lit).
+

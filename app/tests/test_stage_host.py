@@ -82,8 +82,8 @@ class NotificationTests(unittest.TestCase):
         h.handle(HO.WM_WTSSESSION_CHANGE, HO.WTS_SESSION_LOCK, 0)
         h.handle(HO.WM_WTSSESSION_CHANGE, HO.WTS_CONSOLE_DISCONNECT, 0)
         h.handle(HO.WM_WTSSESSION_CHANGE, HO.WTS_REMOTE_DISCONNECT, 0)
-        h.handle(HO.WM_WTSSESSION_CHANGE, 8, 0)                  # WTS_SESSION_UNLOCK: nothing
-        self.assertEqual(events, ["lock"] * 3)
+        h.handle(HO.WM_WTSSESSION_CHANGE, 8, 0)                  # WTS_SESSION_UNLOCK (DD-BUG-036)
+        self.assertEqual(events, ["lock", "session_disconnect", "session_disconnect", "unlock"])
         events.clear()
         self.assertEqual(h.handle(HO.WM_POWERBROADCAST, HO.PBT_APMSUSPEND, 0), 1)
         h.handle(HO.WM_POWERBROADCAST, HO.PBT_POWERSETTINGCHANGE, 1)   # display off

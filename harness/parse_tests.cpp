@@ -14,6 +14,8 @@
 // (ringNow, ringCard, lit[4], color[4], icon[4], feedbackKind, feedbackMoment,
 // feedbackSide, feedbackColor, reducedMotion, ledPink, ledVolFull; null = absent).
 // Exit status 1 on any mismatch.
+// Presentation 6 (PRESENTATION_V5.md section 19): the text fields prevTitle / nextTitle and the typed fields
+// ringKelvin, valueUnit and kelvinRgb (cc_kelvin_rgb(f.ringKelvin), the Kelvin vector of frames_v6.json).
 //
 // With CC_V4_PARSER the same runner is built against the cc5.3 (presentation 4)
 // parser snapshot instead (parse_tests.py extracts it from the cc5.3 source zip):
@@ -116,6 +118,10 @@ const char* stored_text(const CCFrame& f, const std::string& field) {
     if (field == "artKey") return f.artKey;
     if (field == "iconKey") return f.iconKey;   // 1.0.0-cc5.3
     if (field == "volumeCaption") return f.volumeCaption;
+#ifndef CC_V4_PARSER
+    if (field == "prevTitle") return f.prevTitle;     // presentation 6
+    if (field == "nextTitle") return f.nextTitle;
+#endif
     if (field.size() == 6 && field.compare(0, 5, "label") == 0 && field[5] >= '0' && field[5] <= '3')
         return f.buttons[field[5] - '0'].label;
     return nullptr;
@@ -239,6 +245,12 @@ bool check_field(const std::string& name, const CCFrame& f, const std::string& f
     if (field == "ledPink") return expect_latched(name, field, f.ledPinkPresent, f.ledPink, 0, expected);
     if (field == "ledVolFull")
         return expect_latched(name, field, f.ledVolFullPresent, f.ledVolFull ? 1 : 0, 0, expected);
+    // Presentation 6 (section 19).
+    if (field == "ringKelvin") return expect_int(name, field, f.ringKelvin, expected);
+    if (field == "valueUnit") return expect_string(name, field, token(CC_TOKENS_UNIT, f.valueUnit), expected);
+    if (field == "crumb") return expect_string(name, field, token(CC_TOKENS_CRUMB, f.crumb), expected);   // 19.9
+    if (field == "holdMarker") return expect_int(name, field, f.holdMarker ? 1 : 0, expected);   // [r3.1] 19.10
+    if (field == "kelvinRgb") return expect_int(name, field, cc_kelvin_rgb(f.ringKelvin), expected);
     if (field == "lit" || field == "color" || field == "icon") {
         if (!expected.is<JsonArrayConst>() || expected.size() != 4) {
             fail(name, field + ": expectation is not a list of four");

@@ -254,7 +254,7 @@ class RecoveryEncodingTests(unittest.TestCase):
     """WP6GIL-4 ([G1] G1-5): the queue-recovery copy is encoded one value and one queue row at a
     time, byte for byte what json.dumps gave, and written in the CredentialStore format."""
     RECORD = {"room_uid": "RINCON_1", "coordinator_uid": "RINCON_1", "group_revision": "g", "queue_revision": "187",
-              "items": [{"title": "Björk – Jóga 夜に駆ける \"quoted\"", "uri": "x-sonos-http:song%3a1.mp4",
+              "items": [{"title": "Linnéa Holm – Jóga 夜に駆ける \"quoted\"", "uri": "x-sonos-http:song%3a1.mp4",
                          "metadata": "<DIDL-Lite>&amp;</DIDL-Lite>"}, {"title": "", "uri": "", "metadata": None}],
               "track": {"title": "x", "position": "0:01:02", "nested": [1, 2.5, True, None, {"k": []}]},
               "transport": {}, "play_mode": "NORMAL", "empty": [], "number": 3}

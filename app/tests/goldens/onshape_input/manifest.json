@@ -1,0 +1,118 @@
+{
+ "deactivate_mid_param": {
+  "batches": 1,
+  "sha256": "8ba5fb6f5671a22d8f9344bbef4659b50b5ee434c1b02e183a7b911ed3751c20"
+ },
+ "drag_refused_off_target": {
+  "batches": 0,
+  "sha256": "e7d5f9209dd1ea5dca97c3e3c5d5e974742be661687be40540d5421da8b9bf1e"
+ },
+ "exception_mid_drag": {
+  "batches": 6,
+  "sha256": "a88383dc0c8626cfa4742ab61e6a74489db66535bf8724227e49aa371e6a436e"
+ },
+ "focus_loss_mid_drag": {
+  "batches": 8,
+  "sha256": "4b3270c8f2fc3f5acad4befaa2d8c487faf6f61093cc37f849cf300312e20c23"
+ },
+ "foreground_change_mid_drag": {
+  "batches": 7,
+  "sha256": "71030867f1c87913d4a7acbbbe421627b40207f9d63b55257b5d27b7f183e191"
+ },
+ "home_chord_mid_drag": {
+  "batches": 6,
+  "sha256": "1c4b494a30c08c599bcffa35821d01ba2afd875533ca2291acc4c76b2062462c"
+ },
+ "lifecycle_disconnect_mid_drag": {
+  "batches": 4,
+  "sha256": "282a853d492e017982db1b332c820f6998365f120426321d9a73a3d3a5aaa5cb"
+ },
+ "modifier_switch_mid_drag": {
+  "batches": 11,
+  "sha256": "0c45191ea66c706d52568842a3e88cfbd60d05693042ec57f2fd079d1716116f"
+ },
+ "orbit_drag_idle_release": {
+  "batches": 8,
+  "sha256": "c1b0646e28f7adc852c46bb9ac8746383a2dc987cceda976a19b7113c51309a6"
+ },
+ "pan_drag_swapped_buttons": {
+  "batches": 7,
+  "sha256": "7070e9b8a4b63eabfe56f019efd12253df94395cc8798badd307d5abb78a6725"
+ },
+ "param_mode_a": {
+  "batches": 12,
+  "sha256": "577c8e9132aafac64d9228db88bfd20c6d53d595794c86b818eb261a1976ffef"
+ },
+ "param_mode_a_modifier_held": {
+  "batches": 4,
+  "sha256": "b92e7345ef8339211193c051a8e19c39ee7a10573c61d00f62a9b746e4106027"
+ },
+ "param_mode_b": {
+  "batches": 6,
+  "sha256": "86d175ecf55075c900aabbd41fd54051830014600a187992a0415706c0aba948"
+ },
+ "param_mode_b_cancel_search": {
+  "batches": 4,
+  "sha256": "0e55c853abff946e624dd2508574ab8dd855514f826ea645a71f6ed8a235daf1"
+ },
+ "session_change_mid_drag": {
+  "batches": 8,
+  "sha256": "5d0e29c45af831ae79612b8fdbf3d5f62697512f8d385dc6420fed612dbc5cbe"
+ },
+ "short_send_chord": {
+  "batches": 3,
+  "sha256": "2fbfb034abd352443e470f0fe8aa6f91909b53666ce2d9b80973d8ac297ef0d4"
+ },
+ "short_send_mid_drag": {
+  "batches": 6,
+  "sha256": "b8620893040b7a7e98b37ee2d656cec801d9d4c3a15f1a4044a3d1c3d0f94c8f"
+ },
+ "three_button_partial_chord": {
+  "batches": 2,
+  "sha256": "7a01a8156cdec9c73d355814350aca952e4ca469968d6c8f3924366b0c1f4488"
+ },
+ "tilt_drag_direction_change": {
+  "batches": 9,
+  "sha256": "496fbb98efd6c08128f27809664f7969eb19fe0743c9ac75645ea8fb05bf42cc"
+ },
+ "undo_tap_a0": {
+  "batches": 1,
+  "sha256": "9e05761eeb6b0ba8b5c4e8dec1239f8f0d4d0e4d87c3ca3dd4e9bd0f02b491e2"
+ },
+ "undo_tap_canvas": {
+  "batches": 2,
+  "sha256": "1ef608320e53d44f089fed3c68de25456a41b14ff5d6f69fcd36334dd632f87c"
+ },
+ "wheel_cancel": {
+  "batches": 0,
+  "sha256": "325ec9182c3b53dde0e756938b5971f753ff471d4d47d2fedd013d8d9169535d"
+ },
+ "wheel_closed_by_chord": {
+  "batches": 0,
+  "sha256": "325ec9182c3b53dde0e756938b5971f753ff471d4d47d2fedd013d8d9169535d"
+ },
+ "wheel_key_command": {
+  "batches": 3,
+  "sha256": "5e8ad5b158911b22d9a089282c1a369df0850345a4b90b2375be1e1a6129b95e"
+ },
+ "wheel_scroll_and_ring_jumps": {
+  "batches": 1,
+  "sha256": "45b80f266d149437b1520ea5c167a2a54f6a9d51163c3b1f7164f2dae89fa381"
+ },
+ "wheel_search_command": {
+  "batches": 3,
+  "sha256": "31f10ab1e3393ff9302e9ba23f52c6c3abc403b748585e4830c188b7b9aad934"
+ },
+ "zoom_both_ways_67": {
+  "batches": 13,
+  "sha256": "f3268281f5ac55e8a349edb472e8c1109811daee38c01304fa5b043c28a8ad6f"
+ },
+ "zoom_fractional_127": {
+  "batches": 21,
+  "sha256": "8c63cc380fb19db73258f422e089ef206ba946c205c494fd07e6b503c624a6fc"
+ },
+ "zoom_refused_off_target": {
+  "batches": 3,
+  "sha256": "fd73368a718d4ca0f66da814f4adbcc88da9604b62c01b7c3d6e83e93c7084a1"
+ }
+}

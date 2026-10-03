@@ -23,9 +23,9 @@ class Clock:
 
 
 def state(volume=28, **kwargs):
-    data = dict(online=True, volume=volume, group_revision="den-group", group_label="Den",
+    data = dict(online=True, volume=volume, group_revision="hall-group", group_label="Hall",
                 playback="PLAYING", can_pause=True, can_play=False, can_next=True,
-                can_previous=True, title="Cloudbusting", artist="Kate Bush", queue_length=4,
+                can_previous=True, title="Pressure Front", artist="Mira Vale", queue_length=4,
                 track_id="track-1")
     data.update(kwargs)
     return data
@@ -103,7 +103,8 @@ class HandoffPresentationTests(unittest.TestCase):
         self.assertEqual(self.c.frame()["layout"], "nowPlaying")
         self.assertNotEqual(self.c.frame()["status"], "Changed on Sonos")
 
-    def test_pause_idle_age_survives_browse_and_ordinary_polls(self):
+    def test_paused_keeps_now_playing_after_browse_and_ordinary_polls(self):
+        # r3.1 (2026-09-29): paused keeps the Now Playing layout (artwork + buttons), never idle.
         self.pause()
         self.clock.advance(2)
         self.pause()
@@ -111,28 +112,28 @@ class HandoffPresentationTests(unittest.TestCase):
         self.clock.advance(2.001)
         self.c.home()
         frame = self.c.frame()
-        self.assertEqual(frame["layout"], "idle")
+        self.assertEqual((frame["layout"], frame["restLayout"]), ("nowPlaying", "nowPlaying"))
         self.assertEqual(frame["buttons"][0]["icon"], "play")
         self.assertTrue(frame["buttons"][0]["enabled"])
 
-    def test_first_paused_readback_also_reaches_idle(self):
+    def test_first_paused_readback_stays_now_playing(self):
         self.c = Controller(clock=self.clock)
         self.pause()
         self.assertEqual(self.c.frame()["layout"], "nowPlaying")
-        self.clock.advance(4)
-        self.assertEqual(self.c.frame()["layout"], "idle")
+        self.clock.advance(60)
+        self.assertEqual(self.c.frame()["layout"], "nowPlaying")
 
-    def test_turn_from_paused_idle_temporarily_reveals_then_returns(self):
+    def test_turn_while_paused_temporarily_reveals_then_returns(self):
         self.pause()
         self.clock.advance(4)
         self.c.turn(1)
         self.assertEqual(self.c.frame()["layout"], "volume")
-        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Cloudbusting")
+        self.assertEqual(self.c.frame()["volumeCaption"], "Paused · Pressure Front")
         self.c.tick()
         effect = self.command("volume")
         self.c.complete(effect["request"], state(29, playback="PAUSED_PLAYBACK", can_play=True, can_pause=False))
         self.clock.advance(1.401)
-        self.assertEqual(self.c.frame()["layout"], "idle")
+        self.assertEqual(self.c.frame()["layout"], "nowPlaying")
 
     def test_resume_press_exits_idle_immediately_and_success_resets_pause_age(self):
         self.pause()
@@ -181,16 +182,16 @@ class HandoffPresentationTests(unittest.TestCase):
         self.c.disconnected()
         self.assertEqual(self.c.frame()["layout"], "nowPlaying")
 
-    def test_a_failure_does_not_hold_off_the_paused_idle_view(self):
-        # knob-model: a failure only flashes `err`; the pause-idle rule still applies.
+    def test_a_failure_keeps_the_paused_now_playing_view(self):
+        # knob-model: a failure only flashes `err`; r3.1: paused rests on Now Playing (art + buttons).
         self.pause()
         self.clock.advance(10)
         self.c.screen.status = "Playback partially failed"
         frame = self.c.frame()
         self.assertEqual((frame["layout"], frame["restLayout"], frame["status"], frame["activity"]),
-                         ("idle", "idle", "", "idle"))
+                         ("nowPlaying", "nowPlaying", "Paused", "idle"))
         self.assertEqual((frame["buttons"][0]["icon"], frame["buttons"][0]["enabled"]), ("play", True),
-                         "the paused idle view, not the empty-music one")
+                         "the paused view, not the empty-music one")
         self.assertEqual(self.c.screen.status, "Playback partially failed", "the desktop keeps the reason")
 
     def test_failed_volume_does_not_wait_forever_and_flashes_err(self):
@@ -242,7 +243,7 @@ class HandoffPresentationTests(unittest.TestCase):
         control, screen = self.c.control_id, self.c.screen.view_id
         self.clock.advance(5)
         for _ in range(10):
-            self.assertEqual(self.c.frame()["layout"], "idle")
+            self.assertEqual(self.c.frame()["layout"], "nowPlaying")   # r3.1: paused keeps Now Playing
         self.assertEqual(self.c.drain(), [])
         self.assertEqual((self.c.control_id, self.c.screen.view_id), (control, screen))
 
