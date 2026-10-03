@@ -50,8 +50,8 @@ ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
 COMPANION = WORKSPACE / 'app'
 FIXTURES = COMPANION / 'assets' / 'fixtures'
-DEN_SOURCE = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-120.rgb565'
-DEN_240 = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-240.png'
+HALL_SOURCE = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-120.rgb565'
+HALL_240 = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-240.png'
 ARTWORK2 = ROOT / 'artwork2'
 SIZE, TRANSFER = 240, 120
 BYTES = TRANSFER * TRANSFER * 2
@@ -112,16 +112,16 @@ def preview(raw: bytes, target: Path) -> None:
 
 def make_v1(prepare_artwork) -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
-    den = FIXTURES / 'art-hall-120.rgb565'
-    if DEN_SOURCE.stat().st_size != BYTES:
-        raise SystemExit(f'{DEN_SOURCE} is not {BYTES} bytes')
-    shutil.copyfile(DEN_SOURCE, den)
+    hall = FIXTURES / 'art-hall-120.rgb565'
+    if HALL_SOURCE.stat().st_size != BYTES:
+        raise SystemExit(f'{HALL_SOURCE} is not {BYTES} bytes')
+    shutil.copyfile(HALL_SOURCE, hall)
     _, bright_raw, _ = prepare_artwork(bright_source())[:3]
     if len(bright_raw) != BYTES:
         raise SystemExit(f'prepare_artwork returned {len(bright_raw)} bytes, expected {BYTES}')
     bright = FIXTURES / 'art-bright-120.rgb565'
     bright.write_bytes(bright_raw)
-    for path in (den, bright):
+    for path in (hall, bright):
         preview(path.read_bytes(), path.with_suffix('.png'))
         print(f'{path} ({path.stat().st_size} bytes)')
 
@@ -189,10 +189,10 @@ def make_artwork2(prepare_artwork, p, companion_icon_payload) -> None:
     ARTWORK2.mkdir(parents=True, exist_ok=True)
     manifest = {'about': 'artwork2 harness fixtures (ARTWORK2.md section 5), written by make_art_fixtures.py',
                 'covers': [], 'broken': [], 'icons': []}
-    den = Image.open(DEN_240).convert('RGB')
+    hall = Image.open(HALL_240).convert('RGB')
     bright = prepare_artwork(bright_source())[0].convert('RGB')
     detail = prepare_artwork(detail_source())[0].convert('RGB')
-    for name, file, composite in (('a2-hall', 'cover-hall-240.jpg', den), ('a2-bright', 'cover-bright-240.jpg', bright),
+    for name, file, composite in (('a2-hall', 'cover-hall-240.jpg', hall), ('a2-bright', 'cover-bright-240.jpg', bright),
                                   ('a2-detail', 'cover-detail-240.jpg', detail)):
         data, quality = cover_jpeg(composite, p)
         (ARTWORK2 / file).write_bytes(data)

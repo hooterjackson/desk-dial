@@ -32,7 +32,7 @@ for path in (str(ROOT), str(HERE)):
         sys.path.insert(0, path)
 
 from control_center import device, preview_lights  # noqa: E402
-from knob_adapter import ART_BRIGHT, ART_DEN, Adapter, load_golden  # noqa: E402
+from knob_adapter import ART_BRIGHT, ART_HALL, Adapter, load_golden  # noqa: E402
 
 OUTPUT = ROOT / "tests" / "fixtures" / "cc5_frames.json"
 CAPABILITIES = {"presentation": 4, "glyphs": "latin-ext-a"}
@@ -141,7 +141,7 @@ def build(golden=None):
                   "fixture in assets/fixtures/<art>.rgb565 to load for the frame's artKey."),
         "contract": "firmware/PRESENTATION_V4.md",
         "capabilities": CAPABILITIES,
-        "artFixtures": {ART_DEN: "assets/fixtures/art-hall-120.rgb565", ART_BRIGHT: "assets/fixtures/art-bright-120.rgb565"},
+        "artFixtures": {ART_HALL: "assets/fixtures/art-hall-120.rgb565", ART_BRIGHT: "assets/fixtures/art-bright-120.rgb565"},
         "valueNote": ("value carries the volume digits plus '%' (contract section 3 example '54%'); "
                       "Knob Face draws the '%' at 22 px in ink2 after the 48 px digits."),
         "deviations": {

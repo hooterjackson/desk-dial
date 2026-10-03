@@ -30,7 +30,7 @@ MODE = {"home": "VOLUME", "recent": "RECENTLY ADDED", "tracks": "TRACKS", "windo
 TITLE_TONE = {"#F2F2F2": "ink", "#7C7C7C": "muted"}
 LINE_TONE = {"#7C7C7C": "meta", "#A6A6A6": "secondary", "#FF8A7A": "error", "#7EE0A2": "success"}
 # Stage 6 art fixtures (app/assets/fixtures/*.rgb565).
-ART_DEN, ART_BRIGHT = "art-hall-120", "art-bright-120"
+ART_HALL, ART_BRIGHT = "art-hall-120", "art-bright-120"
 ART_BRIGHT_CASE = "stress-long-accented-title-browsing"
 PULSE_MS = presentation.PULSE_MS
 OFF = (0, 0)
@@ -145,7 +145,7 @@ class Adapter:
         """Stage 6 art fixture name, or None where the model shows no cover."""
         if not lcd.get("art") or st["mode"] == "windows":
             return None
-        return ART_BRIGHT if case_id == ART_BRIGHT_CASE else ART_DEN
+        return ART_BRIGHT if case_id == ART_BRIGHT_CASE else ART_HALL
 
     # -------------------------------------------------------------- frame
     def frame(self, st, view, led_style, control_id=1, case_id=""):

@@ -948,7 +948,7 @@ class Cc5FramesTests(unittest.TestCase):
                     self.assertIsNone(case["art"])
                 self.assertEqual(case["leds"]["ring"], [cell_drive(c) for c in target(frame)])
         self.assertEqual(arts[ka.ART_BRIGHT], 1)
-        self.assertGreater(arts[ka.ART_DEN], 10)
+        self.assertGreater(arts[ka.ART_HALL], 10)
         self.assertGreater(arts[None], 5)
 
     def test_field_map_details(self):

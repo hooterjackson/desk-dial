@@ -1629,7 +1629,7 @@ int main(int argc, char** argv) try {
     };
 
     FrameBank bank;
-    const uint8_t* den = artFixtures.at("art-hall-120").data();
+    const uint8_t* hall = artFixtures.at("art-hall-120").data();
     const uint8_t* bright = artFixtures.at("art-bright-120").data();
 
     if (!oneBuffer) {
@@ -1637,7 +1637,7 @@ int main(int argc, char** argv) try {
             const char* artName = item["art"].is<const char*>() ? item["art"].as<const char*>() : nullptr;
             if (item["frame"].isNull()) {
                 renderOffline(item["id"].as<std::string>(), item["name"].as<std::string>() + " (offline screen)", false,
-                              den, *bank.make(HOME5));
+                              hall, *bank.make(HOME5));
                 continue;
             }
             renderCase(item["id"].as<const char*>(), item["name"].as<const char*>(), item["group"].as<const char*>(),
@@ -1663,7 +1663,7 @@ int main(int argc, char** argv) try {
             v5Docs.back().set(item["input"]);
             const bool hasArt = item["input"]["artKey"].is<const char*>() && item["input"]["artKey"].as<std::string>().size();
             renderCase("v5." + name, item["note"].as<std::string>().substr(0, 120), "v5", v5Docs.back().as<JsonVariantConst>(),
-                       hasArt ? den : nullptr, hasArt ? "art-hall-120" : nullptr, Commits());
+                       hasArt ? hall : nullptr, hasArt ? "art-hall-120" : nullptr, Commits());
         }
         for (const V5Case& v : v5Cases()) {
             v5Docs.emplace_back();
@@ -1696,8 +1696,8 @@ int main(int argc, char** argv) try {
             renderCase("r3." + item["id"].as<std::string>(), item["name"].as<std::string>(), "r3",
                        v5Docs.back().as<JsonVariantConst>(), artFor(item["art"]), artName, Commits());
         }
-        renderOffline("v5-offline", "Offline: Waiting for PC / Open Desk Dial on your PC", false, den, *bank.make(HOME5));
-        renderOffline("v5-offline-native", "Offline after native input: Knob controls still work", true, den,
+        renderOffline("v5-offline", "Offline: Waiting for PC / Open Desk Dial on your PC", false, hall, *bank.make(HOME5));
+        renderOffline("v5-offline-native", "Offline after native input: Knob controls still work", true, hall,
                       *bank.make(HOME5));
         renderNativePcVolume();
     }
@@ -1966,27 +1966,27 @@ int main(int argc, char** argv) try {
         const CCFrame* windows = bank.make(WINDOWS5);
         const CCFrame* homeHeld = bank.make(HOME5, {{"id", "511"}});
         named.push_back({"v5-flips", "Section 8.7 flip table (one timeline, every r2.1 flip)", {
-            {0, home, den, E("none"), "baseline"},
+            {0, home, hall, E("none"), "baseline"},
             {600, recent, bright, E("deeper"), "home-to-recent"},
             {1400, recent2, bright, E("same"), "recent-detent"},
-            {1800, explorer0, den, E("deeper"), "recent-to-explorer"},
-            {2600, explorer1, den, E("deeper"), "tab-0-to-1"},
-            {3400, explorer0, den, E("back"), "tab-1-to-0"},
+            {1800, explorer0, hall, E("deeper"), "recent-to-explorer"},
+            {2600, explorer1, hall, E("deeper"), "tab-0-to-1"},
+            {3400, explorer0, hall, E("back"), "tab-1-to-0"},
             {4200, recent, bright, E("back"), "explorer-to-recent"},
-            {5000, home, den, E("back"), "recent-to-home"},
-            {5800, tracks, den, E("deeper"), "home-to-tracks"},
-            {6600, tracksNext, den, E("same"), "tracks-detent"},
-            {7000, seek, den, E("same"), "tracks-to-seek"},
+            {5000, home, hall, E("back"), "recent-to-home"},
+            {5800, tracks, hall, E("deeper"), "home-to-tracks"},
+            {6600, tracksNext, hall, E("same"), "tracks-detent"},
+            {7000, seek, hall, E("same"), "tracks-to-seek"},
             {7800, upnext, bright, E("deeper"), "seek-to-upnext"},
-            {8600, tracks, den, E("back"), "upnext-to-tracks"},
-            {9400, seek, den, E("same"), "seek-on"},
-            {10000, tracks, den, E("same"), "seek-off"},
-            {10600, home, den, E("back"), "tracks-to-home"},
+            {8600, tracks, hall, E("back"), "upnext-to-tracks"},
+            {9400, seek, hall, E("same"), "seek-on"},
+            {10000, tracks, hall, E("same"), "seek-off"},
+            {10600, home, hall, E("back"), "tracks-to-home"},
             {11400, windows, nullptr, E("deeper"), "home-to-windows"},
-            {12200, home, den, E("back"), "windows-to-home"},
+            {12200, home, hall, E("back"), "windows-to-home"},
             {13000, upnext, bright, E("deeper"), "home-to-upnext"},
-            {13800, homeHeld, den, E("back"), "hold-to-home"},
-            {14600, bank.make(HOME5, {{"id", "512"}}), den, E("same"), "control-id-change"},
+            {13800, homeHeld, hall, E("back"), "hold-to-home"},
+            {14600, bank.make(HOME5, {{"id", "512"}}), hall, E("same"), "control-id-change"},
             {15200, bank.make(HOME5, {{"layout", "\"notice\""}, {"artKey", "\"\""}, {"title", "\"Sonos unavailable\""},
                                      {"subtitle", "\"Looking for Sonos…\""}, {"meta", "\"Windows still works\""}}), nullptr,
              E("same"), "home-layout-change"},
@@ -1998,7 +1998,7 @@ int main(int argc, char** argv) try {
         named.push_back({"v5-footer-static", "The footer never moves or fades on a screen change", {
             {0, recent, bright, E("none"), "baseline"},
             {600, bank.make(UPNEXT5, {{"buttons", sameButtons}}), bright, E("footerStatic"), "recent-to-upnext"},
-            {1600, bank.make(EXPLORER5, {{"buttons", sameButtons}}), den, E("footerStatic"), "upnext-to-explorer"},
+            {1600, bank.make(EXPLORER5, {{"buttons", sameButtons}}), hall, E("footerStatic"), "upnext-to-explorer"},
         }});
 
         // Text at rest (section 8.5.4): meta and status fade in over 160 ms; titles, sub-lines,
@@ -2010,14 +2010,14 @@ int main(int argc, char** argv) try {
             {1800, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("line"), "meta-and-title"},
             {2400, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("identical"), "heartbeat-after-fade"},
             {2500, bank.make(RECENT5, {{"meta", "\"Queueing… 1 of 4\""}}), bright, E("identical"), "heartbeat"},
-            {3000, home, den, E("back"), "to-home"},
-            {3800, bank.make(HOME5, {{"status", "\"Paused\""}}), den, E("line"), "status-change"},
-            {4400, bank.make(HOME5, {{"status", "\"Paused\""}, {"title", "\"Paper Lanterns\""}}), den, E("line"), "home-title"},
-            {5000, tracks, den, E("deeper"), "to-tracks"},
-            {5800, bank.make(TRACKS5, {{"meta", "\"Skipping…\""}}), den, E("line"), "tracks-meta"},
-            {6400, seek, den, E("same"), "to-seek"},
-            {7000, bank.make(SEEK5, {{"meta", "\"Jumping…\""}}), den, E("line"), "seek-line"},
-            {7600, bank.make(SEEK5, {{"meta", "\"Jumping…\""}, {"ring", R"({"style":"lap","value":0,"index":79,"count":287})"}}), den,
+            {3000, home, hall, E("back"), "to-home"},
+            {3800, bank.make(HOME5, {{"status", "\"Paused\""}}), hall, E("line"), "status-change"},
+            {4400, bank.make(HOME5, {{"status", "\"Paused\""}, {"title", "\"Paper Lanterns\""}}), hall, E("line"), "home-title"},
+            {5000, tracks, hall, E("deeper"), "to-tracks"},
+            {5800, bank.make(TRACKS5, {{"meta", "\"Skipping…\""}}), hall, E("line"), "tracks-meta"},
+            {6400, seek, hall, E("same"), "to-seek"},
+            {7000, bank.make(SEEK5, {{"meta", "\"Jumping…\""}}), hall, E("line"), "seek-line"},
+            {7600, bank.make(SEEK5, {{"meta", "\"Jumping…\""}, {"ring", R"({"style":"lap","value":0,"index":79,"count":287})"}}), hall,
              E("line"), "seek-time"},
             {8200, windows, nullptr, E("deeper"), "to-windows"},
             {9000, bank.make(WINDOWS5, {{"meta", "\"Switching…\""}}), nullptr, E("line"), "windows-meta"},
@@ -2035,8 +2035,8 @@ int main(int argc, char** argv) try {
             {1200, shuffled, bright, E("ink"), "shuffle-on"},
             {1800, bank.make(UPNEXT5, {{"meta", "\"Shuffle on\""}, {"buttons", R"([{"label":"Back","enabled":true,"icon":"back"},{"label":"Shuffle","enabled":true,"icon":"shuffle","lit":"on"},{"label":"Liked","enabled":true,"icon":"heart","lit":"on"},{"label":"Play","enabled":true,"icon":"play"}])"}}), bright,
              E("identical"), "heartbeat"},
-            {2400, explorer0, den, E("inkDeeper"), "to-explorer"},
-            {3200, explorer1, den, E("inkDeeper"), "tab-switch"},
+            {2400, explorer0, hall, E("inkDeeper"), "to-explorer"},
+            {3200, explorer1, hall, E("inkDeeper"), "tab-switch"},
             {4000, idleNothing, nullptr, E("inkBack"), "to-idle-nothing"},
             {5500, idlePaused, nullptr, E("ink"), "play-becomes-available"},
         }});
@@ -2046,28 +2046,28 @@ int main(int argc, char** argv) try {
         const CCFrame* volumeFrame = bank.make(HOME5, {{"layout", "\"volume\""}, {"value", "\"55%\""}});
         const CCFrame* idleFrame = bank.make(IDLE5);
         named.push_back({"v5-reduced", "reducedMotion true: content fade only, reveal/idle opacity only", {
-            {0, home, den, E("none"), "baseline"},
-            {100, homeReduced, den, E("identical"), "latch-reduced"},
+            {0, home, hall, E("none"), "baseline"},
+            {100, homeReduced, hall, E("identical"), "latch-reduced"},
             {600, recent, bright, E("reducedSlide"), "home-to-recent"},
-            {1400, home, den, E("reducedSlide"), "recent-to-home"},
-            {2200, volumeFrame, den, E("reducedReveal"), "reveal"},
-            {3800, home, den, E("reducedHide"), "reveal-out"},
-            {5000, idleFrame, den, E("reducedIdle"), "idle-in"},
-            {7000, home, den, E("reducedIdleOut"), "idle-out"},
-            {8000, bank.make(HOME5, {{"reducedMotion", "false"}}), den, E("none"), "latch-full"},
+            {1400, home, hall, E("reducedSlide"), "recent-to-home"},
+            {2200, volumeFrame, hall, E("reducedReveal"), "reveal"},
+            {3800, home, hall, E("reducedHide"), "reveal-out"},
+            {5000, idleFrame, hall, E("reducedIdle"), "idle-in"},
+            {7000, home, hall, E("reducedIdleOut"), "idle-out"},
+            {8000, bank.make(HOME5, {{"reducedMotion", "false"}}), hall, E("none"), "latch-full"},
             {8600, recent, bright, E("deeper"), "full-motion-again"},
         }});
 
         // Seek digits (sections 8.6.8, 10): detents redraw the time only; tabular cells.
-        std::vector<Step> seekSteps = {{0, tracks, den, E("none"), "baseline"},
-                                       {600, bank.make(SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":59999})"}}), den, E("seek"), "0:00"}};
+        std::vector<Step> seekSteps = {{0, tracks, hall, E("none"), "baseline"},
+                                       {600, bank.make(SEEK5, {{"ring", R"({"style":"lap","value":0,"index":0,"count":59999})"}}), hall, E("seek"), "0:00"}};
         const uint32_t seconds[] = {1, 9, 10, 59, 60, 61, 74, 119, 480, 599, 600, 601, 999, 1234, 3599, 3600, 3601, 35999, 59998};
         uint32_t t = 900;
         for (uint32_t s : seconds) {
             char ring[96], label[16];
             std::snprintf(ring, sizeof(ring), R"({"style":"lap","value":0,"index":%u,"count":59999})", s);
             cc_mmss(s, label, sizeof(label));
-            seekSteps.push_back({t, bank.make(SEEK5, {{"ring", ring}}), den, E("seek"), label});
+            seekSteps.push_back({t, bank.make(SEEK5, {{"ring", ring}}), hall, E("seek"), label});
             t += 300;
         }
         named.push_back({"v5-seek", "Seek time per detent: cc_font_48t, no animation, fixed digit cells", seekSteps});
@@ -2082,20 +2082,20 @@ int main(int argc, char** argv) try {
             {2600, recent, bright, E("offOut"), "claim", {}, 0, STEP_FRAME},
             {3600, nullptr, nullptr, E("offIn"), "lease-expired-again", {}, 0, STEP_OFFLINE},
             {4600, nullptr, nullptr, E("none"), "handback", {}, 0, STEP_HANDBACK},
-            {5000, home, den, E("none"), "claim-after-handback"},
+            {5000, home, hall, E("none"), "claim-after-handback"},
         }});
 
         // Art show/hide (section 8.4): 240 ms OUT fades; instant swaps over a visible cover.
         named.push_back({"v5-art", "Cover show/hide 240 ms: Windows, idle, notice, artKey \"\"; instant swaps", {
-            {0, home, den, E("none"), "baseline"},
+            {0, home, hall, E("none"), "baseline"},
             {600, windows, nullptr, E("artFadeDeeper"), "to-windows"},
-            {1600, home, den, E("artFadeBack"), "from-windows"},
-            {2600, idleFrame, den, E("artFade"), "to-idle"},
-            {4400, home, den, E("artFade"), "from-idle"},
+            {1600, home, hall, E("artFadeBack"), "from-windows"},
+            {2600, idleFrame, hall, E("artFade"), "to-idle"},
+            {4400, home, hall, E("artFade"), "from-idle"},
             {5400, bank.make(NOTICE5), nullptr, E("artFade"), "to-notice"},
-            {6400, home, den, E("artFade"), "from-notice"},
-            {7400, bank.make(HOME5, {{"artKey", "\"\""}}), den, E("artFade"), "key-cleared"},
-            {8400, home, den, E("artFade"), "key-back"},
+            {6400, home, hall, E("artFade"), "from-notice"},
+            {7400, bank.make(HOME5, {{"artKey", "\"\""}}), hall, E("artFade"), "key-cleared"},
+            {8400, home, hall, E("artFade"), "key-back"},
             {9400, bank.make(HOME5, {{"artKey", "\"k-swap\""}, {"title", "\"Paper Lanterns\""}}), bright, E("artFade"), "instant-swap"},
         }});
 
@@ -2158,9 +2158,9 @@ int main(int argc, char** argv) try {
             const CCFrame* upNextLast = bank.make(UPNEXT5, {{"reducedMotion", rm}, {"meta", "\"12 / 12\""},
                                                             {"ring", R"({"style":"selection","value":0,"index":11,"count":12,"now":4})"}});
             std::vector<Step> v = {
-                {0, home4, den, E("none"), "baseline"},
-                {600, reveal4, den, E("reveal4"), "M2-reveal"},
-                {2000, home4, den, E("hide4"), "M3-reveal-out"},
+                {0, home4, hall, E("none"), "baseline"},
+                {600, reveal4, hall, E("reveal4"), "M2-reveal"},
+                {2000, home4, hall, E("hide4"), "M3-reveal-out"},
                 {3200, song4, bright, E("glide"), "M5-track-change"},
                 {4200, paused4, bright, E("popLine"), "M8-M9-M6-pause"},
                 {5200, song4, bright, E("pop"), "M8-M9-play"},
@@ -2179,23 +2179,23 @@ int main(int argc, char** argv) try {
                 {13200, nullptr, nullptr, E("wall"), "M13-wall-start", {}, 0, STEP_WALL, 0, -1},
                 {14000, nullptr, nullptr, E("wall"), "M13-wall-end", {}, 0, STEP_WALL, 0, 1},
                 {14120, nullptr, nullptr, E("wall"), "M13-wall-again", {}, 0, STEP_WALL, 0, 1},
-                {15000, home4, den, E(reduced ? "reducedSlide" : "back"), "M1-M15-back-to-music"},
-                {16000, vol100, den, E("none"), "M13-volume-100"},
+                {15000, home4, hall, E(reduced ? "reducedSlide" : "back"), "M1-M15-back-to-music"},
+                {16000, vol100, hall, E("none"), "M13-volume-100"},
                 {16800, nullptr, nullptr, E("wall"), "M13-wall-volume-100", {}, 0, STEP_WALL, 0, 1},
-                {17600, vol0, den, E("none"), "M13-volume-0"},
+                {17600, vol0, hall, E("none"), "M13-volume-0"},
                 {18400, nullptr, nullptr, E("wall"), "M13-wall-volume-0", {}, 0, STEP_WALL, 0, -1},
                 {19200, windowsLast, nullptr, E("none"), "M13-windows-last"},
                 {20000, nullptr, nullptr, E("wall"), "M13-wall-windows-last", {}, 0, STEP_WALL, 0, 1},
                 {20800, scenesFirst, nullptr, E("none"), "M13-scenes-first"},
                 {21600, nullptr, nullptr, E("wall"), "M13-wall-scenes-first", {}, 0, STEP_WALL, 0, -1},
-                {22400, seek0, den, E("none"), "M13-seek-0"},
+                {22400, seek0, hall, E("none"), "M13-seek-0"},
                 {23200, nullptr, nullptr, E("wall"), "M13-wall-seek-0", {}, 0, STEP_WALL, 0, -1},
                 {24000, upNextLast, bright, E("none"), "M13-up-next-last"},
                 {24800, nullptr, nullptr, E("wall"), "M13-wall-up-next-last", {}, 0, STEP_WALL, 0, 1},
-                {25600, home4, den, E(reduced ? "reducedSlide" : "none"), "M13-bounded-home"},
+                {25600, home4, hall, E(reduced ? "reducedSlide" : "none"), "M13-bounded-home"},
                 // The latch goes back to full motion (the next timelines start without it).
                 {26600, bank.make(HOME5, {{"crumb", "\"music\""}, {"playing", "true"}, {"holdMarker", "true"},
-                                          {"reducedMotion", "false"}}), den, E("none"), "latch-full"},
+                                          {"reducedMotion", "false"}}), hall, E("none"), "latch-full"},
             };
             return v;
         };
@@ -2608,23 +2608,23 @@ int main(int argc, char** argv) try {
         const CCFrame* volume = bank.make(HOME5, {{"layout", "\"volume\""}, {"value", "\"55%\""}});
         const CCFrame* idle = bank.make(IDLE5);
         const CCFrame* noArt = bank.make(HOME5, {{"artKey", "\"\""}});
-        cc_display_render(*home, den);
+        cc_display_render(*home, hall);
         advance(1200);
         struct CadenceStep { uint32_t t; const CCFrame* frame; const uint8_t* art; uint8_t action; const char* label; };
         const std::vector<CadenceStep> script = {
             {0, recent, bright, STEP_FRAME, "slide-deeper"},
-            {600, home, den, STEP_FRAME, "slide-back"},
-            {1200, volume, den, STEP_FRAME, "volume-reveal"},
-            {1800, home, den, STEP_FRAME, "volume-hide"},
-            {2400, idle, den, STEP_FRAME, "idle-enter"},
-            {3400, home, den, STEP_FRAME, "idle-exit"},
+            {600, home, hall, STEP_FRAME, "slide-back"},
+            {1200, volume, hall, STEP_FRAME, "volume-reveal"},
+            {1800, home, hall, STEP_FRAME, "volume-hide"},
+            {2400, idle, hall, STEP_FRAME, "idle-enter"},
+            {3400, home, hall, STEP_FRAME, "idle-exit"},
             {4400, recent, bright, STEP_FRAME, "slide-deeper-again"},
             {6600, detent, bright, STEP_FRAME, "detent-2s-after-the-slide"},
             {7400, noArt, nullptr, STEP_FRAME, "cover-hide"},
-            {8000, home, den, STEP_FRAME, "cover-show"},
+            {8000, home, hall, STEP_FRAME, "cover-show"},
             {8600, nullptr, nullptr, STEP_OFFLINE, "offline-in"},
             {9400, nullptr, nullptr, STEP_OFFLINE_NATIVE, "native-tap"},
-            {10200, home, den, STEP_FRAME, "claim"},
+            {10200, home, hall, STEP_FRAME, "claim"},
         };
         CCAnimCadence cadence = {};
         flushGap = FlushGapMetric{};
@@ -2692,7 +2692,7 @@ int main(int argc, char** argv) try {
         for (int fixed = 0; fixed < 2; ++fixed) {
             CCAnimCadence app = {};
             cadenceProbe = &app;
-            cc_display_render(*home, den);
+            cc_display_render(*home, hall);
             lv_refr_now(display);
             advance(40, 1);
             const uint32_t lateBefore = app.lateRuns;
@@ -2763,17 +2763,17 @@ int main(int argc, char** argv) try {
             if (id == "ra-hounds") parseFrame(item["frame"], b), detents[1] = &b;
         }
         if (!detents[0] || !detents[1]) throw std::runtime_error("latency frames missing");
-        cc_display_render(*detents[0], den);
+        cc_display_render(*detents[0], hall);
         advance(1200);
         JsonArray waits = latency["timer_wait_ms"].to<JsonArray>();
         JsonArray gaps = latency["gap_ms"].to<JsonArray>();
         uint32_t worst = 0;
         bool anyAnimated = false;
         for (uint32_t gap = 0; gap <= 32; gap += 4) {
-            cc_display_render(*detents[1], den);
+            cc_display_render(*detents[1], hall);
             for (uint32_t first = flushes, guard = 0; flushes == first && guard < 200; ++guard) advance(1, 1);
             if (gap) advance(gap, 1);
-            cc_display_render(*detents[0], den);
+            cc_display_render(*detents[0], hall);
             anyAnimated = anyAnimated || cc_display_stats().lastAnimated;
             const uint32_t before = flushes;
             uint32_t waited = 0;
@@ -2783,7 +2783,7 @@ int main(int argc, char** argv) try {
             worst = std::max(worst, waited);
         }
         latency["animated_in_sample"] = anyAnimated;
-        cc_display_render(*detents[1], den);
+        cc_display_render(*detents[1], hall);
         const uint32_t before = flushes;
         const auto t0 = std::chrono::steady_clock::now();
         lv_refr_now(display);

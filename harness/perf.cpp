@@ -340,7 +340,7 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "item parse failed\n");
             return 2;
         }
-    const uint8_t* den = art120[0].data();
+    const uint8_t* hall = art120[0].data();
     const uint8_t* bright = art120[1].data();
 
     // M1 push, the lcd_bench.py pair (no covers): Music <-> Recently Added loading, 500 ms apart.
@@ -355,14 +355,14 @@ int main(int argc, char** argv) {
         }
         emit(scen["m1_bench_noart"].to<JsonObject>(), s);
     }
-    // M1 push with artwork on both screens: Music (den) <-> Recently Added item (bright).
+    // M1 push with artwork on both screens: Music (hall) <-> Recently Added item (bright).
     {
         Stats s;
-        render(s, musicArt, den);
+        render(s, musicArt, hall);
         settle(nullptr, 1000);
         s = Stats();
         for (int c = 0; c < cycles; ++c) {
-            if (c % 2) render(s, musicArt, den);
+            if (c % 2) render(s, musicArt, hall);
             else render(s, itemsArt[1], bright);
             settle(&s, 496);
         }
@@ -371,12 +371,12 @@ int main(int argc, char** argv) {
     // M4 list glide with artwork: one detent every 130 ms (a steady turn) through Recently Added items.
     {
         Stats s;
-        render(s, itemsArt[0], den);
+        render(s, itemsArt[0], hall);
         settle(nullptr, 1000);
         s = Stats();
         for (int c = 0; c < cycles * 2; ++c) {
             const int k = c % 4;
-            render(s, itemsArt[k], k % 2 ? bright : den);
+            render(s, itemsArt[k], k % 2 ? bright : hall);
             settle(&s, 128);
         }
         emit(scen["m4_art"].to<JsonObject>(), s);
@@ -384,7 +384,7 @@ int main(int argc, char** argv) {
     // M13 wall stretch with artwork: a push at the start of the list every 700 ms.
     {
         Stats s;
-        render(s, itemsArt[0], den);
+        render(s, itemsArt[0], hall);
         settle(nullptr, 1000);
         s = Stats();
         for (int c = 0; c < cycles; ++c) {
@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
     // with parts switched off one at a time (host us, median of 200). Shows where a moving frame's time goes.
     {
         Stats s;
-        render(s, musicArt, den);
+        render(s, musicArt, hall);
         settle(nullptr, 1500);
         JsonObject b = out["content_redraw_breakdown_us"].to<JsonObject>();
         std::vector<lv_obj_t*> twins, art, labels, content;
