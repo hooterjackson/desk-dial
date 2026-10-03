@@ -88,7 +88,7 @@ Over plain `http://` the token crosses your network unencrypted, and a line unde
 
 ## Knob
 
-<p><img src="../media/settings-knob.png" alt="Desk Dial Settings, Knob page: the USB port, button order, LEDs Colour, the note "Onshape and other apps: Settings › Apps.", Knob sounds On at 100 percent, Reduced haptics Off, Recalibrate motor" width="420"></p>
+<p><img src="../media/settings-knob.png" alt="Desk Dial Settings, Knob page: the USB port, button order, LEDs Colour, the note "Onshape and other apps: Settings › Apps.", Knob sounds On at 100 percent, Reduced haptics Off" width="420"></p>
 
 **Knob USB port** · a text field
 

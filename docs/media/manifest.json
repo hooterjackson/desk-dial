@@ -1,17 +1,17 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-03T08:28:15+00:00",
+  "generated_at": "2026-10-03T21:32:49+00:00",
   "firmware": {
     "version": "1.0.0-cc5.8",
     "git": "36a2175d7593ce721b80bac456625cb447493177",
     "dirty": false
   },
   "app": {
-    "version": "7.4.0.0",
-    "tree": "b1c3d0651e335e6e55ab8af900c273d9336e2dcf551e4717e0591109ae2a1d6b"
+    "version": "7.4.1.0",
+    "tree": "d40a8644b2b984a5ad3ac2c2a84389ee301d903c5525d04bc23ef2d0c5ebc9d9"
   },
   "pipeline": {
-    "git": "4d3c9aff25b74e99379fda8f94e4f9e1079695d5",
+    "git": "48ccbe6caea6aa670f53ac931390ef7bb7184782",
     "tree": "23329718c82bc9ccc6f005320b137506c7e9de94cacf3872cb74b5dee7e2d9bc"
   },
   "files": [
@@ -1033,10 +1033,10 @@
       "name": "settings-apps.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 29557,
-      "sha256": "cdba73e07ab0f67255b444036ef98504f18f10b25d2ed034ab1ba73a1ad0433e",
+      "bytes": 29498,
+      "sha256": "3545e4ed8c7cef7d3fcc30b4faaced8766ff6e68b41a190608646044465f440a",
       "width": 616,
-      "height": 1339,
+      "height": 1317,
       "frames": 1,
       "fps": null,
       "duration_ms": 0,
@@ -1072,10 +1072,10 @@
       "name": "settings-knob.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 24661,
-      "sha256": "0b491aa861a98dd08ef8f3ac1a5558af2e7a85d46250a2f6c459d49607c080a0",
+      "bytes": 24164,
+      "sha256": "35fa36cf52b380c586a4d37edaed734960f5f179133923d1e257464b34e49da8",
       "width": 616,
-      "height": 1339,
+      "height": 1317,
       "frames": 1,
       "fps": null,
       "duration_ms": 0,

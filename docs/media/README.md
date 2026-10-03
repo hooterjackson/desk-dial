@@ -83,10 +83,10 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | onshape-knob.webp | 287,628 | 475x550 | 75 | 7.73 |
 | ring-moments.gif | 2,265,085 | 684x544 | 76 | 10 |
 | ring-moments.webp | 1,187,026 | 1036x824 | 167 | 22.2 |
-| settings-apps.png | 29,557 | 616x1339 | 1 |  |
+| settings-apps.png | 29,498 | 616x1317 | 1 |  |
 | settings-general.png | 17,338 | 616x890 | 1 |  |
 | settings-home-assistant.png | 26,173 | 616x1317 | 1 |  |
-| settings-knob.png | 24,661 | 616x1339 | 1 |  |
+| settings-knob.png | 24,164 | 616x1317 | 1 |  |
 | settings-music.png | 19,248 | 616x1093 | 1 |  |
 | settings-windows.png | 15,627 | 616x1093 | 1 |  |
 | social-preview.png | 61,320 | 1280x640 | 1 |  |
