@@ -114,6 +114,9 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 
 ## Limits and known issues
 
+- Tested on one knob, the author's. Recalibrate motor, which other knobs may need, has not yet been tested on real hardware.
+- A self-signed `https://` certificate on Home Assistant has not yet been tested on real hardware and will likely be rejected.
+- Onshape: the tilt direction and tool-search hits are unverified; the Onshape title and address check runs even with Onshape mode Off (it reads the host only).
 - Spotify and other streaming services are not supported; Sonos and Apple Music only.
 - Windows 10/11 only.
 - Exactly one knob per PC.
