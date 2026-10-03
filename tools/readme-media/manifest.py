@@ -217,6 +217,18 @@ def load(manifest) -> dict:
     return json.loads(Path(manifest).read_text(encoding="utf-8"))
 
 
+# Scenes whose bytes differ from run to run although nothing changed: the app's stage engine and Navigator
+# renderer (hero, Navigator, the full-screen desktop clips) and real Tk windows (Settings screenshots) carry
+# small timing / antialiasing differences (check of 2026-10-03: 75 of 91 files byte-identical, these 16 not).
+# For them --check compares what the reader sees (dimensions and frame count), not bytes.
+LOOSE = ("desktop-*", "hero.*", "navigator.*", "navigator-cards.*", "settings-*.png")
+
+
+def _loose(name: str) -> bool:
+    import fnmatch
+    return any(fnmatch.fnmatch(name, pat) for pat in LOOSE)
+
+
 def check(out_dir: Path, manifest, context: dict | None = None) -> tuple[bool, str]:
     """Compare the media in out_dir (hashed now) with a manifest (dict or path, usually the committed
     docs/media/manifest.json). With `context`, also compare the firmware/app/pipeline stamps computed
@@ -233,6 +245,10 @@ def check(out_dir: Path, manifest, context: dict | None = None) -> tuple[bool, s
         o, p = old_files[name], new_files[name]
         nb, ns = p.stat().st_size, sha256_file(p)
         if nb != o["bytes"] or ns != o["sha256"]:
+            if _loose(name):
+                pr = probe(p)
+                if (pr["width"], pr["height"], pr["frames"]) == (o.get("width"), o.get("height"), o.get("frames")):
+                    continue                       # same picture shape; run-to-run byte noise (LOOSE above)
             lines.append(f"changed   {name}  {o['bytes']} -> {nb} bytes, sha256 {o['sha256'][:12]} -> {ns[:12]}")
     if context is not None:
         now = {"firmware": firmware_stamp(Path(context["firmware_dir"])),
@@ -240,6 +256,8 @@ def check(out_dir: Path, manifest, context: dict | None = None) -> tuple[bool, s
                "pipeline": pipeline_stamp(Path(context.get("pipeline_dir", HERE)), context.get("publish_repo"))}
         for section, stamp in now.items():
             for key, val in stamp.items():
+                if section == "pipeline" and key == "git" and stamp.get("tree") == old.get(section, {}).get("tree"):
+                    continue                       # the commit that recorded the pipeline, same pipeline files
                 was = old.get(section, {}).get(key)
                 if was != val:
                     lines.append(f"drift     {section}.{key}: manifest {was!r} -> now {val!r}")
