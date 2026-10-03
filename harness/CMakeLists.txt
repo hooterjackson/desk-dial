@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(nanod_lcd_preview LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 get_filename_component(FIRMWARE "${CMAKE_CURRENT_SOURCE_DIR}/../firmware" ABSOLUTE)
-get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 # Firmware sources compiled into the harness. Always the real src/ for evidence
 # (build.py passes -DNANOD_FIRMWARE_SRC and -DNANOD_TJPGD_SHIM explicitly, so an
 # earlier override cached in build/ cannot survive); overridable (in a separate

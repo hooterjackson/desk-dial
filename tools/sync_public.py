@@ -316,6 +316,9 @@ LAYOUT_RULES: list[Rule] = [
     R("arith:harness-app3", r"(['\"])outputs\1 / \1nanod-desktop-demo\1", lambda m: f"{m.group(1)}app{m.group(1)}",
       only=["harness/**"]),
     R("arith:harness-cmake", r"\.\./NanoD_RatchetH1\b", "../firmware", only=["harness/**"]),
+    # harness/ sits at the repo root, so its workspace is one level up (the private lcd-preview is two deep).
+    R("arith:harness-cmake-workspace", r'(get_filename_component\(WORKSPACE "\$\{CMAKE_CURRENT_SOURCE_DIR\}/\.\.)/\.\."',
+      r'\1"', only=["harness/CMakeLists.txt"]),
     R("arith:tools-harness", r"\bWORK / (['\"])lcd-preview\1", lambda m: f"ROOT / {m.group(1)}harness{m.group(1)}",
       only=["tools/**"]),
     R("arith:app-firmware", r"\b(ROOT\.parents\[1\]|parents\[3\]|parents\[2\]) / (['\"])work\2 / \2NanoD_RatchetH1\2",
