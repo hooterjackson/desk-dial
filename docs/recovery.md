@@ -20,7 +20,7 @@ The Nano_D++ has 4 MB of flash, laid out exactly as in Karl's firmware v1.0.0. D
 So there are two ways back:
 
 - **Firmware only:** write the app area of your backup at `0x10000`. Your settings and profiles stay as they are now. Your calibration stays too, unless the knob calibrated itself under Desk Dial firmware (see below).
-- **Everything:** write the whole 4 MB backup at `0`. The knob returns to exactly the moment you made the backup, with its firmware, calibration, settings and profiles.
+- **Everything:** write your backup from `0x9000` to the end (settings, app areas, profiles and crash area). The knob returns to exactly the moment you made the backup, with its firmware, calibration, settings and profiles. The bootloader and the partition table are left alone, because the flashing guide never changes them.
 
 ## Go back to your own firmware
 
@@ -49,15 +49,28 @@ If the knob calibrated itself while it ran Desk Dial firmware, older firmware do
 
 ### Restore the whole backup
 
-Use this as a last resort. It is for when the firmware-only restore did not help, or when you want your old calibration and profiles back too. It writes all 4 MB, bootloader included, so use only **your own** backup of **this** knob. Never use another knob's file.
+Use this when the firmware-only restore did not help, or when you want your old calibration and profiles back too. Use only **your own** backup of **this** knob. Never use another knob's file.
 
-```powershell
-python -m esptool --chip esp32s3 --port COM8 --before no_reset --after no_reset_stub write_flash --flash_mode keep --flash_freq keep --flash_size keep 0 my-nanod-backup.bin
-python -m esptool --chip esp32s3 --port COM8 --before no_reset --after no_reset_stub verify_flash 0 my-nanod-backup.bin
-python -m esptool --chip esp32s3 --port COM8 --before no_reset --after hard_reset read_mac
-```
+1. Cut everything after the partition table out of the backup:
+
+   ```powershell
+   python -c "d = open('my-nanod-backup.bin', 'rb').read(); open('my-nanod-data-and-app.bin', 'wb').write(d[0x9000:])"
+   ```
+
+   This covers `nvs` (calibration and settings), `otadata`, `app0`, `app1`, `spiffs` (profiles) and `coredump`: everything the knob keeps.
+
+2. Put the knob into its bootloader ([flashing guide, Step 1](flashing.md#step-1-put-the-knob-into-its-bootloader)).
+3. Write, check, restart. **Do not unplug the knob while it writes.**
+
+   ```powershell
+   python -m esptool --chip esp32s3 --port COM8 --before no_reset --after no_reset_stub write_flash --flash_mode keep --flash_freq keep --flash_size keep 0x9000 my-nanod-data-and-app.bin
+   python -m esptool --chip esp32s3 --port COM8 --before no_reset --after no_reset_stub verify_flash 0x9000 my-nanod-data-and-app.bin
+   python -m esptool --chip esp32s3 --port COM8 --before no_reset --after hard_reset read_mac
+   ```
 
 This takes several minutes. *You should see* `verify OK`, and then the knob exactly as it was when you made the backup.
+
+**Last resort only:** if you have reason to believe the bootloader or the partition table itself is damaged, you can write the whole 4 MB file at `0` instead (`write_flash ... 0 my-nanod-backup.bin`, then `verify_flash 0 my-nanod-backup.bin`). That rewrites the bootloader too: if the write is cut off in its first seconds, the knob can only be reached through its BOOT pin, which may not be reachable on a Nano_D++ (see [below](#no-port-at-all-or-the-port-keeps-appearing-and-disappearing)). **Do not unplug the knob while it writes.**
 
 ## Go back to Karl's stock firmware
 
