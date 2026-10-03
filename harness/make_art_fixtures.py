@@ -1,8 +1,10 @@
 """Create the artwork fixtures used by the LVGL harness.
 
 v1 (120 px RGB565), written to app/assets/fixtures/ (data only):
-- art-hall-120.rgb565: byte copy of the real Hall cover transfer captured by the
-  artwork agent (previews/artwork-transport/hall-now-playing-120.rgb565).
+- art-hall-120.rgb565: a synthetic, calm "hall" cover (a dusk gradient with a
+  low sun and hills: a dark, mid-contrast cover, unlike the bright one), passed
+  through the companion's prepare_artwork() like the bright cover below. It is
+  fictional: no real album art is published with the harness.
 - art-bright-120.rgb565: a synthetic bright, busy cover (saturated diagonal
   stripes plus a high-contrast checker band behind the title area). It is
   passed through the companion's own artwork.prepare_artwork() (imported
@@ -12,10 +14,9 @@ v1 (120 px RGB565), written to app/assets/fixtures/ (data only):
 - *.png: 120 px previews decoded back from each .rgb565 file, for eyeballing.
 
 artwork2 (1.0.0-cc5.3, ARTWORK2.md section 5), written to harness/artwork2/:
-- cover-hall-240.jpg: the real Hall cover's 240 px composite
-  (previews/artwork-transport/hall-now-playing-240.png, already 0.8 opacity +
-  scrim) encoded like the host: Pillow JPEG, quality ladder, 4:2:0, optimize,
-  baseline, first result <= COVER_MAX_BYTES.
+- cover-hall-240.jpg: the synthetic hall cover's 240 px composite from
+  prepare_artwork() (0.8 opacity + scrim) encoded like the host: Pillow JPEG,
+  quality ladder, 4:2:0, optimize, baseline, first result <= COVER_MAX_BYTES.
 - cover-bright-240.jpg: the synthetic bright cover's 240 px composite from
   prepare_artwork(), encoded the same way.
 - cover-detail-240.jpg: a synthetic cover whose detail (1 px lines, a 2 px
@@ -41,7 +42,6 @@ from io import BytesIO
 from pathlib import Path
 import hashlib
 import json
-import shutil
 import sys
 
 from PIL import Image, ImageDraw
@@ -50,11 +50,24 @@ ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
 COMPANION = WORKSPACE / 'app'
 FIXTURES = COMPANION / 'assets' / 'fixtures'
-HALL_SOURCE = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-120.rgb565'
-HALL_240 = COMPANION / 'previews' / 'artwork-transport' / 'hall-now-playing-240.png'
 ARTWORK2 = ROOT / 'artwork2'
 SIZE, TRANSFER = 240, 120
 BYTES = TRANSFER * TRANSFER * 2
+
+
+def hall_source() -> bytes:
+    """A fictional, calm cover: dusk gradient, a low sun and two hill bands."""
+    image = Image.new('RGB', (SIZE, SIZE))
+    draw = ImageDraw.Draw(image)
+    for y in range(SIZE):
+        t = y / (SIZE - 1)
+        draw.line([(0, y), (SIZE - 1, y)], fill=(int(30 + 170 * t), int(40 + 60 * t), int(110 - 40 * t)))
+    draw.ellipse([132, 92, 204, 164], fill=(255, 196, 92))
+    draw.polygon([(0, 170), (60, 138), (130, 160), (200, 132), (SIZE, 150), (SIZE, SIZE), (0, SIZE)], fill=(52, 38, 70))
+    draw.polygon([(0, 205), (80, 182), (160, 200), (SIZE, 178), (SIZE, SIZE), (0, SIZE)], fill=(24, 20, 40))
+    out = BytesIO()
+    image.save(out, format='PNG')
+    return out.getvalue()
 
 
 def bright_source() -> bytes:
@@ -112,10 +125,11 @@ def preview(raw: bytes, target: Path) -> None:
 
 def make_v1(prepare_artwork) -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
+    _, hall_raw, _ = prepare_artwork(hall_source())[:3]
+    if len(hall_raw) != BYTES:
+        raise SystemExit(f'prepare_artwork returned {len(hall_raw)} bytes, expected {BYTES}')
     hall = FIXTURES / 'art-hall-120.rgb565'
-    if HALL_SOURCE.stat().st_size != BYTES:
-        raise SystemExit(f'{HALL_SOURCE} is not {BYTES} bytes')
-    shutil.copyfile(HALL_SOURCE, hall)
+    hall.write_bytes(hall_raw)
     _, bright_raw, _ = prepare_artwork(bright_source())[:3]
     if len(bright_raw) != BYTES:
         raise SystemExit(f'prepare_artwork returned {len(bright_raw)} bytes, expected {BYTES}')
@@ -189,7 +203,7 @@ def make_artwork2(prepare_artwork, p, companion_icon_payload) -> None:
     ARTWORK2.mkdir(parents=True, exist_ok=True)
     manifest = {'about': 'artwork2 harness fixtures (ARTWORK2.md section 5), written by make_art_fixtures.py',
                 'covers': [], 'broken': [], 'icons': []}
-    hall = Image.open(HALL_240).convert('RGB')
+    hall = prepare_artwork(hall_source())[0].convert('RGB')
     bright = prepare_artwork(bright_source())[0].convert('RGB')
     detail = prepare_artwork(detail_source())[0].convert('RGB')
     for name, file, composite in (('a2-hall', 'cover-hall-240.jpg', hall), ('a2-bright', 'cover-bright-240.jpg', bright),
