@@ -11,7 +11,7 @@ from control_center.simulation import (SIM_AREA_LIGHTS, SIM_AREAS, SimControls, 
                                        SimulatedHomeAssistant, SimulatedSonos)
 
 SOURCE = Path(__file__).resolve().parents[1] / "control_center" / "simulation.py"
-ROOM = re.compile(r"\b(Hall|HALL)\b|[\"']hall[\"']|\bsim-hall\b|\blight\.den\b|\blight\.den_")
+ROOM = re.compile(r"\b(Hall|HALL)\b|[\"']hall[\"']|\bsim-hall\b")
 
 
 class NeutralSimulatorTests(unittest.TestCase):

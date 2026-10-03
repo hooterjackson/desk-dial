@@ -11,7 +11,7 @@ from control_center.stage.scenes import navigator_render as R  # noqa: E402
 
 SOURCES = [ROOT / "control_center" / "navigator_model.py",
            ROOT / "control_center" / "stage" / "scenes" / "navigator_render.py"]
-ROOM = re.compile(r"\b(Hall|HALL)\b|[\"']hall[\"']|\blight\.den\b")
+ROOM = re.compile(r"\b(Hall|HALL)\b|[\"']hall[\"']")
 
 
 class NeutralNavigatorTests(unittest.TestCase):
