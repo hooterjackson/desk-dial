@@ -690,17 +690,27 @@ class WindowFitTests(AppHarness):
         self.assertGreaterEqual(win.winfo_height(), ui.SETUP_SIZE[1])
         self.assertGreaterEqual(win.winfo_height(), min(win.winfo_reqheight(),
                                                         win.winfo_screenheight() - ui.SCREEN_MARGIN))
-        found = widgets_with_text(win, {"Save settings", "Authorize Apple Music", "On", "Off",
-                                        "Warm only", "Colour", "Frosted", "No background"})
-        self.assertEqual(len(found), 8)
-        for widget in found.values():
-            self.assert_fully_visible(widget, win)
+        # r3.1: one page at a time (the page list under the strip); each page fits with Save.
+        pages = {"General": {"Auto-hide", "Pinned", "Off"}, "Music": {"On", "Authorize Apple Music"},
+                 "Windows": {"Frosted", "No background"}, "Knob": {"Warm only", "Colour"}}
+        tabs = widgets_with_text(win, set(pages) | {"Home Assistant"})
+        self.assertEqual(len(tabs), 5)
+        for page, texts in pages.items():
+            with self.subTest(page=page):
+                tabs[page].invoke()
+                win.update()
+                found = widgets_with_text(win, texts | {"Save settings"})
+                self.assertEqual(len(found), len(texts) + 1)
+                for widget in found.values():
+                    self.assert_fully_visible(widget, win)
 
     def test_a_short_setup_window_never_hides_the_actions(self):
         win = self.open_setup()
         win.geometry("600x420")
         win.update()
         self.assertEqual(win.winfo_height(), 420)
+        widgets_with_text(win, {"Music"})["Music"].invoke()
+        win.update()
         for widget in widgets_with_text(win, {"Save settings", "Authorize Apple Music"}).values():
             self.assert_fully_visible(widget, win)
 

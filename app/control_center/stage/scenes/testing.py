@@ -228,7 +228,7 @@ def upnext_payload(t0, *, kind="album", rows=24, now=4, focus=None, loaded=True,
     elif foreign:
         ctx = {"kind": "foreign", "title": "Sonos queue", "sub": f"Started in another app · {rows} songs"}
     else:
-        ctx = {"kind": "playlist", "title": "Late Night Drive", "sub": "Favourite playlist · 48 songs · 3 h 12 min"}
+        ctx = {"kind": "playlist", "title": "Late Night Channel", "sub": "Favourite playlist · 48 songs · 3 h 12 min"}
     if card is not None:
         count = now + 2
         out = [r for r in out if r["row"] - 1 <= now]
@@ -236,12 +236,6 @@ def upnext_payload(t0, *, kind="album", rows=24, now=4, focus=None, loaded=True,
             "card": card, "context": ctx, "shuffle": shuffle, "likes_known": likes == "known",
             "loading": not loaded, "control_id": control_id, "control_min": 0, "reduced_motion": reduced_motion,
             "foreground_hwnd": 0}
-
-
-def time_it(fn, *a, **k):
-    t = time.perf_counter()
-    r = fn(*a, **k)
-    return r, (time.perf_counter() - t) * 1000.0
 
 
 # --------------------------------------------------------------------------- H4 golden cases

@@ -61,6 +61,18 @@ Readings where the contract is silent, identical to firmware ``CCAlive`` (cc_ali
   §4.4 / P5-R24; 5.1.4): every Up next entry is available, whatever an unparsed frame says.
 * Palette [R5]: the section 2 float constants, identical to the firmware's ``CCAliveSpec``; accents
   stay 8-bit (sat() is integer by definition). PINK follows ``set_tuning`` (section 2).
+
+Presentation 6 (ALIVE.md section 15, Desk Dial r3 release 1), identical to firmware ``cc_alive.cpp``:
+
+* Family ``lights`` (layouts lights, lightsbig, scenes). Ring styles on the r3 arc (45 segments from 38
+  clockwise through the top to 22): ``bri`` (filled to round(45 v / 100) in ``kelvin_rgb(ring.kelvin)``,
+  class 3 while turning = layout lightsbig else L 0.34, the rest OFF [user 2026-09-29]), ``ctemp`` (the Kelvin
+  colour up to the marker round(44 value / 100) class 3, below it 3 while turning else F 0.50, above OFF) and
+  ``clusters`` (N clusters of 3 around round(60 s / N), WARM, selected 3, others O 0.18). The Kelvin colour is an
+  ACCENT drawn as is (never sat(), no WARM fallback, no amber / red, no embers). Resting: L and F at 0.34, T, R
+  and O dark. 6.3: bri takes the local value (max 100), clusters the local index (max count - 1), ctemp never.
+* A plain ``ok`` in the family is the ``wash`` flash: the whole ring GREEN 0.68 for 700 ms, no bloom.
+* A lit-on button in the family is ``active``: WARM 0.90.
 """
 from __future__ import annotations
 
@@ -103,25 +115,93 @@ ROLE_PINK = "pink"                      # [r2] CCAliveRole 7
 ROLE_COLOUR = {ROLE_WARM: WARM, ROLE_GREEN: GREEN, ROLE_RED: RED, ROLE_AMBER: AMBER, ROLE_BLUE: BLUE,
                ROLE_PINK: PINK}
 
+# [r3] ALIVE.md 15.6: Kelvin -> RGB (Tanner Helland; README r3 section 3), firmware cc_kelvin_rgb
+# (cc_presentation.h). KELVIN_GAIN is the ring's white-point calibration hook: out = (c * gain + 127) // 255.
+KELVIN_MIN, KELVIN_MAX = 2200, 6500
+KELVIN_GAIN = (255, 255, 255)
+
+
+def kelvin_rgb(kelvin):
+    """(r, g, b) ints of a colour temperature, clamped to 2200..6500 K; rounded half up in float64."""
+    k = min(max(int(kelvin), KELVIN_MIN), KELVIN_MAX)
+    t = k / 100.0
+    channels = (255.0 if t <= 66.0 else 329.7 * math.pow(t - 60.0, -0.1332),
+                99.47 * math.log(t) - 161.12 if t <= 66.0 else 288.12 * math.pow(t - 60.0, -0.0755),
+                255.0 if t >= 66.0 else 138.52 * math.log(t - 10.0) - 305.04)
+    out = []
+    for c, gain in zip(channels, KELVIN_GAIN):
+        v = int(math.floor(min(255.0, max(0.0, c)) + 0.5))
+        out.append((v * gain + 127) // 255)
+    return tuple(out)
+
 # ----------------------------------------------------------------- levels (section 5.2)
 CLASS_S = "S"                               # odd-volume half-step [D10][M13]
 CLASS_P, CLASS_N, CLASS_Q = "P", "N", "Q"   # [r2] Up next played / now playing / upcoming and the
                                             # unavailable list cursor (CCAliveClass 6, 7, 8)
-CLASSES = (CLASS_P, 1, CLASS_Q, 2, CLASS_N, CLASS_S, 3, 4)
-ALPHA_AWAKE_WARM = {CLASS_P: 0.14, 1: 0.30, CLASS_Q: 0.45, 2: 0.62, CLASS_N: 0.70, CLASS_S: 0.81, 3: 1.0, 4: 1.0}
+# [r3] ALIVE.md 15.3: the Lights classes T 0.08 (bri unfilled), R 0.12 (ctemp remainder), O 0.18 (clusters
+# not selected), L 0.34 (bri filled at rest), F 0.50 (ctemp filled at rest); CCAliveClass 9..13.
+CLASS_T, CLASS_R, CLASS_O, CLASS_L, CLASS_F = "T", "R", "O", "L", "F"
+# [r3] ALIVE.md 15.7: M 0.10, the r3 marker ring's rest of the arc (CCAliveClass 14); it rests dark.
+CLASS_M = "M"
+# [r3.1] ALIVE.md 15.9: W 0.60, the queue ring's playing row (CCAliveClass 15); it rests at 0.34.
+CLASS_W = "W"
+_R3_AWAKE = {CLASS_T: 0.08, CLASS_R: 0.12, CLASS_O: 0.18, CLASS_L: 0.34, CLASS_F: 0.50, CLASS_M: 0.10, CLASS_W: 0.60}
+CLASSES = (CLASS_P, 1, CLASS_Q, 2, CLASS_N, CLASS_S, 3, 4, CLASS_T, CLASS_R, CLASS_O, CLASS_L, CLASS_F, CLASS_M,
+           CLASS_W)
+ALPHA_AWAKE_WARM = {CLASS_P: 0.14, 1: 0.30, CLASS_Q: 0.45, 2: 0.62, CLASS_N: 0.70, CLASS_S: 0.81, 3: 1.0, 4: 1.0,
+                    **_R3_AWAKE}
 # [r2][M1] the semantic body 0.62 and half-step 0.81 like warm (AL: 1.00); ledVolFull restores 1.00.
 ALPHA_AWAKE_SEMANTIC = {CLASS_P: 0.14, 1: 0.45, CLASS_Q: 0.45, 2: 0.62, CLASS_N: 0.70, CLASS_S: 0.81, 3: 1.0,
-                        4: 1.0}
+                        4: 1.0, **_R3_AWAKE}
 ALPHA_VOL_FULL = {2: 1.0, CLASS_S: 1.0}     # [M24] semantic class 2 / S with ledVolFull
 # Resting = BS's thresholds (>= 0.99 -> 0.16, >= 0.5 -> 0.10, else 0.05), but S keeps D10's 0.13.
 # [user 2026-09-26] resting = one steady dim warm white at 0.34 (0.05-0.16 was too dim to show the hue).
-ALPHA_REST = {CLASS_P: 0.34, 1: 0.34, CLASS_Q: 0.34, 2: 0.34, CLASS_N: 0.34, CLASS_S: 0.34, 3: 0.34, 4: 0.34}
+# [r3] 15.3: the filled Lights arc (L, F) rests at 0.34 like every lit class; T, R and O rest dark.
+ALPHA_REST = {CLASS_P: 0.34, 1: 0.34, CLASS_Q: 0.34, 2: 0.34, CLASS_N: 0.34, CLASS_S: 0.34, 3: 0.34, 4: 0.34,
+              CLASS_T: 0.0, CLASS_R: 0.0, CLASS_O: 0.0, CLASS_L: 0.34, CLASS_F: 0.34, CLASS_M: 0.0, CLASS_W: 0.34}
 REST_TOD_MIN = 0.80   # time of day dims resting, never below this
 EXTERNAL_ALPHA = 1.0
 FLASH_ALPHA_NEAR, FLASH_ALPHA_FAR = 1.0, 0.5     # |k| <= 1, |k| == 2
 OFFLINE_ALPHA = 0.12
 OFFLINE_PITCH = 5                                # amber marks at 0, 5, ... 55
 FLASH_MS = {"ok": FLASH_OK_MS, "err": FLASH_ERR_MS}
+# [r3] 15.5: the LIGHTS ok is the "wash" flash (firmware CC_FLASH_WASH): whole ring GREEN 0.68 for 700 ms.
+# FLASH_MS stays the wire's feedback kinds; FLASH_DURATION_MS also times the wash.
+LIGHTS_WASH_MS, LIGHTS_WASH_ALPHA = 700, 0.68
+# [r3] ALIVE.md 15.7 (README r3 sections 1 and 3): the unavailable-press flash (feedback err + moment
+# `refused`): bottom segments 26..34 RED at 0.9 for 320 ms, no fail shake (firmware CC_FLASH_REFUSED); and
+# the matured hold-1 flash: the whole ring WARM 0.68 for 400 ms (CC_FLASH_HOME).
+# r4 (design_handoff_nano_d_r4 README 3.4, ALIVE.md 16): the deny glow is 480 ms in 255,60,40 (was 320 ms RED).
+REFUSED_MS, REFUSED_ALPHA, REFUSED_SEGMENTS = 480, 0.9, tuple(range(26, 35))
+REFUSED_RGB = (255, 60, 40)
+HOME_FLASH_MS, HOME_FLASH_ALPHA = 400, 0.68
+# [r3.1] 15.8 the button-4 hold landings: "land" the whole ring 0.68 for 450 ms in the Kelvin colour of a bri / ctemp
+# frame, else WARM (CC_FLASH_LAND); "queue" the whole ring GREEN 0.68 for 600 ms (CC_FLASH_QUEUE).
+# r4 M12: a plain-ok landing is the domain-swap sweep (no wash); LAND_FLASH_MS is its window (the prototype's 800).
+LAND_FLASH_MS, QUEUE_FLASH_MS, LAND_FLASH_ALPHA = 800, 600, 0.68
+# r4 (README 3.3 / 3.4; ALIVE.md 16), after the animator: every LED eases towards the animator's e (tau 50 ms); a wall
+# glows the cursor +-2 warm white 255,232,205 at 0.9 (rise 90 ms E.out, fall 420 ms E.io, blended); M12: after a
+# plain-ok landing, LED i starts easing to the new ring i x 8.7 ms after it (clockwise from 12 o'clock).
+EASE_TAU_MS = 50.0
+EASE_SNAP = 1e-6          # |target - shown| below this lands on the target (float32 / float64 agree)
+WALL_GLOW_RGB, WALL_GLOW_ALPHA, WALL_GLOW_HALF = (255, 232, 205), 0.9, 2
+GLOW_RISE_MS, GLOW_FALL_MS = 90.0, 420.0
+SWEEP_STEP_MS = 8.7
+FLASH_DURATION_MS = {**FLASH_MS, "wash": LIGHTS_WASH_MS, "refused": REFUSED_MS, "home": HOME_FLASH_MS,
+                     "land": LAND_FLASH_MS, "queue": QUEUE_FLASH_MS}
+# [r3] 15.7 the hold-1 progress ring (README r3 G-7): while button 1 is held on a screen with a crumb (anywhere
+# but the launcher Home), the r3 arc fills WARM 0 -> 45 segments over the 600 ms hold, shown from 12 %.
+HOLD_MS, HOLD_SHOW_PCT = 600, 12
+# [r3.1] 15.8 the button-4 hold ring: while button 4 (physical slot 3) is held on a frame with holdMarker (any screen,
+# the launcher Home too), the same arc fills WARM 0 -> 45 over the 1000 ms hold (the kh of every button but slot 0),
+# shown from 15 %; at maturity the full arc waits (<= 600 ms) for the host's landing: the first new feedback seq
+# within 1500 ms lands it ("land" for a plain ok, "queue" for ok + queued). The release cancels the ring.
+HOLD4_MS, HOLD4_SHOW_PCT = 1000, 15
+LANDING_WINDOW_MS, LANDING_WAIT_MS = 1500, 600
+# [r3.1] 15.9 the queue ring's playing row: warm white 255,232,205 (the r3.1 prototype's WW).
+QUEUE_NOW_RGB = (255, 232, 205)
+# [r3] 15.7 the marker ring (r3 Windows): a white (240,240,240) marker +-1 at the index on the arc, the rest M.
+MARKER_RGB = (240, 240, 240)
 # [r2][M18] resting buttons: 0.12 when the awake alpha >= 0.5, else 0.04 (BS:620).
 BUTTON_REST_HIGH, BUTTON_REST_LOW, BUTTON_REST_SPLIT = 0.34, 0.26, 0.5   # [user 2026-09-26]
 # 5.3 tones -> (role, class, awake alpha). The class is the design light level (RC finishAlive:
@@ -132,18 +212,23 @@ BUTTON_TONES = {
     "dim": (ROLE_WARM, 1, 0.14), "stop": (ROLE_RED, 2, 1.0), "liked": (ROLE_PINK, 1, 0.30),
     "on": (ROLE_WARM, 3, 1.0), "off": (ROLE_WARM, 1, 0.30), "go": (ROLE_GREEN, 3, 1.0),
     "paused": (ROLE_GREEN, 3, 1.0), "nav": (ROLE_WARM, 2, 0.70),
+    "active": (ROLE_WARM, 3, 0.90),             # [r3] 15.4: lit on in the LIGHTS family (README r3 L 0.9)
 }
 # v5 icon tokens (PRESENTATION_V5 9.1): the engine reads them whether or not presentation.ICONS has
 # them yet.
 ICONS_V5 = tuple(dict.fromkeys(ICONS + ("expand", "clock", "playlists", "playnext", "seek", "shuffle",
-                                        "heart", "snapleft", "snapright")))
+                                        "heart", "snapleft", "snapright",
+                                        # [r3] presentation 6 (PRESENTATION_V5 19.5)
+                                        "bulb", "thermo", "power", "wand", "house", "album")))
 
 HOME_LAYOUTS = ("nowPlaying", "volume", "idle", "notice")
 # [r2] 5.4: every layout mapped explicitly (VOC 1.1); seek is Tracks family.
 LAYOUT_FAMILY = {"nowPlaying": "home", "volume": "home", "idle": "home", "notice": "home",
                  "recent": "recent", "explorer": "explorer", "tracks": "tracks", "seek": "tracks",
-                 "upnext": "upnext", "windows": "windows"}
-FAMILIES = ("home", "recent", "tracks", "windows", "explorer", "upnext")
+                 "upnext": "upnext", "windows": "windows",
+                 # [r3] 15.1: the Lights space (presentation 6)
+                 "lights": "lights", "lightsbig": "lights", "scenes": "lights"}
+FAMILIES = ("home", "recent", "tracks", "windows", "explorer", "upnext", "lights")
 LIST_FAMILIES = ("recent", "explorer", "upnext", "windows")     # tint, D7 wash (M10)
 FAMILY_OFFLINE = "offline"
 
@@ -151,6 +236,8 @@ VOLUME_START, VOLUME_END = 35, 25
 TRACKS_PREV, TRACKS_NEUTRAL, TRACKS_NEXT = (52, 53), 0, (7, 8)
 LIST_PITCH = 3
 LAP_TICK = 5
+ARC_START, ARC_LENGTH = 38, 45                   # [r3] 15.2: 38 clockwise through 0 to 22; 23..37 free
+CLUSTERS_MAX = 20
 
 # ----------------------------------------------------------------- timing (sections 6-8)
 SLEEP_MS = 5000
@@ -626,7 +713,26 @@ def _local(frame, local_pos, local_max):
         out = dict(frame)
         out["ring"] = dict(ring, index=local_pos)
         return out, True, None
-    return frame, False, None
+    if style == "bri":                                     # [r3] 15.6: the brightness profile
+        # DD-DES-003: two frames. Off: 0..100, 0 = off. On: 0..99 = 1..100 % (the wall at the 1 % floor).
+        if local_max not in (99, 100):
+            return frame, False, None
+        out = dict(frame)
+        out["ring"] = dict(ring, value=local_pos + 1 if local_max == 99 else local_pos)
+        return out, True, None
+    if style == "queue":                                   # [r3.1] 15.9: the queue (max count - 1); the frame
+        count = _int(ring.get("count"), 0, 65535, 0)       # keeps the host index (the colour window)
+        if count < 1 or local_max != count - 1 or activity in ("pending", "loading"):
+            return frame, False, None
+        return frame, True, local_pos
+    if style in ("clusters", "marker"):                    # [r3] 15.6 / 15.7: scenes, windows (max count - 1)
+        count = _int(ring.get("count"), 0, 65535, 0)
+        if count < 1 or local_max != count - 1 or activity in ("pending", "loading"):
+            return frame, False, None
+        out = dict(frame)
+        out["ring"] = dict(ring, index=local_pos)
+        return out, True, None
+    return frame, False, None                              # off, lap [M11], [r3] ctemp
 
 
 def apply_local(frame, local_pos, local_max):
@@ -800,6 +906,96 @@ def _draw_lap(out, ring):
     return head
 
 
+def _arc(k):
+    """[r3] 15.2: the ring segment of Lights arc position k (0..44)."""
+    return (ARC_START + k) % SEGMENTS
+
+
+def _draw_bri(out, ring, turning):
+    """[r3] 15.2 bri: n = round(45 v / 100) filled in the Kelvin colour (3 turning, else L), the rest T."""
+    rgb = kelvin_rgb(_int(ring.get("kelvin"), KELVIN_MIN, KELVIN_MAX, KELVIN_MIN))
+    v = _int(ring.get("value"), 0, 100, 0)
+    n = (v * ARC_LENGTH + 50) // 100
+    for k in range(min(n, ARC_LENGTH)):             # [user 2026-09-29] the unfilled arc is OFF (15.2)
+        out.put(_arc(k), ROLE_ACCENT, 3 if turning else CLASS_L, rgb)
+    return _arc(n - 1 if n > 0 else 0)
+
+
+def _draw_ctemp(out, ring, turning):
+    """[r3] 15.2 ctemp: marker m = round(44 value / 100) class 3; below 3 turning else F; above R."""
+    rgb = kelvin_rgb(_int(ring.get("kelvin"), KELVIN_MIN, KELVIN_MAX, KELVIN_MIN))
+    v = _int(ring.get("value"), 0, 100, 0)
+    m = (v * (ARC_LENGTH - 1) + 50) // 100
+    for k in range(m + 1):                          # [user 2026-09-29] above the marker is OFF (15.2)
+        out.put(_arc(k), ROLE_ACCENT, 3 if k == m or turning else CLASS_F, rgb)
+    return _arc(m)
+
+
+def _draw_clusters(out, ring):
+    """[r3] 15.2 clusters: N clusters of 3 around round(60 s / N), WARM; selected 3 (drawn last), others O."""
+    n = _int(ring.get("count"), 0, 65535, 0)
+    index = _int(ring.get("index"), 0, 65535, -1)
+    if not 1 <= n <= CLUSTERS_MAX or not 0 <= index < n:
+        return 0
+    selected = 0
+    for c in range(n):
+        centre = (120 * c + n) // (2 * n)
+        if c == index:
+            selected = centre
+            continue
+        for k in (-1, 0, 1):
+            out.put(centre + k, ROLE_WARM, CLASS_O)
+    for k in (-1, 0, 1):
+        out.put(selected + k, ROLE_WARM, 3)
+    return selected % SEGMENTS
+
+
+def _draw_marker(out, ring):
+    """[r3] 15.7 marker: a white marker +-1 (ACCENT, class 3) at pos = round(44 index / max(1, count - 1))
+    (JS Math.round, half up); the rest of the arc is OFF ([user 2026-10-03], like the Lights arcs and the queue
+    ring: no sub-floor dim segments; the design's rest M, WARM 0.10, is not drawn; CLASS_M stays, unused).
+    Cursor: the marker's centre."""
+    n = _int(ring.get("count"), 0, 65535, 0)
+    index = _int(ring.get("index"), 0, 65535, -1)
+    if n < 1 or not 0 <= index < n:
+        return 0
+    span = max(1, n - 1)
+    pos = (2 * index * (ARC_LENGTH - 1) + span) // (2 * span)
+    for k in (pos - 1, pos, pos + 1):
+        if 0 <= k < ARC_LENGTH:
+            out.put(_arc(k), ROLE_ACCENT, 3, MARKER_RGB)
+    return _arc(pos)
+
+
+def _draw_queue(out, ring, color_mode, local_index):
+    """[r3.1] 15.9 queue (the whole-queue Tracks and Up next; r3.1 prototype R.queue): row j at arc position
+    round(44 j / max(1, count - 1)); the playing row (``now``) one warm-white segment (ACCENT QUEUE_NOW_RGB, class W),
+    the focus (the local index while turning) +-1 in its row's album colour (sat(); WARM without one) at class 3,
+    over it. The rest of the arc is OFF ([user 2026-09-29]: no sub-floor dim segments). Cursor: the focus."""
+    n = _int(ring.get("count"), 0, 65535, 0)
+    host = _int(ring.get("index"), 0, 65535, -1)
+    index = host if local_index is None else local_index
+    if n < 1 or not 0 <= host < n or not 0 <= index < n:
+        return 0
+    span = max(1, n - 1)
+    pos = (2 * index * (ARC_LENGTH - 1) + span) // (2 * span)
+    now = _int(ring.get("now", -1), -1, n - 1, -1)
+    if now >= 0:
+        out.put(_arc((2 * now * (ARC_LENGTH - 1) + span) // (2 * span)), ROLE_ACCENT, CLASS_W, QUEUE_NOW_RGB)
+    first, _width, colors, _mask = ring_window(ring, host, n)
+    role, rgb = _accent_of(color_mode, colors, first, -1, index)
+    for k in (pos - 1, pos, pos + 1):
+        if 0 <= k < ARC_LENGTH:
+            out.put(_arc(k), role, 3, rgb)
+    return _arc(pos)
+
+
+def _crumb(frame):
+    """[r3] presentation 6: the frame's breadcrumb token, '' without one (the launcher, r2.2)."""
+    crumb = frame.get("crumb")
+    return crumb if isinstance(crumb, str) else ""
+
+
 def button_tone_v5(frame, slot, family):
     """5.3 [r2][M18]: (tone, sat rgb or None) of button ``slot``, first match wins."""
     buttons = frame.get("buttons") or []
@@ -824,7 +1020,8 @@ def button_tone_v5(frame, slot, family):
             s = sat(rgb_tuple(color))
             if s is not None:
                 return "accent", s                  # VOC-D02: the snap side in sat(app colour)
-        return "on", None
+        # [r3] 15.4 / 15.7: the active mode (warm 0.90) in LIGHTS and on every r3 screen (a crumb).
+        return ("active" if family == "lights" or _crumb(frame) else "on"), None
     if lit == "off":
         return "off", None
     if slot == 3 and icon in ("play", "prev", "next", "switch"):
@@ -839,7 +1036,7 @@ class AliveGeometry:
 
     __slots__ = ("frame", "local", "cells", "cursor", "family", "layout", "style", "activity",
                  "color_mode", "value", "confirmed", "pending", "external", "playing",
-                 "accent", "buttons")
+                 "accent", "buttons", "crumb")
 
 
 def alive_geometry(frame, local_pos=None, local_max=None, pending_ms=0, loading_ms=0):
@@ -872,10 +1069,21 @@ def alive_geometry(frame, local_pos=None, local_max=None, pending_ms=0, loading_
         g.cursor = _draw_transport(out, ring, g.activity, pending_ms)
     elif g.style == "lap":
         g.cursor = _draw_lap(out, ring)
+    elif g.style == "bri":                          # [r3] 15.2: turning = the lightsbig reveal
+        g.cursor = _draw_bri(out, ring, g.layout == "lightsbig")
+    elif g.style == "ctemp":
+        g.cursor = _draw_ctemp(out, ring, g.layout == "lightsbig")
+    elif g.style == "clusters":
+        g.cursor = _draw_clusters(out, ring)
+    elif g.style == "marker":                       # [r3] 15.7: the r3 Windows ring
+        g.cursor = _draw_marker(out, ring)
+    elif g.style == "queue":                        # [r3.1] 15.9: the whole-queue Tracks / Up next ring
+        g.cursor = _draw_queue(out, ring, g.color_mode, local_index)
     else:                                           # 5.1.7 off (or unknown): dark, cursor 0
         g.cursor = 0
     g.cells = out.cells
     g.buttons = [button_tone_v5(resolved, j, g.family) for j in range(BUTTON_SLOTS)]
+    g.crumb = _crumb(resolved)
     return g
 
 
@@ -890,7 +1098,7 @@ def ring_alpha(role, cls, asleep, vol_full=False):
     return ALPHA_AWAKE_SEMANTIC[cls]
 
 
-def alive_finish(g, asleep, flash=None, vol_full=False, reduced_motion=False):
+def alive_finish(g, asleep, flash=None, vol_full=False, reduced_motion=False, hold_fill=None):
     """Second half: alphas, overrides (5.2), buttons (5.3), flags (5.4).
 
     ``asleep`` is effectiveAsleep; ``flash`` the active flash kind ("ok"/"err") or None;
@@ -914,6 +1122,24 @@ def alive_finish(g, asleep, flash=None, vol_full=False, reduced_motion=False):
         for k in (-2, -1, 0, 1, 2):
             ring[(cursor + k) % SEGMENTS] = _role_cell(
                 role, None, 4, FLASH_ALPHA_NEAR if abs(k) <= 1 else FLASH_ALPHA_FAR)
+    elif flash == "wash":                           # [r3] 15.5 LIGHTS ok: the whole ring GREEN 0.68
+        for i in range(SEGMENTS):
+            ring[i] = _role_cell(ROLE_GREEN, None, 4, LIGHTS_WASH_ALPHA)
+    elif flash == "refused":                        # [r3] 15.7 / r4 3.4 the deny glow: bottom 26..34 255,60,40 0.9
+        for i in REFUSED_SEGMENTS:
+            ring[i] = _role_cell(ROLE_ACCENT, REFUSED_RGB, 4, REFUSED_ALPHA)
+    elif flash == "home":                           # [r3] 15.7 the matured hold: the whole ring WARM 0.68
+        for i in range(SEGMENTS):
+            ring[i] = _role_cell(ROLE_WARM, None, 4, HOME_FLASH_ALPHA)
+    elif flash == "land":                           # r4 M12: the landing is the engine's sweep, no wash
+        pass
+    elif flash == "queue":                          # [r3.1] 15.8 the queue landing: the whole ring GREEN 0.68
+        for i in range(SEGMENTS):
+            ring[i] = _role_cell(ROLE_GREEN, None, 4, LAND_FLASH_ALPHA)
+    if hold_fill:                                   # [r3] 15.7 the hold-1 progress ring replaces the ring
+        ring = [None] * SEGMENTS
+        for k in range(min(hold_fill, ARC_LENGTH)):
+            ring[_arc(k)] = _role_cell(ROLE_WARM, None, 4, 1.0)
     buttons = [None] * BUTTON_SLOTS
     paused = False
     for j, (tone_name, rgb) in enumerate(g.buttons):
@@ -930,7 +1156,10 @@ def alive_finish(g, asleep, flash=None, vol_full=False, reduced_motion=False):
         else:
             buttons[j] = _role_cell(role, rgb, cls, alpha)
     tint = None
-    if g.family in LIST_FAMILIES and not asleep:    # 5.4 [R2]: an ACCENT cursor only
+    if (g.family in LIST_FAMILIES and not asleep and g.style not in ("marker", "queue")   # 5.4 [R2]; [r3] never
+            and flash in (None, "land")):
+        # the marker; [r3.1] never the queue ring (its rest is off); never while a flash override owns the ring
+        # (FW-BUG-024: the deny glow's ACCENT cells are not the cursor's accent)
         target = ring[cursor]
         if target is not None and target.role == ROLE_ACCENT:
             tint = target.col
@@ -939,7 +1168,7 @@ def alive_finish(g, asleep, flash=None, vol_full=False, reduced_motion=False):
         offline=False, pending=g.pending,
         heat=g.family == "home" and not asleep and g.style == "level" and g.value >= 90,
         paused_play=paused and not asleep, tint=tint, value=g.value, external=g.external,
-        playing=g.playing, accent=g.accent, flash=flash if flash in FLASH_MS else None,
+        playing=g.playing, accent=g.accent, flash=flash if flash in FLASH_DURATION_MS else None,
         reduced_motion=reduced_motion)
 
 
@@ -955,7 +1184,7 @@ def alive_targets(frame, local_pos=None, local_max=None, *, state_asleep=False, 
     if not claimed or frame is None:
         return offline_targets()
     g = alive_geometry(frame, local_pos, local_max, pending_ms)
-    active = flash if flash in FLASH_MS else None
+    active = flash if flash in FLASH_DURATION_MS else None
     return alive_finish(g, bool(state_asleep) and not g.pending and active is None and not hold, active,
                         vol_full)
 
@@ -1519,7 +1748,20 @@ class AliveLights:
         self._home_playing = None                    # the last Home frame's playing (None absent)
         self._rng = RNG_SEED                         # [M5]
         self._pink_led = 0                           # [M24] latched ledPink (0 = the built-in PINK)
+        self._hold_down = None                       # [r3] 15.7: button 1 went down at (ms), still down
+        self._hold_matured = False
+        self._hold4_down = None                      # [r3.1] button 4 went down at (ms), still down
+        self._hold4_matured = False
+        self._landing_at = None                      # [r3.1] 15.8 the landing window opened at (ms)
         self._vol_full = False                       # [M24] latched ledVolFull
+        self._eased = [(0.0, 0.0, 0.0)] * SEGMENTS    # r4 (ALIVE.md 16): what the LEDs show
+        self._eased_buttons = [(0.0, 0.0, 0.0)] * BUTTON_SLOTS
+        self._prev_e = [(0.0, 0.0, 0.0)] * SEGMENTS     # the previous render's animator e (first-order hold)
+        self._prev_eb = [(0.0, 0.0, 0.0)] * BUTTON_SLOTS
+        self.ease_residue = 0.0
+        self.raw = ([(0.0, 0.0, 0.0)] * SEGMENTS, [(0.0, 0.0, 0.0)] * BUTTON_SLOTS)
+        self._wall = None                            # r4 3.3: (at ms, cursor segment) of the running end glow
+        self._sweep_at = None                        # r4 M12: the landing that started the sweep (ms)
         self.palette = ENGINE_PALETTE
         self.seeds = []                              # every scatter seed drawn (tests, twin replay)
         self.targets = offline_targets()
@@ -1543,6 +1785,9 @@ class AliveLights:
         self._presses, self._detents, self._limits = [], [], []
         self._vel = 0.0
         self._has_rot = False
+        self._hold_down, self._hold_matured = None, False
+        self._hold4_down, self._hold4_matured = None, False
+        self._landing_at = None
 
     def release(self, now):
         """claimed -> unclaimed (OFFLINE): 'down' at the last claimed cursor, snapshot now."""
@@ -1555,6 +1800,10 @@ class AliveLights:
         self._flash = None
         self._hold_ms = 0
         self._presses, self._detents, self._limits = [], [], []
+        self._hold_down, self._hold_matured = None, False
+        self._hold4_down, self._hold4_matured = None, False
+        self._landing_at = None
+        self._wall = self._sweep_at = None
         snap, bsnap = self.animator.snapshot()
         self.animator.play(Effect("down", now, at=self._prev_cursor, snap=snap, bsnap=bsnap))
 
@@ -1575,10 +1824,23 @@ class AliveLights:
         self._limits.append([now & UINT32, 1 if direction > 0 else -1])
 
     def press(self, now, slot):
-        if not self._claimed or type(slot) is not int or not 0 <= slot < BUTTON_SLOTS \
-                or len(self._presses) >= MAX_PRESSES:
+        if not self._claimed or type(slot) is not int or not 0 <= slot < BUTTON_SLOTS:
+            return
+        if slot == 0:                                # [r3] 15.7: the hold-1 progress ring starts here
+            self._hold_down, self._hold_matured = now & UINT32, False
+        if slot == 3:                                # [r3.1] the button-4 hold ring starts here
+            self._hold4_down, self._hold4_matured = now & UINT32, False
+        if len(self._presses) >= MAX_PRESSES:
             return
         self._presses.append([now & UINT32, slot])
+
+    def key_up(self, now, slot):
+        """[r3] 15.7: the release of physical slot `slot` (the firmware's kEventReleased while claimed)."""
+        del now
+        if slot == 0:
+            self._hold_down, self._hold_matured = None, False
+        if slot == 3:
+            self._hold4_down, self._hold4_matured = None, False
 
     def start_reveal(self, now):
         """Firmware ``startReveal`` (a reveal of whatever the engine draws). [M29] revision 2 has no
@@ -1632,7 +1894,9 @@ class AliveLights:
         return lit_masks(self.targets)
 
     def animating(self):
-        return self.animator.animating()
+        """The animator, or the r4 output easer still moving, or a wall glow / domain sweep running."""
+        return (self.animator.animating() or self.ease_residue > RESIDUE or self._wall is not None
+                or self._sweep_at is not None)
 
     def claimed(self):
         return self._claimed
@@ -1659,6 +1923,7 @@ class AliveLights:
         """
         now &= UINT32
         dt = 0 if self._first_render else min(MAX_DT_MS, _elapsed(now, self._last_render))
+        ease_dt = 0 if self._first_render else min(1000, _elapsed(now, self._last_render))   # r4: the real gap
         self._first_render = False
         self._last_render = now
         live = self._claimed and frame is not None
@@ -1667,14 +1932,56 @@ class AliveLights:
             pending_ms = self._onsets(frame, now)
             g = alive_geometry(frame, local_pos, local_max, pending_ms)
             family, pending, playing = g.family, g.pending, g.playing
+            # DD-BUG-053 [r3.1] 15.8: a button-4 hold that matures on this render opens its landing window BEFORE
+            # the frame's feedback is read, so a host frame landing on the same render as the 1000 ms mark (ok +
+            # queued) lands as "queue", not as an ordinary moment. Same guards as the maturity block below (not
+            # the app canvas, holdMarker, hold 1 not running); that block keeps the fill and the 600 ms wait.
+            if (self._hold4_down is not None and not self._hold4_matured and g.frame.get("holdMarker") is True
+                    and not (isinstance(g.frame.get("app"), dict) and g.frame["app"].get("id") == "onshape")
+                    and not (self._hold_down is not None and bool(g.crumb))
+                    and _elapsed(now, self._hold4_down) >= HOLD4_MS):
+                self._hold4_matured = True
+                self._landing_at = now
             event = self._feedback(g, now)
             ext = (not self._seeding and self._prev_family == "home" and family == "home"
                    and not self._prev_external and g.external)
             if family == "home":
                 self._song(now, playing)
+        # [r3] 15.7 the hold-1 progress ring, on a screen with a crumb (never the launcher Home): the fill
+        # from 12 % of the 600 ms hold, then (once) the WARM home flash when it matures.
+        hold_fill = None
+        # 1.0.0-cc5.6 (A2): never on the app canvas (a frame with `app`): there 1 is ZOOM and 4 PAN, and Desk Dial's
+        # Home is all four buttons held 1 s (ONSHAPE.md): no hold-1 / hold-4 ring, flash or landing (cc_alive.cpp).
+        app_canvas = live and isinstance(g.frame.get("app"), dict) and g.frame["app"].get("id") == "onshape"
+        hold1 = live and not app_canvas and self._hold_down is not None and bool(g.crumb)
+        if hold1:
+            self._hold4_down = None                  # [r3.1] hold 1 wins: a held button 4 is dropped
+            held = _elapsed(now, self._hold_down)
+            if held >= HOLD_MS:
+                if not self._hold_matured:
+                    self._hold_matured = True
+                    self._flash, self._flash_start = "home", now
+            elif held * 100 >= HOLD_MS * HOLD_SHOW_PCT:
+                hold_fill = (held * ARC_LENGTH + HOLD_MS // 2) // HOLD_MS
+        # [r3.1] 15.8 the button-4 hold ring while slot 3 is held on a frame with holdMarker (any screen, the launcher
+        # too): the fill from 15 % of the 1000 ms hold; at maturity the full arc waits (<= 600 ms) for the host's
+        # landing feedback (_feedback). While the hold-1 ring runs (button 1 also held on a crumb screen) hold 1
+        # wins: that button-4 press draws nothing more (dropped above) until its next press.
+        if self._landing_at is not None and _elapsed(now, self._landing_at) >= LANDING_WINDOW_MS:
+            self._landing_at = None
+        if live and not app_canvas and self._hold4_down is not None and g.frame.get("holdMarker") is True:
+            held = _elapsed(now, self._hold4_down)
+            if held >= HOLD4_MS:
+                if not self._hold4_matured:
+                    self._hold4_matured = True
+                    self._landing_at = now
+                if self._landing_at is not None and _elapsed(now, self._landing_at) < LANDING_WAIT_MS:
+                    hold_fill = ARC_LENGTH
+            elif held * 100 >= HOLD4_MS * HOLD4_SHOW_PCT:
+                hold_fill = (held * ARC_LENGTH + HOLD4_MS // 2) // HOLD4_MS
         # The flash window (ok 650 ms, err 900 ms) and the moment hold are time-based: they also
         # end on a claimed render without a frame.
-        if self._flash is not None and _elapsed(now, self._flash_start) >= FLASH_MS[self._flash]:
+        if self._flash is not None and _elapsed(now, self._flash_start) >= FLASH_DURATION_MS[self._flash]:
             self._flash = None
         if self._hold_ms and _elapsed(now, self._hold_start) >= self._hold_ms:
             self._hold_ms = 0
@@ -1699,7 +2006,8 @@ class AliveLights:
         elif not live:
             targets = AliveTargets(family=FAMILY_OFFLINE)
         else:
-            targets = alive_finish(g, sleeping, self._flash, self._vol_full, self.animator.reduced_motion)
+            targets = alive_finish(g, sleeping, self._flash, self._vol_full, self.animator.reduced_motion,
+                                   hold_fill)
         self.targets = targets
         self.tod_b = self.tod_brightness(now)
         self.song_prog = None
@@ -1709,9 +2017,60 @@ class AliveLights:
             self.song_prog = 1.0 if pos < self._prog_pos else cl(pos / self._prog_dur)
         if live:
             self._events(now, g, targets, sleeping, event, ext)
+        if live and self._limits:                           # r4 3.3: a wall glows the end LEDs (cursor +-2)
+            self._wall = (self._limits[-1][0], targets.cursor)
         self._presses, self._detents, self._limits = [], [], []
         self._prev_asleep = sleeping
-        return self.animator.step(now, dt, targets, self.song_prog, self.tod_b, self.palette)
+        ring, buttons = self.animator.step(now, dt, targets, self.song_prog, self.tod_b, self.palette)
+        return self._r4_layer(now, ease_dt, ring, buttons)
+
+    def _r4_layer(self, now, dt, ring, buttons):
+        """r4 (ALIVE.md 16): the wall glow blended over the animator's e, then the 50 ms output easer with the M12
+        sweep's per-LED start; returns what the LEDs show (firmware CCAlive::r4Layer)."""
+        ring = list(ring)
+        if self._wall is not None:
+            t = _elapsed(now, self._wall[0])
+            if t < GLOW_RISE_MS:
+                g = eo(t / GLOW_RISE_MS)
+            elif t < GLOW_RISE_MS + GLOW_FALL_MS:
+                g = 1 - eio((t - GLOW_RISE_MS) / GLOW_FALL_MS)
+            else:
+                g, self._wall = 0.0, None
+            if g > 0:
+                c = tone(*(x / 255 * WALL_GLOW_ALPHA for x in WALL_GLOW_RGB))
+                for k in range(-WALL_GLOW_HALF, WALL_GLOW_HALF + 1):
+                    i = (self._wall[1] + k) % SEGMENTS
+                    e = ring[i]
+                    ring[i] = (e[0] + (c[0] - e[0]) * g, e[1] + (c[1] - e[1]) * g, e[2] + (c[2] - e[2]) * g)
+        self.raw = (list(ring), list(buttons))          # the animator's e (+ the wall glow) before the easer
+        sweep_ms = _elapsed(now, self._sweep_at) if self._sweep_at is not None else 0
+        if self._sweep_at is not None and sweep_ms >= LAND_FLASH_MS:
+            self._sweep_at = None
+        # First-order hold (firmware CCAlive::r4Layer): s1 = x1 + (s0 - x0) a - (x1 - x0) b, a = e^-dt/tau,
+        # b = tau / dt (1 - a): the easer integrated exactly across a frame whose e moves linearly.
+        a = math.exp(-dt / EASE_TAU_MS) if dt else 1.0
+        b = EASE_TAU_MS / dt * (1 - a) if dt else 1.0
+        residue = 0.0
+        eased = []
+        for i in range(SEGMENTS):
+            shown, target, prev = self._eased[i], ring[i], self._prev_e[i]
+            held = self._sweep_at is not None and sweep_ms < SWEEP_STEP_MS * i
+            if not held and dt:
+                shown = tuple(target[q] + (shown[q] - prev[q]) * a - (target[q] - prev[q]) * b for q in range(3))
+            shown = tuple(target[q] if abs(target[q] - shown[q]) < EASE_SNAP else shown[q] for q in range(3))
+            residue = max(residue, *(abs(target[q] - shown[q]) for q in range(3)))
+            eased.append(shown)
+        eased_b = []
+        for j in range(BUTTON_SLOTS):
+            shown, target, prev = self._eased_buttons[j], buttons[j], self._prev_eb[j]
+            if dt:
+                shown = tuple(target[q] + (shown[q] - prev[q]) * a - (target[q] - prev[q]) * b for q in range(3))
+            shown = tuple(target[q] if abs(target[q] - shown[q]) < EASE_SNAP else shown[q] for q in range(3))
+            residue = max(residue, *(abs(target[q] - shown[q]) for q in range(3)))
+            eased_b.append(shown)
+        self._prev_e, self._prev_eb = [tuple(x) for x in ring], [tuple(x) for x in buttons]
+        self._eased, self._eased_buttons, self.ease_residue = eased, eased_b, residue
+        return list(eased), list(eased_b)
 
     # ------------------------------------------------------- internals
     def _wake_input(self, sleep_at):
@@ -1752,9 +2111,28 @@ class AliveLights:
                 fb.side = -1 if feedback.get("side") == -1 else 1
             if fb.moment in ("snap", "started"):
                 fb.color = _int(feedback.get("color", 0), 0, 0xFFFFFF, 0)
-        hold = moment_hold_ms(fb, g.color_mode)
+        elif feedback.get("moment") == "refused":
+            fb.moment = "refused"                            # [r3] 15.7: the unavailable press
+        # [r3.1] 15.8: the first new seq after a button-4 hold matured closes its landing window; within 1500 ms a
+        # plain ok lands as "land" and ok + queued as "queue" (no sweep, no moment hold).
+        if self._landing_at is not None:
+            window = _elapsed(now, self._landing_at) < LANDING_WINDOW_MS
+            self._landing_at = None
+            if window and kind == "ok" and not fb.skip and fb.moment in (None, "queued"):
+                self._flash = "queue" if fb.moment == "queued" else "land"
+                self._flash_start, self._hold_ms = now, 0
+                # r4 M12: the domain swap sweeps from 12 o'clock; FW-DES-002: under reduced motion (r4 7) every LED
+                # eases at once (a blend, no sweep).
+                if self._flash == "land" and not self.animator.reduced_motion:
+                    self._sweep_at = now
+                return fb
+        hold = moment_hold_ms(fb, g.color_mode) if kind == "ok" else 0
         if kind == "err" or fb.skip or fb.moment is None:
             self._flash, self._flash_start = kind, now       # rows a, b, i, j: the flash
+            if kind == "err" and fb.moment == "refused":
+                self._flash = "refused"                      # [r3] 15.7: bottom red, no shake
+            if kind == "ok" and not fb.skip and g.family == "lights":
+                self._flash = "wash"                         # [r3] 15.5: the LIGHTS ok wash
             self._hold_ms = 0
         else:
             self._flash = None                               # rows c-h: no flash [M7]
@@ -1784,7 +2162,10 @@ class AliveLights:
         """6.4 row a-j (first match). Returns True when the row was h (started)."""
         play = self.animator.play
         if fb.kind == "err":                                               # a
-            play(Effect("fail", now, at=cursor))
+            if fb.moment != "refused":                                     # [r3] 15.7: no shake
+                play(Effect("fail", now, at=cursor))
+        elif self._flash in ("wash", "land", "queue"):                     # [r3] 15.5, [r3.1] 15.8: overrides
+            pass
         elif fb.skip:                                                      # b [M21]
             play(Effect("sweep", now, at=self._prev_cursor, dir=fb.skip))
         elif fb.moment == "queued":                                        # c

@@ -145,7 +145,7 @@ LIST_BUTTONS = _buttons(("Back", True, "back"), ("Home", True, "home"), ("Win", 
 
 
 def volume_frame(v, c=None, led="color", external=False, activity="idle", feedback=None):
-    frame = {"id": 1, "mode": "VOLUME", "target": "Den", "value": f"{v}%", "detail": "", "status": "",
+    frame = {"id": 1, "mode": "VOLUME", "target": "Hall", "value": f"{v}%", "detail": "", "status": "",
              "activity": activity, "layout": "nowPlaying", "ledStyle": led,
              "confirmedVolume": v if c is None else c, "buttons": HOME_BUTTONS,
              "ring": {"style": "level", "value": v, "index": 0, "count": 101, "external": external}}
@@ -169,7 +169,7 @@ def list_frame(count, index, led="color", colors="auto", unavailable=0, more=-1,
         colors = [accent(j) for j in range(start, start + min(20, count - start))]
     if colors is not None:
         ring["colors"] = colors
-    frame = {"id": 1, "mode": "WINDOWS" if windows else "RECENTLY ADDED", "target": "Den", "value": "",
+    frame = {"id": 1, "mode": "WINDOWS" if windows else "RECENTLY ADDED", "target": "Hall", "value": "",
              "detail": "", "status": "", "activity": activity, "layout": "windows" if windows else "recent",
              "ledStyle": led, "buttons": LIST_BUTTONS, "ring": ring}
     if feedback:
@@ -178,7 +178,7 @@ def list_frame(count, index, led="color", colors="auto", unavailable=0, more=-1,
 
 
 def transport_frame(index, no_prev=False, activity="idle", mask=None):
-    return {"id": 1, "mode": "TRACKS", "target": "Den", "value": "", "detail": "", "status": "",
+    return {"id": 1, "mode": "TRACKS", "target": "Hall", "value": "", "detail": "", "status": "",
             "activity": activity, "layout": "tracks", "ledStyle": "color", "buttons": LIST_BUTTONS,
             "ring": {"style": "transport", "value": 0, "index": index, "count": 3,
                      "unavailable": (1 if no_prev else 0) if mask is None else mask}}

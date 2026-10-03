@@ -2,7 +2,7 @@
 
 * tests/fixtures/frames_alive.json: device._frame (host output, key order included, a fixed
   point, a valid v4 frame plus valid section 3 fields) and device.alive_parse (the parser's
-  reading, rules.aliveRaw) against the shared fixtures that work/lcd-preview/parse_tests.py
+  reading, rules.aliveRaw) against the shared fixtures that harness/parse_tests.py
   also runs through the firmware parser (src/cc_frame_parse.cpp).
 * Capability gating: the fields go only to a knob with capabilities.alive.version == 1. With
   any other knob every frame line is byte-identical to desktop v6's: the reference is the v6

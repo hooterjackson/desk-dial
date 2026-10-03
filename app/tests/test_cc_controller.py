@@ -644,6 +644,22 @@ class UnavailablePlaybackTests(ControllerFixture):
         self.assertEqual(self.c.frame()["status"], "Didn’t start")
 
 
+class FakeScale(FakeWidget):
+    """tk.Scale without Tk: set runs its command (as Tk does), bind records the callbacks."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.value = 0
+        self.bindings = {}
+
+    def set(self, value):
+        self.value = value
+        if self.values.get("command"):
+            self.values["command"](str(value))
+
+    def get(self): return self.value
+    def bind(self, sequence, callback): self.bindings[sequence] = callback
+
+
 class FakeVariable:
     def __init__(self, value=""):
         self.value = value
@@ -677,7 +693,7 @@ class SetupConfigurationTests(unittest.TestCase):
         for target, name, value in (
             (ui, "button", button), (ui, "label", lambda *a, **k: FakeWidget(**k)),
             (ui.tk, "Toplevel", FakeWidget), (ui.tk, "Frame", FakeWidget),
-            (ui.tk, "Entry", FakeWidget), (ui.tk, "StringVar", variable),
+            (ui.tk, "Entry", FakeWidget), (ui.tk, "StringVar", variable), (ui.tk, "Scale", FakeScale),
         ):
             patcher = patch.object(target, name, value)
             patcher.start()

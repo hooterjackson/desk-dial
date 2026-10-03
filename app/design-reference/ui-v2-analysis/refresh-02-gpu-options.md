@@ -17,10 +17,10 @@ ring) is firmware and is not affected by any choice made here; it is out of scop
 | `carousel.py:L`, `overlay.py:L`, `ui.py:L` | `app/control_center/<file>:<line>` |
 | `CAROUSEL.md:L`, `FLOATING_KNOB.md:L` | `app/<file>:<line>` |
 | `README:L`, `01:L` | `design-reference/design_handoff_nano_d_master/README.md`, `.../specs/01-FEATURES-explorers-snap-seek.md` |
-| `spike/…` | `scratchpad/carousel-spike/…` (the v6 visual spike that ran on the user's screen, 2026-09-24) |
-| `bench/…` | `scratchpad/refresh-study/…` (this study's scripts and JSON results) |
+| `spike/…` | `<scratch>/carousel-spike/…` (the v6 visual spike that ran on the user's screen, 2026-09-24) |
+| `bench/…` | `<scratch>/refresh-study/…` (this study's scripts and JSON results) |
 
-`scratchpad` = `<scratchpad>`.
+`a scratch folder` = `<scratch>`.
 
 **Method.** Docs, samples and source (URLs in §9), plus **headless** measurements on this PC
 with the project venv (`.venv\Scripts\python.exe -I`, Python 3.14.5). The scripts create **no

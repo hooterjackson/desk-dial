@@ -1,0 +1,30 @@
+{
+  "repo": "https://github.com/katbinaris/NanoD_RatchetH1",
+  "branch": "feat/firmware-esp-idf-quadra",
+  "commit": "55e47cbb313416ca678936b51e5c1988ef5590d4",
+  "origin": "built-ins",
+  "exporter": "tools/profiles/import_karl.py (Karl's tools/profile_json_test, unchanged)",
+  "cjson": "v1.7.18",
+  "files": {
+    "autocad.json": {
+      "sha256": "57f804bb7e79541ec1da20e6a3a6978b4f7b5f45e346175b00b42e2f12a59e6b",
+      "bytes": 7838
+    },
+    "blender.json": {
+      "sha256": "2b24376eeac710749c43d1e70cb4e40408ed86bc9d0ddca0e3355a8c7b842674",
+      "bytes": 7838
+    },
+    "figma.json": {
+      "sha256": "4468ea3f5621c26cf344eb34e444152fc727775326b6c8a81705d730c273e756",
+      "bytes": 18501
+    },
+    "onshape.json": {
+      "sha256": "967bf79dd5337781c864961dd3db61ad7c6c8c7875199ee1e1141c1d5c17f285",
+      "bytes": 20801
+    },
+    "plasticity.json": {
+      "sha256": "86e31ca7d12a7ac18b5145f8d81b6bde67111e7db1fe220fb2b6521477f9c438",
+      "bytes": 18639
+    }
+  }
+}

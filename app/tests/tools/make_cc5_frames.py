@@ -8,7 +8,7 @@ capacities and section 8 slimming), so each stored frame is exactly the wire
 frame. Renderers draw its text verbatim.
 
 Per case: the model's id/name/note, the Stage 6 art fixture to load for the
-frame's artKey ("art-den-120" where the model shows a cover, "art-bright-120"
+frame's artKey ("art-hall-120" where the model shows a cover, "art-bright-120"
 for one stress case, null where the model has no art), the Windows letter tile,
 screenKey/depth for slide checks and the expected LED drive colours (pre-cap,
 pulse phase 0, flash drawn).
@@ -141,7 +141,7 @@ def build(golden=None):
                   "fixture in assets/fixtures/<art>.rgb565 to load for the frame's artKey."),
         "contract": "firmware/PRESENTATION_V4.md",
         "capabilities": CAPABILITIES,
-        "artFixtures": {ART_DEN: "assets/fixtures/art-den-120.rgb565", ART_BRIGHT: "assets/fixtures/art-bright-120.rgb565"},
+        "artFixtures": {ART_DEN: "assets/fixtures/art-hall-120.rgb565", ART_BRIGHT: "assets/fixtures/art-bright-120.rgb565"},
         "valueNote": ("value carries the volume digits plus '%' (contract section 3 example '54%'); "
                       "Knob Face draws the '%' at 22 px in ink2 after the 48 px digits."),
         "deviations": {

@@ -64,6 +64,18 @@ class MusicUnavailable(AppleMusicError):
     pass
 
 
+class NotSignedIn(AppleMusicError):
+    """No Music user token is stored: Apple Music was never connected on this PC (or was
+    disconnected). Raised before any I/O (DD-BUG-023).
+
+    ``signin_needed`` tells it apart from a token Apple refused (HTTP 401/403). Its K3 outcome
+    stays ``signin_expired`` unless the caller asks ``apple_outcome(..., split_signin=True)``:
+    until the controller has copy for ``signin_needed`` (a connect prompt), every screen keeps
+    the sign-in prompt rather than falling through to a generic failure."""
+
+    signin_needed = True
+
+
 class ResolveTimeout(MusicUnavailable):
     """The whole resolve passed its 20 s deadline (C5-37); nothing was staged."""
 
@@ -81,14 +93,19 @@ class UnlikeUnavailable(AppleMusicError):
     ``unlike_unavailable``; [r2.2] C5-67). Raised before any I/O."""
 
 
-def apple_outcome(error, op: str, *, kind: str | None = None) -> str:
+def apple_outcome(error, op: str, *, kind: str | None = None, split_signin: bool = False) -> str:
     """K3 section 9.10 outcome for an exception from an Apple op.
 
     ``op`` is the effect kind (``like``, ``ratings``, ``catalog_songs``,
     ``favourite_playlists``, ``playlist_meta``, ``recent``, ``play_items``, ``play_next``,
     ``resolve``); ``kind`` the item kind for a start (``album`` / ``playlist`` / ``song``).
+    ``split_signin`` (DD-BUG-023): a never-connected Apple Music (``NotSignedIn``) is
+    ``signin_needed`` instead of ``signin_expired``. Off by default, so a caller whose copy knows
+    only ``signin_expired`` keeps showing the sign-in prompt.
     """
     status = getattr(error, "status", None)
+    if isinstance(error, NotSignedIn):
+        return "signin_needed" if split_signin else "signin_expired"
     if status in (401, 403):
         return "signin_expired"
     if status == 429:
@@ -306,7 +323,7 @@ class AppleMusicClient:
         self.credentials = dict(credentials)
         user_token = credentials.get("music_user_token")
         if not isinstance(user_token, str) or not user_token:
-            raise AppleMusicError("Connect Apple Music in companion settings first.")
+            raise NotSignedIn("Connect Apple Music in companion settings first.")
         try:
             token = developer_token(credentials)
             session, lock = self._http(background)

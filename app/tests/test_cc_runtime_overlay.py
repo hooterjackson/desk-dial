@@ -555,6 +555,11 @@ class FakeWidget:
     def destroy(self): self.destroyed = True
 
 
+class FakeScale(FakeWidget):
+    """tk.Scale without Tk (the Knob sounds volume)."""
+    def set(self, value): self.values["value"] = value
+
+
 class SettingsTests(OverlayAppCase):
     work_area = (0, 0, 1920, 1040)
     frame = (0, 0)                     # the title bar and borders (window_frame_extent)
@@ -584,7 +589,7 @@ class SettingsTests(OverlayAppCase):
             return widget
         patches = [patch.object(ui, "button", button), patch.object(ui, "label", label),
                    patch.object(ui.tk, "Toplevel", FakeWidget), patch.object(ui.tk, "Frame", FakeWidget),
-                   patch.object(ui.tk, "Entry", FakeWidget),
+                   patch.object(ui.tk, "Entry", FakeWidget), patch.object(ui.tk, "Scale", FakeScale),
                    patch.object(ui.tk, "StringVar", lambda value="": SimpleNamespace(get=lambda: value,
                                                                                      set=lambda v: None)),
                    patch.object(ui, "show_fitted", show_fitted),

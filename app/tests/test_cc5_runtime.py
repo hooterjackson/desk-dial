@@ -410,8 +410,8 @@ class ArtAndAccentTests(unittest.TestCase):
     def test_no_art_items_get_the_gen_accent_and_index_7_is_warm(self):
         from control_center.artwork import gen_sleeve
         runtime = self.h.runtime
-        item = {"id": "x", "title": "Night Drive", "artist": "Sample library", "art_template": ""}
-        self.assertEqual(runtime.accent_of("recent", item), gen_sleeve("Night Drive", "Sample library")["ring_accent"])
+        item = {"id": "x", "title": "Night Channel", "artist": "Sample library", "art_template": ""}
+        self.assertEqual(runtime.accent_of("recent", item), gen_sleeve("Night Channel", "Sample library")["ring_accent"])
         for n in range(200):
             title = f"T{n}"
             if gen_sleeve(title, "")["index"] == 7:
@@ -439,7 +439,7 @@ class LedgerTests(unittest.TestCase):
         h.press(1)
         h.run(2)
         h.c.position(1, h.c.control_id)
-        h.press(2)                           # Play next Night Drive
+        h.press(2)                           # Play next Night Channel
         h.run(3)
         self.assertEqual(h.runtime.ledger.playnext[0].start_row, 2)
 

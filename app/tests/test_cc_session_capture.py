@@ -441,7 +441,7 @@ class SessionCaptureTests(unittest.TestCase):
                 self.assertIn("Café finale – ½ time ?", texts, "NFC, compatibility forms, unsupported glyphs")
                 self.assertIn("Now: Say \"Hello\" \\ Goo…", texts, "K3 5.4.3: the 14 px line fitted with an ellipsis")
         legacy = {value for f in map(frame_of, self.session("p2")) for value in f.values() if isinstance(value, str)}
-        self.assertIn("Cafe finale - 1?2 time ?", legacy, "cc4: ASCII fallback")
+        self.assertIn("Cafe finale - 1/2 time ?", legacy, "cc4: ASCII fallback (DD-DES-002: the fraction slash is /)")
         for record in self.presented:
             for name, capacity in presentation.TEXT_CAPACITY.items():
                 text = frame_of(record).get(name, "")

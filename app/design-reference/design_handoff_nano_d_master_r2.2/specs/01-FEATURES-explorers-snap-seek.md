@@ -650,17 +650,17 @@ The prototype measures them live. Values below are approximate character counts;
 | Knob status 12 px | Home · Sonos down | `Sonos unavailable` | ≤ 160 px | 17 |
 | Knob status 12 px | Home · group changed | `Speaker group changed` | ≤ 160 px | 21 |
 | Knob title 22 px | PC not connected | `Waiting for PC` | ≤ 170 px | 14 |
-| Toast | Play next · success | `Queued next · Moon Safari` | — | 25 |
+| Toast | Play next · success | `Queued next · Midnight Arcade` | — | 25 |
 | Toast | Play next · AirPlay / radio / line-in | `Not playing from the queue · use Play` | — | 37 |
 | Toast | Play next · nothing playing | `Nothing playing · use Play` | — | 26 |
 | Toast | Play next · Sonos shuffle | `Shuffle is on · turn it off to play next` | — | 40 |
-| Toast | Play next · failed | `Couldn’t queue Moon Safari · nothing added` | — | 42 |
+| Toast | Play next · failed | `Couldn’t queue Midnight Arcade · nothing added` | — | 42 |
 | Toast | Play next · partial | `Partly queued · check the Sonos queue` | — | 37 |
 | Toast | Play next · song changed | `Song changed · try again` | — | 24 |
 | Toast | Start · success (after overlay closes) | `Playing PAPER LANTERN Ep. 1` | — | 26 |
 | Toast | Start · partly playable | `Playing 33 of 34 · 1 song unavailable` | — | 37 |
 | Toast | Start · partly playable (plural) | `Playing 31 of 34 · 3 songs unavailable` | — | 38 |
-| Toast | Start · album blocked | `Kind of Blue can’t play · a song is unavailable` | — | 47 |
+| Toast | Start · album blocked | `Tidal Glass can’t play · a song is unavailable` | — | 47 |
 | Toast | Start · failed | `Couldn’t start PAPER LANTERN Ep. 1` | — | 33 |
 | Toast | Switch | `Claude · Nano D Control Center` | — | 30 |
 | Toast | Snap · both sides | `Side by side · Claude and Slack` | — | 31 |

@@ -13,8 +13,8 @@ $ErrorActionPreference = 'Stop'
 #            3. the staged seeds (local\settings.json, local\credentials.bin), only where a file is
 #               missing, after the migration (14.3: the user's live files win over the seeds);
 #            4. the Start-menu shortcut.
-#   cleanup: after the new sign-in task is registered: the other name's shortcut is removed and its
-#            program folder moved to backups\ (moved, never deleted).
+#   cleanup: after the new sign-in task is registered: the other name's program folder is moved to the
+#            backups\ of the new home, on its own volume (moved, never deleted), then its shortcut removed.
 # Records names, sizes and whether hashes matched; never file contents or hashes.
 
 function Copy-OldHome([string]$Source, [string]$Destination) {
@@ -56,21 +56,32 @@ function Copy-OldHome([string]$Source, [string]$Destination) {
     return $result
 }
 
+# The report's folder may not exist yet (diagnostics\ is not in the repository): created before the first write,
+# so a failure is still reported.
+$reportFolder = Split-Path -Parent $Report
+if ($reportFolder) { New-Item -ItemType Directory -Path $reportFolder -Force | Out-Null }
 $stage = 'plan'
 try {
     $p = Get-Content -LiteralPath $Plan -Raw | ConvertFrom-Json
     if ($Step -eq 'cleanup') {
-        $stage = 'shortcut'
-        $removed = $false
-        if (Test-Path -LiteralPath $p.otherShortcut) { Remove-Item -LiteralPath $p.otherShortcut -Force; $removed = $true }
+        # The program folder first, then the shortcut: if the move fails the other install stays whole
+        # (folder and shortcut). The backup is on the program's volume, so the move is a rename.
         $stage = 'program'
         $moved = $null
         if (Test-Path -LiteralPath $p.otherProgram) {
             if (Test-Path -LiteralPath $p.programBackup) { throw "$($p.programBackup) already exists" }
+            $programRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($p.otherProgram))
+            $backupRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($p.programBackup))
+            if (-not [string]::Equals($programRoot, $backupRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "$($p.programBackup) is not on the same volume as $($p.otherProgram)"
+            }
             New-Item -ItemType Directory -Path (Split-Path -Parent $p.programBackup) -Force | Out-Null
             Move-Item -LiteralPath $p.otherProgram -Destination $p.programBackup
             $moved = $p.programBackup
         }
+        $stage = 'shortcut'
+        $removed = $false
+        if (Test-Path -LiteralPath $p.otherShortcut) { Remove-Item -LiteralPath $p.otherShortcut -Force; $removed = $true }
         [ordered]@{ passed = $true; step = 'cleanup'; shortcutRemoved = $removed; programMovedTo = $moved } |
             ConvertTo-Json | Set-Content -LiteralPath $Report -Encoding UTF8
         exit 0

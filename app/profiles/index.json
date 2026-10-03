@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "profiles": [
+    {
+      "bytes": 7838,
+      "desk_dial_min": "2.0.0",
+      "file": "karl/autocad.json",
+      "id": "autocad",
+      "overlay": {
+        "bytes": 224,
+        "file": "autocad.windows.json",
+        "sha256": "5430b0d1139438e8279c9d3dddec087952b78a80265cee5a4ce77fe786e19ecf"
+      },
+      "sha256": "57f804bb7e79541ec1da20e6a3a6978b4f7b5f45e346175b00b42e2f12a59e6b"
+    },
+    {
+      "bytes": 7838,
+      "desk_dial_min": "2.0.0",
+      "file": "karl/blender.json",
+      "id": "blender",
+      "overlay": {
+        "bytes": 227,
+        "file": "blender.windows.json",
+        "sha256": "9bdd8b5199987e94280bbe1ae3f4c667ffaf3f088571dfa078771594b65edbc0"
+      },
+      "sha256": "2b24376eeac710749c43d1e70cb4e40408ed86bc9d0ddca0e3355a8c7b842674"
+    },
+    {
+      "bytes": 18501,
+      "desk_dial_min": "2.0.0",
+      "file": "karl/figma.json",
+      "id": "figma",
+      "overlay": {
+        "bytes": 1594,
+        "file": "figma.windows.json",
+        "sha256": "c59c825ddba228fcb79463ae1ba51765a807f0439c383bcd19cfaaf265093979"
+      },
+      "sha256": "4468ea3f5621c26cf344eb34e444152fc727775326b6c8a81705d730c273e756"
+    },
+    {
+      "bytes": 20801,
+      "desk_dial_min": "2.0.0",
+      "file": "karl/onshape.json",
+      "id": "onshape",
+      "overlay": {
+        "bytes": 2028,
+        "file": "onshape.windows.json",
+        "sha256": "73f264f5d5ef4d5eb0211320ff6b10ed81b5565d5067584732c8dc7798c7b751"
+      },
+      "sha256": "967bf79dd5337781c864961dd3db61ad7c6c8c7875199ee1e1141c1d5c17f285"
+    },
+    {
+      "bytes": 18639,
+      "desk_dial_min": "2.0.0",
+      "file": "karl/plasticity.json",
+      "id": "plasticity",
+      "overlay": {
+        "bytes": 1311,
+        "file": "plasticity.windows.json",
+        "sha256": "e58917b282c6e2c3d3d6f3bfd49a70440ffe6f026b2d277de7d2fe8196e644a7"
+      },
+      "sha256": "86e31ca7d12a7ac18b5145f8d81b6bde67111e7db1fe220fb2b6521477f9c438"
+    }
+  ]
+}

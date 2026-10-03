@@ -49,6 +49,7 @@ class MusicOverlay:
         self.posted = 0
         self.failed = 0
         self._warned = False
+        self._closed = None  # the first close()'s result; set once closed
 
     # ------------------------------------------------------------------ effects (Tk thread)
     def post(self, effect) -> bool:
@@ -135,6 +136,11 @@ class MusicOverlay:
         return m
 
     def close(self, timeout: float = 2.0) -> bool:
+        """Close the stage, then the art workers, within ONE ``timeout`` budget. Idempotent: a
+        second call returns the first call's result at once and never waits again."""
+        if self._closed is not None:
+            return self._closed
+        deadline = self.clock() + max(0.0, float(timeout))
         ok = True
         if self.presenter is not None:
             try:
@@ -143,7 +149,8 @@ class MusicOverlay:
                 ok = False
         if self.art is not None:
             try:
-                self.art.close(timeout / 2.0)
+                self.art.close(max(0.0, deadline - self.clock()))
             except Exception:
                 pass
+        self._closed = ok
         return ok

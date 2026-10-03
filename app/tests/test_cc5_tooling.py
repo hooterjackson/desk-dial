@@ -108,6 +108,13 @@ Three kinds of test, none of which touches hardware:
     check_nanod_cc5_look.py (GO / NO-GO, NOT RUN, evidence, the user's answers); the rollback's closing line
     per outcome; and the runbook's "Fix binaries D and E" section. The flow tests of the 2026-09-26 window
     (A, B, C) run with those binaries as the active ones (HardwareFreeScriptTest.active_binaries).
+  * 1.0.0-cc5.5 (plan F1, CURRENT since the tooling moved on; the cc5.4-era classes above run pinned to cc5.4:
+    pinned_to on plain TestCases, HardwareFreeScriptTest.pinned "cc5.4" by default): the profile over the installed,
+    never-finalized cc5.4 D (from_binary, from_finalized False, restore_record manifest-cc5.3.json, the D install
+    record), its own ladder D and F (F: 12 ms, CC_BUILD_BINARY 6, diag build F), the rollback target cc5.4, the
+    from-release checks (from_install_problems, active_record_problems, restore_record_problems), the F1 diag fields
+    and their summary, build (the flash size gate) and package (the kept cc5.4 D record) of D and F, prepare over the
+    never-finalized D, the rollback records to cc5.4 D and the look check of F.
 Nothing here opens a serial port, runs esptool, starts a process or writes outside a
 temporary folder. Skips when the firmware workspace is not next to the companion.
 """
@@ -129,6 +136,7 @@ import shutil
 import struct
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -149,15 +157,25 @@ SCRIPTS = ("build_nanod_cc5.py", "package_nanod_cc5.py", "nanod_enter_bootloader
 FLASHING = ("backup_nanod_cc5.py", "install_nanod_cc5.py", "rollback_nanod_cc5.py")
 BACKUPS = ROOT / "backups"
 needs_tooling = unittest.skipIf(t is None, "tools/nanod_cc5_tooling.py is not present")
-# The flashing runbooks (firmware/*.md) name absolute paths, virtualenvs and release images of the
-# author's workspace; the public tree writes those roots as <repo>, so these runbook checks only run
-# in a full workspace with NANOD_RUNBOOK_CHECKS=1.
-machine_runbook = unittest.skipUnless(os.environ.get("NANOD_RUNBOOK_CHECKS") == "1",
-                                      "runbook paths are <repo> placeholders here (set NANOD_RUNBOOK_CHECKS=1)")
 # The 2026-09-26 window's ladder (PRESENTATION_V5 12.6), retired since A's rollback (tooling.RETIRED_BINARIES). The
 # flow tests of that window run their scripts with these as the active binaries (HardwareFreeScriptTest
 # .active_binaries), so the mechanism they pin stays tested; the fix-binary tests use the real ACTIVE_BINARIES (D, E).
 LEGACY_BINARIES = ("A", "B", "C")
+
+
+def pinned_to(key):
+    """Class decorator: run a plain TestCase as if PROFILES[key] were CURRENT (pin_current before its own setUp).
+    1.0.0-cc5.5 moved CURRENT on (plan F1); the tests written for 1.0.0-cc5.4 (its ladder A..E, the fix binaries D
+    and E, its runbook and records) keep describing that release, as the cc5.3-era classes run pinned to cc5.3."""
+    def decorate(cls):
+        original = cls.setUp
+
+        def setUp(self):
+            pin_current(self.enterContext, key)
+            original(self)
+        cls.setUp = setUp
+        return cls
+    return decorate
 
 
 def port(device, vid, pid, serial):
@@ -225,9 +243,9 @@ class PortMatchingTests(unittest.TestCase):
             self.assertFalse(t.is_app_port(bad))
 
     def test_rom_port_requires_this_chip_mac(self):
-        for serial in ("12:34:56:78:9A:BC", "12:34:56:78:9a:bc", "123456789ABC", "12-34-56-78-9a-bc"):
+        for serial in ("12:34:56:78:9A:BC", "12:34:56:78:9A:BC", "123456789ABC", "12-34-56-78-9A-BC"):
             self.assertTrue(t.is_rom_port(ROM(serial)), serial)
-        for bad in (ROM("12:34:56:78:9A:BD"), ROM(None), ROM(""), port("X", 0x239A, 0x8010, "12:34:56:78:9A:BC")):
+        for bad in (ROM("12:34:56:78:59:6D"), ROM(None), ROM(""), port("X", 0x239A, 0x8010, "12:34:56:78:9A:BC")):
             self.assertFalse(t.is_rom_port(bad))
         self.assertFalse(t.is_rom_port(ROM("12:34:56:78:9A:BC"), mac=""))
 
@@ -240,7 +258,7 @@ class PortMatchingTests(unittest.TestCase):
                 t.find_app_port(ports)
             self.assertIn("Nothing was opened or sent", str(caught.exception))
         with self.assertRaises(t.PortError):
-            t.find_rom_port([ROM(device="C1"), ROM("123456789abc", device="C2")])
+            t.find_rom_port([ROM(device="C1"), ROM("123456789ABC", device="C2")])
 
     def test_poll_waits_for_a_stable_single_match(self):
         now = itertools.count(0, 0.25)
@@ -300,10 +318,10 @@ class EsptoolGuardTests(unittest.TestCase):
                 t.validate_esptool_args(args)
 
     def test_reset_confirmation_and_retry_command(self):
-        good = "MAC: 12:34:56:78:9a:bc\nHard resetting via RTS pin...\n"
+        good = "MAC: 12:34:56:78:9A:BC\nHard resetting via RTS pin...\n"
         self.assertTrue(t.reset_confirmed(True, good))
         self.assertFalse(t.reset_confirmed(False, good))
-        self.assertFalse(t.reset_confirmed(True, "MAC: 12:34:56:78:9a:bc\n"))            # no reset line
+        self.assertFalse(t.reset_confirmed(True, "MAC: 12:34:56:78:9A:BC\n"))            # no reset line
         self.assertFalse(t.reset_confirmed(True, "MAC: aa:bb:cc:dd:ee:ff\nHard resetting via RTS pin...\n"))
         self.assertFalse(t.reset_confirmed(True, None))
         command = t.reset_retry_command("COMQ")
@@ -316,7 +334,7 @@ class EsptoolGuardTests(unittest.TestCase):
 
         def fake_run(command, **kwargs):
             calls.append((command, kwargs))
-            return SimpleNamespace(returncode=0, stdout="MAC: 12:34:56:78:9a:bc\nDetected flash size: 4MB\n", stderr="")
+            return SimpleNamespace(returncode=0, stdout="MAC: 12:34:56:78:9A:BC\nDetected flash size: 4MB\n", stderr="")
 
         with tempfile.TemporaryDirectory() as folder:
             report = {}
@@ -725,30 +743,38 @@ def deepcopy_json(value):
 
 
 @needs_tooling
+@pinned_to("cc5.5")
 class ReleaseNamingTests(unittest.TestCase):
-    """1.0.0-cc5.4 (the cc5.3 -> cc5.4 profile) is the current release everywhere; the cc5.2 -> cc5.3
-    and cc4 -> cc5.2 profiles, 1.0.0-cc5 and 1.0.0-cc5.1 stay as history under their own names."""
+    """1.0.0-cc5.5 (the cc5.4 D -> cc5.5 profile, plan F1) is the current release everywhere; the cc5.3 -> cc5.4,
+    cc5.2 -> cc5.3 and cc4 -> cc5.2 profiles, 1.0.0-cc5 and 1.0.0-cc5.1 stay as history under their own names."""
 
     def test_release_names(self):
-        self.assertEqual(t.CC5_VERSION, "1.0.0-cc5.4")
-        self.assertEqual(t.CC5_TAG, "cc5.4")
-        self.assertIs(t.CURRENT, t.PROFILES["cc5.4"])
-        self.assertEqual(t.CC5_IMAGE.name, "nanod-control-center-1.0.0-cc5.4.bin")
-        self.assertEqual(t.CC5_SOURCE_ZIP.name, "nanod-control-center-1.0.0-cc5.4-source.zip")
-        self.assertEqual(t.CC5_MANIFEST.name, "manifest-1.0.0-cc5.4.json")
-        self.assertEqual(t.EXPECTED_FULL.name, "nanod-cc5.4-expected-full.bin")
-        self.assertEqual(t.BUILD_LOG.name, "nanod-cc5.4-build.log")
+        self.assertEqual(t.CC5_VERSION, "1.0.0-cc5.5")
+        self.assertEqual(t.CC5_TAG, "cc5.5")
+        self.assertIs(t.CURRENT, t.PROFILES["cc5.5"])
+        # The release profile itself is never built or written (its own ladder D and F); its names are the release's.
+        self.assertEqual(t.CC5_IMAGE.name, "nanod-control-center-1.0.0-cc5.5.bin")
+        self.assertEqual(t.CC5_SOURCE_ZIP.name, "nanod-control-center-1.0.0-cc5.5-source.zip")
+        self.assertEqual(t.CC5_MANIFEST.name, "manifest-1.0.0-cc5.5.json")
+        self.assertEqual(t.EXPECTED_FULL.name, "nanod-cc5.5-expected-full.bin")
+        self.assertEqual(t.BUILD_LOG.name, "nanod-cc5.5-build.log")
         self.assertEqual(t.CC4_IMAGE.name, "nanod-control-center-1.0.0-cc4.bin")
-        # cc5.4 installs from its own fresh pre-install backup pair.
+        # cc5.5 installs from its own fresh pre-install backup pair, read with cc5.4 D at app0.
         self.assertEqual((t.BEFORE_FULL.name, t.ROLLBACK_APP.name),
-                         ("nanod-cc5.3-before-cc5.4-full.bin", "nanod-cc5.3-before-cc5.4-active-app.bin"))
+                         ("nanod-cc5.4-before-cc5.5-full.bin", "nanod-cc5.4-before-cc5.5-active-app.bin"))
         self.assertEqual((t.FROM_VERSION, t.FROM_IMAGE.name, t.FROM_RECORD.name),
-                         ("1.0.0-cc5.3", "nanod-control-center-1.0.0-cc5.3.bin", "manifest-cc5.3.json"))
+                         ("1.0.0-cc5.4", "nanod-control-center-1.0.0-cc5.4-D.bin", "manifest-cc5.4-D.json"))
         self.assertEqual([p.name for p in (t.BUILD_REPORT, t.BACKUP_REPORT, t.PREPARATION, t.FLASH_CHECKS,
                                            t.DEVICE_CHECKS, t.LEASE_CHECKS, t.ROLLBACK_REPORT, t.INSTALLATION)],
-                         ["cc5.4-build.json", "cc5.4-backup.json", "cc5.4-preparation.json", "cc5.4-flash-checks.json",
-                          "cc5.4-device-checks.json", "cc5.4-lease-checks.json", "cc5.4-rollback.json",
-                          "cc5.4-installation.json"])
+                         ["cc5.5-build.json", "cc5.5-backup.json", "cc5.5-preparation.json", "cc5.5-flash-checks.json",
+                          "cc5.5-device-checks.json", "cc5.5-lease-checks.json", "cc5.5-rollback.json",
+                          "cc5.5-installation.json"])
+        d, f = t.CURRENT.binary_profile("D"), t.CURRENT.binary_profile("F")
+        self.assertEqual([(v.image.name, v.manifest.name, v.build_report.name, v.build_log.name) for v in (d, f)],
+                         [("nanod-control-center-1.0.0-cc5.5-D.bin", "manifest-1.0.0-cc5.5-D.json", "cc5.5-D-build.json",
+                           "nanod-cc5.5-D-build.log"),
+                          ("nanod-control-center-1.0.0-cc5.5-F.bin", "manifest-1.0.0-cc5.5-F.json", "cc5.5-F-build.json",
+                           "nanod-cc5.5-F-build.log")])
         self.assertEqual(t.SUPERSEDED_CC5_VERSIONS, ("1.0.0-cc5", "1.0.0-cc5.1", "1.0.0-cc5.2", "1.0.0-cc5.3"))
         self.assertEqual(t.release_manifest("1.0.0-cc5.3").name, "manifest-1.0.0-cc5.3.json")
         self.assertEqual(t.release_manifest("1.0.0-cc5").name, "manifest-1.0.0-cc5.json")
@@ -788,12 +814,15 @@ class ReleaseNamingTests(unittest.TestCase):
                           "cc5.3-device-checks.json", "cc5.3-lease-checks.json", "cc5.3-rollback.json",
                           "cc5.3-installation.json"])
         self.assertEqual((old.from_record.name, old.restored_outcome), ("manifest-cc5.2.json", "RESTORED_CC5_2_RESET"))
-        self.assertEqual((t.CURRENT.from_version, t.CURRENT.from_record.name, t.CURRENT.restored_outcome),
+        cc54 = t.PROFILES["cc5.4"]
+        self.assertEqual((cc54.from_version, cc54.from_record.name, cc54.restored_outcome),
                          ("1.0.0-cc5.3", "manifest-cc5.3.json", "RESTORED_CC5_3_RESET"))
-        self.assertIs(t.ROLLBACK_TARGETS["cc5.3"], t.CURRENT)
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.3"], cc54)
         self.assertIs(t.ROLLBACK_TARGETS["cc5.2"], old)
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.4"], t.CURRENT)
+        self.assertEqual((t.CURRENT.restored_outcome, t.CURRENT.restore_record.name), ("RESTORED_CC5_4_RESET",
+                                                                                       "manifest-cc5.3.json"))
 
-    @machine_runbook
     def test_superseded_release_files_are_kept(self):
         """The cc5, cc5.1 and cc5.2 artefacts in firmware/ are history: present and never renamed away."""
         for version in t.SUPERSEDED_CC5_VERSIONS:
@@ -802,16 +831,18 @@ class ReleaseNamingTests(unittest.TestCase):
                     self.assertTrue(path.is_file(), path)
 
     def test_firmware_version_string_matches_the_tooling(self):
-        """The firmware tree builds the newest profile (1.0.0-cc5.4, NEWEST); CURRENT is that profile or the
-        one before it, which the release tooling moves on when the newest release's window opens."""
+        """The firmware tree builds the newest profile (1.0.0-cc5.8, NEWEST; the v2.0.0 candidate); CURRENT is that profile
+        or the one before it, which the release tooling moves on when the newest release's window opens."""
         ini = t.FIRMWARE_SOURCE / "platformio.ini"
         if not ini.is_file():
             self.skipTest("firmware checkout not present")
         self.assertIs(t.NEWEST, list(t.PROFILES.values())[-1])
-        self.assertEqual(t.NEWEST.version, "1.0.0-cc5.4")
+        self.assertEqual(t.NEWEST.version, "1.0.0-cc5.8")
         self.assertIn(f'-DNANO_FIRMWARE_VERSION=\\"{t.NEWEST.version}\\"', ini.read_text(encoding="utf-8"))
         profiles = list(t.PROFILES.values())
-        self.assertIn(profiles.index(t.CURRENT), (len(profiles) - 1, len(profiles) - 2))
+        # (A pinned class sees its own release as CURRENT; the module's own CURRENT is checked unpinned in
+        # Cc58ReleaseTests.) CURRENT is always one of the profiles.
+        self.assertIn(t.CURRENT, profiles)
 
     def test_every_script_names_the_release_through_the_tooling(self):
         """No script hard-codes a superseded version where the release is meant."""
@@ -1950,8 +1981,9 @@ class FakeOperator:
     * "Can you see this?" -> Button 4 (never, when `blind`);
     * a Yes/No screen (cancel + switch live, the Yes/No legend on the note line) -> Button 4, or Button 1 when
       `answers[instruction]` is False;
-    * "Hold Button N" -> press and hold until the screen says "Let go" (`short_first`: the first hold of that
-      instruction lets go after 0.3 s instead);
+    * "Hold Button N" (a new instruction or a retry note only, never a progress redraw) -> press and hold until
+      the screen says "Let go" or "Let go of the buttons" (`short_first`: the first hold of that instruction lets
+      go after 0.3 s instead);
     * "Press Button N" in the instruction or the progress line -> one press (`wrong_first` {instruction: raw}:
       that button first, the right one after the "That was Button" retry);
     * "Turn back and forth" / "Keep turning" -> turn back and forth across the range (FakeFirmware.sweep_step
@@ -1962,6 +1994,7 @@ class FakeOperator:
     * `absent`: instructions it never follows; `actions` {instruction: fn(operator, view)}: custom behaviour.
     A retry note ("That was Button", "Too short") repeats the action."""
     TURN_SAYS = ("Turn back and forth", "Keep turning")
+    LET_GO_SAYS = ("Let go", t and t.PROMPT_LET_GO_KEYS)  # a hold's own end, and the next step's "let go first"
     TURN_TICK_S = 0.05
 
     def __init__(self, firmware, answers=None, react_s=0.3, blind=False, absent=(), wrong_first=None, actions=None,
@@ -1988,7 +2021,7 @@ class FakeOperator:
             self.paused = True
             self.fw.turning = False
             self.fw.schedule(self.pause_s, self.resume_turning)
-        if self.holding is not None and say == "Let go":
+        if self.holding is not None and say in self.LET_GO_SAYS:
             self.let_go()
         key = (view["heading"], say, view["progress"], view["note"])
         if key != self.view:
@@ -2009,7 +2042,7 @@ class FakeOperator:
             return
         if say in self.absent or not (new or retry or say in ("Push past the end", "Push and hold")):
             return
-        yes_no = t.is_yes_no(view["buttons"]) and ("Yes: Button 4" in note or "Yes 4 · No 1" in note)
+        yes_no = t.is_yes_no(view["buttons"]) and (t.PROMPT_YES_NO in note or "Yes 4 · No 1" in note)
         pressed = re.search(r"Press Button (\d)", f"{say} {progress}")
         held = re.search(r"Hold Button (\d)", say)
         if say == t.PROMPT_SEE:
@@ -2018,7 +2051,9 @@ class FakeOperator:
         elif yes_no:
             self.press(t.YES_RAW if self.answers.get(say, True) else t.NO_RAW, say)
         elif held:
-            if self.holding is None:
+            # Only a new instruction or a retry note starts a hold: a progress redraw ("Keep holding") is the
+            # same instruction, and a person who already let go does not grab the button again for it.
+            if self.holding is None and ((heading, say) != previous[:2] or retry):
                 self.hold(int(held.group(1)) - 1, say)
         elif pressed:
             self.press(int(pressed.group(1)) - 1, say)
@@ -2135,7 +2170,9 @@ class CheckScriptRawFlowTests(unittest.TestCase):
         args = SimpleNamespace(**{"turn_seconds": 1.0, "stress_frames": stress_frames, "replay_transfers": 3,
                                   "soak_minutes": soak_minutes, "stress_seconds": stress_seconds, "step_timeout": 30.0,
                                   **extra})
-        with mock.patch.object(t, "RawKnob", factory), mock.patch.object(t, "SOAK_GATE_MINUTES", gate_minutes):
+        # The stress gates' floor follows this run's own length, as SOAK_GATE_MINUTES does (TL-BUG-009; the floor
+        # itself: test_tl_bug_009_stress_floor).
+        with mock.patch.object(t, "RawKnob", factory), mock.patch.object(t, "SOAK_GATE_MINUTES", gate_minutes),                 mock.patch.object(self.module, "STRESS_GATE_FRAMES", args.stress_frames),                 mock.patch.object(self.module, "STRESS_GATE_SECONDS", args.stress_seconds):
             self.module.raw_checks("FAKEAPP", report, {}, args, watch, self.PROFILE)
         return report, watch
 
@@ -3700,6 +3737,7 @@ class PackageSupersedeTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54PackageTests(unittest.TestCase):
     """package_nanod_cc5.py for CURRENT (1.0.0-cc5.4 over the installed cc5.3): the cc5.3 record is kept
     byte-exact as manifest-cc5.3.json and its release manifest stays INSTALLED until finalize."""
@@ -3920,17 +3958,17 @@ class RebootWatchTests(unittest.TestCase):
         source = (WORK / "check_nanod_cc5.py").read_text(encoding="utf-8")
         self.assertIn('report.section("stress")', source)
         self.assertIn('report.section("stressTurn")', source)
-        self.assertIn('Turn the knob continuously now for {args.turn_seconds:.0f} s', source)
+        # The turn is instructed on the knob's own screen (knob-guided, user ruling 2026-09-26), not on the console.
+        self.assertIn('TURN_SAY, TURN_KEEP = "Turn back and forth", "Keep turning"', source)
+        self.assertNotIn("Turn the knob continuously now", source)
         self.assertLess(source.index('report.section("coldTransferTiming")'), source.index('report.section("stress")'))
         self.assertLess(source.index('report.section("stress")'), source.index('report.section("stressTurn")'))
         # 1.0.0-cc5.2: the unattended soak runs after stress+turn and before the final diag margins.
         self.assertLess(source.index('report.section("stressTurn")'), source.index('report.section("soak")'))
         self.assertLess(source.index('report.section("soak")'), source.index('report.section("diag")'))
         self.assertIn('parser.add_argument("--soak-minutes", type=float, default=t.SOAK_DEFAULT_MINUTES,', source)
-        soak = source[source.index("def run_soak("):source.index("def raw_checks(")]
-        self.assertNotIn("audible_cue", soak)                                  # no audible cue in the soak
-        self.assertIn("audible_cue", source[source.index('report.section("stressTurn")'):
-                                            source.index('report.section("soak")')])
+        turn = source[source.index('report.section("stressTurn")'):source.index('report.section("soak")')]
+        self.assertIn("prompter.screen(TURN_SAY, ", turn)                     # stress+turn starts on the knob
         self.assertIn("GATES = t.CURRENT.gates", source)            # the profile's gates, never a copied list
         self.assertEqual(self.module.REPLAY_TRANSFERS, 3)
         finalize = load_script("finalize_nanod_cc5.py")
@@ -3943,11 +3981,9 @@ class RebootWatchTests(unittest.TestCase):
                  ("rawArtwork", "mediaRoundTrip", "mediaPrefetch", "mediaPinning", "mediaErrors", "mediaTiming",
                   "coldTransferTiming", "stress")]
         self.assertEqual(order, sorted(order))
-        # The audible cues are unchanged: opt-in, only around stress+turn.
-        # The definition, its three stress+turn calls and the 1.0.0-cc5.4 hands-on wrapper cue().
-        self.assertEqual(source.count("audible_cue("), 5)
-        self.assertEqual(source.count("def cue("), 1)
-        self.assertIn('if os.environ.get("NANOD_AUDIBLE_CUES") != "1":', source)
+        # No audible cue anywhere: every instruction is on the knob's screen (no beeps, no console prompts).
+        for gone in ("audible_cue", "NANOD_AUDIBLE_CUES", "def cue(", "winsound"):
+            self.assertNotIn(gone, source)
         # Every raw section is followed by a diag checkpoint.
         tree = ast.parse(source)
         raw = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "raw_checks")
@@ -4071,7 +4107,7 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertIn('"bootloader": (0x0, 0x8000), "partition-table": (0x8000, 0x1000)', checks)
         self.assertIn('"otadata": (0xE000, 0x2000), "app0": (0x10000, 0x140000), "app1": (0x150000, 0x140000)', checks)
         self.assertIn("(0x303A,0x1001)", checks)
-        self.assertIn("'123456789abc'", checks)
+        self.assertIn("'123456789ABC'", checks)
         self.assertNotIn("write_flash", checks + regions + reset)
         self.assertEqual(write.count("--baud 460800 --before no_reset --after no_reset_stub write_flash --flash_mode keep "
                                      "--flash_freq keep --flash_size keep 0x10000 $rollbackApp"), 1)
@@ -4146,10 +4182,9 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertIn("--before no_reset --after no_reset_stub verify_flash 0x10000 $rollbackApp", reset[verify])
         self.assertRegex(reset[verify + 1], r"^if \(\$LASTEXITCODE -ne 0\) \{ throw '.*Nothing was reset")
         self.assertIn("(0x303A,0x1001)", reset[find_port])
-        self.assertIn("'123456789abc'", reset[find_port])
+        self.assertIn("'123456789ABC'", reset[find_port])
         self.assertNotIn("write_flash", text)
 
-    @machine_runbook
     def test_leaving_the_bootloader_verifies_app0_before_its_reset(self):
         """Neither read-only reset trusts memory: app0 must verify against the expected image first.
 
@@ -4255,7 +4290,6 @@ class ScriptStaticTests(unittest.TestCase):
                 first = next(i for i, line in enumerate(lines) if "& $flashPython" in line)
                 self.assertIn(interpreter, lines[:first], lines[1])   # set in this block, never inherited
 
-    @machine_runbook
     def test_build_cc5_blocks_set_their_interpreter_and_arm_every_exit_code_check(self):
         text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
         tail = text[text.index("## Hardware window (Stage 10)"):]
@@ -4268,7 +4302,6 @@ class ScriptStaticTests(unittest.TestCase):
                 if uses:
                     self.assertTrue(any(line.startswith(f"${name} = 'C:\\") for line in lines[:uses[0]]), (name, lines[1]))
 
-    @machine_runbook
     def test_build_cc5_signals_guards_and_rollback_block(self):
         text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
         window = text[text.index("## Hardware window (Stage 10)"):text.index("## Rollback and abort")]
@@ -4363,12 +4396,32 @@ class ScriptStaticTests(unittest.TestCase):
                                     "manifest-at-cc5.4-D-rollback-*.json",
                                     "cc5.4-E-manual-rollback-*", "cc5.4-E-rollback-*", "cc5.4-E-rollback-*.log",
                                     "manifest-at-cc5.4-E-rollback-*.json",
+                                    # and those of 1.0.0-cc5.5's binaries D and F (the release profile is never
+                                    # written, so it leaves none)
+                                    "cc5.5-D-manual-rollback-*", "cc5.5-D-rollback-*", "cc5.5-D-rollback-*.log",
+                                    "manifest-at-cc5.5-D-rollback-*.json",
+                                    "cc5.5-F-manual-rollback-*", "cc5.5-F-rollback-*", "cc5.5-F-rollback-*.log",
+                                    "manifest-at-cc5.5-F-rollback-*.json",
+                                    # and 1.0.0-cc5.6's (A2) binaries D and F
+                                    "cc5.6-D-manual-rollback-*", "cc5.6-D-rollback-*", "cc5.6-D-rollback-*.log",
+                                    "manifest-at-cc5.6-D-rollback-*.json",
+                                    "cc5.6-F-manual-rollback-*", "cc5.6-F-rollback-*", "cc5.6-F-rollback-*.log",
+                                    "manifest-at-cc5.6-F-rollback-*.json",
+                                    # and 1.0.0-cc5.7's (r4 FEEL + SOUND) binaries D and F
+                                    "cc5.7-D-manual-rollback-*", "cc5.7-D-rollback-*", "cc5.7-D-rollback-*.log",
+                                    "manifest-at-cc5.7-D-rollback-*.json",
+                                    "cc5.7-F-manual-rollback-*", "cc5.7-F-rollback-*", "cc5.7-F-rollback-*.log",
+                                    "manifest-at-cc5.7-F-rollback-*.json",
+                                    # and 1.0.0-cc5.8's (the v2.0.0 candidate) binaries D and F
+                                    "cc5.8-D-manual-rollback-*", "cc5.8-D-rollback-*", "cc5.8-D-rollback-*.log",
+                                    "manifest-at-cc5.8-D-rollback-*.json",
+                                    "cc5.8-F-manual-rollback-*", "cc5.8-F-rollback-*", "cc5.8-F-rollback-*.log",
+                                    "manifest-at-cc5.8-F-rollback-*.json",
                                     "nanod-current-partitions.bin"})
         self.assertIn("t.BOOT_ENTRY.stem", finalize_source)
         self.assertIn("for profile in t.all_profiles():", finalize_source)    # every profile's and binary's records
         self.assertIn(r"'.\backups\nanod-current-partitions.bin'", recovery)  # section 3's read
 
-    @machine_runbook
     def test_recovery_section5_paths_and_commands(self):
         text = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
         section = text[text.index("## 5. cc5 -> cc4 rollback"):text.index(self.SECTION6)]
@@ -4409,7 +4462,6 @@ class ScriptStaticTests(unittest.TestCase):
         for target in re.findall(r"(?:&\s+\$(?:flash|app|flashPython)|powershell\.exe [^\n]*?-File)\s+(\S+)", blocks):
             self.assertRegex(target, r"^(?:'[A-Za-z]:\\|-[cmu]?$)", target)
 
-    @machine_runbook
     def test_build_cc5_runbook_follows_stage_10(self):
         text = (ROOT / "firmware" / "BUILD-cc5.md").read_text(encoding="utf-8")
         self.assert_absolute_existing_paths(text)
@@ -4464,7 +4516,6 @@ class ScriptStaticTests(unittest.TestCase):
     def lines(block):
         return [line.strip() for line in block.strip().splitlines()]
 
-    @machine_runbook
     def test_build_cc5_3_runbook_follows_stage_10(self):
         text, steps = self.build53()
         cc53 = t.PROFILES["cc5.3"]          # the runbook of the cc5.2 -> cc5.3 install (history since cc5.4)
@@ -4520,7 +4571,6 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertIn("--light-assertions 2174149", steps[9])
         self.assertIn("manifest-1.0.0-cc5.3.json\").Hash) { throw 'NO-GO: manifest.json is not the cc5.3 record' }", steps[9])
 
-    @machine_runbook
     def test_build_cc5_3_signals_guards_and_blocks(self):
         text, steps = self.build53()
         tail = text[text.index("## Hardware window (Stage 10)"):]
@@ -4618,7 +4668,6 @@ class ScriptStaticTests(unittest.TestCase):
         self.assertTrue(blocks[1][1].startswith("if (-not $layoutVerified) { throw"))
         self.assertTrue(blocks[2][1].startswith("if (-not $app0Verified) { throw"))
 
-    @machine_runbook
     def test_recovery_section6_paths_and_commands(self):
         text = (ROOT / "firmware" / "RECOVERY.md").read_text(encoding="utf-8")
         section = text[text.index(self.SECTION6):text.index("## Reference")]
@@ -4649,14 +4698,25 @@ class ScriptStaticTests(unittest.TestCase):
         # that are never rebuilt, and the older v5/v4/v3/v2 rollbacks stay pinned.
         build = (ROOT / "Build-Desktop.ps1").read_text(encoding="utf-8")
         install = (ROOT / "Install-Desktop.ps1").read_text(encoding="utf-8")
-        self.assertIn("[string]$Dist = 'desktop-dist-v7',", build)
-        self.assertIn("[string]$Work = 'desktop-build-v7',", build)
+        # From A0 (2026-09-30) every Desk Dial build has its own folder (v7-b, v7-c, ...): the build defaults
+        # to the newest and every earlier desktop bundle, v6 included, is a refused rollback folder.
+        self.assertIn("[string]$Dist = 'desktop-dist-v7-l',", build)
+        self.assertIn("[string]$Work = 'desktop-build-v7-l',", build)
         self.assertIn("$rollbackFolders = @('desktop-dist-v2', 'desktop-build-v2', 'desktop-dist-v3', 'desktop-build-v3', "
                       "'desktop-dist-v4', 'desktop-build-v4', 'desktop-dist-v5', 'desktop-build-v5', 'desktop-dist-v6', "
-                      "'desktop-build-v6')", build)
+                      "'desktop-build-v6', 'desktop-dist-v7', 'desktop-build-v7', 'desktop-dist-v7-a', 'desktop-build-v7-a', "
+                      "'desktop-dist-v7-b', 'desktop-build-v7-b', 'desktop-dist-v7-c', 'desktop-build-v7-c', 'desktop-dist-v7-d', "
+                      "'desktop-build-v7-d', 'desktop-dist-v7-e', 'desktop-build-v7-e', 'desktop-dist-v7-f', "
+                      "'desktop-build-v7-f', 'desktop-dist-v7-g', 'desktop-build-v7-g', 'desktop-dist-v7-h', "
+                      "'desktop-build-v7-h', 'desktop-dist-v7-i', 'desktop-build-v7-i', 'desktop-dist-v7-j', "
+                      "'desktop-build-v7-j', 'desktop-dist-v7-k', 'desktop-build-v7-k')", build)
         refusal = build.index("if ($rollbackFolders -contains $leaf) { throw")
         self.assertLess(refusal, build.index("-m PyInstaller"))                  # before anything is built
-        self.assertIn("[string]$Bundle = 'desktop-dist-v7',", install)
+        self.assertIn("[string]$Bundle = 'desktop-dist-v7-l',", install)
+        # The installer's default is whatever the build's default $Dist is (DD-BUG-041), not a separate literal.
+        dist_default = re.search(r"^\s*\[string\]\$Dist = '([^']+)'", build, re.M).group(1)
+        bundle_default = re.search(r"^\s*\[string\]\$Bundle = '([^']+)'", install, re.M).group(1)
+        self.assertEqual(bundle_default, dist_default)
         for older in ("v6", "v5", "v4", "v3"):
             self.assertIn(f"Install-Desktop.ps1 -Bundle desktop-dist-{older} -Mirror", install)
         pins = {"desktop-dist-v3": "90A235527274656AE9F4C5E49D99625D0E125A1466D9952DC47A0DD882E8FE19",
@@ -4668,10 +4728,10 @@ class ScriptStaticTests(unittest.TestCase):
         # A refusal throws in a real install (a -DryRun records it instead; Stop-Install), before any change.
         pinned = install.index("if ($bundleExeHash -ne $pinnedBundles[$bundleName]) { Stop-Install")
         self.assertIn("if ($DryRun) { $refusals.Add($Message) } else { throw $Message }", install)
-        self.assertLess(pinned, install.index("New-Item -ItemType Directory -Path $install -Force"))   # nothing changed yet
-        self.assertLess(pinned, install.index("Remove-Item -LiteralPath $stale.FullName"))
+        self.assertLess(pinned, install.index("function Install-ProgramFolder"))   # nothing changed yet
+        self.assertLess(pinned, install.index("Install-ProgramFolder -Source $bundle -Target $install"))
         # The release records: cc5.4 ships desktop v7 and rolls back to v6; cc5.3 keeps v4 -> v3.
-        self.assertEqual((t.CURRENT.desktop_bundle, t.CURRENT.desktop_rollback_bundle), ("desktop-dist-v7", "desktop-dist-v6"))
+        self.assertEqual((t.PROFILES["cc5.4"].desktop_bundle, t.PROFILES["cc5.4"].desktop_rollback_bundle), ("desktop-dist-v7", "desktop-dist-v6"))
         self.assertEqual((t.PROFILES["cc5.3"].desktop_bundle, t.PROFILES["cc5.3"].desktop_rollback_bundle),
                          ("desktop-dist-v4", "desktop-dist-v3"))
         self.assertEqual(t.PROFILES["cc5.2"].desktop_rollback_bundle, "desktop-dist-v2")
@@ -4684,8 +4744,8 @@ class ScriptStaticTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Script flows with a fake esptool: exit codes, outcomes, and that no reset follows a failure.
 
-MAC_OUTPUT = "MAC: 12:34:56:78:9a:bc\nDetected flash size: 4MB\n"
-RESET_OUTPUT = "MAC: 12:34:56:78:9a:bc\nHard resetting via RTS pin...\n"
+MAC_OUTPUT = "MAC: 12:34:56:78:9A:BC\nDetected flash size: 4MB\n"
+RESET_OUTPUT = "MAC: 12:34:56:78:9A:BC\nHard resetting via RTS pin...\n"
 
 
 class FakeEsptool:
@@ -4756,10 +4816,11 @@ class HardwareFreeScriptTest(unittest.TestCase):
 
     `pinned` names the profile a class's fixtures describe (None: CURRENT). The cc5.3-era flow classes
     keep their cc5.2 -> cc5.3 evidence and run pinned to "cc5.3" since CURRENT moved to cc5.4; the
-    Cc54* flow classes run the same scripts against cc5.4 evidence. `active_binaries` is what
+    Cc54*, ladder and fix-binary flow classes run the same scripts against cc5.4 evidence, pinned to "cc5.4"
+    (the default) since CURRENT moved to cc5.5; the cc5.5 flow classes set None. `active_binaries` is what
     tooling.ACTIVE_BINARIES reads during the test: the 2026-09-26 window's A, B and C by default (those flows
-    were written for them), None for the real fix binaries D and E."""
-    script, capture_evidence, pinned, active_binaries = None, True, None, LEGACY_BINARIES
+    were written for them), None for the real active binaries (D and E of cc5.4, D and F of cc5.5)."""
+    script, capture_evidence, pinned, active_binaries = None, True, "cc5.4", LEGACY_BINARIES
 
     def setUp(self):
         self.stack = contextlib.ExitStack()
@@ -5154,7 +5215,8 @@ class RollbackToCc4FlowTests(RollbackFlowTests):
         self.assertEqual((code, report["outcome"], report["target"]), (0, "ROLLED_BACK_VERIFIED_RESET", "cc4"))
         self.assertEqual((report["fromVersion"], report["toVersion"]), ("1.0.0-cc5.3", "1.0.0-cc4"))
         self.assertEqual(report["writeEvidence"], {"1.0.0-cc5.3": ["cc5.3-flash-checks.json records a cc5.3 write attempt"]})
-        self.assertEqual(report["undoesInstallsOf"], ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4"])
+        self.assertEqual(report["undoesInstallsOf"], ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4", "1.0.0-cc5.5",
+                                                      "1.0.0-cc5.6", "1.0.0-cc5.7", "1.0.0-cc5.8"])
         self.assertEqual(fake.args("write")[-2:], ["0x10000", str(self.profile.rollback_app)])
 
     def test_help_is_printed_without_touching_anything(self):
@@ -5167,7 +5229,8 @@ class RollbackToCc4FlowTests(RollbackFlowTests):
             self.module.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
         text = self.out.getvalue()
-        for fragment in ("--to {cc4,cc5.2,cc5.3}", "--records-only",
+        for fragment in ("--to {cc4,cc5.2,cc5.3,cc5.4,cc5.5,cc5.6,cc5.7}", "--records-only", "--to cc5.4 cc5.5 -> cc5.4 D",
+                         "--to cc5.5 cc5.6 -> cc5.5 F", "--to cc5.6 cc5.7 -> cc5.6 F", "--to cc5.7 cc5.8 -> cc5.7 F",
                          "only while the records never show 1.0.0-cc5.3 written", "RECOVERY.md section 6",
                          "--to cc5.3 cc5.4 -> cc5.3", "-Bundle desktop-dist-v6 -Mirror"):
             self.assertIn(fragment, " ".join(text.split()))
@@ -5188,7 +5251,8 @@ class RollbackToCc53FlowTests(RollbackFlowTests):
                          ("cc5.4-rollback.json", "desktop-dist-v6"))
         code, report, _ = self.run_rollback()
         self.assertEqual((code, report["target"], report["toVersion"]), (0, "cc5.3", "1.0.0-cc5.3"))
-        self.assertEqual(self.module.removed_releases(self.profile), ["1.0.0-cc5.4"])
+        self.assertEqual(self.module.removed_releases(self.profile), ["1.0.0-cc5.4", "1.0.0-cc5.5", "1.0.0-cc5.6",
+                                                                      "1.0.0-cc5.7", "1.0.0-cc5.8"])
 
 
 @needs_tooling
@@ -5206,7 +5270,9 @@ class RollbackRecordTests(unittest.TestCase):
                             ("BACKUPS", self.root), ("DIAGNOSTICS", self.root)):
             self.enterContext(mock.patch.object(t, name, value))
         self.images = {"1.0.0-cc4": b"\xe9 cc4 image" * 30, "1.0.0-cc5.2": b"\xe9 cc5.2 image" * 40,
-                       "1.0.0-cc5.3": b"\xe9 cc5.3 image" * 50}
+                       "1.0.0-cc5.3": b"\xe9 cc5.3 image" * 50, "1.0.0-cc5.4": b"\xe9 cc5.4 D image" * 60,
+                       "1.0.0-cc5.5": b"\xe9 cc5.5 D image" * 70, "1.0.0-cc5.6": b"\xe9 cc5.6 F image" * 80,
+                       "1.0.0-cc5.7": b"\xe9 cc5.7 F image" * 90}
         for p in t.PROFILES.values():
             image = self.images[p.from_version]
             self.enterContext(mock.patch.object(p, "from_image_sha256", t.sha256_bytes(image)))
@@ -5244,7 +5310,8 @@ class RollbackRecordTests(unittest.TestCase):
         self.assertEqual(t.load_json(t.CURRENT.manifest)["hardwareStatus"],
                          "Rolled back to cc4 (app0 restored from the pre-cc5 backup).")
         self.assertEqual(t.load_json(t.PROFILES["cc5.2"].manifest), {"installationStatus": "SUPERSEDED"})
-        self.assertEqual(self.module.removed_releases(p), ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4"])
+        self.assertEqual(self.module.removed_releases(p), ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4", "1.0.0-cc5.5",
+                                                           "1.0.0-cc5.6", "1.0.0-cc5.7", "1.0.0-cc5.8"])
         self.assertEqual((t.PROFILES["cc5.2"].backup_role, t.PROFILES["cc5.3"].backup_role),
                          ("pre-cc5 backup", "pre-cc5.3 backup"))
 
@@ -5263,9 +5330,18 @@ class RollbackRecordTests(unittest.TestCase):
         # The cc5.2 profile's own records (prefix cc5) never count for cc5.3, nor the other way round.
         (self.root / "cc5-flash-checks.json").write_text(json.dumps({"writeAttempted": True}), encoding="utf-8")
         self.assertEqual(t.release_write_evidence(cc53), ["cc5.3-flash-checks.json records a cc5.3 write attempt"])
-        self.assertEqual(t.later_profiles(t.PROFILES["cc5.2"]), [cc53, t.PROFILES["cc5.4"]])
-        self.assertEqual(t.later_profiles(cc53), [t.PROFILES["cc5.4"]])
-        self.assertEqual(t.later_profiles(t.PROFILES["cc5.4"]), [])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.2"]), [cc53, t.PROFILES["cc5.4"], t.PROFILES["cc5.5"],
+                                                                 t.PROFILES["cc5.6"], t.PROFILES["cc5.7"],
+                                                                 t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(cc53), [t.PROFILES["cc5.4"], t.PROFILES["cc5.5"], t.PROFILES["cc5.6"],
+                                                  t.PROFILES["cc5.7"], t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.4"]), [t.PROFILES["cc5.5"], t.PROFILES["cc5.6"],
+                                                                 t.PROFILES["cc5.7"], t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.5"]), [t.PROFILES["cc5.6"], t.PROFILES["cc5.7"],
+                                                                 t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.6"]), [t.PROFILES["cc5.7"], t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.7"]), [t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.8"]), [])
 
     def test_inputs_are_checked_before_anything_is_sent(self):
         p = t.ROLLBACK_TARGETS["cc5.2"]
@@ -5722,7 +5798,11 @@ class BuildAndPackageFixture(HardwareFreeScriptTest):
         self.elf_sizes = list(V5_SIZE_SYMBOLS)       # the 12.4 size symbols firmware.elf carries
         self.log_note = ""                           # extra text the fake PlatformIO writes into the log
         self.build = load_script("build_nanod_cc5.py")
-        self.patch(self.build, "subprocess", SimpleNamespace(run=self.fake_platformio, STDOUT="STDOUT", CREATE_NO_WINDOW=0))
+        # The build records the tree it compiles (TL-BUG-005: git ls-files, status and HEAD, through the same fake).
+        self.git_status = b""
+        self.patch(self.build, "subprocess", SimpleNamespace(run=self.fake_platformio, check_output=self.fake_git,
+                                                             CalledProcessError=OSError, STDOUT="STDOUT",
+                                                             CREATE_NO_WINDOW=0))
         self.call_order = None                       # None: LcdThread::run()'s calls follow the fake ELF (below)
         self.patch(t, "lcd_run_call_order", self.fake_call_order)
         self.patch(self.module, "subprocess", SimpleNamespace(check_output=self.fake_git, CREATE_NO_WINDOW=0))
@@ -5745,6 +5825,14 @@ class BuildAndPackageFixture(HardwareFreeScriptTest):
         if number:
             image += t.BUILD_MARKER_PREFIX + number.group(1).encode("ascii") + b"\0"
         (folder / "firmware.bin").write_bytes(image)
+        # Object files, as a real build leaves them (tooling.stale_object_problems reads their times);
+        # `stale_object` models one PlatformIO did not recompile (an hour older than this build).
+        for rel in ("src/main.cpp.o", "libae9/lvgl/core/lv_obj.c.o"):
+            (folder / rel).parent.mkdir(parents=True, exist_ok=True)
+            (folder / rel).write_bytes(b"\x7fELF")
+        if getattr(self, "stale_object", False):
+            old = time.time() - 3600
+            os.utime(folder / "libae9/lvgl/core/lv_obj.c.o", (old, old))
         dma = "-DCC_LCD_DMA=0" not in flags
         if self.write_elf:
             (folder / "firmware.elf").write_bytes(fake_elf(["setup", "loop"] + self.elf_sizes
@@ -5773,6 +5861,8 @@ class BuildAndPackageFixture(HardwareFreeScriptTest):
             return b"src/main.cpp\0platformio.ini\0.vscode/settings.json\0compile_commands.json\0cc_media.d\0"
         if command[5:] == ["rev-parse", "HEAD"]:
             return b"0123456789abcdef0123456789abcdef01234567\n"
+        if command[5:] == ["status", "--porcelain"]:
+            return self.git_status
         raise AssertionError(f"git {command[5:]} is not a read")
 
 
@@ -5829,7 +5919,8 @@ class BuildAndPackageFlowTests(BuildAndPackageFixture):
         # finalize_nanod_cc5.py records cc5.3 (FinalizeFlowTests).
         self.assertEqual(self.cc52_manifest.read_bytes(), self.active)
         self.assertEqual(list(self.cc52_manifest.parent.glob("manifest-1.0.0-cc5.2.superseded-*")), [])
-        self.assertEqual({tuple(c[5:]) for c in self.git_calls}, {self.LS_FILES, ("rev-parse", "HEAD")})
+        self.assertEqual({tuple(c[5:]) for c in self.git_calls},
+                         {self.LS_FILES, ("rev-parse", "HEAD"), ("status", "--porcelain")})
 
     def test_an_image_without_the_version_string_is_rejected_by_build_and_package(self):
         self.image = self.image.replace(self.p.version.encode("ascii"), self.p.from_version.encode("ascii"))
@@ -6152,7 +6243,8 @@ class FinalizeFlowTests(FinalizeFlowBase):
             (f"cc5-usb-boot-entry-{late}.json", {"startedUtc": late, "touchSent": True}, B + 400),
             ("cc5-usb-boot-entry-copy.json", {"startedUtc": late, "touchSent": True}, B + 50),   # recorded stamp only
             (f"cc5-usb-boot-entry-{late}.json", {"alreadyInBootloader": True}, B + 50),         # name stamp only
-            ("cc5-usb-boot-entry-copy.json", {"touchSent": False}, B + 100),                    # same file time
+            # same file time (a touch was sent; a refused run with touchSent false is no rollback, TL-BUG-010)
+            ("cc5-usb-boot-entry-copy.json", {"touchSent": True}, B + 100),
             ("cc5-usb-boot-entry-copy.json", b"{not json", B + 400),                            # unreadable, new
         )
         for name, data, at in cases:
@@ -6347,7 +6439,7 @@ class Cc54FinalizeFlowBase(FinalizeFlowBase):
     """The cc5.3 -> cc5.4 evidence (CURRENT) for finalize_nanod_cc5.main(): presentation 5, the alive capability
     of this knob's ledMaxBrightness, every cc5.4 gate true. Cc54FinalizeFlowTests (and the ladder classes after
     it) and Cc54FinalizeWaiverTests run on it."""
-    pinned = None
+    pinned = "cc5.4"
     LED_MAX = 120                       # a knob whose LED maximum is below the alive drive cap (150)
 
     def records(self):
@@ -7091,11 +7183,12 @@ class ProfileTests(unittest.TestCase):
     def test_profiles_never_share_a_file_name(self):
         names = [getattr(p, attr).name for p in t.PROFILES.values() for attr in self.FILES]
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual(set(t.ROLLBACK_TARGETS), {"cc4", "cc5.2", "cc5.3"})
+        self.assertEqual(set(t.ROLLBACK_TARGETS), {"cc4", "cc5.2", "cc5.3", "cc5.4", "cc5.5", "cc5.6", "cc5.7"})
         self.assertEqual([p.version for p in t.PROFILES.values()],
-                         ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4"])   # oldest first
+                         ["1.0.0-cc5.2", "1.0.0-cc5.3", "1.0.0-cc5.4", "1.0.0-cc5.5", "1.0.0-cc5.6",
+                          "1.0.0-cc5.7", "1.0.0-cc5.8"])   # oldest first
         for cc5x, before, image_bytes, token in ((t.PROFILES["cc5.3"], t.PROFILES["cc5.2"], 1010656, "CC5_2"),
-                                                 (t.CURRENT, t.PROFILES["cc5.3"], 1023648, "CC5_3")):
+                                                 (t.PROFILES["cc5.4"], t.PROFILES["cc5.3"], 1023648, "CC5_3")):
             with self.subTest(cc5x.tag):
                 self.assertEqual((cc5x.from_image_bytes, cc5x.from_image.name),
                                  (image_bytes, f"nanod-control-center-{before.version}.bin"))
@@ -7132,9 +7225,12 @@ class ProfileTests(unittest.TestCase):
         caps = t.PROFILES["cc5.3"].expected_capabilities()
         self.assertEqual((caps["artwork"], caps["artwork2"], caps["presentation"]),
                          (t.EXPECTED_ARTWORK_CAPABILITY, module.ARTWORK2_CAPABILITY, 4))
-        caps = t.CURRENT.expected_capabilities()           # cc5.4: presentation 5, artwork2 unchanged, alive
+        caps = t.PROFILES["cc5.4"].expected_capabilities()   # cc5.4: presentation 5, artwork2 unchanged, alive
         self.assertEqual((caps["artwork"], caps["artwork2"], caps["presentation"], caps[module.ALIVE_CAPABILITY]),
                          (t.EXPECTED_ARTWORK_CAPABILITY, module.ARTWORK2_CAPABILITY, 5, t.alive_capability()))
+        caps = t.CURRENT.expected_capabilities()           # cc5.5: presentation 6 (r3) as cc5.4 D reports it
+        self.assertEqual((caps["artwork"], caps["artwork2"], caps["presentation"], caps[module.ALIVE_CAPABILITY]),
+                         (t.EXPECTED_ARTWORK_CAPABILITY, module.ARTWORK2_CAPABILITY, 6, t.alive_capability()))
         self.assertNotIn("artwork2", t.PROFILES["cc5.2"].expected_capabilities())
         # The contract values are never copied into the tooling (no duplicated literals).
         for name in ("nanod_cc5_tooling.py", "check_nanod_cc5.py", "check_nanod_cc5_lease.py", "finalize_nanod_cc5.py",
@@ -7684,6 +7780,7 @@ class LeaseFlowTests(HardwareFreeScriptTest):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54ProfileTests(unittest.TestCase):
     """The 1.0.0-cc5.4 profile (ALIVE.md revision 2, PRESENTATION_V5.md): presentation 5, the alive
     capability, its gates and memory gates. CURRENT since the release tooling moved to the combined
@@ -7691,8 +7788,8 @@ class Cc54ProfileTests(unittest.TestCase):
 
     def test_the_cc5_4_profile(self):
         cc54 = t.PROFILES["cc5.4"]
-        self.assertIs(t.NEWEST, cc54)
-        self.assertIs(t.CURRENT, cc54)
+        self.assertIs(t.NEWEST, t.PROFILES["cc5.8"])      # 1.0.0-cc5.5 (F1), cc5.6 (A2), cc5.7 (r4), cc5.8 (v2.0.0) follow it
+        self.assertIs(t.CURRENT, cc54)                     # pinned (pinned_to): these tests describe cc5.4
         self.assertTrue(cc54.alive and cc54.artwork2)
         self.assertFalse(t.PROFILES["cc5.3"].alive)
         self.assertEqual((cc54.presentation, t.PROFILES["cc5.3"].presentation, t.PROFILES["cc5.2"].presentation), (5, 4, 4))
@@ -7737,6 +7834,7 @@ class Cc54ProfileTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54HelperTests(unittest.TestCase):
     """The pure 1.0.0-cc5.4 device-check helpers (LED, LCD, hold, End stop, ready ks)."""
 
@@ -8088,6 +8186,7 @@ class FakeFirmware54(FakeFirmware):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54CheckFlowTests(unittest.TestCase):
     """check_nanod_cc5.raw_checks() for the 1.0.0-cc5.4 profile against FakeFirmware54 (no port, no device,
     fake clock): the cc5.3 sections plus ledIdle, lcdAnimation, ledUnderLoad and the hands-on section."""
@@ -8120,7 +8219,7 @@ class Cc54CheckFlowTests(unittest.TestCase):
         args = SimpleNamespace(**{"turn_seconds": 1.0, "stress_frames": 40, "replay_transfers": 3, "soak_minutes": 1.0,
                                   "stress_seconds": 2.0, "hid_check": hid_check, "push_retries": push_retries,
                                   "binary": binary, "step_timeout": 30.0, **extra})
-        with mock.patch.object(t, "RawKnob", factory), mock.patch.object(t, "SOAK_GATE_MINUTES", 1.0):
+        with mock.patch.object(t, "RawKnob", factory), mock.patch.object(t, "SOAK_GATE_MINUTES", 1.0),                 mock.patch.object(self.module, "STRESS_GATE_FRAMES", args.stress_frames),                 mock.patch.object(self.module, "STRESS_GATE_SECONDS", args.stress_seconds):
             self.module.raw_checks("FAKEAPP", report, {}, args, watch, profile)
         return report, watch
 
@@ -8499,20 +8598,29 @@ class Cc54CheckFlowTests(unittest.TestCase):
         bases.append(device._frame({**copy_json(v4["v4-tracks-no-previous"]), "layout": "seek",
                                     "ring": {"style": "lap", "value": 0, "index": 17, "count": 20}}, caps))
         meter = t.TurnMeter(10, 30)
-        notes = ["Don’t stop turning", "Left end done · right next", "Right end done · left next", "Push past each end",
-                 "Reach both ends", "Both ends done", "You stopped for 3 s", "You touched the knob",
-                 "Push 5 of 5, then let go", "Again · Push 1 of 5, then let go", "Hold it against the end",
-                 "Keep holding · 3", "Then push past it once", t.PROMPT_YES_NO, "That was Button 4 · Yes 4 · No 1"]
-        says = [module.TURN_KEEP, module.AUTOMATIC, "Push past the end", "Let it spring back", "Push and hold",
-                "Turn to 0:00", "Now push past 0:00", "Did you push?", "Pushed past 0:00?", "Let go", "Press Button 4"]
+        # Each overlay carries the copy the run puts on it (TL-TST-002): the stress and soak bases the turn and
+        # hands-off lines, the End stop test's Seek control its pushes, questions and their retries.
+        turn_says = [module.TURN_KEEP, module.AUTOMATIC, "Press Button 4"]
+        recent_says = [module.TURN_READY, module.TURN_SAY]   # the turn test's start, on the Recent base only
+        turn_notes = ["Don’t stop turning", "Left end done · right next", "Right end done · left next",
+                      "Push past each end", "Reach both ends", "Both ends done", "You stopped for 3 s",
+                      "You touched the knob", "Start turning now", module.UNTOUCHED, "That was Button 3"]
+        seek_says = ["End stop test", "Push past the end", "Let it spring back", "Push and hold", "Turn to 0:00",
+                     "Now push past 0:00", "Did you push?", "Pushed past 0:00?", "Let go"]
+        seek_notes = [module.push_note(n, again) for n in range(1, module.PUSHES + 1) for again in ("", "Again · ")]
+        seek_notes += [f"{module.PUSHES} pushes", f"Again · {module.PUSHES} pushes", "Hold it against the end",
+                       "Keep holding · 3", "Let it spring back", "Then push past it once", t.PROMPT_YES_NO,
+                       t.PROMPT_YES_NO_RETRY.format(n=2), t.PROMPT_YES_NO_RETRY.format(n=3), "Yes", "No"]
         for base in bases:
+            seek = base.get("layout") == "seek"
+            says = seek_says if seek else turn_says + (recent_says if base.get("layout") == "recent" else [])
             for say in says:
-                for note in notes:
+                for note in seek_notes if seek else turn_notes:
                     frame = device._frame(t.overlay({**base, "id": 5}, "STEP 10 OF 10", say, meter.progress()
                                                     .replace("Turned 0", "Turned 30"), note, "error"), caps)
                     self.assertEqual(prompt_fit_problems(frame), [], (base.get("layout"), say, note))
         for n in range(1, 11):
-            for text in (f"Attempt {n} of 10", f"Once more · attempt {n} of 10", f"{n}:59 left"):
+            for text in (f"Attempt {n} of 10", module.DEFERRED_AGAIN.format(n=n, of=10), f"{n}:59 left"):
                 frame = device._frame({**t.prompt_frame(f"STEP {n} OF 10", "Hold Button 1", "Hold until it says Let go",
                                                         text), "id": 5}, caps)
                 self.assertEqual(prompt_fit_problems(frame), [], text)
@@ -8520,6 +8628,7 @@ class Cc54CheckFlowTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54CheckScriptStaticTests(unittest.TestCase):
     """check_nanod_cc5.py --release, --hid-check and the hands-on cues (parsed, never run)."""
 
@@ -8550,8 +8659,10 @@ class Cc54CheckScriptStaticTests(unittest.TestCase):
         self.assertIn("binary=t.lcd_binary(diag), byEye=list(BY_EYE)", self.source)
 
     def test_hands_on_cues_stay_opt_in_and_hid_stays_off_by_default(self):
-        hands = self.source[self.source.index("def cue("):self.source.index("def run_stress(")]
-        self.assertNotIn("winsound", hands)                          # every beep goes through audible_cue
+        # The hands-on block: from the step plan to the stress runner (the knob-guided redesign removed cue()).
+        hands = self.source[self.source.index("def prompt_plan("):self.source.index("def run_stress(")]
+        self.assertNotIn("winsound", self.source)                    # no beeps: every cue is on the knob's screen
+        self.assertNotIn("audible_cue", self.source)
         self.assertIn("windows_hid=True", hands)                     # only the F24 test enables HID
         self.assertEqual(self.source.count("windows_hid=True"), 1)
         self.assertIn('if getattr(args, "hid_check", False):', hands)
@@ -8572,10 +8683,12 @@ def companion_device():
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class AliveTourTests(unittest.TestCase):
     """tools/nanod_alive_tour.py (ALIVE.md 11.9 hands-on tour): every frame it can send is one the cc5.4
     parser accepts (the companion's device.v5_parse / alive_parse reading), and a session against
-    FakeFirmware54 (fake clock, no port) claims, plays, tunes, restores the defaults and records."""
+    FakeFirmware54 (fake clock, no port) claims, plays, tunes, restores the defaults and records. Pinned to
+    cc5.4 (its fixtures); the tour checks the knob against CURRENT (TL-BUG-001, test_tl_bug_001_*)."""
 
     def setUp(self):
         self.tour_module = load_tour()
@@ -8718,10 +8831,12 @@ class AliveTourTests(unittest.TestCase):
 LADDER_FLAGS = {"A": (), "B": ("-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0"),
                 "C": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0"),    # the phase-2b gatekeeper's
                 "D": ("-DCC_BUILD_BINARY=4",),                                              # the fix binaries: A + fixes
-                "E": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0", "-DCC_BUILD_BINARY=5")}   # C + fixes
+                "E": ("-DCC_LCD_DMA=0", "-DCC_LCD_PERIOD_MS=33", "-DCC_ART_ASYNC=0", "-DCC_BUILD_BINARY=5"),   # C + fixes
+                "F": ("-DCC_LCD_PERIOD_MS=12", "-DCC_BUILD_BINARY=6")}                   # 1.0.0-cc5.5: D at 12 ms
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LadderProfileTests(unittest.TestCase):
     """Binary A is the cc5.4 profile itself; B and C are variants with their own names that share the
     release's backup pair, backup record and check records."""
@@ -8781,7 +8896,8 @@ class LadderProfileTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         self.assertEqual([p.label for p in t.all_profiles()],
                          ["cc5.2", "cc5.3", "cc5.4", "cc5.4 binary B", "cc5.4 binary C", "cc5.4 binary D",
-                          "cc5.4 binary E"])
+                          "cc5.4 binary E", "cc5.5 binary D", "cc5.5 binary F", "cc5.6 binary D", "cc5.6 binary F",
+                          "cc5.7 binary D", "cc5.7 binary F", "cc5.8 binary D", "cc5.8 binary F"])
 
     def test_the_flags_are_the_contract_and_a_is_the_source_default(self):
         """12.6: the binaries differ only in CC_LCD_DMA, CC_LCD_PERIOD_MS and CC_ART_ASYNC; A is the source
@@ -8918,6 +9034,7 @@ class CompanionInterlockTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LadderRecordTests(unittest.TestCase):
     """Backup locks, write evidence and the newest written binary across A, B and C (real files in a
     temporary folder)."""
@@ -8978,8 +9095,10 @@ class LadderRecordTests(unittest.TestCase):
         self.assertIn(t.PROFILES["cc5.3"].before_full.name, history)
         # A later release's history holds every binary's expected image of this one.
         self.assertTrue({v.expected_full.name for v in t.CURRENT.variants()} <= t.history_backup_names(t.PROFILES["cc5.3"]))
-        self.assertEqual(t.later_profiles(self.b), [])
-        self.assertEqual(t.later_profiles(t.PROFILES["cc5.3"]), [t.CURRENT])
+        self.assertEqual(t.later_profiles(self.b), [t.PROFILES["cc5.5"], t.PROFILES["cc5.6"], t.PROFILES["cc5.7"],
+                                                    t.PROFILES["cc5.8"]])
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.3"]), [t.CURRENT, t.PROFILES["cc5.5"], t.PROFILES["cc5.6"],
+                                                                 t.PROFILES["cc5.7"], t.PROFILES["cc5.8"]])
 
 
 @needs_tooling
@@ -9309,6 +9428,7 @@ class LadderRollbackChoiceTests(RollbackFlowTests):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LadderRollbackRecordTests(unittest.TestCase):
     """restore_records for binary B: manifest.json from the cc5.3 record, B's INSTALLED manifest (and any
     other binary's) ROLLED_BACK, pointing at B's rollback record."""
@@ -9341,10 +9461,14 @@ class LadderRollbackRecordTests(unittest.TestCase):
         marked = t.load_json(b.manifest)
         self.assertEqual((marked["installationStatus"], marked["rollback"]), ("ROLLED_BACK", "diagnostics/cc5.4-B-rollback.json"))
         self.assertEqual(t.load_json(t.CURRENT.manifest), {"installationStatus": "UNFLASHED"})   # A untouched
-        self.assertEqual(self.module.removed_releases(b), ["1.0.0-cc5.4"])
+        self.assertEqual(self.module.removed_releases(b), ["1.0.0-cc5.4", "1.0.0-cc5.5", "1.0.0-cc5.6", "1.0.0-cc5.7",
+                                                           "1.0.0-cc5.8"])
         self.assertEqual([m.name for m in self.module.removed_manifests(t.ROLLBACK_TARGETS["cc5.2"])],
                          ["manifest-1.0.0-cc5.3.json", "manifest-1.0.0-cc5.4.json", "manifest-1.0.0-cc5.4-B.json",
-                          "manifest-1.0.0-cc5.4-C.json", "manifest-1.0.0-cc5.4-D.json", "manifest-1.0.0-cc5.4-E.json"])
+                          "manifest-1.0.0-cc5.4-C.json", "manifest-1.0.0-cc5.4-D.json", "manifest-1.0.0-cc5.4-E.json",
+                          "manifest-1.0.0-cc5.5-D.json", "manifest-1.0.0-cc5.5-F.json", "manifest-1.0.0-cc5.6-D.json",
+                          "manifest-1.0.0-cc5.6-F.json", "manifest-1.0.0-cc5.7-D.json", "manifest-1.0.0-cc5.7-F.json",
+                          "manifest-1.0.0-cc5.8-D.json", "manifest-1.0.0-cc5.8-F.json"])
 
 
 @needs_tooling
@@ -9718,6 +9842,7 @@ class LadderStepDownFinalizeFlowTests(LadderFinalizeFlowTests):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class ElfSizeTests(unittest.TestCase):
     """TOOLBC-3: tooling.elf_symbols reads st_size and the symbol type; v5_size_record takes sizeof(CCFrame) and the
     ALIVE instance from the data objects hmi_thread.cpp defines, and the real ELFs have both when present."""
@@ -9850,6 +9975,7 @@ class BuildLogAndSizeTests(BuildAndPackageFixture):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LadderCheckFlowTests(unittest.TestCase):
     """check_nanod_cc5.py --binary: the run checks that diag reports the binary just installed (the
     Cc54CheckFlowTests fixture, without running its cases again)."""
@@ -9879,6 +10005,7 @@ class LadderCheckFlowTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class Cc54RunbookTests(unittest.TestCase):
     """firmware/BUILD-cc5.4.md read as text (never run): the ladder's build and package commands, the
     Stage 10 steps with the binary under test, the 12.6 step-down table, the dual-name companion guards,
@@ -9906,7 +10033,6 @@ class Cc54RunbookTests(unittest.TestCase):
     def blocks(text):
         return [[line.strip() for line in block.strip().splitlines()] for block in re.findall(r"```powershell\n(.*?)```", text, re.S)]
 
-    @machine_runbook
     def test_paths_interpreters_and_armed_exit_codes(self):
         ScriptStaticTests.assert_absolute_existing_paths(self, self.text, pending=self.PENDING)
         tail = self.text[self.text.index("## Hardware window (Stage 10)"):]
@@ -9929,8 +10055,8 @@ class Cc54RunbookTests(unittest.TestCase):
                           f"\\build_nanod_cc5.py' --binary {name}", build)
             self.assertIn(".venv\\Scripts\\python.exe' '<repo>\\tools"
                           f"\\package_nanod_cc5.py' --binary {name}", package)
-        for flags in LADDER_FLAGS.values():
-            if flags:
+        for name, flags in LADDER_FLAGS.items():
+            if flags and name in t.PIPELINE_BINARIES:       # F is 1.0.0-cc5.5's (BUILD-cc5.5.md)
                 self.assertIn(f"`{' '.join(flags)}`", self.text)
         self.assertNotIn(" upload", " ".join(re.findall(r"```powershell\n(.*?)```", build, re.S)))
 
@@ -9949,7 +10075,6 @@ class Cc54RunbookTests(unittest.TestCase):
                 record = t.load_json(v.build_report)
                 self.assertIn(f"{record['heapProjection']['heapMinFreeProjected']:,} B", self.text)
 
-    @machine_runbook
     def test_stage_10_steps_follow_the_ladder(self):
         steps = self.steps()
         p = t.CURRENT
@@ -10117,10 +10242,20 @@ class Cc54RunbookTests(unittest.TestCase):
                        "`aliveInstanceBytes`", "| 1,124 B, 11,284 B | 1,124 B, 11,284 B | 1,124 B, 11,284 B |"):
             self.assertIn(phrase, build)
         for v in t.CURRENT.variants():
-            if v.built_elf.is_file():
-                record = t.v5_size_record(t.elf_symbols(v.built_elf))
+            if not v.built_elf.is_file():
+                continue
+            record = t.v5_size_record(t.elf_symbols(v.built_elf))
+            if v.binary in LEGACY_BINARIES:
+                # The table's row is the 2026-09-26 window's A, B and C builds.
                 self.assertEqual((record["ccFrameBytes"], record["aliveInstanceBytes"]), (CCFRAME_BYTES, ALIVE_INSTANCE_BYTES),
                                  f"binary {v.binary}: update the size row of the build table")
+            elif v.build_report.is_file():
+                # D and E were rebuilt since (r3, r3.1, the sleep build): their own build record holds the sizes of
+                # the ELF they were built into, which is what packaging records.
+                projection = t.load_json(v.build_report).get("heapProjection") or {}
+                self.assertEqual((projection.get("ccFrameBytes"), projection.get("aliveInstanceBytes")),
+                                 (record["ccFrameBytes"], record["aliveInstanceBytes"]),
+                                 f"binary {v.binary}: its build record's 12.4 sizes are not its ELF's")
         deviations = self.text[self.text.index("## Deviations recorded by the tooling package (TOOL-bc)"):]
         self.assertIn("review fix TOOLBC-2", deviations)
 
@@ -10301,20 +10436,23 @@ class Cc54RunbookTests(unittest.TestCase):
 # at rest). D is A's pipeline + the fixes, E is C's; A, B and C are retired.
 
 @needs_tooling
+@pinned_to("cc5.4")
 class FixBinaryProfileTests(unittest.TestCase):
     """D and E: their names, flags, pipelines and targets; A, B and C retired, refused by every script that builds,
     packages, prepares, installs, finalizes or looks, and still taken by rollback and check."""
 
     def test_d_and_e_are_the_active_binaries(self):
         self.assertEqual((t.ACTIVE_BINARIES, t.binary_choices(), t.binary_choices(t.PROFILES["cc5.3"])),
-                         (("D", "E"), ("D", "E"), ()))
+                         (("D", "E", "F"), ("D", "E"), ()))       # F is 1.0.0-cc5.5's; cc5.4 never staged it
+        self.assertEqual(t.binary_choices(t.PROFILES["cc5.5"]), ("D", "F"))
         self.assertEqual(set(t.RETIRED_BINARIES), set(LEGACY_BINARIES))
-        self.assertEqual(set(t.PIPELINE_BINARIES), set(t.ACTIVE_BINARIES) | set(t.RETIRED_BINARIES))
+        self.assertEqual(set(t.ALL_BINARIES), set(t.ACTIVE_BINARIES) | set(t.RETIRED_BINARIES))
+        self.assertEqual(set(t.PIPELINE_BINARIES), set(t.ALL_BINARIES) - {"F"})
         for words in ("rolled back 2026-09-26", "initDMA", "FSPIQ_OUT (102)", "Superseded by D"):
             self.assertIn(words, t.RETIRED_BINARIES["A"])
         self.assertIn("never flashed", t.RETIRED_BINARIES["B"])
         self.assertIn("superseded by E", t.RETIRED_BINARIES["C"])
-        self.assertEqual(t.BINARY_BUILD_NUMBERS, {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5})
+        self.assertEqual(t.BINARY_BUILD_NUMBERS, {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6})
         for name in t.PIPELINE_BINARIES:
             v = t.CURRENT.binary_profile(name)
             self.assertEqual((v.build_number, t.binary_build_number(name)), ({"D": 4, "E": 5}.get(name),) * 2, name)
@@ -10381,10 +10519,11 @@ class FixBinaryProfileTests(unittest.TestCase):
             for name in t.PIPELINE_BINARIES:                 # --binary is validated before --help ends the run
                 with self.subTest(script=script, binary=name):
                     self.assertEqual(self.argparse_exit(module, (*argv, "--binary", name, "--help"))[0], 0)
-            self.assertEqual(self.argparse_exit(module, (*argv, "--binary", "F", "--help"))[0], 2)
+            self.assertEqual(self.argparse_exit(module, (*argv, "--binary", "G", "--help"))[0], 2)
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LcdDataLineTests(unittest.TestCase):
     """The LCD data-line gate (build-only) and diag lcdMosiSig / build (on the knob)."""
     INI = ("; PlatformIO Project Configuration File\n[platformio]\ndefault_envs = nanofoc_d\n\n[env:nanofoc_d]\n"
@@ -10829,6 +10968,7 @@ class FixBinaryStepDownTests(HardwareFreeScriptTest):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class LookCheckTests(unittest.TestCase):
     """check_nanod_cc5_look.py and tooling.look_check_problems: two read-only diag reads of a fix binary (build and
     pipeline, lcdMosiSig 103, coredump, reset reason, no reboot), GO / NO-GO / NOT RUN, the evidence under the
@@ -10857,8 +10997,15 @@ class LookCheckTests(unittest.TestCase):
                                            "ledShowGapMsMax": 17, "ledMode": "alive", "lcdFps": 0, "lcdFullRefrs": 12,
                                            **extra})
 
-    def run_look(self, *argv, reads=(), quit_error=None, port_error=None, running=()):
+    def run_look(self, *argv, reads=(), quit_error=None, port_error=None, running=(), redraw=None):
         self.probes, answers = [], iter(reads)
+        self.redraws = []
+        redraw = redraw if redraw is not None else {"samples": [{"lcdFps": 9, "lcdFlushUs": 5000}] * 3,
+                                                    "claimErrors": [], "problems": [], "passed": True}
+
+        def redraw_check(port):
+            self.redraws.append(port)
+            return redraw
 
         def probe(port):
             self.probes.append(port)
@@ -10868,7 +11015,7 @@ class LookCheckTests(unittest.TestCase):
             return value
 
         clock, out = self.Clock(), io.StringIO()
-        with mock.patch.object(t, "probe_diag", probe), \
+        with mock.patch.object(t, "probe_diag", probe), mock.patch.object(t, "redraw_check", redraw_check), \
                 mock.patch.object(t, "require_companion_quit", mock.Mock(side_effect=quit_error, return_value=False)), \
                 mock.patch.object(t, "find_app_port", mock.Mock(side_effect=port_error, return_value="FAKEAPP")), \
                 mock.patch.object(t, "running_companions", lambda: list(running)), contextlib.redirect_stdout(out):
@@ -11011,6 +11158,7 @@ class LookCheckTests(unittest.TestCase):
                           "write_flash"):
             self.assertNotIn(forbidden, code, forbidden)
         self.assertIn("t.probe_diag(port)", code)                               # read-only: open, diag, close
+        self.assertIn("t.redraw_check(port)", code)     # the one claim: tooling.redraw_check, which always releases
         self.assertIn("t.write_json_evidence(p.look_checks, record)", code)     # an earlier record is archived
         look = code[code.index("def look("):code.index("def record_by_eye(")]
         self.assertLess(look.index("t.require_companion_quit()"), look.index("t.find_app_port()"))
@@ -11018,6 +11166,7 @@ class LookCheckTests(unittest.TestCase):
 
 
 @needs_tooling
+@pinned_to("cc5.4")
 class FixBinaryRunbookTests(unittest.TestCase):
     """firmware/BUILD-cc5.4.md "Fix binaries D and E" read as text: the root causes, the retired binaries, the D and
     E build and package commands, the look session's blocks, the step-down rows and the guards that take D and E."""
@@ -11065,7 +11214,6 @@ class FixBinaryRunbookTests(unittest.TestCase):
         build = section[section.index("### Build and package D and E"):section.index("### Gate evidence for D and E")]
         self.assertNotIn(" upload", "\n".join("\n".join(lines) for lines in self.blocks(build)))
 
-    @machine_runbook
     def test_the_look_session_blocks(self):
         section = self.section()
         look = section[section.index("### The look session (hardware, D first)"):]
@@ -11164,11 +11312,14 @@ def prompt_fit_problems(frame):
     """Why the instruction on `frame` does not fit the knob's glass (control_center.lcd_preview, the firmware's
     fitting): the heading loses its 1 px tracking or is cut, or an instruction line ends in an ellipsis. The line
     that carries a per-frame tag ("Stress 12 ab3f", "Soak recent 7") is exempt (the tag only keeps a label
-    changing)."""
+    changing). Copy that itself ends in an ellipsis ("Keep holding…") is not a cut when the line drawn is the whole
+    of it or its last wrapped part."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     from control_center import lcd_preview
     problems = []
+    own_ellipsis = [str(frame.get(name)) for name in DRAWN_FIELDS
+                    if str(frame.get(name, "")).endswith(lcd_preview.ELLIPSIS)]
     heading = frame.get("heading", "")
     if heading:
         fitted, tracking, _ = lcd_preview.fit_heading(heading)
@@ -11181,8 +11332,980 @@ def prompt_fit_problems(frame):
             continue
         if tag_line and run.role in ("meta", "status", "line"):
             continue
+        if any(copy == text or copy.endswith(" " + text) for copy in own_ellipsis):
+            continue
         problems.append(f"{run.role} cut: {text!r}")
     return problems
+
+
+# ---------------------------------------------------------------------------
+# 1.0.0-cc5.5 (plan F1, safety and measurement): CURRENT since the release tooling moved on. It upgrades cc5.4 binary
+# D, installed but never finalized (manifest.json still the cc5.3 record), and has its own ladder D (16 ms) and F
+# (12 ms, CC_BUILD_BINARY 6). The cc5.4-era classes above run pinned to cc5.4 (pinned_to, HardwareFreeScriptTest).
+
+CC55_D_IMAGE_SHA256 = "dcff9c9525c250419851177774f00882a8837d19b7ad15ecad23377a3928eee2"
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55ReleaseTests(unittest.TestCase):
+    """The cc5.5 profile, its ladder, rollback target, the never-finalized from-release and the F1 diag fields."""
+
+    def test_the_cc5_5_profile(self):
+        p = t.PROFILES["cc5.5"]
+        self.assertIs(t.CURRENT, p)
+        self.assertIs(t.NEWEST, t.PROFILES["cc5.8"])      # A2 (cc5.6), r4 (cc5.7) and v2.0.0 (cc5.8) followed F1
+        self.assertEqual((p.version, p.from_version, p.from_binary, p.from_artifact_version, p.tag, p.from_tag),
+                         ("1.0.0-cc5.5", "1.0.0-cc5.4", "D", "1.0.0-cc5.4-D", "cc5.5", "cc5.4"))
+        self.assertEqual((p.from_image.name, p.from_image_sha256, p.from_image_bytes),
+                         ("nanod-control-center-1.0.0-cc5.4-D.bin", CC55_D_IMAGE_SHA256, 1142448))
+        self.assertEqual((p.from_manifest.name, p.from_record.name, p.restore_record.name, p.from_install_record.name),
+                         ("manifest-1.0.0-cc5.4-D.json", "manifest-cc5.4-D.json", "manifest-cc5.3.json",
+                          "cc5.4-D-flash-checks.json"))
+        self.assertFalse(p.from_finalized)
+        self.assertTrue(all(q.from_finalized for q in (t.PROFILES["cc5.2"], t.PROFILES["cc5.3"], t.PROFILES["cc5.4"])))
+        self.assertEqual((p.from_expected_full.name, p.from_preparation.name),
+                         ("nanod-cc5.4-D-expected-full.bin", "cc5.4-D-preparation.json"))
+        self.assertEqual((p.before_full.name, p.rollback_app.name, p.backup_role, p.backup_report.name),
+                         ("nanod-cc5.4-before-cc5.5-full.bin", "nanod-cc5.4-before-cc5.5-active-app.bin",
+                          "pre-cc5.5 backup", "cc5.5-backup.json"))
+        self.assertEqual((p.restored_outcome, p.presentation, p.alive, p.artwork2, p.image_size_gate),
+                         ("RESTORED_CC5_4_RESET", 6, True, True, 1245184))
+        self.assertEqual(p.gates, t.PROFILES["cc5.4"].gates)
+        self.assertEqual((p.desktop_bundle, p.desktop_rollback_bundle), ("desktop-dist-v7-d", "desktop-dist-v7-c"))
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.4"], p)
+        self.assertEqual(p.expected_capabilities()["presentation"], 6)
+        self.assertIsNone(t.PROFILES["cc5.4"].image_size_gate)       # the gate is cc5.5's build acceptance on
+
+    def test_its_own_ladder_d_and_f(self):
+        p = t.CURRENT
+        self.assertEqual((p.binary, p.pipeline_binaries(), t.binary_choices(), t.binary_choices(t.PROFILES["cc5.4"])),
+                         (None, ("D", "F"), ("D", "F"), ("D", "E")))
+        self.assertEqual([v.label for v in p.variants()], ["cc5.5 binary D", "cc5.5 binary F"])
+        d, f = p.binary_profile("D"), p.binary_profile("F")
+        self.assertIs(p.binary_profile(None), p)
+        with self.assertRaises(ValueError):
+            p.binary_profile("E")
+        self.assertEqual((d.build_flags, f.build_flags), (("-DCC_BUILD_BINARY=4",),
+                                                          ("-DCC_LCD_PERIOD_MS=12", "-DCC_BUILD_BINARY=6")))
+        self.assertEqual((d.build_number, f.build_number), (4, 6))
+        self.assertEqual((d.pipeline, f.pipeline), ({"lcdDma": True, "lcdPeriodMs": 16, "artAsync": True},
+                                                    {"lcdDma": True, "lcdPeriodMs": 12, "artAsync": True}))
+        for v in (d, f):
+            self.assertEqual(v.build_dir, t.FIRMWARE_SOURCE / ".pio" / f"build-cc5.5-{v.binary}")
+            self.assertEqual((v.prefix, v.release_prefix, v.backup_report.name, v.before_full.name),
+                             (f"cc5.5-{v.binary}", "cc5.5", "cc5.5-backup.json", "nanod-cc5.4-before-cc5.5-full.bin"))
+            self.assertEqual((v.from_image.name, v.restore_record.name, v.from_finalized),
+                             ("nanod-control-center-1.0.0-cc5.4-D.bin", "manifest-cc5.3.json", False))
+        self.assertEqual((t.BINARY_PARENTS["F"], t.LCD_FPS_TARGETS["F"], t.BINARY_BUILD_NUMBERS["F"]),
+                         ("D", t.LCD_FPS_TARGETS["D"], 6))
+        # No file name of any profile or binary is shared.
+        names = [getattr(q, attr).name for q in t.all_profiles()
+                 for attr in ("image", "source_zip", "manifest", "build_log", "build_report", "preparation",
+                              "flash_checks", "rollback_report", "installation", "expected_full", "look_checks")]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(t.later_profiles(t.PROFILES["cc5.4"]), [p, t.PROFILES["cc5.6"], t.PROFILES["cc5.7"],
+                                                                 t.PROFILES["cc5.8"]])
+        self.assertNotIn(p.before_full.name, t.history_backup_names(p))
+        self.assertIn(p.before_full.name, t.history_backup_names(t.PROFILES["cc5.4"]))
+
+    def test_the_cc5_6_profile(self):
+        """A2 (firmware/BUILD-cc5.6.md): cc5.5 F (on the knob since 2026-09-30, checked by eye) -> 1.0.0-cc5.6, the
+        same ladder and size gate, appCanvas 1, rolled back by --to cc5.5; CURRENT from then on."""
+        q, p = t.PROFILES["cc5.6"], t.PROFILES["cc5.5"]
+        self.assertIs(t.later_profiles(q)[0], t.PROFILES["cc5.7"])
+        self.assertEqual((q.version, q.from_version, q.from_binary, q.from_artifact_version, q.tag),
+                         ("1.0.0-cc5.6", "1.0.0-cc5.5", "F", "1.0.0-cc5.5-F", "cc5.6"))
+        self.assertEqual((q.from_image.name, q.from_image_sha256, q.from_image_bytes),
+                         ("nanod-control-center-1.0.0-cc5.5-F.bin",
+                          "5c926d2721d26b4e71789828c2571fe537c8c235973702726441f9d6878ad1f8", 1144112))
+        self.assertEqual((q.from_record.name, q.restore_record.name, q.from_install_record.name, q.from_finalized),
+                         ("manifest-cc5.5-F.json", "manifest-cc5.3.json", "cc5.5-F-flash-checks.json", False))
+        self.assertEqual(q.from_expected_sha256, "c5056fa52cf0b3970727da92a272fa20ce35dd01ea1a4e61945eba2a3d863fd4")
+        self.assertIs(t.PROFILES["cc5.6"], q)
+        self.assertEqual((q.before_full.name, q.rollback_app.name),
+                         ("nanod-cc5.5-before-cc5.6-full.bin", "nanod-cc5.5-before-cc5.6-active-app.bin"))
+        self.assertEqual((q.pipeline_binaries(), q.image_size_gate, q.presentation, q.gates),
+                         (p.pipeline_binaries(), 1245184, 6, p.gates))
+        self.assertEqual((q.desktop_bundle, q.desktop_rollback_bundle), ("desktop-dist-v7-g", "desktop-dist-v7-f"))
+        self.assertEqual(q.expected_capabilities()["appCanvas"], 1)
+        self.assertNotIn("appCanvas", p.expected_capabilities())
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.5"], q)
+        self.assertEqual([v.label for v in q.variants()], ["cc5.6 binary D", "cc5.6 binary F"])
+        self.assertEqual(q.binary_profile("D").build_dir, t.FIRMWARE_SOURCE / ".pio" / "build-cc5.6-D")
+
+    def test_build_and_package_take_the_release(self):
+        """While CURRENT is cc5.5 (the F1 install), build / package build A2 with --release cc5.6."""
+        for script in ("build_nanod_cc5.py", "package_nanod_cc5.py"):
+            text = (t.WORK / script).read_text(encoding="utf-8")
+            self.assertIn('parser.add_argument("--release", choices=releases, default=t.CURRENT.tag,', text)
+            self.assertIn("p = t.PROFILES[args.release].binary_profile(", text)
+
+    def test_f_is_told_by_its_build_letter(self):
+        f = {"lcdDma": True, "lcdPeriodMs": 12, "artAsync": True}
+        self.assertEqual(t.lcd_binary({**f, "build": "F"}), "F")
+        self.assertIsNone(t.lcd_binary({"lcdDma": False, "lcdPeriodMs": 33, "artAsync": False, "build": "F"}))
+        self.assertEqual(t.lcd_binary(f), "A")                          # without a build letter: A's allowance
+        image = b"\xe9" + b"x" * 100 + t.R5_IMAGE_MARKER + t.BUILD_MARKER_PREFIX + b"6\0"
+        self.assertEqual(t.binary_image_problems(image, "F"), [])
+        self.assertIn("cc-build-binary:6", " ".join(t.binary_image_problems(image.replace(b":6", b":4"), "F")))
+        self.assertEqual(t.binary_elf_problems({t.R3_ELF_SYMBOL}, "F"), [])
+
+    def test_the_firmware_tree_is_cc5_5_with_the_f1_changes(self):
+        src = t.FIRMWARE_SOURCE / "src"
+        if not (src / "lcd_thread.cpp").is_file():
+            self.skipTest("firmware checkout not present")
+        read = lambda name: (src / name).read_text(encoding="utf-8")          # noqa: E731
+        # The tree has moved on to 1.0.0-cc5.7 (r4 FEEL + SOUND), which keeps every F1 change checked below.
+        self.assertIn(f'-DNANO_FIRMWARE_VERSION=\\"{t.NEWEST.version}\\"', (t.FIRMWARE_SOURCE / "platformio.ini").read_text(
+            encoding="utf-8"))
+        self.assertIn("#if CC_BUILD_BINARY < 0 || CC_BUILD_BINARY > 6", read("lcd_thread.cpp"))
+        self.assertIn('{"A", "B", "C", "D", "E", "F"}', read("cc_diag.h"))
+        foc = read("foc_thread.cpp")
+        self.assertLess(foc.index("motor.voltage_limit = kMotorVoltageCap;"), foc.index("motor.init();"))
+        self.assertNotIn('Serial.println("Received and handling message', foc)
+        self.assertEqual([line for line in foc.splitlines() if "Serial." in line and not line.strip().startswith("//")], [])
+        self.assertIn("constexpr float kMotorVoltageCap = 2.2f;", read("HapticCommander.h"))
+        self.assertIn("haptic_register_write_allowed(reg)", read("HapticCommander.cpp"))   # FW-BUG-003 allow-list
+        self.assertIn("BLDCMotor(7, 5.3)", foc)                                   # the phase resistance is kept
+        self.assertIn("xQueueCreate(16, sizeof( KeyEvt ))", read("hmi_thread.cpp"))
+        self.assertIn('eventDoc["ks"] = cc_position_key_state(live, pending);', read("com_thread.cpp"))
+        haptic = read("haptic.cpp").replace("\r\n", "\n")
+        # F1's explicit braces: only loopFOC() is conditional. 1.0.0-cc5.7 adds a host effect to the PID output
+        # (zero without one) and clamps the sum to the cap before the one move(). Rest sleep (ID-REST-250MS, the
+        # cc5.7 F tree) makes the output mutable: zeroed, with the PID reset, while the knob rests on its detent.
+        self.assertIn("    else {\n        motor->loopFOC();\n    }\n", haptic)
+        legacy_out = "float out = default_pid(error) + fx_.volts(now) / CC_HAPTIC_PHASE_OHMS;"
+        self.assertEqual(haptic.count(legacy_out), 1)
+        start = haptic.index(legacy_out)
+        move = haptic.index("motor->move(", start)
+        tail = haptic[start:haptic.index(";", move) + 1]
+        self.assertIn("out = 0.0f;", tail)                                      # the rest gate zeroes the output
+        self.assertIn("haptic_pid->reset();", tail)                              # and restarts the PID from 0
+        self.assertLess(tail.index("out = 0.0f;"), tail.index("motor->move("))
+        self.assertIn("motor->move(out > CC_HAPTIC_CAP_AMPS ? CC_HAPTIC_CAP_AMPS : "
+                      "(out < -CC_HAPTIC_CAP_AMPS ? -CC_HAPTIC_CAP_AMPS : out));", tail)   # the cap clamp, one move()
+        self.assertEqual(tail.count("motor->move("), 1)
+        diag = read("cc_diag.cpp")
+        for field in t.F1_DIAG_FIELDS:
+            self.assertIn(f'd["{field}"]', diag, field)
+
+    def test_the_f1_diag_fields_and_their_summary(self):
+        diag = {"build": "F", "resetReason": "poweron", "rtcReset": [1, 1], "lcdFps": 41, "lcdRefrUsAvg": 9000,
+                "focLoopHz": 6100, "focLoopUsMax": 812, "uqAbsMax": 2118, "uqCapMs": 0, "uqCapMv": 2200,
+                "pdRead": True, "pdPdo": 2, "pdVolts": 9, "pdRdo": 0x2004B12C, "usbMidiOk": True, "usbHidOk": True,
+                "hidRetries": 4, "title": "never"}
+        summary = t.f1_diag_summary(diag)
+        self.assertNotIn("title", summary)
+        self.assertEqual(set(summary) - {"build"} - set(t.STEP0_DIAG_FIELDS), set(t.F1_DIAG_FIELDS))
+        lines = t.f1_diag_lines(diag)
+        self.assertEqual(lines[0], "FOC loop 6100 Hz, longest gap 812 us; |Uq| max 2118 mV of the 2200 mV cap, 0 ms at "
+                                   "the cap since boot")
+        self.assertEqual(lines[1], "PD contract: read ok, PDO 2, 9 V (0 = none or unknown), RDO 0x2004B12C")
+        self.assertEqual(lines[2], "USB MIDI True, HID True; HID retries 4")
+        self.assertTrue(lines[3].startswith("Step 0: build F, resetReason poweron, rtcReset [1, 1]"))
+        self.assertEqual(t.f1_diag_lines({"lcdFps": 20}), ["Step 0: lcdFps 20"])      # a cc5.4 knob: no F1 fields
+        self.assertEqual((t.f1_diag_summary(None), t.f1_diag_lines(None)), ({}, []))
+        if (ROOT / "control_center" / "device.py").is_file():
+            if str(ROOT) not in sys.path:
+                sys.path.insert(0, str(ROOT))
+            from control_center import device
+            self.assertEqual(device.DIAG_F1_FIELDS, t.F1_DIAG_FIELDS)
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55FromReleaseTests(unittest.TestCase):
+    """from_install_problems, active_record_problems and restore_record_problems in a temporary tree: cc5.4 D is
+    installed (its flash record) and never finalized (manifest.json the cc5.3 record)."""
+
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name in ("DIAGNOSTICS", "BACKUPS", "FIRMWARE_OUT"):
+            self.enterContext(mock.patch.object(t, name, self.root))
+        self.enterContext(mock.patch.object(t, "ACTIVE_MANIFEST", self.root / "manifest.json"))
+        self.p = t.CURRENT
+        cc53 = t.PROFILES["cc5.4"]
+        self.cc53_record = {"firmwareVersion": "1.0.0-cc5.3", "installationStatus": "INSTALLED",
+                            "artifacts": {cc53.from_image.name: {"sha256": cc53.from_image_sha256}}}
+        self.p.restore_record.write_text(json.dumps(self.cc53_record), encoding="utf-8")
+        shutil.copyfile(self.p.restore_record, t.ACTIVE_MANIFEST)
+        self.d_record = {"firmwareVersion": "1.0.0-cc5.4", "installationStatus": "UNFLASHED",
+                         "artifacts": {self.p.from_image.name: {"sha256": CC55_D_IMAGE_SHA256}}}
+        self.p.from_manifest.write_text(json.dumps(self.d_record), encoding="utf-8")
+        self.install = {"startedUtc": "20260929T184254Z", "firmwareVersion": "1.0.0-cc5.4", "binary": "D",
+                        "candidate": self.p.from_image.name, "candidateSha256": CC55_D_IMAGE_SHA256,
+                        "writeAttempted": True, "flashWritten": True, "outcome": "INSTALLED_VERIFIED_RESET"}
+        self.write("cc5.4-D-flash-checks.json", self.install)
+        self.write("cc5.4-D-flash-checks.superseded-20260929T173237Z.json",
+                   {**self.install, "startedUtc": "20260929T173200Z"})
+        self.write("cc5.4-D-rollback.json", {"startedUtc": "20260929T184045Z", "outcome": "ROLLED_BACK_VERIFIED_RESET"})
+
+    def write(self, name, data):
+        (self.root / name).write_text(json.dumps(data), encoding="utf-8")
+
+    def test_the_knob_runs_the_never_finalized_d(self):
+        self.assertEqual(t.from_install_problems(self.p), [])
+        self.assertEqual(t.active_record_problems(self.p), [])
+        self.assertEqual(t.restore_record_problems(self.p), [])
+        self.assertEqual(t.from_record_problems(self.p, self.p.from_manifest), [])
+        self.assertEqual(t.from_record_problems(self.p), ["manifest-cc5.4-D.json is missing or unreadable"])
+        for q in (t.PROFILES["cc5.3"], t.PROFILES["cc5.4"]):
+            self.assertEqual(t.from_install_problems(q), [])             # finalized from-releases: manifest.json says
+
+    def test_what_says_the_knob_no_longer_runs_it(self):
+        cases = (
+            ("restored", lambda: self.write("cc5.4-D-flash-checks.json", {**self.install, "outcome": "RESTORED_CC5_3_RESET"}),
+             "records outcome RESTORED_CC5_3_RESET, not a verified install"),
+            ("other image", lambda: self.write("cc5.4-D-flash-checks.json", {**self.install, "candidateSha256": "0" * 64}),
+             "does not record nanod-control-center-1.0.0-cc5.4-D.bin"),
+            ("rolled back since", lambda: self.write("cc5.4-D-rollback.json", {"startedUtc": "20260930T010000Z"}),
+             "cc5.4-D-rollback.json records a cc5.4 binary D rollback after cc5.4-D-flash-checks.json"),
+            ("E written since", lambda: self.write("cc5.4-E-flash-checks.json",
+                                                   {"startedUtc": "20260930T020000Z", "writeAttempted": True}),
+             "the newest cc5.4 write is cc5.4-E-flash-checks.json, not cc5.4-D-flash-checks.json"),
+            ("missing", lambda: (self.root / "cc5.4-D-flash-checks.json").unlink(),
+             "cc5.4-D-flash-checks.json (the 1.0.0-cc5.4 install record) is missing or unreadable"),
+        )
+        for label, change, words in cases:
+            with self.subTest(label):
+                self.setUp()
+                change()
+                self.assertIn(words, " ".join(t.from_install_problems(self.p)))
+                self.assertIn(words, " ".join(t.active_record_problems(self.p)))
+
+    def test_manifest_json_must_be_the_record_in_force(self):
+        t.ACTIVE_MANIFEST.write_text(json.dumps(self.d_record), encoding="utf-8")
+        self.assertEqual(t.active_record_problems(self.p), [
+            "manifest.json is not the record in force while the never-finalized 1.0.0-cc5.4 runs (manifest-cc5.3.json)"])
+        self.p.restore_record.write_text(json.dumps({**self.cc53_record, "firmwareVersion": "1.0.0-cc5.4"}),
+                                         encoding="utf-8")
+        self.assertIn("manifest-cc5.3.json is not the 1.0.0-cc5.3 record", " ".join(t.restore_record_problems(self.p)))
+
+
+def cc55_prepare_fixture(case, root):
+    """The files prepare_nanod_cc5_install.py --binary D|F reads for 1.0.0-cc5.4 D -> 1.0.0-cc5.5 in `root`: the
+    pre-cc5.5 backup with cc5.4 D at app0, the never-finalized D (its install record, its kept package record,
+    manifest.json the cc5.3 record) and the two UNFLASHED cc5.5 packages. Returns (profile, before, candidates)."""
+    backups, diag, fw = root / "backups", root / "diagnostics", root / "firmware"
+    for folder in (backups, diag, fw):
+        folder.mkdir()
+    for name, value in (("BACKUPS", backups), ("DIAGNOSTICS", diag), ("FIRMWARE_OUT", fw),
+                        ("ACTIVE_MANIFEST", fw / "manifest.json"),
+                        ("ORIGINAL_MANIFEST", backups / t.ORIGINAL_MANIFEST.name)):
+        case.patch(t, name, value)
+    p = t.CURRENT
+    installed = b"\xe9" + b"cc5.4-D-image" * 300
+    sha = hashlib.sha256(installed).hexdigest()
+    for q in [p] + p.variants():
+        case.patch(q, "from_image_sha256", sha)
+        case.patch(q, "from_image_bytes", len(installed))
+        case.patch(q, "from_expected_sha256", None)
+    before = bytearray(b"\x5a" * t.FLASH_BYTES)
+    before[0x8000:0x9000] = partition_table(LAYOUT)
+    before[0xE000:0x10000] = ota_slot(1) + ota_slot(0)
+    original = bytes(before)
+    before[t.APP_OFFSET:t.APP_OFFSET + len(installed)] = installed
+    before = bytes(before)
+    p.before_full.write_bytes(before)
+    p.backup_report.write_text(json.dumps({"passed": True, "sha256": hashlib.sha256(before).hexdigest(),
+                                           "role": "pre-cc5.5 backup", "file": p.before_full.name}), encoding="utf-8")
+    (backups / "original-full.bin").write_bytes(original)
+    t.ORIGINAL_MANIFEST.write_text(json.dumps({
+        "full_flash_file": "original-full.bin", "full_flash_sha256": hashlib.sha256(original).hexdigest(),
+        "partitions": [dict(zip(("name", "type", "subtype", "offset", "size"), row)) for row in LAYOUT]}),
+        encoding="utf-8")
+    p.from_image.write_bytes(installed)
+    d_record = {"firmwareVersion": "1.0.0-cc5.4", "installationStatus": "UNFLASHED", "binary": {"name": "D"},
+                "artifacts": {p.from_image.name: {"sha256": sha}}}
+    p.from_manifest.write_text(json.dumps(d_record), encoding="utf-8")
+    shutil.copyfile(p.from_manifest, p.from_record)                          # kept by package_nanod_cc5.py
+    cc53 = t.PROFILES["cc5.4"]
+    p.restore_record.write_text(json.dumps({"firmwareVersion": "1.0.0-cc5.3", "installationStatus": "INSTALLED",
+                                            "artifacts": {cc53.from_image.name: {"sha256": cc53.from_image_sha256}}}),
+                                encoding="utf-8")
+    shutil.copyfile(p.restore_record, t.ACTIVE_MANIFEST)
+    (diag / "cc5.4-D-flash-checks.json").write_text(json.dumps({
+        "startedUtc": "20260929T184254Z", "firmwareVersion": "1.0.0-cc5.4", "binary": "D", "candidate": p.from_image.name,
+        "candidateSha256": sha, "writeAttempted": True, "flashWritten": True, "outcome": "INSTALLED_VERIFIED_RESET"}),
+        encoding="utf-8")
+    candidates = {}
+    for variant in p.variants():
+        image = (b"\xe9" + f"cc5.5-{variant.binary}-image".encode() * 400 + b"1.0.0-cc5.5\0" + t.R5_IMAGE_MARKER
+                 + t.BUILD_MARKER_PREFIX + str(variant.build_number).encode("ascii") + b"\0")
+        candidates[variant.binary] = image
+        variant.image.write_bytes(image)
+        variant.manifest.write_text(json.dumps({"firmwareVersion": "1.0.0-cc5.5", "installationStatus": "UNFLASHED",
+                                                "binary": {"name": variant.binary},
+                                                "artifacts": {variant.image.name: {"sha256": t.sha256_bytes(image)}}}),
+                                    encoding="utf-8")
+    (backups / "inventory-before.json").write_text(json.dumps({"settings": {"firmwareVersion": "1.0.0-cc5.4"},
+                                                               "capabilities": {"presentation": 6}}), encoding="utf-8")
+    return p, before, candidates
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55PrepareFlowTests(HardwareFreeScriptTest):
+    """prepare_nanod_cc5_install.py --binary D|F for cc5.5 over the installed, never-finalized cc5.4 D."""
+    script, capture_evidence, pinned, active_binaries = "prepare_nanod_cc5_install.py", False, None, None
+
+    def setUp(self):
+        super().setUp()
+        self.root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
+        self.p, self.before, self.candidates = cc55_prepare_fixture(self, self.root)
+
+    def prepare(self, binary):
+        return self.module.main(["--before-inventory", "inventory-before.json", "--binary", binary])
+
+    def refused(self, binary, words):
+        with self.assertRaises(SystemExit) as caught:
+            self.prepare(binary)
+        self.assertIn(words, str(caught.exception))
+        self.assertFalse(self.p.binary_profile(binary).preparation.exists())
+
+    def test_d_and_f_are_prepared_from_the_pre_cc5_5_backup(self):
+        for name in ("D", "F"):
+            self.assertEqual(self.prepare(name), 0, name)
+            v = self.p.binary_profile(name)
+            prep = t.load_json(v.preparation)
+            self.assertEqual((prep["firmwareVersion"], prep["fromVersion"], prep["binary"], prep["fromImageFile"],
+                              prep["fromRecord"], prep["fromFinalized"], prep["activeRecord"], prep["fromInstallRecord"]),
+                             ("1.0.0-cc5.5", "1.0.0-cc5.4", name, "nanod-control-center-1.0.0-cc5.4-D.bin",
+                              "manifest-cc5.4-D.json", False, "manifest-cc5.3.json", "cc5.4-D-flash-checks.json"))
+            expected, _ = t.assemble_expected(self.before, self.candidates[name])
+            self.assertEqual(v.expected_full.read_bytes(), bytes(expected))
+        self.assertEqual(self.p.rollback_app.read_bytes(), self.before[t.APP_OFFSET:t.APP_OFFSET + t.APP_SIZE])
+        self.assertIn("Next: install_nanod_cc5.py --binary F", self.out.getvalue())
+        with self.assertRaises(SystemExit):                                    # cc5.4's E is not a cc5.5 binary
+            self.module.main(["--before-inventory", "inventory-before.json", "--binary", "E"])
+
+    def test_the_never_finalized_d_must_still_be_what_the_records_say(self):
+        t.ACTIVE_MANIFEST.write_text(self.p.from_manifest.read_text(encoding="utf-8"), encoding="utf-8")
+        self.refused("D", "manifest.json is not the record in force while the never-finalized 1.0.0-cc5.4 runs")
+        shutil.copyfile(self.p.restore_record, t.ACTIVE_MANIFEST)
+        (t.DIAGNOSTICS / "cc5.4-D-rollback.json").write_text(json.dumps({"startedUtc": "20260930T000000Z"}),
+                                                              encoding="utf-8")
+        self.refused("F", "records a cc5.4 binary D rollback after cc5.4-D-flash-checks.json")
+        (t.DIAGNOSTICS / "cc5.4-D-rollback.json").unlink()
+        self.p.from_record.unlink()
+        self.refused("D", "run package_nanod_cc5.py --binary D first (it keeps manifest-cc5.4-D.json)")
+        shutil.copyfile(self.p.from_manifest, self.p.from_record)
+        (t.BACKUPS / "inventory-before.json").write_text(json.dumps({"settings": {"firmwareVersion": "1.0.0-cc5.4"},
+                                                                     "capabilities": {"presentation": 5}}),
+                                                         encoding="utf-8")
+        self.refused("D", "does not report presentation 6")
+        (t.BACKUPS / "inventory-before.json").write_text(json.dumps({"settings": {"firmwareVersion": "1.0.0-cc5.4"},
+                                                                     "capabilities": {"presentation": 6}}),
+                                                         encoding="utf-8")
+        self.assertEqual(self.prepare("D"), 0)
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55RollbackRecordTests(unittest.TestCase):
+    """rollback_nanod_cc5.py --to cc5.4 (cc5.5 -> cc5.4 D): the records it restores and checks."""
+
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name, value in (("FIRMWARE_OUT", self.root), ("ACTIVE_MANIFEST", self.root / "manifest.json"),
+                            ("BACKUPS", self.root), ("DIAGNOSTICS", self.root)):
+            self.enterContext(mock.patch.object(t, name, value))
+        self.module = load_script("rollback_nanod_cc5.py")
+        self.p = t.ROLLBACK_TARGETS["cc5.4"].binary_profile("F")
+        cc53 = t.PROFILES["cc5.4"]
+        self.cc53 = {"firmwareVersion": "1.0.0-cc5.3", "installationStatus": "INSTALLED",
+                     "artifacts": {cc53.from_image.name: {"sha256": cc53.from_image_sha256}}}
+        self.p.restore_record.write_text(json.dumps(self.cc53), encoding="utf-8")
+        self.installed = {"firmwareVersion": "1.0.0-cc5.5", "installationStatus": "INSTALLED"}
+        t.ACTIVE_MANIFEST.write_text(json.dumps(self.installed), encoding="utf-8")
+        self.p.manifest.write_text(json.dumps(self.installed), encoding="utf-8")
+
+    def test_the_record_in_force_before_cc5_5_is_restored(self):
+        self.assertIs(self.p.base, t.CURRENT)
+        self.assertEqual(self.module.removed_releases(self.p), ["1.0.0-cc5.5", "1.0.0-cc5.6", "1.0.0-cc5.7",
+                                                                "1.0.0-cc5.8"])
+        self.assertEqual([m.name for m in self.module.removed_manifests(self.p)],
+                         ["manifest-1.0.0-cc5.5-D.json", "manifest-1.0.0-cc5.5-F.json", "manifest-1.0.0-cc5.6-D.json",
+                          "manifest-1.0.0-cc5.6-F.json", "manifest-1.0.0-cc5.7-D.json", "manifest-1.0.0-cc5.7-F.json",
+                          "manifest-1.0.0-cc5.8-D.json", "manifest-1.0.0-cc5.8-F.json"])
+        self.assertIsNone(self.module.check_record_inputs(self.p))
+        report = {}
+        self.module.restore_records(report, self.p)
+        self.assertEqual(t.load_json(t.ACTIVE_MANIFEST), self.cc53)
+        [kept] = self.root.glob("manifest-at-cc5.5-F-rollback-*.json")
+        self.assertEqual(report["manifestRestored"], {"from": "manifest-cc5.3.json", "previousKeptAs": kept.name})
+        manifest = t.load_json(self.p.manifest)
+        self.assertEqual((manifest["installationStatus"], manifest["rollback"], manifest["hardwareStatus"]),
+                         ("ROLLED_BACK", "diagnostics/cc5.5-F-rollback.json",
+                          "Rolled back to cc5.4 (app0 restored from the pre-cc5.5 backup)."))
+
+    def test_a_wrong_record_is_refused_before_anything_is_sent(self):
+        self.p.restore_record.write_text(json.dumps({**self.cc53, "firmwareVersion": "1.0.0-cc5.4"}), encoding="utf-8")
+        with self.assertRaises(SystemExit) as caught:
+            self.module.check_record_inputs(self.p)
+        self.assertIn("manifest-cc5.3.json is not the 1.0.0-cc5.3 record", str(caught.exception))
+
+    def test_the_binary_must_be_one_of_cc5_5s(self):
+        parser = self.module.argparse.ArgumentParser()
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+            self.module.choose_binary(parser, "cc5.4", "E")
+        self.assertEqual(caught.exception.code, 2)
+        self.assertEqual(self.module.choose_binary(parser, "cc5.4", "D")[0], t.CURRENT.binary_profile("D"))
+        install = load_script("install_nanod_cc5.py")
+        self.assertEqual(install.exit_codes(t.CURRENT)["RESTORED_CC5_4_RESET"], 3)
+
+
+@needs_tooling
+class Cc56RollbackRecordTests(unittest.TestCase):
+    """rollback_nanod_cc5.py --to cc5.5 (cc5.6 -> cc5.5 F), CURRENT: two never-finalized releases in a row (cc5.5 F from
+    cc5.4 D, cc5.6 from cc5.5 F) leave manifest-cc5.3.json in force, so the record a rollback restores is checked as
+    the 1.0.0-cc5.3 record (2026-09-30: it was checked as cc5.4 D's and every cc5.6 rollback was refused)."""
+
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name, value in (("FIRMWARE_OUT", self.root), ("ACTIVE_MANIFEST", self.root / "manifest.json"),
+                            ("BACKUPS", self.root), ("DIAGNOSTICS", self.root)):
+            self.enterContext(mock.patch.object(t, name, value))
+        self.module = load_script("rollback_nanod_cc5.py")
+        self.p = t.ROLLBACK_TARGETS["cc5.5"].binary_profile("F")
+        cc53 = t.PROFILES["cc5.4"]
+        self.cc53 = {"firmwareVersion": "1.0.0-cc5.3", "installationStatus": "INSTALLED",
+                     "artifacts": {cc53.from_image.name: {"sha256": cc53.from_image_sha256}}}
+        self.p.restore_record.write_text(json.dumps(self.cc53), encoding="utf-8")
+        self.installed = {"firmwareVersion": "1.0.0-cc5.6", "installationStatus": "INSTALLED"}
+        t.ACTIVE_MANIFEST.write_text(json.dumps(self.installed), encoding="utf-8")
+        self.p.manifest.write_text(json.dumps(self.installed), encoding="utf-8")
+
+    def test_the_record_in_force_before_cc5_5_is_restored(self):
+        self.assertIs(self.p.base, t.PROFILES["cc5.6"])
+        self.assertEqual(self.p.restore_record.name, "manifest-cc5.3.json")
+        self.assertEqual(t.restore_record_problems(self.p), [])
+        self.assertIsNone(self.module.check_record_inputs(self.p))
+        report = {}
+        self.module.restore_records(report, self.p)
+        self.assertEqual(t.load_json(t.ACTIVE_MANIFEST), self.cc53)
+        self.assertEqual(t.load_json(self.p.manifest)["installationStatus"], "ROLLED_BACK")
+
+    def test_a_wrong_record_is_refused_before_anything_is_sent(self):
+        for version in ("1.0.0-cc5.4", "1.0.0-cc5.5"):
+            with self.subTest(version=version):
+                self.p.restore_record.write_text(json.dumps({**self.cc53, "firmwareVersion": version}),
+                                                 encoding="utf-8")
+                with self.assertRaises(SystemExit) as caught:
+                    self.module.check_record_inputs(self.p)
+                self.assertIn("manifest-cc5.3.json is not the 1.0.0-cc5.3 record", str(caught.exception))
+
+    def test_every_profile_and_binary_resolves_its_restore_record(self):
+        for key, profile in t.ROLLBACK_TARGETS.items():
+            for variant in profile.variants():
+                with self.subTest(to=key, binary=variant.binary):
+                    self.assertIsNotNone(t.restore_record_problems(variant))   # never a crash on a chain
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55BuildAndPackageTests(BuildAndPackageFixture):
+    """build_ and package_nanod_cc5.py --binary D and F for cc5.5: flags, folders, the flash size gate, and the
+    package's kept cc5.4 D record (never finalized: manifest.json stays the record it left in force)."""
+    pinned, active_binaries = None, None
+
+    def setUp(self):
+        super().setUp()
+        self.d_record = {"firmwareVersion": "1.0.0-cc5.4", "installationStatus": "UNFLASHED",
+                         "artifacts": {self.p.from_image.name: {"sha256": self.p.from_image_sha256}},
+                         "sourceFiles": {"src/main.cpp": {"sha256": "2" * 64, "bytes": 1}}}
+        self.p.from_manifest.write_text(json.dumps(self.d_record, indent=2) + "\n", encoding="utf-8")
+
+    def test_d_and_f_build_with_their_flags_and_pass_the_size_gate(self):
+        for argv in (["--binary", "D"], ["--binary", "F"]):
+            self.assertEqual(self.build.main(argv), 0, argv)
+        for env, name in zip(self.envs, ("D", "F")):
+            v = t.CURRENT.binary_profile(name)
+            self.assertEqual((env["PLATFORMIO_BUILD_FLAGS"], env["PLATFORMIO_BUILD_DIR"]),
+                             (" ".join(LADDER_FLAGS[name]), str(v.build_dir)))
+            record = t.load_json(v.build_report)
+            self.assertEqual((record["accepted"], record["binary"], record["buildNumber"], record["diagBuild"],
+                              record["pipeline"], record["version"], record["fromVersion"]),
+                             (True, name, t.BINARY_BUILD_NUMBERS[name], name, t.LCD_BINARIES[name], "1.0.0-cc5.5",
+                              "1.0.0-cc5.4"))
+            gate = record["sizeGate"]
+            self.assertEqual((gate["maxBytes"], gate["bytes"], gate["passed"], gate["headroomBytes"]),
+                             (1245184, record["bytes"], True, 1245184 - record["bytes"]))
+            self.assertEqual(record["pipelineEvidence"]["buildMarkers"], [t.BINARY_BUILD_NUMBERS[name]])
+        self.assertIn("Size gate: ", self.out.getvalue())
+        self.assertFalse(t.BUILT_IMAGE.exists())                                 # the release profile is never built
+
+    def test_an_image_above_the_size_gate_is_rejected(self):
+        self.image = b"\xe9" + b"z" * (t.IMAGE_SIZE_GATE_BYTES + 100) + self.p.version.encode("ascii") + b"\0"
+        self.assertEqual(self.build.main(["--binary", "D"]), 1)
+        record = t.load_json(t.CURRENT.binary_profile("D").build_report)
+        self.assertFalse(record["accepted"] or record["sizeGate"]["passed"])
+        self.assertIn("above the flash size gate of 1245184 B", " ".join(record["problems"]))
+        self.assertIn("FAILED", self.out.getvalue())
+
+    def test_packaging_keeps_the_cc5_4_d_record_and_leaves_manifest_json(self):
+        for name in ("D", "F"):
+            self.assertEqual(self.build.main(["--binary", name]), 0)
+            self.assertEqual(self.module.main(["--binary", name]), 0)
+        self.assertEqual(t.ACTIVE_MANIFEST.read_bytes(), self.active)
+        self.assertEqual(self.p.from_record.read_bytes(), self.p.from_manifest.read_bytes())
+        self.assertIn("manifest-cc5.4-D.json written: byte copy of manifest-1.0.0-cc5.4-D.json", self.out.getvalue())
+        self.assertIn("manifest-cc5.4-D.json kept (the installed, never finalized 1.0.0-cc5.4-D record)",
+                      self.out.getvalue())
+        self.assertFalse(t.CURRENT.manifest.exists() or t.CURRENT.image.exists())
+        for name in ("D", "F"):
+            v = t.CURRENT.binary_profile(name)
+            manifest = t.load_json(v.manifest)
+            self.assertEqual((manifest["firmwareVersion"], manifest["installationStatus"], manifest["upgradesFrom"],
+                              manifest["installedRecordBeforeUpgrade"]),
+                             ("1.0.0-cc5.5", "UNFLASHED", "1.0.0-cc5.4", "manifest-cc5.4-D.json"))
+            self.assertEqual(manifest["image"]["sizeGate"]["maxBytes"], 1245184)
+            binary = manifest["binary"]
+            self.assertEqual((binary["name"], binary["active"], binary["retired"], binary["ladder"]),
+                             (name, ["D", "F"], {}, {"D": "manifest-1.0.0-cc5.5-D.json", "F": "manifest-1.0.0-cc5.5-F.json"}))
+            self.assertIn("firmware/BUILD-cc5.5.md", binary["contract"])
+            self.assertEqual(manifest["changedFromPreviousCc5"]["from"], "1.0.0-cc5.4-D")
+            self.assertEqual(manifest["expectedCapabilities"]["presentation"], 6)
+        self.assertEqual(t.load_json(self.p.from_manifest), self.d_record)       # cc5.4 D's package is never changed
+
+    def test_a_kept_record_that_differs_stops_packaging(self):
+        self.assertEqual(self.build.main(["--binary", "D"]), 0)
+        self.p.from_record.write_text(json.dumps({**self.d_record, "note": "edited"}), encoding="utf-8")
+        with self.assertRaises(SystemExit) as caught:
+            self.module.main(["--binary", "D"])
+        self.assertIn("manifest-cc5.4-D.json differs from manifest-1.0.0-cc5.4-D.json", str(caught.exception))
+        self.p.from_record.unlink()
+        self.p.from_manifest.write_text(json.dumps({**self.d_record, "firmwareVersion": "1.0.0-cc5.3"}), encoding="utf-8")
+        with self.assertRaises(SystemExit) as caught:
+            self.module.main(["--binary", "D"])
+        self.assertIn("cannot be kept as manifest-cc5.4-D.json", str(caught.exception))
+        self.assertFalse(t.CURRENT.binary_profile("D").manifest.exists())
+
+
+@needs_tooling
+@pinned_to("cc5.5")
+class Cc55LookCheckTests(unittest.TestCase):
+    """check_nanod_cc5_look.py for cc5.5: --binary D (default) or F, the F1 fields recorded and printed, and a NO-GO
+    that names the rollback to cc5.4 D."""
+    Clock = LookCheckTests.Clock
+    diag = LookCheckTests.diag
+    run_look = LookCheckTests.run_look
+    evidence = LookCheckTests.evidence
+
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name in ("DIAGNOSTICS", "BACKUPS", "FIRMWARE_OUT"):
+            self.enterContext(mock.patch.object(t, name, self.root))
+        self.enterContext(mock.patch.object(t, "console_utf8", lambda: None))
+        self.enterContext(mock.patch.object(t, "list_ports", mock.Mock(side_effect=AssertionError("no enumeration"))))
+        self.module = load_script("check_nanod_cc5_look.py")
+
+    def f1(self, **extra):
+        return {"focLoopHz": 6100, "focLoopUsMax": 700, "uqAbsMax": 2100, "uqCapMs": 0, "uqCapMv": 2200, "pdRead": True,
+                "pdPdo": 1, "pdVolts": 5, "pdRdo": 0x1004B12C, "usbMidiOk": True, "usbHidOk": True, "hidRetries": 0,
+                **extra}
+
+    def test_f_is_looked_at_with_its_f1_fields(self):
+        code, out = self.run_look("--binary", "F", reads=(self.diag("F", **self.f1()),
+                                                          self.diag("F", uptime=62100, **self.f1(uqAbsMax=2050))))
+        self.assertEqual(code, 0, out)
+        record = self.evidence("F")
+        self.assertEqual((record["binary"], record["go"], record["expected"]["pipeline"]["lcdPeriodMs"]), ("F", True, 12))
+        self.assertEqual(record["f1"]["second"]["uqAbsMax"], 2050)
+        self.assertEqual(record["f1"]["first"]["build"], "F")
+        self.assertIn("FOC loop 6100 Hz, longest gap 700 us; |Uq| max 2050 mV of the 2200 mV cap", out)
+        self.assertIn("PD contract: read ok, PDO 1, 5 V", out)
+        self.assertEqual(self.root.glob("cc5.5-F-look-checks.json").__next__().name, "cc5.5-F-look-checks.json")
+
+    def test_a_no_go_names_the_rollback_to_cc5_4(self):
+        code, out = self.run_look(reads=(self.diag("D", lcdMosiSig=102), self.diag("D", lcdMosiSig=102, uptime=62100)))
+        self.assertEqual(code, 1)
+        self.assertIn("roll binary D back (rollback_nanod_cc5.py --to cc5.4 --binary D; firmware/BUILD-cc5.5.md)", out)
+        code, _ = self.run_look("--binary", "D", reads=(self.diag("F"), self.diag("F", uptime=62100)))
+        self.assertEqual(code, 1)                                                 # F on the knob is not D
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.module.main(["--binary", "E"])
+
+
+# ---------------------------------------------------------------------------
+# 1.0.0-cc5.7 (plan F2 + F3, the r4 FEEL + SOUND job; firmware/BUILD-cc5.7.md, HAPTICS.md): pinned since cc5.8 became CURRENT. It upgrades
+# cc5.6 binary F (the tilt rebuild on the knob since 2026-09-30, never finalized), with the same ladder and size gate.
+
+@needs_tooling
+@pinned_to("cc5.7")
+class Cc57ReleaseTests(unittest.TestCase):
+    """The cc5.7 profile (pinned: CURRENT moved on to cc5.8): from cc5.6 F, rolled back by --to cc5.6, the r4
+    capabilities, desktop v7-j."""
+
+    def test_the_cc5_7_profile(self):
+        q, p = t.PROFILES["cc5.7"], t.PROFILES["cc5.6"]
+        self.assertIs(t.CURRENT, q)                        # pinned (pinned_to)
+        self.assertIs(t.NEWEST, t.PROFILES["cc5.8"])
+        self.assertEqual((q.version, q.from_version, q.from_binary, q.from_artifact_version, q.tag),
+                         ("1.0.0-cc5.7", "1.0.0-cc5.6", "F", "1.0.0-cc5.6-F", "cc5.7"))
+        self.assertEqual((q.from_image.name, q.from_image_sha256, q.from_image_bytes),
+                         ("nanod-control-center-1.0.0-cc5.6-F.bin",
+                          "81ee99fca7f1b4bc42e7ed7ddc1313e9198704356533e770d3e8bfbdbf1ed888", 1177424))
+        self.assertEqual((q.from_record.name, q.restore_record.name, q.from_install_record.name, q.from_finalized),
+                         ("manifest-cc5.6-F.json", "manifest-cc5.3.json", "cc5.6-F-flash-checks.json", False))
+        self.assertEqual(q.from_expected_sha256, "0f8773931487deefe7a0dd91c31be17ea532969a0c2c77aaf9a1974adcb9a2f1")
+        self.assertEqual((q.before_full.name, q.rollback_app.name),
+                         ("nanod-cc5.6-before-cc5.7-full.bin", "nanod-cc5.6-before-cc5.7-active-app.bin"))
+        self.assertEqual((q.pipeline_binaries(), q.image_size_gate, q.presentation, q.gates),
+                         (p.pipeline_binaries(), 1245184, 6, p.gates))
+        self.assertEqual((q.desktop_bundle, q.desktop_rollback_bundle), ("desktop-dist-v7-j", "desktop-dist-v7-i"))
+        caps = q.expected_capabilities()
+        self.assertEqual({name: caps[name] for name in t.R4_FEEL_CAPABILITIES},
+                         {"feel": 1, "hapticFx": 1, "knobSound": 1, "offlineVolume": 1, "recalibration": 1,
+                          "knobVolume": 1})
+        self.assertEqual(caps["appCanvas"], 1)
+        self.assertFalse(set(t.R4_FEEL_CAPABILITIES) & set(p.expected_capabilities()))
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.6"], q)
+        self.assertEqual([v.label for v in q.variants()], ["cc5.7 binary D", "cc5.7 binary F"])
+        self.assertEqual(q.binary_profile("F").build_dir, t.FIRMWARE_SOURCE / ".pio" / "build-cc5.7-F")
+        self.assertEqual(t.later_profiles(p), [q, t.PROFILES["cc5.8"]])
+
+    def test_the_firmware_tree_keeps_the_r4_capabilities(self):
+        ini = t.FIRMWARE_SOURCE / "platformio.ini"
+        if not ini.is_file():
+            self.skipTest("firmware checkout not present")
+        text = ini.read_text(encoding="utf-8")
+        self.assertRegex(text, r"(?m)^\s*-DAUDIO_EN=1\s*$")
+        center = (t.FIRMWARE_SOURCE / "src" / "control_center.cpp").read_text(encoding="utf-8")
+        for name in t.R4_FEEL_CAPABILITIES:
+            self.assertIn(f'c["{name}"] = 1;', center)
+
+    def test_the_desktop_capabilities_match(self):
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from control_center import device
+        self.assertEqual((device.FEEL_CAPABILITY, device.HAPTIC_CAPABILITY, device.SOUND_CAPABILITY,
+                          device.OFFLINE_VOLUME_CAPABILITY, device.RECALIBRATION_CAPABILITY, device.KNOB_VOLUME_CAPABILITY),
+                         t.R4_FEEL_CAPABILITIES)
+
+
+@needs_tooling
+class Cc58ReleaseTests(unittest.TestCase):
+    """The cc5.8 profile (the v2.0.0 release candidate): CURRENT, NEWEST, from cc5.7 F, rolled back by --to cc5.7,
+    the r4 and app profile capabilities, desktop v7-l (rollback v7-k)."""
+
+    def test_the_cc5_8_profile(self):
+        q, p = t.PROFILES["cc5.8"], t.PROFILES["cc5.7"]
+        self.assertIs(t.CURRENT, q)
+        self.assertIs(t.NEWEST, q)
+        self.assertEqual((q.version, q.from_version, q.from_binary, q.from_artifact_version, q.tag),
+                         ("1.0.0-cc5.8", "1.0.0-cc5.7", "F", "1.0.0-cc5.7-F", "cc5.8"))
+        self.assertEqual((q.from_image.name, q.from_image_sha256, q.from_image_bytes),
+                         ("nanod-control-center-1.0.0-cc5.7-F.bin",
+                          "93ff0d50fcb39dfa81e9b70249a653aab8aa4374ee267ac9a3b7eec016ae6f05", 1128128))
+        self.assertEqual((q.from_record.name, q.restore_record.name, q.from_install_record.name, q.from_finalized),
+                         ("manifest-cc5.7-F.json", "manifest-cc5.3.json", "cc5.7-F-flash-checks.json", False))
+        self.assertEqual(q.from_manifest.name, "manifest-1.0.0-cc5.7-F.json")
+        self.assertEqual(q.from_expected_sha256, "aa64fef511f9f33cf661307e2bc636442b820b198c4db2ebb71dc4b5fbcf53dd")
+        self.assertEqual((q.before_full.name, q.rollback_app.name),
+                         ("nanod-cc5.7-before-cc5.8-full.bin", "nanod-cc5.7-before-cc5.8-active-app.bin"))
+        self.assertEqual((q.pipeline_binaries(), q.image_size_gate, q.presentation, q.gates),
+                         (p.pipeline_binaries(), 1245184, 6, p.gates))
+        self.assertEqual((q.desktop_bundle, q.desktop_rollback_bundle), ("desktop-dist-v7-l", "desktop-dist-v7-k"))
+        self.assertEqual((q.restored_outcome, q.from_token), ("RESTORED_CC5_7_RESET", "CC5_7"))
+        caps, before = q.expected_capabilities(), p.expected_capabilities()
+        self.assertEqual({k: v for k, v in caps.items() if k not in t.APP_PROFILE_CAPABILITIES}, before)
+        self.assertEqual({name: caps[name] for name in t.APP_PROFILE_CAPABILITIES},
+                         {"appProfiles": 1, "appProfileSlots": 4, "appProfileMaxBytes": 32768, "appProfileFeatures": 31})
+        self.assertFalse(set(t.APP_PROFILE_CAPABILITIES) & set(before))
+        self.assertIs(t.ROLLBACK_TARGETS["cc5.7"], q)
+        self.assertEqual([v.label for v in q.variants()], ["cc5.8 binary D", "cc5.8 binary F"])
+        self.assertEqual(q.binary_profile("F").build_dir, t.FIRMWARE_SOURCE / ".pio" / "build-cc5.8-F")
+        self.assertEqual(t.later_profiles(p), [q])
+        self.assertEqual(t.later_profiles(q), [])
+
+    def test_the_from_release_files_match_the_profile(self):
+        """Read only: the installed cc5.7 F image and its package manifest carry the recorded hash and size."""
+        q = t.PROFILES["cc5.8"]
+        if not q.from_image.is_file():
+            self.skipTest("cc5.7 F package not present")
+        self.assertEqual(t.sha256_bytes(q.from_image.read_bytes()), q.from_image_sha256)
+        self.assertEqual(q.from_image.stat().st_size, q.from_image_bytes)
+        manifest = t.load_json(q.from_manifest)
+        self.assertEqual((manifest["firmwareVersion"], manifest["image"]["sha256"], manifest["image"]["bytes"]),
+                         ("1.0.0-cc5.7", q.from_image_sha256, q.from_image_bytes))
+
+    def test_the_firmware_tree_is_cc5_8(self):
+        ini = t.FIRMWARE_SOURCE / "platformio.ini"
+        if not ini.is_file():
+            self.skipTest("firmware checkout not present")
+        text = ini.read_text(encoding="utf-8")
+        self.assertIn('-DNANO_FIRMWARE_VERSION=\\"1.0.0-cc5.8\\"', text)
+        self.assertIn('-DNANO_FIRMWARE_PUBLIC=\\"2.0.0\\"', text)
+        self.assertEqual(t.firmware_version_defines(text), ("2.0.0", "1.0.0-cc5.8"))
+        self.assertEqual(t.knob_reported_version(t.PROFILES["cc5.8"].binary_profile("F"), ini_text=text),
+                         "2.0.0+cc5.8.F")
+        center = (t.FIRMWARE_SOURCE / "src" / "control_center.cpp").read_text(encoding="utf-8")
+        self.assertIn('c["appProfiles"] = 1; c["appProfileSlots"] = CC_APP_STORE_SLOTS; '
+                      'c["appProfileMaxBytes"] = CC_APP_WIRE_MAX_BYTES;', center)
+        self.assertIn('c["appProfileFeatures"] = CC_APP_FEATURES_SUPPORTED;', center)
+        store = (t.FIRMWARE_SOURCE / "src" / "cc_app_store.h").read_text(encoding="utf-8")
+        profile = (t.FIRMWARE_SOURCE / "src" / "cc_app_profile.h").read_text(encoding="utf-8")
+        self.assertRegex(store, r"#define CC_APP_STORE_SLOTS 4u\b")
+        self.assertRegex(store, r"#define CC_APP_WIRE_MAX_BYTES 32768u\b")
+        self.assertRegex(profile, r"#define CC_APP_FEATURES_SUPPORTED 0x1Fu\b")
+
+    def test_the_public_version_is_desk_dial_product_version(self):
+        """FW-PUB-004: the knob's public version (platformio.ini) is Desk Dial's ProductVersion (desktop-version.txt)."""
+        ini = t.FIRMWARE_SOURCE / "platformio.ini"
+        if not ini.is_file():
+            self.skipTest("firmware checkout not present")
+        public, _ = t.firmware_version_defines(ini.read_text(encoding="utf-8"))
+        self.assertEqual(t.desktop_product_version(), public)
+
+    def test_the_desktop_capability_name_matches(self):
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from control_center import device
+        self.assertEqual(device.APP_PROFILES_CAPABILITY, "appProfiles")
+        self.assertIn(device.APP_PROFILES_CAPABILITY, t.APP_PROFILE_CAPABILITIES)
+
+
+# ---------------------------------------------------------------------------
+# Consistent builds and the redraw check (2026-09-30, the cc5.7 failure: an incremental build mixed LVGL objects
+# compiled with LV_OBJ_STYLE_CACHE 0 and display code compiled with 1; the knob never drew a claimed frame).
+
+@needs_tooling
+class ConsistentBuildTests(BuildAndPackageFixture):
+    """build_nanod_cc5.py always builds clean, rejects objects not compiled by the run or older than a config
+    header, and rejects a harness built with another lv_conf.h."""
+    pinned, active_binaries = "cc5.7", None
+
+    def test_the_build_folder_is_emptied_first(self):
+        leftover = self.p.binary_profile("F").build_dir / t.PIO_ENV / "libae9" / "lvgl" / "old.c.o"
+        leftover.parent.mkdir(parents=True)
+        leftover.write_bytes(b"old")
+        self.assertEqual(self.build.main(["--binary", "F"]), 0, self.out.getvalue())
+        self.assertFalse(leftover.exists())
+        build = t.load_json(self.p.binary_profile("F").build_report)
+        self.assertEqual(build["cleanBuild"]["filesRemovedBefore"], 1)
+        self.assertEqual((build["objectFreshness"]["objects"], build["objectFreshness"]["passed"]), (2, True))
+        self.assertFalse(build["harnessConf"]["applicable"])       # the fixture tree has no lv_conf.h
+
+    def test_an_object_the_build_did_not_compile_rejects_it(self):
+        self.stale_object = True
+        self.assertEqual(self.build.main(["--binary", "F"]), 1)
+        build = t.load_json(self.p.binary_profile("F").build_report)
+        self.assertFalse(build["accepted"])
+        self.assertEqual(build["objectFreshness"]["compiledBeforeThisBuild"], 1)
+        self.assertIn("1 of 2 object files were not compiled by this build", " ".join(build["problems"]))
+
+    def test_an_object_older_than_lv_conf_rejects_it(self):
+        include = t.FIRMWARE_SOURCE / "include"
+        include.mkdir()
+        conf = include / "lv_conf.h"
+        conf.write_text("#define LV_OBJ_STYLE_CACHE 1\n", encoding="utf-8")
+        folder = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
+        (folder / "lv_obj.c.o").write_bytes(b"o")
+        old = time.time() - 60
+        os.utime(folder / "lv_obj.c.o", (old, old))
+        record, problems = t.stale_object_problems(folder, old - 10)
+        self.assertEqual(record["olderThanConfig"], {"lv_conf.h": 1})
+        self.assertIn("older than lv_conf.h", problems[0])
+        record, problems = t.stale_object_problems(folder / "missing", time.time())
+        self.assertIn("no object files", problems[0])
+
+    def test_only_build_folders_inside_pio_are_deleted(self):
+        for bad in (t.FIRMWARE_SOURCE, t.FIRMWARE_SOURCE / "src", t.FIRMWARE_SOURCE / ".pio" / "libdeps",
+                    t.FIRMWARE_SOURCE / ".pio" / "build-x" / "nanofoc_d"):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                t.clean_build_folder(bad)
+        self.assertTrue((t.FIRMWARE_SOURCE / "src" / "main.cpp").is_file())
+        self.assertEqual(t.clean_build_folder(t.FIRMWARE_SOURCE / ".pio" / "build-none"), 0)
+
+    def test_the_harness_must_use_the_firmware_lv_conf(self):
+        root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
+        firmware, harness, exe = root / "fw.h", root / "host.h", root / "lcd-preview.exe"
+        firmware.write_text("#define LV_COLOR_DEPTH 16\n#define LV_USE_TFT_ESPI 1\n"
+                            "#define LV_OBJ_STYLE_CACHE      1   /* r4 */\n", encoding="utf-8")
+        harness.write_text("/* Generated by build.py */\r\n#define LV_COLOR_DEPTH 16\r\n#define LV_USE_TFT_ESPI 0\r\n"
+                           "#define LV_OBJ_STYLE_CACHE 1\r\n", encoding="utf-8")
+        exe.write_bytes(b"MZ")
+        record, problems = t.harness_conf_problems(firmware, harness, exe)
+        self.assertEqual((problems, record["passed"]), ([], True))
+        # The cc5.7 state: the harness still had the old cache setting.
+        harness.write_text("#define LV_COLOR_DEPTH 16\n#define LV_USE_TFT_ESPI 0\n#define LV_OBJ_STYLE_CACHE 0\n",
+                           encoding="utf-8")
+        record, problems = t.harness_conf_problems(firmware, harness, exe)
+        self.assertEqual(record["differences"], ["LV_OBJ_STYLE_CACHE: firmware '1', harness '0'"])
+        self.assertIn("run harness/build.py", problems[0])
+        # Same defines, but the renderer predates its copy.
+        harness.write_text("#define LV_COLOR_DEPTH 16\n#define LV_USE_TFT_ESPI 0\n#define LV_OBJ_STYLE_CACHE 1\n",
+                           encoding="utf-8")
+        old = time.time() - 60
+        os.utime(exe, (old, old))
+        _, problems = t.harness_conf_problems(firmware, harness, exe)
+        self.assertIn("older than its lv_conf.h", problems[0])
+        self.assertEqual(t.harness_conf_problems(root / "none.h", harness, exe)[1], [])   # no firmware file
+
+    def test_the_build_rejects_a_stale_harness(self):
+        include = t.FIRMWARE_SOURCE / "include"
+        include.mkdir()
+        (include / "lv_conf.h").write_text("#define LV_OBJ_STYLE_CACHE 1\n", encoding="utf-8")
+        preview = t.WORK.parent / "harness"
+        (preview / "build" / "Release").mkdir(parents=True)
+        (preview / "lv_conf.h").write_text("#define LV_OBJ_STYLE_CACHE 0\n", encoding="utf-8")
+        (preview / "build" / "Release" / "lcd-preview.exe").write_bytes(b"MZ")
+        self.assertEqual(self.build.main(["--binary", "F"]), 1)
+        build = t.load_json(self.p.binary_profile("F").build_report)
+        self.assertFalse(build["harnessConf"]["passed"])
+        self.assertIn("the harness's lv_conf.h differs from the firmware's", " ".join(build["problems"]))
+
+
+@needs_tooling
+class RedrawCheckTests(unittest.TestCase):
+    """tooling.redraw_check / redraw_problems: claimed frames must reach the panel (the cc5.7 failure), and the
+    knob is always released."""
+
+    class Clock:
+        def __init__(self):
+            self.now = 0.0
+
+        def __call__(self):
+            return self.now
+
+    class Knob:
+        def __init__(self, clock, fps, fail_enter=False):
+            self.clock, self.fps, self.fail_enter = clock, fps, fail_enter
+            self.sent, self.released, self.closed, self.errors = [], False, False, []
+
+        def enter(self, control):
+            if self.fail_enter:
+                raise TimeoutError("No ready 907 within 3.0 s")
+            self.sent.append(("control", control["id"]))
+
+        def frame(self, frame):
+            self.sent.append(("frame", frame["id"]))
+
+        def pump(self, duration=0.0):
+            self.clock.now += max(duration, 0.01)
+
+        def diag(self):
+            fps = self.fps(self.clock.now)
+            return {"lcdFps": fps, "lcdFlushUs": 4000 if fps else 0, "lcdStep": "wait", "sessionPhase": "ready"}
+
+        def release_quietly(self):
+            self.released = True
+
+        def close(self):
+            self.closed = True
+
+    def run_check(self, fps, fail_enter=False):
+        clock = self.Clock()
+        knob = self.Knob(clock, fps, fail_enter)
+        frames = Path(self.enterContext(tempfile.TemporaryDirectory())) / "frames.json"
+        frames.write_text(json.dumps({"control": {"id": 2, "profile": "X"},
+                                      "frames": [{"id": 2, "title": "A", "feedback": {}}, {"id": 2, "title": "B"}]}),
+                          encoding="utf-8")
+        record = t.redraw_check("FAKEAPP", knob_factory=lambda port: knob, clock=clock, sleep=lambda s: None,
+                                frames_path=frames)
+        return record, knob
+
+    def test_a_knob_that_redraws_passes(self):
+        record, knob = self.run_check(lambda now: 9)
+        self.assertTrue(record["passed"], record)
+        self.assertGreaterEqual(len(record["samples"]), 3)
+        self.assertEqual(knob.sent[0], ("control", t.REDRAW_CONTROL_ID))
+        self.assertGreaterEqual(sum(1 for kind, _ in knob.sent if kind == "frame"), 6)
+        self.assertTrue(knob.released and knob.closed)
+
+    def test_the_cc5_7_knob_fails(self):
+        # cc5.7 F, 2026-09-30: the claim's own refresh, then no flush at all while the frames changed.
+        record, knob = self.run_check(lambda now: 0)
+        self.assertFalse(record["passed"])
+        self.assertIn("the screen did not redraw while the frames changed: 0 of", record["problems"][0])
+        self.assertTrue(knob.released)
+
+    def test_a_failed_claim_still_releases(self):
+        record, knob = self.run_check(lambda now: 9, fail_enter=True)
+        self.assertFalse(record["passed"])
+        self.assertIn("could not run (TimeoutError", record["problems"][0])
+        self.assertTrue(knob.released and knob.closed)
+
+    def test_redraw_problems(self):
+        live = {"lcdFps": 9, "lcdFlushUs": 5000}
+        self.assertEqual(t.redraw_problems([live, live, {"lcdFps": 0, "lcdFlushUs": 0}]), [])
+        self.assertTrue(t.redraw_problems([live, {"lcdFps": 0, "lcdFlushUs": 0}]))
+        self.assertTrue(t.redraw_problems([{"lcdFps": 3, "lcdFlushUs": 0}] * 3))      # counted but nothing flushed
+        self.assertTrue(t.redraw_problems([]))
+
+
+@needs_tooling
+class LookRedrawTests(unittest.TestCase):
+    """check_nanod_cc5_look.py runs the redraw check after the two diag reads; a knob that does not redraw is NO-GO."""
+    Clock = LookCheckTests.Clock
+    diag = LookCheckTests.diag
+    run_look = LookCheckTests.run_look
+    evidence = LookCheckTests.evidence
+    setUp = Cc55LookCheckTests.setUp
+
+    def test_no_redraw_is_no_go(self):
+        failed = {"samples": [{"lcdFps": 0, "lcdFlushUs": 0}] * 3, "claimErrors": [],
+                  "problems": ["the screen did not redraw while the frames changed"], "passed": False}
+        code, out = self.run_look("--binary", "F", reads=(self.diag("F"), self.diag("F", uptime=62100)), redraw=failed)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(self.redraws, ["FAKEAPP"])
+        record = self.evidence("F")
+        self.assertFalse(record["redraw"]["passed"])
+        self.assertIn("the screen did not redraw while the frames changed", record["problems"])
+        self.assertIn("redraw while claimed: 0 fps, 0 fps, 0 fps -> FAILED", out)
+        self.assertIn("NO-GO: do not ask the user to look", out)
+
+    def test_a_redrawing_knob_is_go(self):
+        code, out = self.run_look("--binary", "F", reads=(self.diag("F"), self.diag("F", uptime=62100)))
+        self.assertEqual(code, 0, out)
+        self.assertTrue(self.evidence("F")["redraw"]["passed"])
+        self.assertIn("redraw while claimed: 9 fps, 9 fps, 9 fps -> passed", out)
+
+
+@needs_tooling
+class KnobReportedVersionTests(unittest.TestCase):
+    """FW-PUB-004: the string the knob reports mirrors src/cc_fw_version.h; the matcher takes either form."""
+    INI = ("[env:nanofoc_d]\nbuild_flags =\n"
+           '\t-DNANO_FIRMWARE_VERSION=\\"1.0.0-cc5.7\\"\n'
+           '\t-DNANO_FIRMWARE_PUBLIC=\\"2.0.0\\"\n')
+
+    def test_public_build_id_and_binary_letter(self):
+        profile = SimpleNamespace(version="1.0.0-cc5.7", binary="F")
+        self.assertEqual(t.knob_reported_version(profile, public="2.0.0"), "2.0.0+cc5.7.F")
+        self.assertEqual(t.knob_reported_version(profile, ini_text=self.INI), "2.0.0+cc5.7.F")
+
+    def test_d_differs_from_f(self):
+        profile = SimpleNamespace(version="1.0.0-cc5.7", binary="F")
+        self.assertEqual(t.knob_reported_version(profile, "D", public="2.0.0"), "2.0.0+cc5.7.D")
+        self.assertNotEqual(t.knob_reported_version(profile, "D", public="2.0.0"),
+                            t.knob_reported_version(profile, "F", public="2.0.0"))
+
+    def test_no_letter_without_a_numbered_binary(self):
+        for binary in (None, "A"):
+            profile = SimpleNamespace(version="1.0.0-cc5.7", binary=binary)
+            self.assertEqual(t.knob_reported_version(profile, public="2.0.0"), "2.0.0+cc5.7")
+
+    def test_release_field_and_no_public(self):
+        profile = SimpleNamespace(version="1.0.0-cc5.7", binary="F", public_version="2.0.0")
+        self.assertEqual(t.knob_reported_version(profile, ini_text=""), "2.0.0+cc5.7.F")
+        other = SimpleNamespace(version="1.0.0-cc5.6", binary="F")
+        self.assertEqual(t.knob_reported_version(other, ini_text=self.INI), "1.0.0-cc5.6")
+
+    def test_matcher_accepts_either_form(self):
+        profile = SimpleNamespace(version="1.0.0-cc5.7", binary="F")
+        self.assertTrue(t.reports_version("1.0.0-cc5.7", profile, public="2.0.0"))
+        self.assertTrue(t.reports_version("2.0.0+cc5.7.F", profile, public="2.0.0"))
+        self.assertFalse(t.reports_version("2.0.0+cc5.7.D", profile, public="2.0.0"))
+        self.assertFalse(t.reports_version("2.0.0", profile, public="2.0.0"))
+        self.assertFalse(t.reports_version(None, profile, public="2.0.0"))
+
+    def test_real_profile_binaries(self):
+        base = t.PROFILES["cc5.7"]
+        f, d = base.binary_profile("F"), base.binary_profile("D")
+        self.assertEqual(t.knob_reported_version(f, public="2.0.0"), "2.0.0+cc5.7.F")
+        self.assertEqual(t.knob_reported_version(d, public="2.0.0"), "2.0.0+cc5.7.D")
 
 
 if __name__ == "__main__":

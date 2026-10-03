@@ -30,7 +30,7 @@ class TracksLineTests(Fixture):
         self.enter()
         frame = self.frame()
         self.assertEqual((frame["heading"], frame["title"], frame["subtitle"], frame["meta"]),
-                         ("TRACKS", "Turn to choose", "Now: Cloudbusting", "5 / 12"))
+                         ("TRACKS", "Turn to choose", "Now: Pressure Front", "5 / 12"))
         self.turn_to(2)
         frame = self.frame()
         self.assertEqual((frame["title"], frame["subtitle"], frame["meta"]), ("Next track", "Next: Song 6", "Press 4 to skip"))
@@ -54,24 +54,26 @@ class TracksLineTests(Fixture):
         self.assertEqual(self.frame()["meta"], "5 / 12 · shuffle")
 
     def test_ends_and_repeat_all(self):
+        """r4 4.3 (walls everywhere, no wrap-around): the queue's ends are ends under repeat-all too (Desk Dial 7.3
+        no longer shows "Next: back to track 1" or reads the last row to wrap Previous)."""
         self.enter(P=12, T=12, can_next=False)
         self.turn_to(2)
         self.assertEqual(self.frame()["subtitle"], "End of queue")
         self.press(0)
         self.enter(P=12, T=12, repeat="all", play_mode="REPEAT_ALL")
         self.turn_to(2)
-        self.assertEqual(self.frame()["subtitle"], "Next: back to track 1")
+        self.assertEqual(self.frame()["subtitle"], "End of queue")
         self.press(0)
         reads = self.enter(P=1, T=12, repeat="all", play_mode="REPEAT_ALL", track_id="track-1")
-        self.assertIn((11, 1, "tracks_last"), [(r["start"], r["count"], r["purpose"]) for r in reads])
+        self.assertNotIn("tracks_last", [r["purpose"] for r in reads])
         self.turn_to(0)
-        self.assertEqual(self.frame()["subtitle"], "Prev: Song 12")
+        self.assertEqual(self.frame()["subtitle"], "Start of queue")
 
     def test_non_queue_sources_show_now_at_every_index(self):
         self.enter(source="radio", queue_length=0, playlist_position=0)
         for index in (0, 1, 2):
             self.turn_to(index)
-            self.assertEqual(self.frame()["subtitle"], "Now: Cloudbusting")
+            self.assertEqual(self.frame()["subtitle"], "Now: Pressure Front")
         self.turn_to(1)
         self.assertEqual(self.frame()["meta"], "")
 
@@ -133,7 +135,7 @@ class SeekMappingTests(Fixture):
         self.assertEqual(self.c.control()["profile"], "BINARIS BEER")
         frame = self.frame()
         self.assertEqual((frame["layout"], frame["heading"], frame["title"], frame["meta"]),
-                         ("seek", "SEEK", "Cloudbusting", "of 3:30"))
+                         ("seek", "SEEK", "Pressure Front", "of 3:30"))
         self.assertEqual(frame["ring"], {"style": "lap", "value": 0, "index": 74, "count": 210})
 
     def test_longest_offer(self):

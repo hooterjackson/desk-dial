@@ -21,7 +21,6 @@ import json
 import math
 from pathlib import Path
 import sys
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +34,8 @@ from control_center.artwork import icon_payload, prepare_artwork2  # noqa: E402
 from control_center.presentation import RING_SEGMENTS  # noqa: E402
 from control_center.preview_lights import PreviewLights  # noqa: E402
 
-DEFAULT_OUT = Path(tempfile.gettempdir()) / 'desk-dial-previews' / 'v5-previews'
+DEFAULT_OUT = Path(r'<scratch>'
+                   r'\cf8135e8-b752-4b82-a6c8-08e4a81ebf8b\<scratch>\v5-previews')
 FIXTURES = ROOT / 'tests' / 'fixtures' / 'cc5_frames.json'
 DESIGN = ROOT / 'design-reference' / 'design_handoff_nano_d_artwork_color' / 'assets'
 DPIS = (96, 192)
@@ -59,7 +59,7 @@ V4_BUTTON_FILL, V4_BUTTON_EDGE = (0x20, 0x20, 0x20), (0x2C, 0x2C, 0x2C)
 class Media:
     def __init__(self):
         self.covers = {name: prepare_artwork2((DESIGN / 'covers' / name).read_bytes())
-                       for name in ('hounds-of-love.png', 'night-drive-chromatics-album-.jpg')}
+                       for name in ('hounds-of-love.png', 'night-drive-velvet circuit-album-.jpg')}
         with Image.open(DESIGN / 'apps' / 'claude.png') as source:
             app = source.convert('RGBA')
         self.icon_hires = app.resize((HIRES_ICON, HIRES_ICON), Image.Resampling.LANCZOS)
@@ -82,7 +82,7 @@ def volume(frame, percent):
 def scenarios(media):
     """[(name, title, frame, artwork, window_icon, hires_cover, hires_icon)] (artwork2 media)."""
     frames = cases()
-    hounds, night = media.covers['hounds-of-love.png'], media.covers['night-drive-chromatics-album-.jpg']
+    hounds, night = media.covers['hounds-of-love.png'], media.covers['night-drive-velvet circuit-album-.jpg']
 
     def with_cover(frame, cover):
         return dict(deepcopy(frame), artKey=cover.jpeg_key)
@@ -91,7 +91,7 @@ def scenarios(media):
         return dict(deepcopy(frame), iconKey=media.icon_key)
 
     return [
-        ('now-playing', 'Now Playing, design cover (Hounds of Love)', with_cover(frames['home'], hounds),
+        ('now-playing', 'Now Playing, design cover (Paper Lanterns)', with_cover(frames['home'], hounds),
          hounds.jpeg, None, hounds.hires_jpeg, None),
         ('volume-85', 'Volume 85 % (amber)', with_cover(volume(frames['led-vol-86'], 85), hounds),
          hounds.jpeg, None, hounds.hires_jpeg, None),

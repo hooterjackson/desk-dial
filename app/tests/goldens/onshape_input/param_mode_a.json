@@ -1,0 +1,18 @@
+{
+"batches": [
+ {"events": [["key", 16, false], ["key", 69, false], ["key", 69, true], ["key", 16, true]], "inputs": [{"flags": 0, "scan": 42, "type": "key", "vk": 16}, {"flags": 0, "scan": 18, "type": "key", "vk": 69}, {"flags": 2, "scan": 18, "type": "key", "vk": 69}, {"flags": 2, "scan": 42, "type": "key", "vk": 16}], "t": 0.3},
+ {"events": [["wheel", 120]], "inputs": [{"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.4},
+ {"events": [["wheel", 120]], "inputs": [{"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", 120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", 120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", 120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", 120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", -120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 4294967176, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 17, false], ["wheel", -120], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"data": 4294967176, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.4},
+ {"events": [["key", 16, false], ["wheel", 120], ["key", 16, true]], "inputs": [{"flags": 0, "scan": 42, "type": "key", "vk": 16}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 42, "type": "key", "vk": 16}], "t": 0.4},
+ {"events": [["key", 16, false], ["wheel", 120], ["key", 16, true]], "inputs": [{"flags": 0, "scan": 42, "type": "key", "vk": 16}, {"data": 120, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}, {"flags": 2, "scan": 42, "type": "key", "vk": 16}], "t": 0.4},
+ {"events": [["key", 13, false], ["key", 13, true]], "inputs": [{"flags": 0, "scan": 28, "type": "key", "vk": 13}, {"flags": 2, "scan": 28, "type": "key", "vk": 13}], "t": 0.5}
+],
+"feedback": [],
+"status": {"action": "zoom", "active": true, "commands": 2, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 0, "refusals": 0, "releases": {}, "scrolls": 10, "short": 0, "typed": 0, "undo": 0, "undoSkipped": 0, "wheel": 0}
+}

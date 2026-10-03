@@ -170,7 +170,7 @@ function frameOf(inst) {
     if (f.t === 'on' && f.c && name === 'rect' && RAW(f.c)) b.color = RAW(f.c);
     return b;
   });
-  const frame = { id: 1, target: 'Den', value: '', detail: '', status: '', ledStyle: 'color', buttons, activity: 'idle' };
+  const frame = { id: 1, target: 'Hall', value: '', detail: '', status: '', ledStyle: 'color', buttons, activity: 'idle' };
   if (mode === 'home') {
     Object.assign(frame, { mode: 'HOME', layout: 'nowPlaying', value: `${s.vol}%`, confirmedVolume: s.vol,
       ring: { style: 'level', value: s.vol, index: 0, count: 101 } });

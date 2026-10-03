@@ -50,7 +50,7 @@ def btn(label, icon, enabled=True, **extra):
 
 
 def base(mode, layout, buttons, ring, **fields):
-    frame = {"id": 77, "mode": mode, "target": "Den", "value": "", "detail": "", "status": ""}
+    frame = {"id": 77, "mode": mode, "target": "Hall", "value": "", "detail": "", "status": ""}
     if layout is not None:
         frame["layout"] = layout
     frame.update(fields)
@@ -63,7 +63,7 @@ def home():
     return base("HOME", "nowPlaying", [btn("Pause", "pause"), btn("Browse", "list"), btn("Tracks", "tracks"),
                                        btn("Win", "win")],
                 {"style": "level", "value": 54, "index": 0, "count": 101},
-                value="54%", title="Colombina", subtitle="Mari Froes", ledStyle="color", artKey="cover_7f3a",
+                value="54%", title="Varanda", subtitle="Ana Ribeira", ledStyle="color", artKey="cover_7f3a",
                 confirmedVolume=54)
 
 
@@ -72,7 +72,7 @@ def recent(index=2, count=12):
     return base("RECENTLY ADDED", "recent", [btn("Back", "back"), btn("Open", "expand"), btn("Play next", "playnext"),
                                              btn("Play", "play")],
                 {"style": "selection", "value": 0, "index": index, "count": count, "colors": colors},
-                heading="RECENTLY ADDED", title="Vespertine", subtitle="Björk", meta=f"{index + 1} / {count}",
+                heading="RECENTLY ADDED", title="Perihelion", subtitle="Linnéa Holm", meta=f"{index + 1} / {count}",
                 ledStyle="color", artKey="cover_a01")
 
 
@@ -81,22 +81,22 @@ def explorer(tab=0):
                 [btn("Back", "back"), btn("Recent", "clock", lit="on" if tab == 0 else "off"),
                  btn("Favourites", "playlists", lit="off" if tab == 0 else "on"), btn("Play", "play")],
                 {"style": "selection", "value": 0, "index": 1, "count": 8, "colors": [0x204060] * 8},
-                heading="RECENT" if tab == 0 else "FAVOURITES", page=tab, title="Homogenic",
-                subtitle="Björk" if tab == 0 else "34 songs", meta="2 / 8", ledStyle="color", artKey="cover_b02")
+                heading="RECENT" if tab == 0 else "FAVOURITES", page=tab, title="Slow Orbit",
+                subtitle="Linnéa Holm" if tab == 0 else "34 songs", meta="2 / 8", ledStyle="color", artKey="cover_b02")
 
 
 def tracks():
     return base("TRACKS", "tracks", [btn("Back", "back"), btn("Up next", "expand"), btn("Seek", "seek"),
                                      btn("Next", "next")],
                 {"style": "transport", "value": 0, "index": 2, "count": 3},
-                heading="TRACKS", title="Hunter", subtitle="Next: Jóga", meta="Track 3 of 10", artKey="cover_c03")
+                heading="TRACKS", title="Drift", subtitle="Next: Jóga", meta="Track 3 of 10", artKey="cover_c03")
 
 
 def seek(target=74, duration=210, meta="of 3:30"):
     return base("TRACKS", "seek", [btn("Back", "back"), btn("Up next", "expand"), btn("Seek", "seek", lit="on"),
                                    btn("Next", "next", enabled=False)],
                 {"style": "lap", "value": 0, "index": target, "count": duration},
-                heading="SEEK", title="Hunter", meta=meta, artKey="cover_c03")
+                heading="SEEK", title="Drift", meta=meta, artKey="cover_c03")
 
 
 def upnext(now=4, count=12, card=False, index=5, liked=False):
@@ -107,7 +107,7 @@ def upnext(now=4, count=12, card=False, index=5, liked=False):
     return base("RECENTLY ADDED", "upnext",
                 [btn("Back", "back"), btn("Shuffle", "shuffle", lit="off"),
                  btn("Like", "heart", **({"lit": "on"} if liked else {})), btn("Play", "play")],
-                ring, heading="UP NEXT", title="All Is Full of Love", subtitle="Björk", meta=f"{index + 1} / {count}",
+                ring, heading="UP NEXT", title="Satellite Hearts", subtitle="Linnéa Holm", meta=f"{index + 1} / {count}",
                 ledStyle="color", artKey="cover_d04")
 
 
@@ -264,11 +264,11 @@ out = add('v5-seek-p5', 'Seek on a cc5.4 knob: lap ring (index = target s, count
 add('v5-seek-p4', 'Section 2.2: seek -> tracks for cc5.3, title := mmss(74) = "1:14", subtitle := the song, '
     'meta/heading kept, ring := off index 1 count 3 (the position row centre dot), icons expand->more, '
     'seek->tracks, lit dropped.', CAP_P4, seek(),
-    check=eq({"id": 77, "mode": "TRACKS", "target": "Den", "value": "", "detail": "", "status": "", "layout": "tracks",
+    check=eq({"id": 77, "mode": "TRACKS", "target": "Hall", "value": "", "detail": "", "status": "", "layout": "tracks",
               "heading": "SEEK", "title": "1:14", "meta": "of 3:30", "artKey": "cover_c03",
               "buttons": [btn("Back", "back"), btn("Up next", "more"), btn("Seek", "tracks"),
                           btn("Next", "next", enabled=False)],
-              "ring": {"style": "off", "value": 0, "index": 1, "count": 3}, "subtitle": "Hunter"}),
+              "ring": {"style": "off", "value": 0, "index": 1, "count": 3}, "subtitle": "Drift"}),
     stored={"layout": "seek", "ringStyle": "lap"})
 add('v5-explorer-tab0-p5', 'Explorer, Recently Added tab: page 0 (slimmed), clock lit on, playlists lit off.',
     CAP_P5_ALIVE, explorer(0), stored={"layout": "explorer", "page": 0, "lit": [None, "on", "off", None],
@@ -337,14 +337,14 @@ add('lap-on-tracks-p4', 'Section 2.2: lap on any other layout -> off 0/0/0.', CA
     with_ring(tracks(), style="lap", index=30, count=200),
     check=ring_is({"style": "off", "value": 0, "index": 0, "count": 0}))
 add('lap-seek-p4-at-zero', 'Seek downgrade at the start: mmss(0) = "0:00".', CAP_P4, with_ring(seek(), index=0),
-    check=lambda o: (o['title'], o['subtitle']) == ('0:00', 'Hunter') or (_ for _ in ()).throw(AssertionError(o)))
+    check=lambda o: (o['title'], o['subtitle']) == ('0:00', 'Drift') or (_ for _ in ()).throw(AssertionError(o)))
 add('lap-seek-p4-long', 'Seek downgrade of a long work: mmss(59998) = "999:58".', CAP_P4,
     with_ring(seek(), index=59998, count=59999),
     check=lambda o: o['title'] == '999:58' or (_ for _ in ()).throw(AssertionError(o)))
 add('seek-p4-without-lap', 'A Seek frame whose ring is not a lap draws no time (4.3), so the downgrade title is "".',
     CAP_P4, with_ring(seek(), style="off", index=0, count=0),
     check=lambda o: (o['layout'], o['title'], o['subtitle'], o['ring']) ==
-    ('tracks', '', 'Hunter', {"style": "off", "value": 0, "index": 1, "count": 3})
+    ('tracks', '', 'Drift', {"style": "off", "value": 0, "index": 1, "count": 3})
     or (_ for _ in ()).throw(AssertionError(o)))
 
 # 3. now (section 4.4).
@@ -591,7 +591,7 @@ add('downgrade-p4-no-artwork2', 'cc5.2 (presentation 4 without artwork2): the sa
 add('downgrade-cc4-seek', 'cc4 (presentation 2): V4 legacy rules after the 2.2 mapping; ASCII, colours kept, no v4 '
     'or v5 field.', CAP_P2, seek(),
     check=lambda o: (o['layout'], o['title'], o['subtitle'], [b['icon'] for b in o['buttons']], 'heading' in o, o['ring'])
-    == ('tracks', '1:14', 'Hunter', ['back', 'more', 'tracks', 'next'], False,
+    == ('tracks', '1:14', 'Drift', ['back', 'more', 'tracks', 'next'], False,
         {"style": "off", "value": 0, "index": 1, "count": 3}) and all('lit' not in b for b in o['buttons'])
     or (_ for _ in ()).throw(AssertionError(o)))
 add('downgrade-cc4-upnext', 'cc4: upnext -> recent (page dropped with every v4 field), heart -> more.', CAP_P2, upnext(),

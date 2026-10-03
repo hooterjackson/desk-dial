@@ -1,0 +1,7 @@
+{
+  "overlay": 1,
+  "status": "basic",
+  "legend": ["", "", "", ""],
+  "detect": {"exe": ["blender.exe"]},
+  "notes": ["Karl's Blender profile is still his empty template: the knob scrolls, nothing else (plan section 9.1)."]
+}

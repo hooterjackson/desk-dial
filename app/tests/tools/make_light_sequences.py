@@ -63,7 +63,7 @@ TRACKS_BUTTONS = _buttons(("Back", True, "back"), ("Home", True, "home"), ("Win"
 
 
 def _base(control_id, mode, layout, activity, led, buttons, ring, feedback=None, **extra):
-    frame = {"id": control_id, "mode": mode, "target": "Den", "value": "", "detail": "", "status": "",
+    frame = {"id": control_id, "mode": mode, "target": "Hall", "value": "", "detail": "", "status": "",
              "activity": activity, "layout": layout, "ledStyle": led, "buttons": buttons, "ring": ring}
     frame.update(extra)
     if feedback:

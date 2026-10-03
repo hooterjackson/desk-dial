@@ -292,7 +292,7 @@ put((s.qSel - c0) * 3, col(s.qSel), 1);
   - now playing: **0.70**;
   - upcoming: **0.45**, with **no warm check** (other lists use 0.30 for warm items);
   - cursor: 1.0, which hides the 0.70 when the cursor is on the playing track.
-- **Example (BS's initial state, BS:595–601):** Hounds of Love, 12 tracks, colour 160,90,255, `qNow = qSel = 4`, so `c0 = 5`.
+- **Example (BS's initial state, BS:595–601):** Paper Lanterns, 12 tracks, colour 160,90,255, `qNow = qSel = 4`, so `c0 = 5`.
   - k 0–3 (segments 45, 48, 51, 54): 0.14;
   - k 4 (segment 57): the cursor, 1.0;
   - k 5–11 (segments 0, 3, …, 18): 0.45.

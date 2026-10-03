@@ -57,10 +57,12 @@ class MenuModelTests(unittest.TestCase):
         model = tray_menu_model("Knob ready · installed profiles active", True, True)
         self.assertEqual([entry[0] for entry in model],
                          ["Knob connected", "Knob ready · installed profiles active", "Show knob", "Open Settings…",
-                          "Disconnect knob", "Quit"])
-        self.assertEqual([entry[1] for entry in model], [None, None, "peek", "settings", "connect", "quit"])
-        self.assertEqual([entry[2] for entry in model], [False, False, True, True, True, True])
-        self.assertEqual([entry[3] for entry in model], [False, False, True, False, False, False])
+                          "Disconnect knob", "App mode", "Quit"])
+        self.assertEqual([entry[1] for entry in model], [None, None, "peek", "settings", "connect", "apps", "quit"])
+        self.assertEqual([entry[2] for entry in model], [False, False, True, True, True, True, True])
+        self.assertEqual([entry[3] for entry in model], [False, False, True, False, False, False, False])
+        # Plan section 3c: A0's Onshape item is the App mode submenu (its entries: tray_app_entries).
+        self.assertEqual(tray_menu_model("", True, True, [("onshape", "Onshape", True)])[5][0], "App mode")
         self.assertEqual(tray_menu_model("", False)[0][0], "Knob not found")
         self.assertEqual(tray_menu_model("", False)[1][0], "Knob disconnected")
         self.assertEqual(tray_menu_model("", False)[4][0], "Connect knob")
@@ -74,7 +76,8 @@ class MenuModelTests(unittest.TestCase):
         menu = build_tray_menu(fake, state, queued.append)
         items = list(menu.items)
         self.assertEqual([item.text for item in items],
-                         ["Knob not found", "Knob disconnected", "Show knob", "Open Settings…", "Connect knob", "Quit"])
+                         ["Knob not found", "Knob disconnected", "Show knob", "Open Settings…", "Connect knob",
+                          "App mode", "Quit"])
         self.assertFalse(items[0].enabled)
         self.assertFalse(items[1].enabled)
         self.assertTrue(items[2].default)
@@ -87,8 +90,10 @@ class MenuModelTests(unittest.TestCase):
         icon = object()
         menu(icon)                                  # a left click: the default item
         for item in items:
-            item(icon)                              # each item from the right-click menu
+            if item.submenu is None:
+                item(icon)                          # each item from the right-click menu
         self.assertEqual(queued, ["peek", "peek", "settings", "connect", "quit"])
+        self.assertIsNotNone(items[5].submenu, "App mode opens a submenu; it never queues by itself")
 
     def test_the_icon_rebuilds_its_menu_on_the_tray_thread_before_it_opens(self):
         calls = []

@@ -3,7 +3,7 @@
 Measured headless on 2026-09-26 (03:03–03:19 local time) on the user's PC, which was busy with other work at the time. No network, no Sonos, no Apple Music, no knob, nothing on screen.
 
 - **Bench:** `tools\stage_checks\gil_parse_hold.py` (new; K4 §6.6 H5, K4 §4.7.3, K3 §1.2, [G1] G1-5).
-- **Run it:** from `app`: `.venv\Scripts\python.exe -I ..\tools\stage_checks\gil_parse_hold.py [--reps 20] [--json PATH] [--recorded DIR] [--only TEXT] [--quick]`. The script blocks every network entry point of requests, urllib3 and soco before the first row runs.
+- **Run it:** from `app`: `.venv\Scripts\python.exe -I ..\..\tools\stage_checks\gil_parse_hold.py [--reps 20] [--json PATH] [--recorded DIR] [--only TEXT] [--quick]`. The script blocks every network entry point of requests, urllib3 and soco before the first row runs.
 - **Runs:** six full runs, four at 20 repetitions and two at 60, plus three 60-repetition runs of the JSON rows only. Unless a row says otherwise, the table gives the 60-repetition run at 03:15 and the range over the six full runs. One 20-repetition run (03:12) ran with the whole machine about 1.7 times slower; its figures are the top of each range.
 - **Machine:** Windows 11 build 26200, Python 3.14.5, requests 2.34.2, soco 0.31.2, lxml 6.1.3.
 - **Tests:** `tests\test_cc_gil_parse.py` pins the caps, checks that no request exceeds them, and runs the bench's fixtures through the real client code. Since the review it also covers `playlist_meta`'s reach and its failures after the first page, and the encoding of the recovery copy.

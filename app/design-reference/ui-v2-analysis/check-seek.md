@@ -276,7 +276,7 @@ Wrap unexpected exceptions like `transport()` does (`sonos.py:303-306`). The fix
 
 **Not run.** It needs the user's go-ahead.
 
-**Purpose:** confirm on the user's room (Den) and an Apple Music queue track:
+**Purpose:** confirm on the user's room (Hall) and an Apple Music queue track:
 - that `SeekTime` is advertised while playing and while paused
 - that REL_TIME seek lands
 - how long the transition and readback take

@@ -1,0 +1,19 @@
+{
+"batches": [
+ {"events": [["wheel", 42]], "inputs": [{"data": 42, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", -42]], "inputs": [{"data": 4294967254, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", -43]], "inputs": [{"data": 4294967253, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", -43]], "inputs": [{"data": 4294967253, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 300]], "inputs": [{"data": 300, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", -85]], "inputs": [{"data": 4294967211, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 42]], "inputs": [{"data": 42, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", -386]], "inputs": [{"data": 4294966910, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0}
+],
+"feedback": [],
+"status": {"action": "zoom", "active": true, "commands": 0, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 0, "refusals": 0, "releases": {}, "scrolls": 0, "short": 0, "typed": 0, "undo": 0, "undoSkipped": 0, "wheel": 13}
+}

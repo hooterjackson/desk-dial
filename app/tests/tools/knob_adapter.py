@@ -30,7 +30,7 @@ MODE = {"home": "VOLUME", "recent": "RECENTLY ADDED", "tracks": "TRACKS", "windo
 TITLE_TONE = {"#F2F2F2": "ink", "#7C7C7C": "muted"}
 LINE_TONE = {"#7C7C7C": "meta", "#A6A6A6": "secondary", "#FF8A7A": "error", "#7EE0A2": "success"}
 # Stage 6 art fixtures (app/assets/fixtures/*.rgb565).
-ART_DEN, ART_BRIGHT = "art-den-120", "art-bright-120"
+ART_DEN, ART_BRIGHT = "art-hall-120", "art-bright-120"
 ART_BRIGHT_CASE = "stress-long-accented-title-browsing"
 PULSE_MS = presentation.PULSE_MS
 OFF = (0, 0)
@@ -168,7 +168,7 @@ class Adapter:
         frame = {
             "id": control_id,
             "mode": MODE[mode],
-            "target": "DESKTOP" if mode == "windows" else "Den",
+            "target": "DESKTOP" if mode == "windows" else "Hall",
             "value": f"{lcd['big']}%" if home and lcd.get("big") != "" else lcd.get("big", ""),
             "detail": "",
             "status": lcd.get("st", ""),

@@ -326,10 +326,225 @@ class RetryPolicy:
         return self.enabled and not self.inflight and now >= self.due
 
 
-def matching_port(ports):
-    matches = [p.device for p in ports if (p.vid, p.pid) == (0x239A, 0x8010)
-               and (p.serial_number or '').upper() == 'NANO_D']
-    return matches[0] if len(matches) == 1 else None
+KNOB_USB_ID = (0x239A, 0x8010)
+# DD-BUG-046: every knob reports the same USB serial, so two plugged knobs cannot be told apart by it.
+TWO_KNOBS_STATUS = 'Two knobs found · unplug one, or choose its USB port in Settings'
+
+
+def knob_ports(ports):
+    """The ports of every plugged Nano_D knob (its VID/PID and the USB serial NANO_D)."""
+    return [p.device for p in ports if (p.vid, p.pid) == KNOB_USB_ID
+            and (p.serial_number or '').upper() == 'NANO_D']
+
+
+def matching_port(ports, remembered=None):
+    """The knob's port: the only knob plugged, or, with more than one, the remembered port
+    (config['port'], saved at every connect or chosen in Settings) when it is one of them; else None."""
+    matches = knob_ports(ports)
+    if len(matches) == 1:
+        return matches[0]
+    wanted = (remembered or '').strip().upper()
+    if wanted:
+        for device in matches:
+            if device.upper() == wanted:
+                return device
+    return None
+
+
+# DD-BUG-004: the bridge's own control validation (device.py DeviceBridge._enter) refuses a control with a
+# ValueError. Reconnecting cannot fix it (the same control is refused again, and every reconnect writes a new
+# inventory backup), so such a refusal holds the auto-connect instead of feeding the reconnect loop. "Control IDs
+# must increase within a connection" is left out on purpose: a new connection does fix that one.
+CONTROL_REFUSALS = (
+    'Choose an inventoried existing profile',
+    'Windows HID enable must be a boolean',
+    'Button order must be a physical-to-raw permutation',
+    'Invalid control bounds, index or button mapping',
+)
+
+
+def lifecycle_item(kind, values):
+    """The lifecycle queue's item for a bridge event: ('refused', message) for a non-retryable control refusal
+    (the bridge marks it retry=False; older bridges are recognised by the message), ('stock', profile names or
+    None) for a connect whose capabilities lack controlCenter == 1 (DD-BUG-005), ('connected', profile names)
+    for a connect that reports its inventory, else the event kind."""
+    if kind == 'error':
+        message = str(values.get('message') or '')
+        if values.get('retry') is False or (values.get('error') == 'ValueError'
+                                            and message.startswith(CONTROL_REFUSALS)):
+            return ('refused', message)
+    if kind == 'connected':
+        profiles = values.get('profiles')
+        names = (frozenset(name for name in profiles if isinstance(name, str))
+                 if isinstance(profiles, dict) else None)
+        capabilities = values.get('capabilities')
+        if isinstance(capabilities, dict) and capabilities.get('controlCenter') != 1:
+            return ('stock', names)
+        if names is not None:
+            return ('connected', names)
+    return kind
+
+
+def refusal_status(message):
+    return f'Knob refused the control: {message} · change the knob’s profiles, then replug it or choose Connect'
+
+
+# DD-BUG-005: a knob on stock firmware connects (its inventory is read) but can never take a control, so 'ready'
+# never arrives. It is terminal for this plug-in: no 40 s timeout, no retry, until its port goes away and comes back.
+STOCK_STATUS = 'Stock firmware · display/control extension required · replug the knob after updating it'
+
+
+MAINTAIN_MS = 1000             # the auto-connect and status.json tick
+MAINTAIN_PREPARING_MS = 250    # while a found knob waits for Sonos' first answer
+
+
+class KnobConnector:
+    """The knob's auto-connect, one step per maintain tick on the Tk thread: lifecycle events
+    feed the retry policy; a found port gets a fresh controller first, and 'connect' follows
+    once its Sonos state is in or the preparation deadline passes."""
+    PREPARE_SECONDS = 5
+
+    def __init__(self, app, policy, lifecycle, comports):
+        self.app = app
+        self.policy = policy
+        self.lifecycle = lifecycle
+        self.comports = comports
+        self.preparing = None   # (port, deadline) while the fresh controller asks for Sonos state
+        # DD-BUG-045: one link failure is one back-off step. The bridge reports a drop as 'error' (or
+        # 'released') and then 'disconnected', in the same pass or the next: only the first counts,
+        # until the next connect is submitted or the knob is ready.
+        self.failure_counted = False
+        # DD-BUG-004: the refusal message while a non-retryable control refusal holds the auto-connect (None =
+        # not held). The knob stays connected (no disconnect, no reconnect); the hold ends when a connect reports
+        # a different inventory (a different profile set), when a control is accepted ('ready') or on a manual
+        # Connect (clear_refusal). After the knob is unplugged, its next plug-in is connected once so its
+        # inventory can be read; the same inventory keeps the hold.
+        self.refused = None
+        self.refused_profiles = None   # the inventory the refusal was made against (None = unknown)
+        self.profiles = None           # the profile set of the latest 'connected' (None = not reported)
+        self.replugged = False         # the knob's port went away while held: one connect may read its inventory
+        # DD-BUG-005: True after a connect reported stock firmware (no controlCenter == 1). The link is kept
+        # read-only (no disconnect, no 40 s timeout, no back-off step, no reconnect) until matching_port() has
+        # gone away (then the next plug-in is a new attempt) or the owner chooses Connect (clear_stock).
+        self.stock = False
+
+    def clear_stock(self):
+        self.stock = False
+
+    def clear_refusal(self):
+        self.refused = None
+        self.refused_profiles = None
+        self.replugged = False
+
+    def step(self, now):
+        app, policy = self.app, self.policy
+        while not self.lifecycle.empty():
+            item = self.lifecycle.get_nowait()
+            kind = item[0] if isinstance(item, tuple) else item
+            if kind == 'refused':
+                # Not a link failure, and reconnecting cannot fix it: show it and keep the knob connected
+                # (no disconnect, no 40 s timeout, no retry) until the inventory changes.
+                self.preparing = None
+                self.refused = item[1] if isinstance(item, tuple) and len(item) > 1 else ''
+                self.refused_profiles = self.profiles
+                self.replugged = False
+                policy.inflight = False
+                policy.due = now + 3
+                self.failure_counted = True   # a later drop of this held link is not a back-off step
+                app.runtime.device_status = refusal_status(self.refused)
+            elif kind == 'stock':
+                # DD-BUG-005: not a failure, and reconnecting cannot fix it: end this attempt and hold.
+                self.stock = True
+                self.preparing = None
+                self.profiles = item[1] if len(item) > 1 else None
+                self.replugged = False
+                policy.inflight = False
+                policy.attempts = 0
+                self.failure_counted = True   # a later drop of this read-only link is not a back-off step
+            elif kind == 'ready':
+                policy.ready()
+                self.failure_counted = False
+                self.clear_refusal()
+            elif kind == 'connected':
+                self.failure_counted = False   # also a connect not submitted here (Settings' Connect)
+                self.profiles = item[1] if isinstance(item, tuple) and len(item) > 1 else None
+                self.replugged = False
+                if (self.refused is not None and self.profiles is not None
+                        and self.profiles != self.refused_profiles):
+                    self.clear_refusal()   # a different inventory: the controls may be accepted now
+            elif kind in ('error','released','disconnected'):
+                self.preparing = None
+                if not self.failure_counted and not self.stock:
+                    policy.failed(now)
+                    self.failure_counted = True
+                if kind in ('error','released') and app.device.serial is not None:
+                    app.device.submit('disconnect')
+        if policy.inflight and now > policy.due:
+            app.device.submit('disconnect')
+            policy.failed(now)
+            self.failure_counted = True   # the 'disconnected' that follows is this same failure
+            self.preparing = None
+        if self.preparing is not None:
+            # A new controller requests current Sonos state; old completions and
+            # gestures cannot target this controller or a remembered screen.
+            if not policy.enabled:
+                self.preparing = None
+            elif (getattr(app.controller, 'state_known', False) or app.controller.state.get('online')
+                  or now >= self.preparing[1]):
+                # DD-RES-017: Sonos has answered (online or not: no speaker set up, or one offline),
+                # so the knob connects now; the deadline only covers a request that never answers.
+                app.config['port'] = self.preparing[0]
+                app.runtime.button_order = app.config['button_order'][:]
+                app.device.submit('connect', self.preparing[0])
+                self.failure_counted = False   # a new attempt: its failure counts once
+                self.preparing = None
+                policy.due = now + 40
+        elif self.stock:
+            # DD-BUG-005: held on stock firmware. While its link is up nothing happens; once it is down, a new
+            # attempt waits for the knob's port to go away (the next plug-in is then connected once).
+            if not app.runtime.device_connected and app.device.serial is None:
+                if matching_port(list(self.comports()), app.config.get('port')) is None:
+                    self.stock = False
+                    app.runtime.device_status = 'Knob disconnected'
+                    policy.due = now
+                elif app.runtime.device_status != STOCK_STATUS:
+                    app.runtime.device_status = STOCK_STATUS
+        elif self.refused is not None and app.device.serial is not None and not policy.inflight:
+            # DD-BUG-004: held on a connected knob: nothing is disconnected or retried. The runtime's own 'error'
+            # status is the bare message; say what to do instead.
+            if app.runtime.device_status == self.refused:
+                app.runtime.device_status = refusal_status(self.refused)
+        elif (self.refused is not None and not self.replugged and not app.runtime.device_connected
+              and app.device.serial is None and policy.can_attempt(now)):
+            # DD-BUG-004: held after the link dropped: no retry while the same knob stays plugged in. Once it is
+            # unplugged, its next plug-in is connected once to read its inventory ('connected' decides the hold).
+            if knob_ports(list(self.comports())):
+                app.runtime.device_status = refusal_status(self.refused)
+            else:
+                self.replugged = True
+                app.runtime.device_status = 'Knob disconnected'
+            policy.due = now + 3
+        elif (not app.runtime.device_connected and app.device.serial is None
+              and policy.can_attempt(now)):
+            ports = list(self.comports())
+            port = matching_port(ports, app.config.get('port'))
+            if port:
+                policy.inflight = True
+                policy.due = now + 45
+                app.runtime.invalidate_actions()
+                app.runtime.windows.hide()
+                app.runtime.windows.set_hotkey_enabled(False)
+                app.controller = fresh_controller(app.controller, app.runtime)
+                app.runtime.attach(app.controller)  # idempotent; keeps the rebuild explicit
+                app.runtime.last_frame = None
+                self.preparing = (port, now + self.PREPARE_SECONDS)
+            else:
+                # DD-BUG-046: say why nothing connects instead of waiting silently.
+                if len(knob_ports(ports)) > 1:
+                    app.runtime.device_status = TWO_KNOBS_STATUS
+                elif app.runtime.device_status == TWO_KNOBS_STATUS:
+                    app.runtime.device_status = 'Knob disconnected'
+                policy.due = now + 3
 
 
 def fresh_controller(previous, runtime=None):
@@ -465,40 +680,149 @@ def connect_label(connected):
     return 'Disconnect knob' if connected else 'Connect knob'
 
 
-def tray_menu_model(status, connected, present=False):
+# Plan section 3c (S1 DD-C): A0's 'Onshape mode' item became the App mode submenu, one entry per app
+# runtime.app_menu() lists (Manual toggles, checked while that app's mode is on; Windows draws the arrow).
+TRAY_APP_MODE = 'App mode'
+TRAY_APP_NONE = 'Set an app to Manual in Settings › Apps'
+TRAY_APP_REQUEST = 'app:'               # + the profile id: runtime.toggle_app(id) on the Tk thread
+TRAY_APP_LIMIT = 40                     # UTF-16 units of one submenu label
+
+
+def tray_menu_model(status, connected, present=False, apps=(), peek=True):
     """The tray menu, top to bottom: (text, request or None, enabled, default).
 
     The request strings are queued for the Tk thread (handle_requests). The header
     ('Knob connected' / 'Knob not found', APP_ICON.md section 5) and the detailed device
-    status are disabled lines; Show knob is the default item (a left click)."""
+    status are disabled lines; Show knob is the default item (a left click). App mode (a
+    submenu of ``apps``, see tray_app_entries; request 'apps' is never queued) sits above
+    Quit. DD-BUG-018: Show knob is greyed out while ``peek`` is False (app.peek_available():
+    no knob connected or nothing can show); a left click still reaches it and explains why
+    (show_knob_request)."""
     return ((tray_header(present), None, False, False),
             (utf16_cut(_one_line(status) or 'Knob disconnected', MENU_STATUS_LIMIT), None, False, False),
-            ('Show knob', 'peek', True, True),
+            ('Show knob', 'peek', bool(peek), True),
             (TRAY_OPEN_SETTINGS, 'settings', True, False),
             (connect_label(connected), 'connect', True, False),
+            (TRAY_APP_MODE, 'apps', True, False),
             ('Quit', 'quit', True, False))
+
+
+def tray_app_entries(apps):
+    """The App mode submenu: (text, request or None, checked) per runtime.app_menu() entry
+    (id, label, checked), or one disabled hint when there is none."""
+    out = []
+    for item in apps or ():
+        try:
+            pid, text, checked = item
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(pid, str) or not pid or len(pid) > 11:
+            continue
+        out.append((utf16_cut(_one_line(text) or pid, TRAY_APP_LIMIT), TRAY_APP_REQUEST + pid, bool(checked)))
+    return out or [(TRAY_APP_NONE, None, False)]
+
+
+def app_menu_entries(runtime):
+    """runtime.app_menu() (lane DD-B) on the Tk thread, as plain tuples the tray thread can read. A runtime
+    from before app profiles has Onshape only. Never raises."""
+    try:
+        menu = getattr(runtime, 'app_menu', None)
+        if callable(menu):
+            return [tuple(item) for item in menu()]
+        active = getattr(runtime, 'onshape_menu_text', None)
+        if callable(active):
+            return [('onshape', 'Onshape', active() != 'Onshape mode')]
+    except Exception:
+        logging.warning('The App mode menu could not be read', exc_info=True)
+    return []
+
+
+def toggle_app_request(app, pid):
+    """The tray's App mode entry for ``pid`` (Tk thread): runtime.toggle_app; a refusal becomes a balloon."""
+    runtime = app.runtime
+    toggle = getattr(runtime, 'toggle_app', None)
+    if callable(toggle):
+        message = toggle(pid)
+    elif pid == 'onshape' and callable(getattr(runtime, 'toggle_onshape', None)):
+        message = runtime.toggle_onshape()
+    else:
+        message = None
+    if message:
+        app.tray_messages.append(message)
+    return message
 
 
 class TrayState:
     """What the tray thread reads when pystray (re)builds the menu: plain values the Tk
     thread sets (never tkinter or the app from the tray thread)."""
 
-    def __init__(self, status='Knob disconnected', connected=False, present=False):
+    def __init__(self, status='Knob disconnected', connected=False, present=False, apps=(), peek=True):
         self.status, self.connected, self.present = status, connected, bool(present)
+        self.apps = list(apps)            # app_menu_entries(runtime), refreshed on the Tk tick
+        self.peek = bool(peek)           # DD-BUG-018: app.peek_available(), refreshed on the Tk tick
 
     def model(self):
-        return tray_menu_model(self.status, self.connected, self.present)
+        return tray_menu_model(self.status, self.connected, self.present, self.apps, self.peek)
 
 
 def build_tray_menu(pystray, state, put):
     """A pystray.Menu over ``state``: every text is read when the menu is built (after each
-    menu action, and before the menu opens); every action only calls ``put(request)``."""
+    menu action, and before the menu opens); every action only calls ``put(request)``. App
+    mode is a submenu rebuilt from ``state.apps`` each time."""
+    def app_item(index):
+        def text(_item):
+            entries = tray_app_entries(state.apps)
+            return entries[index][0] if index < len(entries) else ''
+
+        def request():
+            entries = tray_app_entries(state.apps)
+            return entries[index][1] if index < len(entries) else None
+        return pystray.MenuItem(text, lambda *_: request() and put(request()),
+                                enabled=lambda _item: request() is not None,
+                                checked=lambda _item: (tray_app_entries(state.apps)[index][2]
+                                                       if index < len(tray_app_entries(state.apps)) else False))
+
+    def app_items():
+        return tuple(app_item(index) for index in range(len(tray_app_entries(state.apps))))
+
     def entry(index):
         _text, request, enabled, default = tray_menu_model('', False)[index]
+        if request == 'apps':
+            return pystray.MenuItem(lambda _item: state.model()[index][0], pystray.Menu(app_items))
         action = (lambda *_: put(request)) if request else None
+        if request:                      # DD-BUG-018: Show knob's enabled flag follows the state
+            enabled = lambda _item: state.model()[index][2]
         return pystray.MenuItem(lambda _item: state.model()[index][0], action,
                                 enabled=enabled, default=default)
     return pystray.Menu(*(entry(index) for index in range(len(tray_menu_model('', False)))))
+
+
+TRAY_PEEK_NO_KNOB = 'Nothing to show: connect the knob'
+TRAY_PEEK_NOTHING = 'Nothing to show: the floating knob is off'
+
+
+def peek_available(app):
+    """app.peek_available() (DD-BUG-018), False when it is missing or fails."""
+    try:
+        return bool(app.peek_available())
+    except Exception:
+        return False
+
+
+def show_knob_request(app, seconds=PEEK_SECONDS):
+    """The tray's 'peek' request (Show knob, also the default left click; DD-BUG-018). When
+    app.peek() reports that nothing will show, one tray balloon says why instead of a silent
+    no-op; a repeated click while that text still waits does not queue it again."""
+    if app.peek(seconds) is not False:
+        return True
+    connected = bool(getattr(getattr(app, 'runtime', None), 'device_connected', False))
+    text = TRAY_PEEK_NOTHING if connected else TRAY_PEEK_NO_KNOB
+    messages = getattr(app, 'tray_messages', None)
+    if not isinstance(messages, list):
+        messages = app.tray_messages = []
+    if text not in messages:
+        messages.append(text)
+    return False
 
 
 class TrayIconApi:
@@ -715,7 +1039,13 @@ def make_tray_icon(pystray, image, state, put, icon_file=None, icon_api=None, on
 
 
 def route_request(command, handlers):
-    """Run one queued tray request on the Tk thread. True when it was 'quit'."""
+    """Run one queued tray request on the Tk thread. True when it was 'quit'. 'app:<id>' (the App mode
+    submenu) goes to handlers['app'] with the id."""
+    if isinstance(command, str) and command.startswith(TRAY_APP_REQUEST):
+        handler = handlers.get('app')
+        if handler is not None:
+            handler(command[len(TRAY_APP_REQUEST):])
+        return False
     handler = handlers.get(command)
     if handler is not None:
         handler()
@@ -943,6 +1273,65 @@ def _safe_metrics(overlay):
         return {}
 
 
+# ------------------------------------------------------------------ r3: the Navigator
+def start_navigator(log=None, factory=None, art=None):
+    """The r3 Navigator (``control_center.navigator``; DESKTOP_STAGE 24): the glass card that stands
+    in for the floating knob of a presentation-6 knob. Its ``NanoD-navigator`` thread creates only
+    its hidden click-through host here; the device comes at the first show. Never raises: a failure
+    gives None and every knob keeps the floating knob."""
+    log = log or logging.getLogger('nanod.navigator')
+
+    def nav_log(message):
+        try:
+            log.info('%s', message)
+        except Exception:
+            pass
+    try:
+        if factory is None:
+            factory = _navigator_factory
+        navigator = factory(log=nav_log, art=art)
+    except Exception:
+        log.exception('Navigator unavailable: the floating knob stays for every knob')
+        return None
+    disabled = getattr(getattr(navigator, 'backend', None), 'disabled', None)
+    if disabled or getattr(navigator, 'backend', None) is None:
+        log.warning('Navigator disabled: %s', disabled)
+    return navigator
+
+
+def _navigator_factory(log=None, art=None):
+    """The Navigator as the wiring point builds it (K4 4.1; WP8-R11: this file is the one module
+    outside the stage package that imports it): the ``NanoD-navigator`` thread
+    (``stage.scenes.navigator_engine``) and the Recently Added covers over the explorer's art workers
+    (``stage.scenes.navigator_covers``), handed to the Tk facade ``control_center.navigator``."""
+    from control_center.navigator import start_navigator as facade
+    backend = None
+    try:
+        from control_center.stage.scenes.navigator_engine import NavigatorThread
+        backend = NavigatorThread(log=log)
+    except Exception as exc:
+        if log is not None:
+            log(f'navigator: unavailable: {exc!r}')
+    covers = None
+    if art is not None:
+        try:
+            from control_center.stage.scenes.navigator_covers import NavigatorCovers
+            covers = NavigatorCovers(art)
+        except Exception:
+            covers = None
+    return facade(backend, covers=covers)
+
+
+def close_navigator(navigator):
+    """navigator.close() (its thread owns its host window), never raising; idempotent."""
+    if navigator is None:
+        return
+    try:
+        navigator.close()
+    except Exception:
+        logging.getLogger('nanod.navigator').exception('Navigator did not close cleanly')
+
+
 # ------------------------------------------------------------------ desktop v7: the stage
 def start_stage(speaker_hosts=None, log=None, factory=None):
     """The explorer / Up next presenter (K4 4.1): ``stage.scenes.start_music_stage`` (the
@@ -1132,6 +1521,20 @@ def overlay_status(app):
     return value
 
 
+def fast_path_status(app):
+    """status.json "fastPath" (DD-RES-016): the knob fast path's counters, ``{'posted', 'failures'}``
+    from ``app.fast_path.status()``; None without a fast path. Kept beside ``overlay`` (not inside it)
+    because the fast path also drives the Navigator when no floating knob runs. Never raises."""
+    status = getattr(getattr(app, 'fast_path', None), 'status', None)
+    if not callable(status):
+        return None
+    try:
+        value = status()
+        return _json_ready(value if isinstance(value, dict) else {})
+    except Exception as exc:
+        return {'error': type(exc).__name__}
+
+
 def _json_ready(value):
     try:
         return json.loads(json.dumps(value, default=str))
@@ -1172,6 +1575,119 @@ def stage_status(app):
     return _json_ready(metrics)
 
 
+def _knob_feel_status(runtime):
+    """r4 status.json `knobFeel` (volume / sound / reduced haptics sent, knob capabilities, recalibration); never
+    raises."""
+    try:
+        status = getattr(runtime, "knob_feel_status", None)
+        return status() if callable(status) else None
+    except Exception as exc:  # the status file must always be written
+        return {'error': type(exc).__name__}
+
+
+def _lights_status(runtime):
+    """The Home Assistant lights section of status.json (never the token or the address)."""
+    try:
+        from control_center.home_assistant import lights_status
+        return lights_status(getattr(runtime, 'ha', None))
+    except Exception as exc:  # the status file must always be written
+        return {'error': type(exc).__name__}
+
+
+def _onshape_status(runtime):
+    """status.json `onshape` (A0): the setting, whether the mode is on, refusal counts, the
+    injector's counters; never a window title."""
+    try:
+        return runtime.onshape_status()
+    except Exception as exc:  # the status file must always be written
+        return {'error': type(exc).__name__}
+
+
+STATUS_PRIVATE_KEYS = frozenset(('title', 'windowtitle', 'url', 'address', 'path', 'query'))
+
+
+def _scrub_private(value, depth=0):
+    """status.json never carries a window title or a URL (plan section 3a): keys that name one are dropped,
+    and so is any text that looks like a web address."""
+    if depth > 8:
+        return None
+    if isinstance(value, dict):
+        return {k: _scrub_private(v, depth + 1) for k, v in value.items()
+                if str(k).lower().replace('_', '') not in STATUS_PRIVATE_KEYS
+                and not (isinstance(v, str) and '://' in v)}
+    if isinstance(value, (list, tuple)):
+        return [_scrub_private(v, depth + 1) for v in value if not (isinstance(v, str) and '://' in v)]
+    return value
+
+
+def _app_status(runtime):
+    """status.json `app` (plan section 3a, lane DD-B's runtime.app_status()): the profile id, the modes,
+    how the app matched (exe / host); never a title or URL (scrubbed again here). None for a runtime from
+    before app profiles."""
+    status = getattr(runtime, 'app_status', None)
+    if not callable(status):
+        return None
+    try:
+        return _scrub_private(status())
+    except Exception as exc:  # the status file must always be written
+        return {'error': type(exc).__name__}
+
+
+STATUS_REFRESH_S = 3.0          # an unchanged status.json is still rewritten this often (its `time` stays fresh)
+STATUS_VOLATILE = ('time',)    # fields that alone never cause a write
+STATUS_REPLACE_TRIES = 5       # os.replace retries while a reader holds the file (Windows)
+STATUS_REPLACE_WAIT_S = 0.01
+
+
+class StatusWriter:
+    """Writes status.json atomically and only when it matters (DD-RES-018).
+
+    Compact JSON goes to a temp file in the same folder, then ``os.replace`` swaps it in, so a
+    reader sees the old document or the new one, never a torn one. A write happens when the
+    payload (minus ``STATUS_VOLATILE``) changed, or every ``STATUS_REFRESH_S`` for liveness.
+    Windows refuses the replace while a reader holds the target open: retried briefly, then the
+    next tick tries again (the temp file is removed). ``write`` raises only what the caller's
+    ``maintain`` already tolerates (OSError after the retries)."""
+
+    def __init__(self, path, refresh_s=STATUS_REFRESH_S, clock=time.monotonic,
+                 replace=None, sleep=time.sleep):
+        self.path = Path(path)
+        self.refresh_s = refresh_s
+        self.clock = clock
+        self.replace = replace or os.replace
+        self.sleep = sleep
+        self.last_key = None
+        self.last_at = None
+        self.writes = 0
+
+    def write(self, status, now=None):
+        """Returns True when the file was written."""
+        now = self.clock() if now is None else now
+        stable = {k: v for k, v in status.items() if k not in STATUS_VOLATILE}             if isinstance(status, dict) else status
+        key = json.dumps(stable, sort_keys=True, separators=(',', ':'), default=str)
+        if key == self.last_key and self.last_at is not None and now - self.last_at < self.refresh_s:
+            return False
+        text = json.dumps(status, separators=(',', ':'), default=str)
+        tmp = self.path.with_name(f'{self.path.name}.{os.getpid()}.tmp')
+        try:
+            tmp.write_text(text, encoding='utf-8')
+            for attempt in range(STATUS_REPLACE_TRIES):
+                try:
+                    self.replace(tmp, self.path)
+                    break
+                except PermissionError:
+                    if attempt == STATUS_REPLACE_TRIES - 1: raise
+                    self.sleep(STATUS_REPLACE_WAIT_S)
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass   # normally already moved into place
+        self.last_key, self.last_at = key, now
+        self.writes += 1
+        return True
+
+
 def status_payload(app, policy, startup_credentials, capabilities=None, data_dir=None):
     """The status.json document (read-only view of the running app)."""
     runtime, controller = app.runtime, app.controller
@@ -1189,6 +1705,7 @@ def status_payload(app, policy, startup_credentials, capabilities=None, data_dir
             'startupCredentialFile': startup_credentials,
             'executable': sys.executable,
             'sonosOnline': controller.state.get('online'),
+            'playback': controller.state.get('playback'),   # transport state only, never a title
             'volume': controller.state.get('volume'), 'autoConnect': policy.enabled,
             'deviceStatus': runtime.device_status,
             'ledStyle': runtime.led_style,
@@ -1199,9 +1716,14 @@ def status_payload(app, policy, startup_credentials, capabilities=None, data_dir
             'firmwarePresentation': firmware['presentation'] if firmware else None,
             'firmware': firmware,
             'overlay': overlay_status(app),
+            'fastPath': fast_path_status(app),
             'frames': frames_status(app),
             'stage': stage_status(app),
             'openSurfaces': sorted(getattr(runtime, 'open_surfaces', None) or ()),
+            'lights': _lights_status(runtime),
+            'knobFeel': _knob_feel_status(runtime),
+            'onshape': _onshape_status(runtime),
+            'app': _app_status(runtime),
             'reducedMotion': bool(getattr(runtime, 'reduced_motion', False)),
             'process': getattr(app, 'process_settings', None),
             'time': time.time()}
@@ -1209,11 +1731,12 @@ def status_payload(app, policy, startup_credentials, capabilities=None, data_dir
 
 # --smoke-test: a bundled-asset and UI check that opens no port, no network and
 # no desktop action, and never contacts a running instance.
-SMOKE_ART = Path('assets') / 'fixtures' / 'art-den-120.rgb565'  # relative to the bundle (ui.APP_DIR)
+# C12-05: generated, synthetic artwork (tests/tools/make_smoke_art.py); assets/fixtures is not in the bundle.
+SMOKE_ART = Path('assets') / 'smoke' / 'smoke-art-120.rgb565'  # relative to the bundle (ui.APP_DIR)
 SMOKE_ICON_SIZES = (16, 20, 26)
 SMOKE_FRAME = {
-    'mode': 'VOLUME', 'target': 'Den', 'value': '54%', 'detail': '', 'status': '',
-    'layout': 'nowPlaying', 'heading': 'DEN', 'title': 'Smoke test', 'subtitle': 'Desk Dial',
+    'mode': 'VOLUME', 'target': 'Hall', 'value': '54%', 'detail': '', 'status': '',
+    'layout': 'nowPlaying', 'heading': 'HALL', 'title': 'Smoke test', 'subtitle': 'Desk Dial',
     'activity': 'idle', 'ledStyle': 'color', 'artKey': 'smoke-test',
     'buttons': [{'label': 'Pause', 'enabled': True, 'icon': 'pause'},
                 {'label': 'Browse', 'enabled': True, 'icon': 'list'},
@@ -2307,16 +2830,19 @@ def main():
     # tray, Settings) still closes the overlay thread's window (FLOATING_KNOB.md section 4),
     # stops a started tray and destroys the root before the interpreter finalizes.
     try:
+        navigator = None   # r3: the Navigator (replaces the floating knob for a presentation-6 knob)
         holder = {}
         # K4 4.1: NanoD-stage starts with the app, after the floating knob, inside this try. Its art
         # workers may fetch Sonos covers only from the configured speaker (read when they ask).
         stage = start_stage(speaker_hosts=lambda: tuple(
             host for host in (getattr(holder.get('app'), 'config', {}).get('speaker_ip'),) if host))
+        # r3: the Navigator's thread (hidden host only; its device comes at the first show). Never raises.
+        navigator = start_navigator(art=getattr(stage, 'art', None))   # the explorer's art workers
         # CAROUSEL.md 12.4 (WP7c-D11): the picker's GPU chrome is installed once, here, before
         # ControlCenterApp builds the WindowsAdapter, whose CarouselPresenter takes the factory when it is
         # made (a later install would leave the CPU chrome for the session). It never raises.
         install_picker_chrome()
-        app = ControlCenterApp(root, live=True, chrome=False, overlay=overlay, stage=stage)
+        app = ControlCenterApp(root, live=True, chrome=False, overlay=overlay, stage=stage, navigator=navigator)
         holder['app'] = app
         app.process_settings = process_settings
         startup_credentials = credential_file_info(DATA_DIR)
@@ -2325,11 +2851,11 @@ def main():
         requests = queue.Queue()
         lifecycle = queue.Queue()
         policy = RetryPolicy()
-        preparing = None
+        connector = KnobConnector(app, policy, lifecycle, comports)
         emit = app.device._emit
         def device_event(kind, **values):
             if kind in ('connected','ready','released','disconnected','closed','error'):
-                lifecycle.put(kind)
+                lifecycle.put(lifecycle_item(kind, values))   # DD-BUG-004: a control refusal is not a link failure
                 logging.info('Device %s: %s', kind, values.get('message', values.get('reason','')))
             emit(kind, **values)
         app.device._emit = device_event
@@ -2347,6 +2873,8 @@ def main():
                 policy.enabled = False
                 app.device.submit('disconnect')
             else:
+                connector.clear_refusal()   # DD-BUG-004: a manual Connect retries a refused control once
+                connector.clear_stock()     # DD-BUG-005: and a stock-firmware knob (e.g. after updating it)
                 policy.enabled = True
                 policy.inflight = False
                 policy.due = 0
@@ -2358,7 +2886,8 @@ def main():
         # tkinter (or the app) from there; handle_requests runs them on the Tk thread.
         theme = taskbar_theme()
         present = knob_present(app.runtime)
-        tray_state = TrayState(app.runtime.device_status, connected_or_connecting(), present)
+        tray_state = TrayState(app.runtime.device_status, connected_or_connecting(), present,
+                               apps=app_menu_entries(app.runtime), peek=peek_available(app))
         icon = start_tray(lambda: make_tray_icon(pystray, Image.open(tray_png(theme, present, APP_DIR)),
                                                  tray_state, requests.put,
                                                  icon_file=tray_icon_file(theme, present, APP_DIR),
@@ -2372,7 +2901,9 @@ def main():
         if not args.background: open_settings()
         logging.info('Standalone started pid=%s frozen=%s overlay=%s', os.getpid(), bool(getattr(sys,'frozen',False)),
                      getattr(overlay, 'state', None))
-        handlers = {'peek': lambda: app.peek(PEEK_SECONDS), 'settings': open_settings,
+        handlers = {'peek': lambda: show_knob_request(app, PEEK_SECONDS), 'settings': open_settings,
+                    # Plan section 3c: the App mode submenu's entries (Manual toggles); a refusal is a balloon.
+                    'app': lambda pid: toggle_app_request(app, pid),
                     'connect': manual_connect, 'quit': quit_app,
                     'theme': lambda: presenter.set_theme(taskbar_theme()),   # WM_SETTINGCHANGE (K4 20.3)
                     'fallback': lambda: tray_fallback(app, manual_connect, quit_app, connected_or_connecting)}
@@ -2390,6 +2921,8 @@ def main():
                         break
                     if route_request(command, handlers): return
                 # The notice is only read: the knob keeps "Last action failed" until the next action.
+                tray_state.apps = app_menu_entries(app.runtime)
+                tray_state.peek = peek_available(app)        # DD-BUG-018
                 presenter.update(app.runtime.device_status, connected_or_connecting(), app.controller.notice,
                                  present=knob_present(app.runtime), messages=app.take_tray_messages())
             finally:
@@ -2411,53 +2944,16 @@ def main():
                 maintain_once()
             finally:
                 if not app.closing:
-                    root.after(1000, maintain)
+                    # While a found knob waits for Sonos' first answer, look again every 250 ms (DD-RES-017).
+                    root.after(MAINTAIN_PREPARING_MS if connector.preparing is not None else MAINTAIN_MS, maintain)
 
         def maintain_once():
-            nonlocal preparing
             if app.closing: return
-            now = time.monotonic()
-            while not lifecycle.empty():
-                kind = lifecycle.get_nowait()
-                if kind == 'ready': policy.ready()
-                elif kind in ('error','released','disconnected'):
-                    preparing = None
-                    policy.failed(now)
-                    if kind in ('error','released') and app.device.serial is not None:
-                        app.device.submit('disconnect')
-            if policy.inflight and now > policy.due:
-                app.device.submit('disconnect')
-                policy.failed(now)
-                preparing = None
-            if preparing is not None:
-                # A new controller requests current Sonos state; old completions and
-                # gestures cannot target this controller or a remembered screen.
-                if not policy.enabled:
-                    preparing = None
-                elif app.controller.state.get('online') or now >= preparing[1]:
-                    app.config['port'] = preparing[0]
-                    app.runtime.button_order = app.config['button_order'][:]
-                    app.device.submit('connect', preparing[0])
-                    preparing = None
-                    policy.due = now + 40
-            elif (not app.runtime.device_connected and app.device.serial is None
-                  and policy.can_attempt(now)):
-                port = matching_port(comports())
-                if port:
-                    policy.inflight = True
-                    policy.due = now + 45
-                    app.runtime.invalidate_actions()
-                    app.runtime.windows.hide()
-                    app.runtime.windows.set_hotkey_enabled(False)
-                    app.controller = fresh_controller(app.controller, app.runtime)
-                    app.runtime.attach(app.controller)  # idempotent; keeps the rebuild explicit
-                    app.runtime.last_frame = None
-                    preparing = (port, now + 5)
-                else:
-                    policy.due = now + 3
+            connector.step(time.monotonic())
             status = status_payload(app, policy, startup_credentials,
                                     getattr(app.device, 'capabilities', None), DATA_DIR)
-            (logs/'status.json').write_text(json.dumps(status, indent=2))
+            status_writer.write(status)
+        status_writer = StatusWriter(logs/'status.json')
         root.after(REQUEST_POLL_MS, handle_requests)
         root.after(THEME_POLL_MS, poll_theme)
         root.after(500, maintain)
@@ -2471,6 +2967,7 @@ def main():
         close_stage(stage)
         if icon is not None:
             stop_tray(icon, tray_stopping)
+        close_navigator(navigator)   # r3: its thread owns its host window
         try:
             root.destroy()
         except Exception:
@@ -2479,9 +2976,20 @@ def main():
         kernel.CloseHandle(show_event)
         kernel.CloseHandle(mutex)
 
-if __name__ == '__main__':
+def run_and_exit(entry=None):
+    """Run main(); on a normal return (main's finally has closed the single-instance mutex)
+    flush the logs and end the process with os._exit(0). DD-BUG-032 (D9): a lane worker
+    still running past Runtime.close()'s bounded join ('Shutdown: N lane worker(s) still
+    running') would otherwise keep the hidden process alive, because the interpreter joins
+    ThreadPoolExecutor workers at exit. A failure is logged and re-raised as before; a
+    SystemExit (the smoke test's exit code) passes through untouched."""
     try:
-        main()
+        (entry or main)()
     except Exception:
         logging.exception('Application failed')
         raise
+    logging.shutdown()
+    os._exit(0)
+
+if __name__ == '__main__':
+    run_and_exit()

@@ -560,7 +560,7 @@ Recipe: `WindowsAdapter.snap(item, side)`, run under `_changing_focus = True` (`
 ### 9.1 Current Settings
 `ControlCenterApp.setup` (`UI:1550-1766`):
 - Title `Nano_D++ · Setup` (`UI:1568`); heading `Connect your desk` (`UI:1574`); subtitle `SETUP_SUBTITLE` (`UI:113-114`).
-- Fields: `Den speaker IP`, `Knob USB port`, raw button order with the `Verify physical button order` probe (`UI:1583-1613`); `Apple Team ID`, `MusicKit Key ID`, `Choose .p8 key` (`UI:1614-1620`).
+- Fields: `Hall speaker IP`, `Knob USB port`, raw button order with the `Verify physical button order` probe (`UI:1583-1613`); `Apple Team ID`, `MusicKit Key ID`, `Choose .p8 key` (`UI:1614-1620`).
 - Segmented choices: `Album artwork` On/Off, `LEDs` `Targeted colour` / `White` (`UI:1656-1657`), `Switcher background` Frosted / No background (`UI:1659-1666`).
 - Buttons: `Save settings` / `Authorize Apple Music`.
 - On tray failure: Connect/Quit rows (`UI:1733-1753`).
@@ -581,7 +581,7 @@ Recipe: `WindowsAdapter.snap(item, side)`, run under `_changing_focus = True` (`
 |---|---|---|---|---|
 | Knob not found | offline LCD (firmware) | missing icon, `Knob not found` | Knob `Not found` (bad) | — |
 | Reconnecting… | — | missing icon | Knob `Reconnecting` (wait) | "Turns and presses made while unplugged are discarded" is already true (`RT:1391-1399`) |
-| Den unavailable | `Sonos unavailable` / `Windows still works` (`CT:1103-1112`) | header stays; a balloon only for a failed action | Sonos `Unavailable` + `Set manual IP…` | Explorer, Up next and Seek refuse to open (new) |
+| Hall unavailable | `Sonos unavailable` / `Windows still works` (`CT:1103-1112`) | header stays; a balloon only for a failed action | Sonos `Unavailable` + `Set manual IP…` | Explorer, Up next and Seek refuse to open (new) |
 | Apple Music sign-in expired | Recent full-screen sign-in state (`CT:1133-1135`); new: the same on the explorer's tabs and on Like (disabled) | balloon (existing auth message path, `UI:1788-1807`) | Apple Music `Sign-in needed` + `Renew sign-in…` | — |
 
 ---

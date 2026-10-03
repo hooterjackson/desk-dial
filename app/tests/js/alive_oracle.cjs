@@ -231,7 +231,7 @@ const PAUSED = { playing: false, playReq: false };
 const ASLEEP = { asleep: true };
 const OK = id => ({ flash: { kind: 'ok', id }, flashId: id });
 const ERR = id => ({ flash: { kind: 'err', id }, flashId: id });
-const NIGHT_DRIVE = { np: { t: 'Night Drive', a: 'Chromatics' } };
+const NIGHT_DRIVE = { np: { t: 'Night Channel', a: 'Velvet Circuit' } };
 const home = (vol, ...extra) => src(Object.assign({ vol, volConf: vol }, ...extra));
 const recent = (idx, status, ...extra) => src(Object.assign({ mode: 'recent', recent: { page: 0, idx, stack: [], status: status || 'ready' } }, ...extra));
 const tracks = (pos, status, ...extra) => src(Object.assign({ mode: 'tracks', tracks: { pos, status: status || 'idle' } }, ...extra));
@@ -418,7 +418,7 @@ C({ name: 'heat-home100-paused-then-sleep', hour: 13, note: 'Home 100 % paused (
 C({ name: 'tint-windows-glide', hour: 20, note: 'Windows: tint appears (Claude), glides to Chrome, disappears on Codex (warm), residue decays on Home.',
   end: 2300, pattern: [33, 17],
   events: [[0, { view: W1 }], [600, { view: W2 }], [1200, { view: windows(0) }], [1800, { view: H54 }]] });
-C({ name: 'tint-recent-sleep', hour: 13, note: 'Recently Added: Tropicalia tint, glide to Night Drive, then resting (tint off).',
+C({ name: 'tint-recent-sleep', hour: 13, note: 'Recently Added: Tropicalia tint, glide to Night Channel, then resting (tint off).',
   end: 1600, pattern: [33, 17], events: [[0, { view: recent(1) }], [500, { view: recent(2) }], [1000, { view: recent(2, 'ready', ASLEEP) }]] });
 
 // 8. Song hand at several progress values (design fake progress; the view is re-sent every step).
@@ -513,7 +513,7 @@ C({ name: 'replace-wake-reveal-bound', hour: 20, note: 'Wake + reveal, bound, th
   for (let k = 1; k <= 4; k++) ev.push([1700 + 260 * k, { view: recent(2, 'pending', { tick: k }) }]);
   ev.push([2900, { view: played, fx: [['reveal', {}], flashOkFx(last, played)] }]);
   ev.push([3550, { view: home(54, NIGHT_DRIVE) }]);
-  C({ name: 'seq-recent-play', hour: 20, note: 'Home -> Recently Added (loading comet), turn to Night Drive, Play (pending pulse draws the cursor warm), started: reveal + bloom (design, see ALIVE D7).',
+  C({ name: 'seq-recent-play', hour: 20, note: 'Home -> Recently Added (loading comet), turn to Night Channel, Play (pending pulse draws the cursor warm), started: reveal + bloom (design, see ALIVE D7).',
     end: 2900 + 1100 + 40, coarse: [[0, 300, [50]], [950, 2890, [33, 17]], [3450, 4040, [33, 17]]], events: ev });
 }
 {

@@ -327,6 +327,3 @@ def qi(obj: int, iid: GUID):
 def release(obj) -> int:
     return vfn(obj, "Unknown.Release")(obj) if obj else 0
 
-
-def addref(obj) -> int:
-    return vfn(obj, "Unknown.AddRef")(obj) if obj else 0

@@ -18,7 +18,7 @@ Firmware (LVGL LCD, LED task) is out of scope here.
 - **Code references** are `control_center/<file>.py:<line>`, relative to `app/`.
   Docs are `CAROUSEL.md §n` and `FLOATING_KNOB.md §n`.
 - **"Spike"** means the v6 carousel visual spike. It ran **on the user's screen** on 2026-09-24. Its data is
-  under `scratchpad/carousel-spike/` (`spike.py`, `results_p4.json`, `p4_frames.json`, `p4b_frames.json`).
+  under `<scratch>/carousel-spike/` (`spike.py`, `results_p4.json`, `p4_frames.json`, `p4b_frames.json`).
   It is the only on-screen timing data available. Everything new in this file was measured **headless**:
   - PIL images;
   - DIB sections in memory DCs;
@@ -215,7 +215,7 @@ to frame. Motion then judders on top of the lower frame rate. Change A5 fixes th
 
 ## 3. Measurements (headless, this PC)
 
-The scripts are in `scratchpad/refresh-study/` (list in §7).
+The scripts are in `<scratch>/refresh-study/` (list in §7).
 
 ### 3.1 Carousel compose at k = 2, 5120 × 1440 (`bench_carousel.py`, 4 runs)
 
@@ -575,7 +575,7 @@ slack per frame. Larger scales, from the measured parts:
 
 ## 7. Sources
 
-**Scratch scripts** (`<scratchpad>\refresh-study\`):
+**Scratch scripts** (`<scratch>`):
 
 | Script | Output | Measures |
 |---|---|---|
@@ -593,7 +593,7 @@ slack per frame. Larger scales, from the measured parts:
 
 **Spike (on-screen, 2026-09-24):**
 
-- `scratchpad/carousel-spike/spike.py`: `Layer.present` timing, `:756-763`; frame loop, `:999-1032`;
+- `<scratch>/carousel-spike/spike.py`: `Layer.present` timing, `:756-763`; frame loop, `:999-1032`;
   geometry, `:207-215`.
 - `results_p4.json`, `p4_frames.json`, `p4b_frames.json`.
 

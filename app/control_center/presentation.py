@@ -62,11 +62,15 @@ INK_SUCCESS = 0x7EE0A2
 INK_DISABLED_GLYPH = 0x555555
 TILE = 0x444444
 TILE_INITIAL = 0xF2F2F2          # V4 letter tile initial (AW2 section 7)
-INK_ON = 0xFFFFFF                # section 5.2 row 6 (and accent_ink's fallback)
+INK_ON = 0xFFFFFF                # accent_ink's fallback (section 5.3)
+# r3 (README section 2.2 "act", L-9): a lit-on button without an app colour, the active mode or tab.
+INK_ACT = 0xFFBE69
+# r3 (README section 9 "warm"): the amber line tone (`Knob: temperature`, the Seek status, Shuffle on/off).
+INK_WARM = 0xFFBE69
 FOOTER_INK = {"nav": 0xE6E6E6, "go": 0x6ED996, "stop": 0xFF8474, "dim": 0x5A5A5A,
               "on": INK_ON, "off": 0x7A7A7A, "liked": 0xA3244A}
 TONE_INK = {"ink": INK, "muted": INK_META, "meta": INK_META, "secondary": INK_SECONDARY,
-            "error": INK_ERROR, "success": INK_SUCCESS}
+            "error": INK_ERROR, "success": INK_SUCCESS, "warm": INK_WARM}
 
 # Wire tokens. The *_V4 tuples are what a presentation-4 parser (cc5.3 and older) accepts; the
 # full tuples add the presentation-5 tokens (VOC section 1.2, append-only enum order).
@@ -107,11 +111,61 @@ ALIVE_TUNING_FIELDS = ("ledPink", "ledVolFull")
 ALIVE_TUNING_WORST = {"ledPink": LED_PINK_MAX, "ledVolFull": False}
 
 # Section 2.2: the presentation-4 downgrade of a v5 frame (v7 host -> cc5.3 or older).
-LAYOUT_DOWNGRADE = {"seek": "tracks", "explorer": "recent", "upnext": "recent"}
 ICON_DOWNGRADE = {"expand": "more", "clock": "list", "playlists": "list", "playnext": "more", "seek": "tracks",
                   "shuffle": "switch", "heart": "more", "snapleft": "prev", "snapright": "next"}
 SEEK_DOWNGRADE_RING = {"style": "off", "value": 0, "index": 1, "count": 3}   # the position row's centre dot
 LAP_DOWNGRADE_RING = {"style": "off", "value": 0, "index": 0, "count": 0}
+
+# Presentation 6 (Desk Dial r3 release 1: spaces navigation + Home Assistant Lights). Append-only
+# additions to the v5 vocabulary; the host sends them only to a knob reporting presentation >= 6
+# (and only then uses the r3 navigation at all). The v5 tuples above stay exactly as cc5.4 has them.
+PRESENTATION_V6 = 6
+LIGHTS_LAYOUTS = ("lights", "lightsbig", "scenes")
+LAYOUTS_V6 = LAYOUTS + LIGHTS_LAYOUTS
+LIGHTS_RING_STYLES = ("bri", "ctemp", "clusters")
+RING_STYLES_V6 = RING_STYLES + LIGHTS_RING_STYLES + ("marker", "queue")
+# r3.1 (section 19.10): the whole-queue ring of Tracks and Up next, {style "queue", index = the focus, count = T,
+# now = the playing row (-1 none), first / colors as a selection ring}; `now` is kept on this style.
+ICONS_V6_ADDED = ("bulb", "thermo", "power", "wand", "house", "album")
+ICONS_V6 = ICONS + ICONS_V6_ADDED
+ICON_ENUM_V6 = ICON_ENUM + ICONS_V6_ADDED        # firmware CCIcon, appended after the v5 tokens
+VALUE_UNITS = ("%", "K")                         # `valueUnit` (lightsbig): default "%"
+RING_KELVIN_MIN, RING_KELVIN_MAX = 2200, 6500     # ring.kelvin (bri / ctemp): the arc's colour temperature
+RING_KELVIN_DEFAULT = 2700                       # the host fills a missing / invalid one (the knob requires it)
+CLUSTERS_MAX = 20                                # clusters: 1 <= count <= 20, index < count
+V6_TEXT_CAPACITY = {"prevTitle": 64, "nextTitle": 64}
+# r3 navigation (README sections 1-3; PRESENTATION_V5.md section 19.9), append-only:
+# `crumb` selects the pre-rendered arc breadcrumb (absent = none: the launcher, older screens);
+CRUMBS = ("music", "recent", "onScreenRecent", "onScreenPlaylists", "tracks", "upnext", "windows", "lights",
+          "scenes", "playlists")   # r3.1: `playlists` = MUSIC › PLAYLISTS (the knob list on Favourite playlists)
+# the `warm` line tone (metaTone / statusTone) #FFBE69;
+LINE_TONES_V6 = ("meta", "secondary", "error", "success", "warm")
+# feedback.moment `refused` (kind "err" only): the unavailable-press flash (bottom 26-34 red, 320 ms);
+FEEDBACK_MOMENTS_V6 = ("queued", "shuffle", "like", "unlike", "snap", "started", "refused")
+# the `marker` ring (index < count, 1 <= count): a white marker at index on the r3 arc, the rest warm 0.1.
+V6_FIELDS = ("valueUnit", "prevTitle", "nextTitle", "crumb", "holdMarker")
+# r3.1 (section 19.10): `holdMarker` true = button 4 has a hold action on this screen (the knob draws the
+# hold tick under its icon and the 1.0 s hold ring); absent = none.
+# A v6 frame for an older knob (never produced by the controller, which uses r3 only at >= 6).
+LAYOUT_DOWNGRADE_V6 = {"lights": "recent", "lightsbig": "recent", "scenes": "recent"}
+ICON_DOWNGRADE_V6 = {"bulb": "more", "thermo": "more", "power": "more", "wand": "more", "house": "home",
+                     "album": "list"}
+LIGHTS_DOWNGRADE_RING = {"style": "off", "value": 0, "index": 0, "count": 0}
+
+
+def kelvin_rgb(kelvin: int) -> int:
+    """README section 3's Kelvin -> RGB (Tanner Helland; white-only bulbs, 2200-6500 K) as 0xRRGGBB.
+    2200 K ~ (255,146,39), 3200 K ~ (255,183,112), 6500 K ~ (255,254,250). The firmware calibrates
+    against the ring's white point; this is the reference curve (desktop mirror, tests)."""
+    import math
+    t = max(RING_KELVIN_MIN, min(RING_KELVIN_MAX, int(kelvin))) / 100.0
+    r = 255.0 if t <= 66 else 329.7 * (t - 60) ** -0.1332
+    g = 99.47 * math.log(t) - 161.12 if t <= 66 else 288.12 * (t - 60) ** -0.0755
+    b = 255.0 if t >= 66 else 138.52 * math.log(t - 10) - 305.04
+    out = 0
+    for channel in (r, g, b):
+        out = (out << 8) | int(max(0.0, min(255.0, math.floor(channel + 0.5))))   # rounded half up
+    return out
 
 # UTF-8 byte capacities (CCFrame buffer size minus NUL).
 TEXT_CAPACITY = {"mode": 24, "target": 64, "value": 64, "detail": 96, "status": 64,
@@ -299,29 +353,17 @@ def button_tone_v5(slot: int, icon: str, enabled: bool, lit=None, layout: str = 
     return "nav"
 
 
-def button_ink_v5(slot: int, icon: str, enabled: bool, lit=None, color: int = 0, layout: str = "") -> int:
+def button_ink_v5(slot: int, icon: str, enabled: bool, lit=None, color: int = 0, layout: str = "",
+                  crumb: str = "") -> int:
     """Section 5.2's footer / idle-row ink of one button (0 = hidden, tone none)."""
     tone = button_tone_v5(slot, icon, enabled, lit, layout)
     if tone == "none":
         return 0
     if tone == "on":
-        return accent_ink(color) if color else INK_ON   # rows 5 and 6
+        if color:
+            return accent_ink(color)                     # row 5
+        return INK_ACT if crumb else INK_ON              # row 6; presentation 6: act #FFBE69 on r3 screens
     return FOOTER_INK[tone]   # includes row 4, `liked` #A3244A (never sat(), whatever ledPink is)
-
-
-def list_slot(entry: int, count: int) -> int:
-    """Logical ring segment for absolute list entry `entry` (design pitch 3, centred on top)."""
-    c0 = (count - 1) // 2
-    return ((entry - c0) * LIST_PITCH) % RING_SEGMENTS
-
-
-def volume_steps(value: int) -> int:
-    """JS Math.round(v/2) for 0..100 (round half up)."""
-    return (value + 1) // 2
-
-
-def volume_segment(value: int) -> int:
-    return (VOLUME_START + volume_steps(value)) % RING_SEGMENTS
 
 
 def button_tone(slot: int, icon: str, enabled: bool) -> str:

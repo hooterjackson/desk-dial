@@ -41,7 +41,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.dirname(os.path.dirname(HERE))
-TOURS = os.path.normpath(os.path.join(PROJECT, "..", "tools", "stage_checks", "music_tours.py"))
+TOURS = os.path.normpath(os.path.join(PROJECT, "..", "..", "work", "stage_checks", "music_tours.py"))
 
 
 def _summary(xs):

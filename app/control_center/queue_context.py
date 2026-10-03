@@ -124,7 +124,8 @@ class QueueLedger:
         self.path = Path(path) if path else default_path()
         self._clock = clock or time.time
         self.autosave = autosave
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()       # the in-memory ledger (classify readers); never held over disk I/O
+        self._save_lock = threading.Lock()   # serialises writers (DD-BUG-031): the newest snapshot lands last
         self.base: Segment | None = None
         self.playnext: list = []   # newest first
 
@@ -136,7 +137,7 @@ class QueueLedger:
             base.song_ids = [str(v) for v in final_song_ids or []]
             base.created_at = base.created_at or self._clock()
             self.base, self.playnext = base, []
-            self._changed()
+        self._changed()
 
     def append_playnext(self, start_row: int, song_ids, context: Segment | None = None) -> None:
         """A successful ``play_next`` (or a ``move_next`` re-insert): newest first."""
@@ -146,12 +147,12 @@ class QueueLedger:
                           created_at=self._clock())
             self.playnext.insert(0, Segment.from_dict(source))
             del self.playnext[PLAYNEXT_SEGMENTS_MAX:]
-            self._changed()
+        self._changed()
 
     def clear(self) -> None:
         with self._lock:
             self.base, self.playnext = None, []
-            self._changed()
+        self._changed()
 
     def playnext_song_ids(self) -> list:
         """Every Play-next segment's ids, newest block first (section 9.5.3)."""
@@ -240,6 +241,7 @@ class QueueLedger:
 
     # ------------------------------------------------------------------ persistence
     def _changed(self):
+        """After a write, outside ``_lock`` (DD-BUG-031: a classify on the Tk thread never waits for the fsync)."""
         if self.autosave:
             try:
                 self.save()
@@ -282,11 +284,20 @@ class QueueLedger:
         the rewrite are one json.loads and one json.dumps (GIL-holding C calls). For a 5000-song base
         with 64 Play-next blocks (104 KB) the H5 bench measured p50 / p95 0.26 / 0.47 ms and 0.32 /
         0.45 ms in its 03:15 run, p95 at most 0.53 and 0.61 ms over six runs (gil-parse-hold.md
-        section 2.3), within K3 section 1.2's 1 ms."""
-        with self._lock:
+        section 2.3), within K3 section 1.2's 1 ms.
+
+        DD-BUG-031: only the room entry's snapshot holds ``_lock``; the re-read, the temp write, the fsync
+        and the replace run under ``_save_lock`` alone, so ``classify`` readers never wait on disk I/O. A
+        writer snapshots after taking ``_save_lock``, so the newest state is the one written last."""
+        with self._save_lock:
+            with self._lock:
+                entry = self._room_entry()
             data = self._read_all() or {"version": LEDGER_VERSION, "rooms": {}}
-            data["rooms"][self.room_uid] = self._room_entry()
+            data["rooms"][self.room_uid] = entry
             payload = json.dumps(data, ensure_ascii=False, sort_keys=True)
+            self._write(payload)
+
+    def _write(self, payload: str) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:

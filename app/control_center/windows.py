@@ -141,6 +141,8 @@ FOCUS_SETTLE_SECONDS = 0.06   # an external foreground change is re-checked this
 FOCUS_VERIFY_SECONDS = 0.25
 FOCUS_VERIFY_OTHER_SECONDS = 0.10
 FOCUS_POLL_SECONDS = 0.004
+GA_ROOT, GW_OWNER = 2, 4
+OWNER_WALK = 8      # owner levels followed from the foreground window back to a switch target (owned dialogs)
 FOREGROUND_EVENT_LIMIT = 256  # queued WinEvent window handles awaiting pump()
 # K4 9.7: a one-side completion resolves by its start + 600 ms on NanoD-snap (and the carousel's
 # backstop); this adapter-side bound only covers a presenter that never answers at all.
@@ -406,6 +408,16 @@ def picker_icons(window_icons, window_facts=None, hires_icon=None):
         result[item_id] = master if master is not None else icons.get(item_id)
     return result
 
+
+def _handle_or_zero(value):
+    """A window handle as an int, or 0 when the call gave nothing usable (NULL, or a stand-in that is no
+    number): an owner walk that cannot read the next owner simply stops there."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 class NativeWindows:
     """Small ctypes boundary; helpers above remain usable on other platforms."""
 
@@ -475,7 +487,28 @@ class NativeWindows:
         sig(d, "DwmGetWindowAttribute", LONG, HANDLE, DWORD, HANDLE, DWORD)
 
     def root_handle(self, hwnd):
-        return int(self.u.GetAncestor(hwnd, 2) or hwnd)  # GA_ROOT, not owner chain
+        return int(self.u.GetAncestor(hwnd, GA_ROOT) or hwnd)  # GA_ROOT, not owner chain
+
+    def owned_by(self, hwnd, target):
+        """True when ``hwnd``'s top-level window is ``target`` or is owned by it (through at most OWNER_WALK
+        owners): activating an app whose modal dialog is open (Save As, Print, an error box) hands the
+        activation to that dialog, and the app still came forward."""
+        target = int(target or 0)
+        current = self.root_handle(hwnd) if hwnd else 0
+        for _ in range(OWNER_WALK):
+            if not current:
+                return False
+            if current == target:
+                return True
+            current = _handle_or_zero(self.u.GetWindow(current, GW_OWNER))
+        return False
+
+    def foreground_for(self, target):
+        """``foreground()``, except that a window owned by ``target`` (its modal dialog) reads as ``target``."""
+        hwnd = self.u.GetForegroundWindow()
+        if hwnd and target and self.owned_by(hwnd, target):
+            return self.identity(target)
+        return self.foreground()
 
     def _pid(self, hwnd):
         pid = DWORD()
@@ -675,7 +708,7 @@ class NativeWindows:
         while True:
             checks += 1
             current = self.u.GetForegroundWindow()
-            granted = bool(current and self.root_handle(current) == hwnd)
+            granted = bool(current and self.owned_by(current, hwnd))
             if granted or time.perf_counter() >= deadline:
                 break
             time.sleep(FOCUS_POLL_SECONDS)
@@ -2002,7 +2035,7 @@ class WindowsAdapter:
         try:
             granted = self.native.focus(item["hwnd"], restore=True)
             self._log_focus("switch", granted)
-            success = granted and same_identity(item, self.native.foreground())
+            success = granted and same_identity(item, self._foreground_for(item))
             if success:
                 # Focus has moved and is verified: the Switch visual is an exit animation. v7: the
                 # picker raises no toast of its own; K3 sends toast.switch through toast() at +360.
@@ -2077,12 +2110,19 @@ class WindowsAdapter:
         """True when no knob-driven call came for IDLE_INFER_SECONDS (see cancel())."""
         return self._last_input is not None and time.monotonic() - self._last_input >= IDLE_INFER_SECONDS
 
+    def _foreground_for(self, item):
+        """The foreground identity as seen for ``item``: its owned dialog in front counts as ``item`` (DD-BUG-019)."""
+        reader = getattr(self.native, "foreground_for", None)
+        if callable(reader):
+            return reader(item.get("hwnd", 0))
+        return self.native.foreground()
+
     def _restore_focus(self, origin):
         self._changing_focus = True
         try:
             granted = self.native.focus(origin["hwnd"], restore=True)
             self._log_focus("cancel", granted)
-            return bool(granted and same_identity(origin, self.native.foreground()))
+            return bool(granted and same_identity(origin, self._foreground_for(origin)))
         finally:
             self._changing_focus = False
 
@@ -2097,7 +2137,7 @@ class WindowsAdapter:
         if pending["restore"] and same_identity(origin, self.native.identity(origin.get("hwnd", 0))):
             restored = self._restore_focus(origin)
         elif pending["reason"] == "idle":
-            restored = same_identity(origin, self.native.foreground())
+            restored = same_identity(origin, self._foreground_for(origin))
         if pending["shown"] and self._visible:
             self._play_exit("play_cancel_exit")
             self.hide(reason=pending["reason"])

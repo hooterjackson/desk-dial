@@ -1,0 +1,8 @@
+{
+"batches": [
+ {"events": [["key", 17, false], ["key", 90, false], ["key", 90, true], ["key", 17, true]], "inputs": [{"flags": 0, "scan": 29, "type": "key", "vk": 17}, {"flags": 0, "scan": 44, "type": "key", "vk": 90}, {"flags": 2, "scan": 44, "type": "key", "vk": 90}, {"flags": 2, "scan": 29, "type": "key", "vk": 17}], "t": 0.1},
+ {"events": [["key", 16, false], ["key", 83, false], ["key", 83, true], ["key", 16, true]], "inputs": [{"flags": 0, "scan": 42, "type": "key", "vk": 16}, {"flags": 0, "scan": 31, "type": "key", "vk": 83}, {"flags": 2, "scan": 31, "type": "key", "vk": 83}, {"flags": 2, "scan": 42, "type": "key", "vk": 16}], "t": 2.2}
+],
+"feedback": ["undo"],
+"status": {"action": "zoom", "active": true, "commands": 1, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 0, "refusals": 0, "releases": {}, "scrolls": 0, "short": 0, "typed": 0, "undo": 1, "undoSkipped": 1, "wheel": 0}
+}

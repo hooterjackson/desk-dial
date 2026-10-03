@@ -395,6 +395,10 @@ class ArtRuleTests(Harness):
         self.c.complete(self.c.request("state"), {**self.sonos.read_state(), "volume": 29,
                                                   "playback": "PAUSED_PLAYBACK", "can_play": True, "can_pause": False})
         self.clock.advance(5)
+        self.assertEqual(self.key()[::2], ("cover_key_0123456789abcd", "nowPlaying"),
+                         "r3.1: paused keeps Now Playing and its cover")
+        self.c.complete(self.c.request("state"), {**self.sonos.read_state(), "volume": 29, "playback": "STOPPED",
+                                                  "can_play": True, "can_pause": False})
         self.assertEqual(self.key()[::2], ("cover_key_0123456789abcd", "idle"),
                          "idle keeps the key so the firmware can fade it out")
         self.c.button(2)                  # Home 3: Tracks

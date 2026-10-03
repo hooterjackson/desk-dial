@@ -22,9 +22,13 @@ peek, square corners), ``WM_SETCURSOR`` -> the arrow. Handlers are wrapped in ``
 BaseException`` and fall back to ``DefWindowProcW``.
 
 System notifications (§4.1; the host is the app's single observer for all three overlays):
-session lock and console / remote disconnect -> ``lock``; ``PBT_APMSUSPEND`` or the console
-display turning off (``GUID_CONSOLE_DISPLAY_STATE`` = 0) -> ``sleep`` (and ``display_off`` for the
-harvest, G1-3); display on -> ``display_on``; ``WM_DISPLAYCHANGE``, ``WM_DPICHANGED``,
+session lock -> ``lock``; console / remote disconnect -> ``session_disconnect``; session unlock
+(only ``WTS_SESSION_UNLOCK``) -> ``unlock``; console / remote connect -> ``session_connect`` (a
+connect can land on the lock screen, so it never counts as an unlock); ``PBT_APMSUSPEND`` or the
+console display turning off (``GUID_CONSOLE_DISPLAY_STATE`` = 0) -> ``sleep`` (and ``display_off``
+for the harvest, G1-3); ``PBT_APMRESUMESUSPEND`` (a user-attended resume) -> ``resume``, while
+``PBT_APMRESUMEAUTOMATIC`` (also sent on an unattended timer wake with the display off) reports
+nothing; display on -> ``display_on``; ``WM_DISPLAYCHANGE``, ``WM_DPICHANGED``,
 ``WM_SETTINGCHANGE(SPI_SETWORKAREA)``, ``WM_DWMCOMPOSITIONCHANGED`` -> ``display``;
 ``WM_SETTINGCHANGE(SPI_SETCLIENTAREAANIMATION)`` -> ``motion``; ``WM_ENDSESSION`` -> ``endsession``.
 All are unregistered at close.
@@ -66,7 +70,9 @@ WM_APP_WAKE = WM_APP + 0x31          # the presenter's post (any thread -> the s
 MA_NOACTIVATE = 3
 HTCLIENT, HTTRANSPARENT = 1, -1
 PBT_APMSUSPEND, PBT_POWERSETTINGCHANGE = 0x4, 0x8013
+PBT_APMRESUMESUSPEND, PBT_APMRESUMEAUTOMATIC = 0x7, 0x12
 WTS_CONSOLE_DISCONNECT, WTS_REMOTE_DISCONNECT, WTS_SESSION_LOCK = 2, 4, 7
+WTS_CONSOLE_CONNECT, WTS_REMOTE_CONNECT, WTS_SESSION_UNLOCK = 1, 3, 8
 SPI_SETWORKAREA, SPI_SETCLIENTAREAANIMATION = 0x002F, 0x1043
 SHOW_FLAGS = 0x10 | 0x200 | 0x40      # SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW
 
@@ -89,7 +95,7 @@ def make_lparam(x, y):
 
 class HostInput:
     """Pure message logic of a host role. ``notify(kind)`` receives 'click_action', 'lock',
-    'sleep', 'display_off', 'display_on', 'display', 'motion' and 'endsession'. ``cursor()``
+    'unlock', 'session_disconnect', 'session_connect', 'sleep', 'resume', 'display_off', 'display_on', 'display', 'motion' and 'endsession'. ``cursor()``
     sets the arrow; ``power_setting(lp)`` returns (is_console_display_state, value) for a
     ``PBT_POWERSETTINGCHANGE`` lParam."""
 
@@ -166,12 +172,20 @@ class HostInput:
         if msg == WM_CLOSE:
             return 0                               # the engine destroys the host, nobody else
         if msg == WM_WTSSESSION_CHANGE:
-            if int(wp) in (WTS_SESSION_LOCK, WTS_CONSOLE_DISCONNECT, WTS_REMOTE_DISCONNECT):
+            if int(wp) == WTS_SESSION_LOCK:
                 self.notify("lock")
+            elif int(wp) in (WTS_CONSOLE_DISCONNECT, WTS_REMOTE_DISCONNECT):
+                self.notify("session_disconnect")
+            elif int(wp) == WTS_SESSION_UNLOCK:
+                self.notify("unlock")              # DD-BUG-036: the Navigator may show again
+            elif int(wp) in (WTS_CONSOLE_CONNECT, WTS_REMOTE_CONNECT):
+                self.notify("session_connect")     # may still be on the lock screen: not an unlock
             return 0
         if msg == WM_POWERBROADCAST:
             if int(wp) == PBT_APMSUSPEND:
                 self.notify("sleep")
+            elif int(wp) == PBT_APMRESUMESUSPEND:
+                self.notify("resume")              # user-attended; PBT_APMRESUMEAUTOMATIC is not
             elif int(wp) == PBT_POWERSETTINGCHANGE and self.power_setting is not None:
                 is_display, value = self.power_setting(lp)
                 if is_display:

@@ -1,5 +1,6 @@
 pyserial==3.5
 soco==0.31.2
-PyJWT[crypto]==2.14.0
+PyJWT[crypto]==2.15.0
 Pillow==12.3.0
 requests==2.34.2
+websocket-client==1.8.0

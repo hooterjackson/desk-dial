@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+<script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&amp;family=Archivo:wght@400;500;600;700&amp;display=swap">
+<script src="motion-lab.js"></script>
+<script src="haptic-lab.js"></script>
+<style>body{margin:0;background:var(--color-bg)}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent)}button:focus-visible,input:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}</style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:32px 32px 80px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:20px;border-bottom:2px solid var(--color-text);padding-bottom:16px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:760px">
+      <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-accent-700)">Nano D · Haptic map · r2 (firmware-grounded)</div>
+      <h1 style="margin:0;font-family:var(--font-heading);font-size:36px;line-height:1.05;font-weight:700;letter-spacing:-0.02em">How every part of the knob feels</h1>
+      <div style="font-size:15px;line-height:1.5;color:var(--color-neutral-700);text-wrap:pretty">Each context plays a scripted turn or press. You see the force curve under the finger, the pulses over time and the knob screen, and hear an approximate click. Sound is a proxy for the motor, not the final audio.</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
+      <button onClick="{{ toggleSound }}" style="font:600 14px var(--font-body);padding:9px 14px;border:2px solid var(--color-text);background:{{ sdBg }};color:{{ sdFg }};cursor:pointer;text-align:left;border-radius:0">{{ sdLabel }}</button>
+      <button onClick="{{ toggleReduced }}" style="font:600 14px var(--font-body);padding:9px 14px;border:2px solid var(--color-text);background:{{ rdBg }};color:{{ rdFg }};cursor:pointer;text-align:left;border-radius:0">{{ rdLabel }}</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;border:2px solid var(--color-text);align-self:flex-start">
+    <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="9">
+      <button onClick="{{ tb.pick }}" style="font:600 14px var(--font-body);padding:10px 14px;border:0;border-right:2px solid var(--color-text);background:{{ tb.bg }};color:{{ tb.fg }};cursor:pointer;text-align:left;border-radius:0;display:flex;gap:8px;align-items:baseline"><span style="opacity:0.6;font-size:12px">{{ tb.n }}</span><span>{{ tb.label }}</span></button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ notReady }}" hint-placeholder-val="{{ false }}">
+    <div style="font-size:15px;color:var(--color-neutral-700)">Loading…</div>
+  </sc-if>
+
+  <sc-for list="{{ cards }}" as="c" hint-placeholder-count="2">
+    <div style="display:flex;flex-direction:column;gap:14px;border-top:2px solid var(--color-text);padding-top:16px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:4px 7px;background:{{ c.vBg }};color:{{ c.vFg }}">{{ c.v }}</span>
+        <h2 style="margin:0;font-family:var(--font-heading);font-size:22px;line-height:1.2;font-weight:700;flex:1;min-width:240px">{{ c.title }}</h2>
+        <button onClick="{{ c.onPlay }}" style="font:600 13px var(--font-body);padding:8px 14px;min-width:72px;border:2px solid var(--color-text);background:var(--color-text);color:var(--color-bg);cursor:pointer;text-align:left;border-radius:0">{{ c.playLabel }}</button>
+        <button onClick="{{ c.onReplay }}" style="font:600 13px var(--font-body);padding:8px 12px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Replay</button>
+        <input type="range" min="0" max="{{ c.dur }}" step="4" value="{{ c.tv }}" onChange="{{ c.onScrub }}" style="width:200px;accent-color:var(--color-accent)">
+        <span style="font-size:13px;font-variant-numeric:tabular-nums;width:82px">{{ c.tLabel }}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <sc-for list="{{ c.tokens }}" as="k" hint-placeholder-count="2">
+          <span style="font-size:12px;font-weight:600;padding:3px 7px;border:1px solid var(--color-text);font-variant-numeric:tabular-nums">{{ k.id }}</span>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+        <div style="line-height:0;flex:none">{{ c.stage }}</div>
+        <div style="display:flex;flex-direction:column;gap:12px;flex:none">
+          <div style="line-height:0">{{ c.curve }}</div>
+          <div style="line-height:0">{{ c.wave }}</div>
+          <div style="font-size:12px;line-height:1.5;color:var(--color-neutral-700);max-width:340px;text-wrap:pretty">{{ c.live }}</div>
+        </div>
+        <div style="flex:1 1 320px;min-width:0;max-width:560px;display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+          <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:6px 0;border-bottom:1px solid var(--color-neutral-300);font-size:13px;line-height:1.45">
+              <div style="font-weight:700">{{ r.k }}</div>
+              <div style="text-wrap:pretty">{{ r.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ isVocab }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:32px">
+      <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700);padding:12px 0">Principles</div>
+        <sc-for list="{{ principles }}" as="p" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:40px minmax(0,1fr) minmax(0,1.4fr);gap:16px;padding:12px 0;border-top:1px solid var(--color-neutral-300)">
+            <div style="font-family:var(--font-heading);font-size:22px;font-weight:700;color:var(--color-accent)">{{ p.n }}</div>
+            <div style="font-size:16px;font-weight:700;line-height:1.35">{{ p.rule }}</div>
+            <div style="font-size:14px;line-height:1.5;color:var(--color-neutral-700);text-wrap:pretty">{{ p.why }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700);padding:12px 0">Haptic tokens · implement once, reuse everywhere</div>
+        <div style="display:grid;grid-template-columns:170px 80px minmax(0,1.3fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,0.9fr) 76px;gap:12px;padding:8px 0;border-bottom:2px solid var(--color-text);font-size:12px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700"><div>Token</div><div>Kind</div><div>Intent</div><div>Parameters</div><div>Sound</div><div>Reduced haptics</div><div>Hear</div></div>
+        <sc-for list="{{ tokens }}" as="k" hint-placeholder-count="15">
+          <div style="display:grid;grid-template-columns:170px 80px minmax(0,1.3fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,0.9fr) 76px;gap:12px;padding:9px 0;border-bottom:1px solid var(--color-neutral-300);font-size:13px;line-height:1.45;align-items:start">
+            <div style="font-weight:700">{{ k.id }}</div><div style="color:var(--color-neutral-700)">{{ k.kind }}</div><div style="text-wrap:pretty">{{ k.intent }}</div><div style="text-wrap:pretty;font-variant-numeric:tabular-nums">{{ k.params }}</div><div>{{ k.sound }}</div><div>{{ k.reduced }}</div>
+            <div><sc-if value="{{ k.canHear }}" hint-placeholder-val="{{ false }}"><button onClick="{{ k.hear }}" style="font:600 12px var(--font-body);padding:5px 9px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Play</button></sc-if></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isMap }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 56px minmax(0,0.9fr) minmax(0,0.8fr) 56px 60px 56px minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.8fr) minmax(0,0.9fr);gap:10px;padding:8px 0;border-bottom:2px solid var(--color-text);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700"><div>Context</div><div>Build</div><div>Feel</div><div>Detents</div><div>Snap</div><div>Damp</div><div>Click</div><div>Ends</div><div>Events</div><div>Sound</div><div>Reduced</div></div>
+      <sc-for list="{{ map }}" as="r" hint-placeholder-count="30">
+        <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 56px minmax(0,0.9fr) minmax(0,0.8fr) 56px 60px 56px minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.8fr) minmax(0,0.9fr);gap:10px;padding:8px 0;border-bottom:1px solid var(--color-neutral-300);font-size:12px;line-height:1.45;align-items:start">
+          <div><div style="font-size:11px;color:var(--color-neutral-700);text-transform:uppercase;letter-spacing:0.06em">{{ r.group }}</div><div style="font-weight:700;font-size:13px">{{ r.title }}</div></div>
+          <div><span style="font-size:11px;font-weight:700;padding:2px 5px;background:{{ r.vBg }};color:{{ r.vFg }}">{{ r.v }}</span></div>
+          <div>{{ r.feel }}</div><div>{{ r.dpt }}</div><div>{{ r.snap }}</div><div>{{ r.damp }}</div><div>{{ r.click }}</div><div>{{ r.ends }}</div><div style="text-wrap:pretty">{{ r.events }}</div><div>{{ r.sound }}</div><div>{{ r.reduced }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'home', reduced: false, sound: true, cards: {}, ready: !!window.NanoHaptic }; this._stops = {}; this._cache = {}; }
+  componentDidMount() {
+    const boot = () => { if (!window.NanoHaptic) { this._bt = setTimeout(boot, 60); return; } this.setState({ ready: true }); };
+    boot(); this._last = performance.now();
+    const loop = ts => { const dt = Math.min(64, ts - this._last); this._last = ts; const H = window.NanoHaptic, S = this.state;
+      if (H && S.ready) { const next = {}; let any = false;
+        for (const c of H.CTX) { const st = S.cards[c.id]; if (!st || !st.playing) continue; any = true; let t = st.t + dt, playing = true; if (t >= c.sim.dur) { t = c.sim.dur; playing = false; } next[c.id] = { t, playing }; }
+        if (any) this.setState(s => ({ cards: Object.assign({}, s.cards, next) })); }
+      this._raf = requestAnimationFrame(loop); };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); clearTimeout(this._bt); Object.values(this._stops).forEach(f => f && f()); }
+  stopAudio(id) { if (this._stops[id]) { this._stops[id](); this._stops[id] = null; } }
+  play(c, fromT) { const H = window.NanoHaptic; this.stopAudio(c.id); if (this.state.sound) this._stops[c.id] = H.playAudio(c, this.state.reduced, fromT); this.setState(s => ({ cards: Object.assign({}, s.cards, { [c.id]: { t: fromT, playing: true } }) })); }
+  pause(c) { this.stopAudio(c.id); this.setState(s => ({ cards: Object.assign({}, s.cards, { [c.id]: Object.assign({}, s.cards[c.id], { playing: false }) }) })); }
+  setTab(tab) { Object.keys(this._stops).forEach(k => this.stopAudio(k)); this.setState(s => { const cards = {}; Object.keys(s.cards).forEach(k => { cards[k] = Object.assign({}, s.cards[k], { playing: false }); }); return { tab, cards }; }); window.scrollTo(0, 0); }
+  renderVals() {
+    const S = this.state, H = window.NanoHaptic, sel = on => ({ bg: on ? 'var(--color-text)' : 'var(--color-bg)', fg: on ? 'var(--color-bg)' : 'var(--color-text)' });
+    const groups = H ? H.groups : [], vTag = v => (v === 'v1' ? { vBg: 'var(--color-accent)', vFg: '#FFFFFF' } : { vBg: 'var(--color-neutral-200)', vFg: 'var(--color-text)' });
+    const tabs = groups.concat([{ id: 'vocab', label: 'Tokens & principles', n: '09' }, { id: 'map', label: 'Full map', n: '10' }]).map(g => Object.assign({ n: g.n, label: g.label, pick: () => this.setTab(g.id) }, sel(S.tab === g.id)));
+    const base = { tabs, notReady: !S.ready || !H, cards: [], isVocab: S.tab === 'vocab', isMap: S.tab === 'map', principles: [], tokens: [], map: [],
+      toggleReduced: () => { Object.keys(this._stops).forEach(k => this.stopAudio(k)); this.setState({ reduced: !S.reduced }); }, toggleSound: () => this.setState({ sound: !S.sound }),
+      rdLabel: S.reduced ? 'Reduced haptics: on' : 'Reduced haptics: off', rdBg: S.reduced ? 'var(--color-text)' : 'transparent', rdFg: S.reduced ? 'var(--color-bg)' : 'var(--color-text)',
+      sdLabel: S.sound ? 'Sound proxy: on' : 'Sound proxy: off', sdBg: S.sound ? 'var(--color-text)' : 'transparent', sdFg: S.sound ? 'var(--color-bg)' : 'var(--color-text)' };
+    if (!S.ready || !H) return base;
+    const h = React.createElement, gLabel = id => (groups.find(g => g.id === id) || {}).label;
+    base.cards = H.CTX.filter(c => c.group === S.tab).map(c => {
+      const st0 = S.cards[c.id] || { t: 0, playing: false }, t = Math.round(st0.t / 4) * 4, st = H.stateAt(c, S.reduced, t), id = ('h' + c.id).replace(/[^a-z0-9]/gi, '');
+      const sig = t + '|' + S.reduced, hit = this._cache[c.id]; let els;
+      if (hit && hit.sig === sig) els = hit.els; else { els = { stage: H.stageEl(h, c, st, id), curve: H.curveEl(h, c, st, S.reduced), wave: H.waveEl(h, c, st, S.reduced) }; this._cache[c.id] = { sig, els }; }
+      const fired = st.evs.filter(e => e.t <= t && !['wall', 'coast', 'feel'].includes(e.type)).length;
+      const rows = [['Feel', c.feel], ['Detents / turn', c.dpt], ['Snap', c.snap], ['Damping', c.damp], ['Click', c.click], ['Ends', c.ends], ['Events', c.events], ['Sound', c.sound], ['Pairs with', c.pair], ['Reduced', c.reduced]].concat(c.later ? [['Later', c.later]] : []).concat(c.why ? [['Why', c.why]] : []).map(([k, v]) => ({ k, v }));
+      return Object.assign({ title: c.title, v: c.v, tokens: c.tokens.map(x => ({ id: x })), stage: els.stage, curve: els.curve, wave: els.wave, rows, dur: c.sim.dur, tv: t,
+        tLabel: (t / 1000).toFixed(2) + ' / ' + (c.sim.dur / 1000).toFixed(1) + ' s', playLabel: st0.playing ? 'Pause' : 'Play',
+        live: (st.coast ? 'Coasting: events suppressed. ' : '') + (st.pen > 3 ? 'Pushing against the wall. ' : '') + `${fired} pulse${fired === 1 ? '' : 's'} so far${S.reduced ? ' (reduced haptics)' : ''}.`,
+        onPlay: () => (st0.playing ? this.pause(c) : this.play(c, st0.t >= c.sim.dur ? 0 : st0.t)), onReplay: () => this.play(c, 0),
+        onScrub: e => { this.stopAudio(c.id); this.setState(s => ({ cards: Object.assign({}, s.cards, { [c.id]: { t: +e.target.value, playing: false } }) })); } }, vTag(c.v));
+    });
+    base.principles = H.PRINCIPLES.map(([rule, why], i) => ({ n: String(i + 1), rule, why }));
+    base.tokens = H.TOKENS.map(k => { const snd = H.tokenSound[k.id]; return Object.assign({}, k, { canHear: !!snd, hear: () => snd && H.preview(snd) }); });
+    base.map = H.CTX.map(c => Object.assign({ group: gLabel(c.group), title: c.title, v: c.v, feel: c.feel, dpt: c.dpt, snap: c.snap, damp: c.damp, click: c.click, ends: c.ends, events: c.events, sound: c.sound, reduced: c.reduced }, vTag(c.v)));
+    return base;
+  }
+}
+</script>
+</body>
+</html>

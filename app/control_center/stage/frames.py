@@ -496,46 +496,6 @@ class ClockWait:
         return (TICK, None) if idx is None else (HANDLE, idx)
 
 
-def native_clock_wait():
-    """``DCompositionWaitForCompositorClock`` taking a tuple of handles, or None where the
-    export is missing (Windows < 11: fall back to DwmFlush / the timer, P3)."""
-    import ctypes as C
-    from . import win32 as W
-    f = W.DCompositionWaitForCompositorClock
-    if f is None:
-        return None
-
-    def wait(count, handles, timeout_ms):
-        arr = (C.c_void_p * count)(*handles) if count else None
-        return f(count, arr, timeout_ms)
-    return wait
-
-
-def native_timer_wait():
-    """A ``timer_wait`` on a high-resolution waitable timer plus MsgWaitForMultipleObjectsEx
-    (Windows; one timer per calling thread, created lazily)."""
-    import ctypes as C
-    import threading
-    from . import win32 as W
-    local = threading.local()
-
-    def wait(handles, seconds):
-        t = getattr(local, "timer", None)
-        if t is None:
-            t = W.CreateWaitableTimerExW(None, None, W.CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, W.TIMER_ALL_ACCESS) \
-                or W.CreateWaitableTimerExW(None, None, 0, W.TIMER_ALL_ACCESS)
-            local.timer = t
-        rel = C.c_int64(-max(1, int(seconds * 1e7)))
-        W.SetWaitableTimer(t, C.byref(rel), 0, None, None, False)
-        arr = (C.c_void_p * (len(handles) + 1))(*handles, t)
-        r = W.MsgWaitForMultipleObjectsEx(len(handles) + 1, arr, max(1, int(seconds * 4000)), W.QS_ALLINPUT,
-                                          W.MWMO_INPUTAVAILABLE)
-        if r < len(handles):
-            return int(r)
-        return None
-    return wait
-
-
 # =========================================================================== pacer (P2, P4, P5)
 class Pacer:
     """Pacing rules for a Python-stepped loop, in ticks of one clock (``freq``)."""

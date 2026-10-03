@@ -1,0 +1,9 @@
+{
+"batches": [
+ {"events": [["wheel", 42]], "inputs": [{"data": 42, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0},
+ {"events": [["wheel", 43]], "inputs": [{"data": 43, "dx": 0, "dy": 0, "flags": 2048, "type": "mouse"}], "t": 0.0}
+],
+"feedback": ["refused"],
+"status": {"action": "zoom", "active": true, "commands": 0, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 0, "refusals": 1, "releases": {}, "scrolls": 0, "short": 0, "typed": 0, "undo": 0, "undoSkipped": 0, "wheel": 3}
+}

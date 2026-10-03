@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -31,7 +30,8 @@ from PIL import Image, ImageChops, ImageDraw  # noqa: E402
 from control_center import carousel as c  # noqa: E402
 from control_center import carousel_render as R  # noqa: E402
 
-DEFAULT_OUT = Path(tempfile.gettempdir()) / "desk-dial-previews" / "v6-previews-fullscreen"
+DEFAULT_OUT = Path(r"<scratch>"
+                   r"\cf8135e8-b752-4b82-a6c8-08e4a81ebf8b\<scratch>\v6-previews-fullscreen")
 EDGE_PX = 4                 # the strip along each screen edge the frost check compares
 ICON_DIR = ROOT / "design-reference" / "design_handoff_window_carousel" / "assets" / "apps"
 

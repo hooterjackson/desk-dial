@@ -1,7 +1,7 @@
 # Standalone Windows app
 
 The app is **Desk Dial** (renamed from NanoD Control Center on 2026-09-26; desktop v7 on). Installed at
-`%LOCALAPPDATA%\Programs\DeskDial\DeskDial.exe`. The v2-v6 rollback bundles keep the old
+`C:\Users\someone\AppData\Local\Programs\DeskDial\DeskDial.exe`. The v2-v6 rollback bundles keep the old
 name and install to `...\Programs\NanoDControlCenter\NanoDControlCenter.exe`.
 This is a self-contained executable with bundled Python, Tk, and dependencies.
 Neither Codex nor the source workspace is needed to run it.
@@ -32,7 +32,7 @@ Neither Codex nor the source workspace is needed to run it.
   Closing Settings keeps the tray app and the knob running.
 - Use **Quit** in the tray menu to stop the app and release the knob.
 - The Windows task **Desk Dial** starts it ten seconds after sign-in.
-  It runs as the signed-in user, without elevation, including on battery power.
+  It runs as Someone, without elevation, including on battery power.
 - Reopening the app opens Settings in the existing instance instead of opening
   another USB connection. Windows Task Scheduler owns the running process
   independently. If the tray icon cannot be created, Settings opens with
@@ -69,13 +69,15 @@ every check, changes nothing and writes the plan to `diagnostics\desktop-install
   again, so a later install cannot bring back old queue-recovery files.
 - It registers the **Desk Dial** task and the **Desk Dial** Start-menu shortcut. Then, only after
   the new program folder and the data step verified, it unregisters **NanoD Control Center**,
-  removes its shortcut and moves `%LOCALAPPDATA%\Programs\NanoDControlCenter` to
-  `backups\desktop-program-NanoDControlCenter-<UTC>` (moved, never deleted).
+  moves `%LOCALAPPDATA%\Programs\NanoDControlCenter` to
+  `%LOCALAPPDATA%\DeskDial\backups\program-NanoDControlCenter-<UTC>` (same volume as the program
+  folder; moved, never deleted) and then removes its shortcut.
 - Windows keeps tray-icon preferences per exe path, so a "show in the taskbar corner" choice
   resets once, and a stale **Nano_D++ Control Center** entry stays listed in Settings >
   Personalization > Taskbar. It is harmless and Windows owns it.
 - Rolling back to v6 (`-Bundle desktop-dist-v6 -Mirror`) does the reverse: it unregisters
-  **Desk Dial**, removes its shortcut, moves `Programs\DeskDial` to `backups\`, installs the old
+  **Desk Dial**, moves `Programs\DeskDial` to
+  `%LOCALAPPDATA%\NanoDControlCenter\backups\`, removes its shortcut, installs the old
   name and re-registers **NanoD Control Center**. v6 reads the old home as it was when Desk Dial
   copied it; settings changed in Desk Dial since are not carried back (the installer has no option
   for it; copy them back by hand with the user if they are wanted). `%LOCALAPPDATA%\DeskDial\`
@@ -256,9 +258,10 @@ installer copies and hash-verifies the executable bundle, creates the Start-menu
 shortcut, and registers the sign-in task. Quit the existing tray app before
 updating. It does not copy plaintext secrets or overwrite existing credentials.
 
-Desktop v7 builds into `desktop-dist-v7` / `desktop-build-v7` (the build refuses
-the v2, v3, v4, v5 and v6 rollback folders) and the installer defaults to
-`-Bundle desktop-dist-v7`. The exe embeds the app icon (`--icon`, all 8 frames).
+Each Desk Dial build goes into a folder of its own; the current one builds into
+`desktop-dist-v7-l` / `desktop-build-v7-l` (the build refuses the v2 to v6 rollback
+folders and the earlier v7 ones, `desktop-dist-v7` to `desktop-dist-v7-l`) and the
+installer defaults to `-Bundle desktop-dist-v7-l`, the bundle `Build-Desktop.ps1` builds. The exe embeds the app icon (`--icon`, all 8 frames).
 Its frozen `--smoke-test` adds, for v7: the alive knob face (the six glow looks
 built and one frame composed at 96 and 192 DPI), the process timing settings
 (set, self-checked and undone) and the music overlays' compositor (its windows
@@ -285,14 +288,14 @@ The desktop step of the cc5.4 window (it can also run on its own, before the
 firmware step):
 
 1. Quit the app from the tray. Run
-   `desktop-dist-v7\DeskDial\DeskDial.exe --smoke-test` (or
+   `desktop-dist-v7-l\DeskDial\DeskDial.exe --smoke-test` (or
    `--smoke-test --headless`) and check that
    `%LOCALAPPDATA%\DeskDial\logs\smoke-test.json` says
    `passed: true`. The installer refuses a new bundle without a passing report
    from that bundle's exe, newer than the exe.
 2. Back up the program folder and hash the user data.
-3. Run `Install-Desktop.ps1 -Bundle desktop-dist-v7 -Mirror -DryRun` and read
-   `diagnostics\desktop-install-plan.json`, then `Install-Desktop.ps1 -Bundle desktop-dist-v7 -Mirror`.
+3. Run `Install-Desktop.ps1 -Bundle desktop-dist-v7-l -Mirror -DryRun` and read
+   `diagnostics\desktop-install-plan.json`, then `Install-Desktop.ps1 -Bundle desktop-dist-v7-l -Mirror`.
 4. Confirm the old home's hashes are unchanged and the migrated files in `%LOCALAPPDATA%\DeskDial\`
    have the same hashes, then start the **Desk Dial** task and verify
    (`firmware/BUILD-cc5.4.md` step 9).
@@ -302,6 +305,12 @@ resource FileDescription and ProductName `Desk Dial`); its exe SHA-256 and file 
 recorded in `diagnostics/desktop-v7-build.json` and `diagnostics/desktop-dist-v7-sha256.json`.
 The earlier v7 builds recorded there under the old name were never installed; the build moves
 their `NanoDControlCenter` folder out of `desktop-dist-v7` (to `desktop-build-v7`).
+
+Uninstall: quit Desk Dial from the tray, review `Uninstall-Desktop.ps1 -DryRun` (it prints its plan
+and changes nothing), then run `Uninstall-Desktop.ps1`. It removes the program folder
+`%LOCALAPPDATA%\Programs\DeskDial`, the **Desk Dial** sign-in task and the **Desk Dial** Start-menu
+shortcut, and keeps the data folder `%LOCALAPPDATA%\DeskDial` (settings, credentials, logs) unless
+it is given `-RemoveData`. It refuses while `DeskDial.exe` runs.
 
 Desktop rollback: `Install-Desktop.ps1 -Bundle desktop-dist-v6 -Mirror` (the
 floating knob with the Windows-switcher carousel, exe SHA-256
@@ -325,7 +334,7 @@ Exact build dependencies are in `requirements-desktop.txt`.
 212 Python tests pass, including reconnect request identity and retry behavior.
 The frozen executable passes its UI smoke test. Task Scheduler launched the
 installed executable under `svchost`; the app connected to the physical knob and
-Den in live mode. A second launch exited successfully, leaving one running app.
+Hall in live mode. A second launch exited successfully, leaving one running app.
 The standalone app reads firmware **1.0.0-cc3**. The application image and full
 flash were verified, all ten saved profiles were preserved, and all four device
 control entries plus host-lease recovery passed.

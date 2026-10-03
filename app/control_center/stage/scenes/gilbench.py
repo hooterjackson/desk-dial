@@ -107,14 +107,14 @@ def operations(k=2.0):
     src1200.save(buf, "JPEG", quality=90)
     jpeg1200 = buf.getvalue()
     src400 = src1200.resize((400, 400))
-    plan_gen = SM.cover_plan({"title": "Hounds of Love", "artist": "Kate Bush"})
-    plan_load = SM.cover_plan({"title": "Heligoland", "artist": "Massive Attack", "art_bg": 0xFF781E,
+    plan_gen = SM.cover_plan({"title": "Paper Lanterns", "artist": "Mira Vale"})
+    plan_load = SM.cover_plan({"title": "Glass Weather", "artist": "Lumen Park", "art_bg": 0xFF781E,
                                "art_ink": 0xF2F2F2, "art_template": "simulation://art/x/{w}x{h}bb.jpg", "art_max": 1200})
-    card_img = RM.art_generated("Hounds of Love", "Kate Bush", l0)
+    card_img = RM.art_generated("Paper Lanterns", "Mira Vale", l0)
     c2buf = io.BytesIO()
     card_img.save(c2buf, "JPEG", quality=92)
     c2 = c2buf.getvalue()
-    label = RM.label_sprite("Hounds of Love", "Kate Bush", "1985 · 12 tracks", k)
+    label = RM.label_sprite("Paper Lanterns", "Mira Vale", "1985 · 12 tracks", k)
     frost_src = Image.linear_gradient("L").resize((1280 * int(k), 720 * int(k))).convert("RGB")
 
     def decode_full():
@@ -133,21 +133,21 @@ def operations(k=2.0):
         "L0 -> L1 reduce(2)": lambda: card_img.reduce(2),
         "C2 decode + opaque bytes (L0)": c2_decode,
         "C2 encode JPEG q92 (L0)": lambda: card_img.save(io.BytesIO(), "JPEG", quality=92),
-        "art.generated L0": lambda: RM.art_generated("Tropicália ou Panis et Circencis", "Various artists", l0),
-        "art.generated big cover": lambda: RM.art_generated("Moon Safari", "Air", big, variant="cover"),
+        "art.generated L0": lambda: RM.art_generated("Copper Sun Sessions", "Various artists", l0),
+        "art.generated big cover": lambda: RM.art_generated("Midnight Arcade", "Air", big, variant="cover"),
         "art.extended L0 (400 px source)": lambda: RM.art_extended(src400, l0, (200, 100, 50), 0.88, l0 / 340.0),
-        "art.loading L0": lambda: RM.art_loading("Heligoland", "Massive Attack", l0, 0xFF781E, 0xF2F2F2),
-        "art.loading L1": lambda: RM.art_loading("Heligoland", "Massive Attack", l1, 0xFF781E, 0xF2F2F2),
+        "art.loading L0": lambda: RM.art_loading("Glass Weather", "Lumen Park", l0, 0xFF781E, 0xF2F2F2),
+        "art.loading L1": lambda: RM.art_loading("Glass Weather", "Lumen Park", l1, 0xFF781E, 0xF2F2F2),
         "art.mosaic L0": lambda: RM.art_mosaic([src400] * 4, l0),
         "simulated cover 1200": lambda: art.simulated.draw("simulation://art/a1/{w}x{h}bb.jpg", 1200, 1200,
                                                            {"art_bg": 0xFF2850}),
-        "label sprite + bgra": lambda: RM.label_sprite("Hounds of Love", "Kate Bush", "1985 · 12 tracks", k).bgra(),
+        "label sprite + bgra": lambda: RM.label_sprite("Paper Lanterns", "Mira Vale", "1985 · 12 tracks", k).bgra(),
         "label bgra only": lambda: label.bgra(),
-        "row sprite + bgra": lambda: RM.row_sprite(k, lead="number", number="04", title="Running Up That Hill",
-                                                   sub="Kate Bush", tag=("overlay.upnext.tag_now", SM.U_TAG_NOW_RGB,
+        "row sprite + bgra": lambda: RM.row_sprite(k, lead="number", number="04", title="Lantern Light",
+                                                   sub="Mira Vale", tag=("overlay.upnext.tag_now", SM.U_TAG_NOW_RGB,
                                                                          1.0)).bgra(),
         "row placeholder sprite": lambda: RM.row_sprite(k, lead="placeholder", placeholder_k=3).bgra(),
-        "left text sprite": lambda: RM.left_text_sprite("Hounds of Love", "Kate Bush · 1985", k)[0].bgra(),
+        "left text sprite": lambda: RM.left_text_sprite("Paper Lanterns", "Mira Vale · 1985", k)[0].bgra(),
         "ambient build (64 px source)": lambda: B.ambient(RM.thumb64(src400), k, (5120, 1440)),
         "ambient build (art_bg)": lambda: B.ambient(0xFF781E, k, (5120, 1440)),
         "thumb64 + dominant": lambda: _thumb_dom(src1200),

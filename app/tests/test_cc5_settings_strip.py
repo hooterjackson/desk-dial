@@ -21,7 +21,7 @@ OK, PROBLEM = "#6ED996", "#FF7A66"
 
 
 def runtime(connected=True, supported=True, online=True, source="queue", host="192.168.1.40",
-            expired=False, signed_in=True, room="Den"):
+            expired=False, signed_in=True, room="Hall"):
     state = {"online": online, "room_label": room, "source": source, "host": host}
     apple = SimpleNamespace(has_credentials=lambda: signed_in)
     return SimpleNamespace(device_connected=connected, device_supported=supported, device_status="Knob ready",
@@ -43,7 +43,7 @@ class StripModelTests(unittest.TestCase):
                          (True, "Connected", "USB · firmware 1.0.0-cc5.4", "Knob settings…",
                           "knob_settings"))
         self.assertEqual(self.column(runtime(), 0)["detail"], "USB", "no version: none invented")
-        for rt in (runtime(connected=False), runtime(supported=False)):
+        for rt in (runtime(connected=False), runtime(connected=False, supported=False)):   # DD-BUG-039
             knob = self.column(rt, 0)
             self.assertEqual((knob["ok"], knob["state"], knob["action"], knob["key"]),
                              (False, "Not connected", "Troubleshoot…", "troubleshoot"))
@@ -57,7 +57,7 @@ class StripModelTests(unittest.TestCase):
             with self.subTest(source=source):
                 sonos = self.column(runtime(source=source), 1)
                 self.assertEqual((sonos["ok"], sonos["state"], sonos["detail"]),
-                                 (True, "Den", f"{phrase} · 192.168.1.40"))
+                                 (True, "Hall", f"{phrase} · 192.168.1.40"))
                 self.assertEqual((sonos["action"], sonos["key"]), ("Set manual IP…", "manual_ip"))
         self.assertEqual(self.column(runtime(source="podcast"), 1)["detail"], "Idle · 192.168.1.40")
         self.assertEqual(self.column(runtime(host=""), 1, speaker_ip="10.0.0.9")["detail"],

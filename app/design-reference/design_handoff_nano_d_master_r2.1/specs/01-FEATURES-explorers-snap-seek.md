@@ -588,7 +588,7 @@ The prototype measures them live. Values below are approximate character counts;
 | Knob meta | Snap · hung | `Slack not responding` | ≤ 170 px | 20 |
 | Knob meta | Snap · move failed | `Couldn’t move Slack` | ≤ 170 px | 19 |
 | Knob meta | Snap · too big | `Slack can’t fit half` | ≤ 170 px | 20 |
-| Knob line 14 px | Tracks · now | `Now: Running Up That Hill` | ≤ 170 px | 25 |
+| Knob line 14 px | Tracks · now | `Now: Lantern Light` | ≤ 170 px | 25 |
 | Knob line 14 px | Tracks · Sonos shuffle, next unknown | `Next: shuffle pick` | ≤ 170 px | 18 |
 | Knob line 14 px | Tracks · shuffle, previous | `Prev: last played` | ≤ 170 px | 17 |
 | Knob line 14 px | Tracks · repeat all, last track | `Next: back to track 1` | ≤ 170 px | 21 |
@@ -602,16 +602,16 @@ The prototype measures them live. Values below are approximate character counts;
 | Knob status 12 px | Home · album blocked | `Album unavailable` | ≤ 160 px | 17 |
 | Knob status 12 px | Home | `Paused` | ≤ 160 px | 6 |
 | Knob title 22 px | PC not connected | `Waiting for PC` | ≤ 170 px | 14 |
-| Toast | Play next · success | `Queued next · Moon Safari` | — | 25 |
+| Toast | Play next · success | `Queued next · Midnight Arcade` | — | 25 |
 | Toast | Play next · AirPlay / radio / line-in | `Not playing from the queue · use Play` | — | 37 |
 | Toast | Play next · nothing playing | `Nothing playing · use Play` | — | 26 |
 | Toast | Play next · Sonos shuffle | `Shuffle is on · turn it off to play next` | — | 40 |
-| Toast | Play next · failed | `Couldn’t queue Moon Safari · nothing added` | — | 42 |
+| Toast | Play next · failed | `Couldn’t queue Midnight Arcade · nothing added` | — | 42 |
 | Toast | Play next · partial | `Partly queued · check the Sonos queue` | — | 37 |
 | Toast | Play next · song changed | `Song changed · try again` | — | 24 |
 | Toast | Start · success (after overlay closes) | `Playing PAPER LANTERN Ep. 1` | — | 26 |
 | Toast | Start · partly playable | `Playing 33 of 34 · 1 song unavailable` | — | 37 |
-| Toast | Start · album blocked | `Kind of Blue can’t play · a song is unavailable` | — | 47 |
+| Toast | Start · album blocked | `Tidal Glass can’t play · a song is unavailable` | — | 47 |
 | Toast | Start · failed | `Couldn’t start PAPER LANTERN Ep. 1` | — | 33 |
 | Toast | Switch | `Claude · Nano D Control Center` | — | 30 |
 | Toast | Snap · both sides | `Side by side · Claude and Slack` | — | 31 |

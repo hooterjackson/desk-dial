@@ -321,6 +321,20 @@ def hires_cover_jpeg(rgb_source, size: int = HIRES_SIZE, *, fitted=None) -> byte
         return None  # the 240 px cover still serves the overlay
 
 
+def clean_cover_jpeg(rgb_source, size: int = HIRES_SIZE, *, fitted=None) -> bytes | None:
+    """r3.1 Navigator: the hi-res cover of ``hires_cover_jpeg`` without the knob's scrim or its 0.8
+    opacity (the desktop card draws its own text on glass, not over the art). None on failure."""
+    try:
+        if fitted is None:
+            fitted = ImageOps.fit(rgb_source.convert("RGB"), (size, size), method=Image.Resampling.LANCZOS)
+        output = BytesIO()
+        fitted.convert("RGB").save(output, format="JPEG", quality=HIRES_JPEG_QUALITY, subsampling=2, optimize=True,
+                                   progressive=False)
+        return output.getvalue()
+    except Exception:
+        return None
+
+
 @lru_cache(maxsize=1)
 def _scrim_rows():
     """One 256-entry table per knob row: round(value * factor(y + 0.5)) per byte, applied
@@ -473,6 +487,7 @@ class PreparedArtwork(NamedTuple):
     jpeg: bytes | None    # artwork2: baseline 240 px JPEG <= COVER_MAX_BYTES
     jpeg_key: str | None  # artwork2: sha256(jpeg)[:24]
     hires_jpeg: bytes | None = None  # desktop v5: 480 px continuous-scrim cover, quality 90
+    clean_jpeg: bytes | None = None  # r3.1 Navigator: the same 480 px cover without the knob's scrim
 
 
 def _knob_composite(cover):
@@ -561,7 +576,13 @@ def _prepare(encoded: bytes, hires: bool = False):
     preview, raw = _knob_composite(cropped)
     if hires:
         fitted = extended.resize((HIRES_SIZE, HIRES_SIZE), Image.Resampling.LANCZOS) if extended else None
-        return preview, raw, dominant, hires_cover_jpeg(rgb_source, fitted=fitted)
+        if fitted is None:
+            try:
+                fitted = ImageOps.fit(rgb_source, (HIRES_SIZE, HIRES_SIZE), method=Image.Resampling.LANCZOS)
+            except Exception:
+                fitted = None
+        return (preview, raw, dominant, hires_cover_jpeg(rgb_source, fitted=fitted),
+                clean_cover_jpeg(rgb_source, fitted=fitted))
     return preview, raw, dominant
 
 
@@ -588,12 +609,12 @@ def prepare_artwork2(encoded: bytes) -> PreparedArtwork:
     The same pass keeps ``hires_jpeg`` (desktop v5: hires_cover_jpeg of the same
     EXIF-transposed source; None when it cannot be encoded).
     """
-    preview, raw, dominant, hires_jpeg = _prepare(encoded, hires=True)
+    preview, raw, dominant, hires_jpeg, clean_jpeg = _prepare(encoded, hires=True)
     try:
         jpeg_key, jpeg = cover_jpeg(preview)
     except Exception:
         jpeg_key = jpeg = None
-    return PreparedArtwork(preview, raw, dominant, jpeg, jpeg_key, hires_jpeg)
+    return PreparedArtwork(preview, raw, dominant, jpeg, jpeg_key, hires_jpeg, clean_jpeg)
 
 
 # ---------------------------------------------------------------------- knob art states (section 10.5)
@@ -830,7 +851,7 @@ def _new_session():
 
 
 def _fetch(session, url, hosts, cancelled) -> bytes:
-    """One bounded artwork download. ``cancelled()`` is polled per chunk.
+    """One bounded artwork download. ``cancelled()`` and the 8 s deadline are polled per read.
 
     Redirects are deliberately rejected. Never turn a trusted art URL into a
     request for an arbitrary local address or send Apple auth headers. Errors
@@ -849,15 +870,70 @@ def _fetch(session, url, hosts, cancelled) -> bytes:
         if content_type and not content_type.startswith("image/"):
             raise ArtworkError("Artwork is unavailable.")
         data = bytearray()
-        for part in response.iter_content(chunk_size=16_384):
-            if time.monotonic() - start > 8:
-                raise ArtworkError("Artwork took too long to load.")
-            if cancelled():
-                raise ArtworkCancelled("Artwork selection changed.")
-            data.extend(part)
-            if len(data) > MAX_DOWNLOAD:
-                raise ArtworkError("Artwork is too large.")
+        deadline = start + _FETCH_DEADLINE_S
+        try:
+            for part in _body_parts(response, deadline):
+                if time.monotonic() > deadline:
+                    raise ArtworkError("Artwork took too long to load.")
+                if cancelled():
+                    raise ArtworkCancelled("Artwork selection changed.")
+                data.extend(part)
+                if len(data) > MAX_DOWNLOAD:
+                    raise ArtworkError("Artwork is too large.")
+        except ArtworkError:
+            raise
+        except Exception:
+            # A read cut short by the deadline-capped socket timeout is the deadline, not a fault.
+            if time.monotonic() >= deadline - 0.05:
+                raise ArtworkError("Artwork took too long to load.") from None
+            raise
         return bytes(data)
+
+
+_FETCH_DEADLINE_S = 8.0   # whole-download budget for one cover
+_READ_TIMEOUT_S = 3.0     # per-read stall budget (the session.get read timeout)
+_FALLBACK_CHUNK = 2_048   # iter_content chunk when the raw stream has no read1()
+
+
+def _body_parts(response, deadline):
+    """Yield the body as it arrives so the total deadline is checked after every socket read.
+
+    ``iter_content(16384)`` blocks until 16 KB arrive, so a trickling source slipped the 8 s
+    deadline by seconds (DD-RES-007). ``raw.read1`` returns whatever one read delivers, and the
+    socket's read timeout is capped at the time left, so no single read outlasts the deadline.
+    """
+    raw = getattr(response, "raw", None)
+    read1 = getattr(raw, "read1", None)
+    if not callable(read1):
+        yield from response.iter_content(chunk_size=_FALLBACK_CHUNK)
+        return
+    sock = getattr(getattr(raw, "connection", None), "sock", None)
+    original = None
+    if sock is not None:
+        try:
+            original = sock.gettimeout()
+        except Exception:
+            sock = None
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ArtworkError("Artwork took too long to load.")
+            if sock is not None:
+                try:
+                    sock.settimeout(max(0.01, min(_READ_TIMEOUT_S, remaining)))
+                except Exception:
+                    sock = None
+            part = read1(16_384, decode_content=True)
+            if not part:
+                return
+            yield part
+    finally:
+        if sock is not None:
+            try:
+                sock.settimeout(original)
+            except Exception:
+                pass
 
 
 @dataclass(frozen=True)
@@ -875,6 +951,8 @@ class ArtworkResult:
     # Desktop v5 floating knob: the 480 px continuous-scrim cover of the same source
     # (quality-90 JPEG), matched through the same key / jpeg_key. Never sent to the knob.
     hires_jpeg: bytes | None = None
+    # r3.1 Navigator: the same 480 px cover without the knob's scrim. Never sent to the knob.
+    clean_jpeg: bytes | None = None
 
 
 def _art_key(raw: bytes) -> str:
@@ -893,6 +971,7 @@ class _Entry(NamedTuple):
     jpeg: bytes | None
     jpeg_key: str | None
     hires_jpeg: bytes | None = None
+    clean_jpeg: bytes | None = None
 
 
 class ArtworkService:
@@ -1021,7 +1100,7 @@ class ArtworkService:
     @staticmethod
     def _result_for(token, entry):
         return ArtworkResult(token, entry.key, entry.preview.copy(), entry.raw, entry.dominant, "",
-                             entry.jpeg, entry.jpeg_key, entry.hires_jpeg)
+                             entry.jpeg, entry.jpeg_key, entry.hires_jpeg, entry.clean_jpeg)
 
     def request(self, url, token=None, *, speaker_host=None):
         with self._condition:
@@ -1104,7 +1183,7 @@ class ArtworkService:
         """Download and prepare one claimed URL, then cache it. Raises on failure."""
         prepared = prepare_artwork2(_fetch(self._session(), safe_url, hosts, cancelled))
         entry = _Entry(prepared.preview, prepared.raw, prepared.dominant, _art_key(prepared.raw),
-                       prepared.jpeg, prepared.jpeg_key, prepared.hires_jpeg)
+                       prepared.jpeg, prepared.jpeg_key, prepared.hires_jpeg, prepared.clean_jpeg)
         with self._condition:
             self._cache[safe_url] = entry
             self._cache.move_to_end(safe_url)

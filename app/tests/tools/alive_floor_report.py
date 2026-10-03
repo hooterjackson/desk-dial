@@ -114,7 +114,7 @@ CONTINUITY_RUNS = (("offline", None, False), ("asleep, clock unset", None, True)
                    ("asleep 06:00", 6 * 60, True), ("asleep 21:00", 21 * 60, True),
                    ("asleep 22:30", 22 * 60 + 30, True), ("asleep 23:00", 23 * 60, True))
 CONTINUITY_MS = 20000          # measured per run, after the settle (the reveal offline; asleep and damped on Home)
-HOME_FRAME = {"id": 1, "mode": "VOLUME", "target": "Den", "value": "54%", "detail": "", "status": "",
+HOME_FRAME = {"id": 1, "mode": "VOLUME", "target": "Hall", "value": "54%", "detail": "", "status": "",
               "activity": "idle", "layout": "nowPlaying", "ledStyle": "color", "confirmedVolume": 54,
               "buttons": [{"label": label, "enabled": True, "icon": icon} for label, icon in
                           (("Pause", "pause"), ("Browse", "list"), ("Win", "win"), ("Tracks", "tracks"))],

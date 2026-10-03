@@ -551,6 +551,13 @@ def max_diff(a, b):
     return max(abs(x - y) for ea, eb in zip(a, b) for x, y in zip(ea, eb))
 
 
+# r4 (ALIVE.md 16, MOTION.md 3): the engine's output eases (50 ms) towards the animator's e. The mirror's H1 / K2 M27
+# properties hold on the animator's e (AliveLights.raw) as before; the eased ring integrates each cadence's samples of
+# an effect's own edges (a wash edge, the half's steps), so a mirror and a twin at other cadences differ by up to
+# EASED_MIRROR_TOLERANCE while such an edge passes (measured 0.13 in the started-wash slide-in).
+EASED_MIRROR_TOLERANCE = 0.2
+
+
 class AliveLookTests(unittest.TestCase):
     """K2 10.3 item 3 / K4 11.3: fill 36 + 219 e, six looks (GLL, ties to the lower look), alpha
     0.95 GLL, sigma GLB / 2 x S_glow, ring only, nothing blurred per frame."""
@@ -736,7 +743,7 @@ class AliveMirrorTests(unittest.TestCase):
                     mirror.apply_frame(with_feedback(HOME, 5, moment='like'), True, 100, stamp)
                 else:
                     mirror.apply_input('limit', 1, 7, stamp)
-            out[ms] = mirror.render(t)
+            out[ms] = (mirror.render(t), tuple(mirror.lights.raw[0]))
         return out
 
     def quiet(self, ms):
@@ -751,16 +758,20 @@ class AliveMirrorTests(unittest.TestCase):
         self.assertGreater(len(compared), 30)
         for rate in (60, 120, 144, 240):
             with self.subTest(rate=rate):
-                worst = max(max_diff(runs[rate][ms], runs[360][ms]) for ms in compared)
+                worst = max(max_diff(runs[rate][ms][1], runs[360][ms][1]) for ms in compared)
                 self.assertLess(worst, 0.01)
+                eased = max(max_diff(runs[rate][ms][0], runs[360][ms][0]) for ms in compared)
+                self.assertLess(eased, EASED_MIRROR_TOLERANCE)
 
     def test_skipped_vblanks_resume_on_the_curve(self):
         base = sorted({math.floor(k * 1000 / 240 + 0.5) for k in range(self.END_MS * 240 // 1000 + 1)})
         skipped = [ms for k, ms in enumerate(base) if k % 7 not in (3, 4, 5) or ms % 250 == 0]   # 1-3 in a row
         full, gaps = self.run_ms(base), self.run_ms(skipped)
         compared = [ms for ms in skipped if self.quiet(ms)]
-        worst = max(max_diff(full[ms], gaps[ms]) for ms in compared)
+        worst = max(max_diff(full[ms][1], gaps[ms][1]) for ms in compared)
         self.assertLess(worst, 0.01, 'no catch-up burst after a skip')
+        eased = max(max_diff(full[ms][0], gaps[ms][0]) for ms in compared)
+        self.assertLess(eased, EASED_MIRROR_TOLERANCE, 'the eased ring: no catch-up burst either')
 
 
 class InlineBackend:
@@ -886,6 +897,7 @@ class FloatingKnobAliveTests(unittest.TestCase):
                     lights.press(now, value)
             position = local[1] if local is not None and frame is not None and local[0] == frame.get('id') else None
             ring, _ = lights.render(now, frame, position, 100 if position is not None else None)
+        self.twin_raw = tuple(lights.raw[0])                    # r4: the animator's e before the easer
         return ring
 
     def test_while_hidden_one_render_per_message_and_no_loop_timer_compose_or_present(self):
@@ -918,7 +930,8 @@ class FloatingKnobAliveTests(unittest.TestCase):
         shown_at = mirror.last
         self.assertAlmostEqual(shown_at, slide_at, delta=1 / 240)
         twin = self.twin(schedule, shown_at)
-        self.assertLess(max_diff(mirror.ring, twin), 0.02)
+        self.assertLess(max_diff(mirror.lights.raw[0], self.twin_raw), 0.02)
+        self.assertLess(max_diff(mirror.ring, twin), EASED_MIRROR_TOLERANCE)
         return mirror.ring, twin
 
     def test_a_like_posted_while_hidden_does_not_bloom_at_the_slide_in(self):
@@ -983,7 +996,8 @@ class FloatingKnobAliveTests(unittest.TestCase):
         later = mirror.last
         self.assertGreaterEqual(later - shown_at, 0.3 - 1e-6)
         twin = self.twin(schedule, later)
-        self.assertLess(max_diff(mirror.ring, twin), 0.02)
+        self.assertLess(max_diff(mirror.lights.raw[0], self.twin_raw), 0.02)
+        self.assertLess(max_diff(mirror.ring, twin), EASED_MIRROR_TOLERANCE)
         self.assertGreater(max_diff(self.twin(stale, later), twin), 0.02, 'the comparison would see it')
 
     def test_a_detent_that_summons_the_knob_after_ten_seconds_hidden(self):

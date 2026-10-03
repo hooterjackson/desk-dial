@@ -36,6 +36,7 @@ alive (ALIVE.md revision 2): ``SongProgress`` posts the knob's song position; se
 ``controller.set_reduced_motion`` and the picker's ``set_reduced_motion``; the picker also gets the
 overlay registry (``set_overlay_registry(overlay_surfaces)``, K4 2.4) when the runtime is built.
 """
+import base64
 from collections import OrderedDict, deque
 from concurrent.futures import Future, ThreadPoolExecutor
 import inspect
@@ -49,6 +50,10 @@ import time
 from .controller import _needs_login, presenter_event_dict
 from .presentation import (ALIVE_LED_DRIVE_MAX, ALIVE_LED_DRIVE_MIN, ALIVE_PROGRESS_MAX_MS,
                            MEDIA_KEY_PATTERN, MEDIA_KINDS, RING_WINDOW)
+from .onshape import (DEFAULT_DETENTS_PER_TURN, OnshapeAuto, choose_profile as choose_onshape_profile,
+                      normal_mode as normal_onshape_mode)
+from .onshape import _detents as _profile_detents
+from .app_engine import REFUSALS
 from .queue_context import QueueLedger, Segment
 
 ART_RETRY_SECONDS = 1.0
@@ -79,8 +84,55 @@ WARMUP_INTERVAL_SECONDS = 600.0
 WARMUP_COVERS = 10
 PAGE_ITEMS = 10                 # the Home warm-up's page-1 copy
 LIST_COVERS = 24                # covers of a list prefetched / named around the focus
-HIRES_COVER_CACHE = 4
+HIRES_COVER_CACHE = 8
 MOTION_RECHECK_SECONDS = 5.0    # the Motion backstop (section 14.3)
+# r4 (firmware 1.0.0-cc5.7; HAPTICS.md "Sound"): the Knob sounds level sent with every control of an r4 knob, from
+# Settings > Knob (`knob_sounds` On / Off and `knob_sound_level` Low / Medium / High; default On at Low). Off (and any
+# knob or host that sends nothing) is silent.
+KNOB_SOUND_VALUES = ("off", "low", "medium", "high")
+KNOB_SOUND_LEVELS = ("low", "medium", "high")
+DEFAULT_KNOB_SOUND = "low"
+# Desk Dial 7.3.1: the level became the speaker volume in percent (`knob_sound_volume` 0..100, default 100, also for
+# a settings.json without it; `knob_sound_level` is still read but no longer shown or sent). Off sends 0. A knob with
+# knobVolume takes it as is, a knobSound knob its level (device.sound_level_for_volume).
+KNOB_VOLUME_MAX = 100
+KNOB_VOLUME_STEP = 5            # the Settings slider's step
+DEFAULT_KNOB_VOLUME = 100
+
+
+def normal_knob_sound(value):
+    """A Knob sounds value (off / low / medium / high); anything else is the default (low)."""
+    return value if isinstance(value, str) and value in KNOB_SOUND_VALUES else DEFAULT_KNOB_SOUND
+
+
+def knob_sound_setting(settings):
+    """The effective Knob sounds value of settings.json: off unless `knob_sounds` is on (default on), then
+    `knob_sound_level` (default low)."""
+    settings = settings if isinstance(settings, dict) else {}
+    if settings.get("knob_sounds", True) is False:
+        return "off"
+    level = settings.get("knob_sound_level", DEFAULT_KNOB_SOUND)
+    return level if level in KNOB_SOUND_LEVELS else DEFAULT_KNOB_SOUND
+
+
+def normal_knob_volume(value):
+    """A Knob sounds volume (int 0..100); anything else (a bool, a float, out of range) is the default (100)."""
+    return value if type(value) is int and 0 <= value <= KNOB_VOLUME_MAX else DEFAULT_KNOB_VOLUME
+
+
+def knob_volume_setting(settings):
+    """The effective Knob sounds volume of settings.json: 0 unless `knob_sounds` is on (default on), then
+    `knob_sound_volume` (default 100, also when absent: an older file starts at 100 %)."""
+    settings = settings if isinstance(settings, dict) else {}
+    if settings.get("knob_sounds", True) is False:
+        return 0
+    return normal_knob_volume(settings.get("knob_sound_volume", DEFAULT_KNOB_VOLUME))
+
+
+def knob_sound_for_volume(volume):
+    """The Knob sounds level name (off / low / medium / high) a knobSound knob plays for `volume`."""
+    from .device import SOUND_LEVELS, sound_level_for_volume
+    return SOUND_LEVELS[sound_level_for_volume(normal_knob_volume(volume))]
 DIAG_LOG_SECONDS = 60.0         # section 6.5: the knob's enterMsLast / enterMsMax, once per minute
 AUDIO_RAN_KEEP = 256            # AudioLane.ran is a bounded diagnostic (the tray process runs for weeks)
 PROGRESS_REFRESH_SECONDS = 30.0
@@ -96,7 +148,14 @@ APPLE_OPS = frozenset(("recent", "recent_lookahead", "favourite_playlists", "pla
                        "ratings", "like", "play_items", "play_next"))
 # Section 10.2: unsent write effects dropped by invalidate_actions() (never replayed).
 WRITE_OPS = frozenset(("volume", "transport", "play_items", "play_next", "seek", "shuffle_reorder",
-                       "set_shuffle", "jump", "move_next", "like"))
+                       "set_shuffle", "jump", "move_next", "like", "lights_set", "lights_power", "scene_run"))
+# r3 (Desk Dial r3 release 1): the Home Assistant lane `nanod-home` (one worker, never the audio lane).
+HOME_OPS = frozenset(("lights_read", "lights_set", "lights_power", "scene_run"))
+PROFILES_ONSHAPE = "BINARIS BEER"   # A0: until the inventory names the knob's profiles
+APP_MODES = ("off", "manual", "auto")                # app profiles: settings.json `app_modes` values
+APP_UPLOAD_IDLE = {"state": "idle", "id": None, "bytes": 0, "ms": 0, "error": None}
+APP_FEEL_CHOICES = ("BINARIS BEER", "MIDI SKIPPER", "MIDI CLACK JONES")   # knob profiles an app's slot may map to
+SPACES_PRESENTATION = 6         # the r3 navigation + Lights only for a presentation-6 knob
 STAGE_EFFECTS = frozenset(("explorer_open", "explorer_source", "explorer_highlight", "explorer_close",
                            "upnext_open", "upnext_highlight", "upnext_rows", "upnext_close"))
 SURFACE_OF = {"explorer_open": "explorer", "upnext_open": "upnext"}
@@ -302,6 +361,15 @@ class OperationFailure(str):
         return value
 
 
+def _signin_needed(error):
+    """Apple Music was never connected on this PC (``NotSignedIn``, outcome ``signin_needed``):
+    not an expired sign-in (DD-BUG-023)."""
+    if getattr(error, "outcome", None) == "signin_needed" or getattr(error, "signin_needed", False) is True:
+        return True
+    from .apple_music import NotSignedIn
+    return isinstance(error, NotSignedIn)
+
+
 def failure(error, fallback="Operation failed", op=None, kind=None):
     """An OperationFailure for ``error`` from op ``op`` (the effect kind), with its K3 outcome."""
     from .apple_music import AppleMusicError, LikeNotConfirmed, MusicUnavailable, apple_outcome
@@ -313,7 +381,10 @@ def failure(error, fallback="Operation failed", op=None, kind=None):
     elif op is not None and isinstance(error, SonosError):
         outcome = sonos_outcome(error, op)
     elif op is not None and isinstance(error, AppleMusicError):
-        outcome = apple_outcome(error, op, kind=kind)
+        # The controller has connect copy for a never-connected Apple Music (DD-BUG-023).
+        outcome = apple_outcome(error, op, kind=kind, split_signin=True)
+    elif op in HOME_OPS and isinstance(getattr(error, "outcome", None), str):
+        outcome = error.outcome          # HomeAssistantError: not_configured | offline | auth | not_allowed ...
     elif op is not None and _needs_login(message.lower()):
         outcome = "signin_expired"
     return OperationFailure(message, unavailable=isinstance(error, MusicUnavailable), outcome=outcome,
@@ -366,6 +437,35 @@ def _system_animations_off():
 
 
 # ------------------------------------------------------------------ lanes (section 1)
+LANE_STOPPED_MESSAGE = "Pending action discarded: Desk Dial is closing"
+SHUTDOWN_JOIN_S = 3.0   # DD-BUG-032: one shared deadline for every lane worker on close()
+# DD-BUG-032: the lane kinds a quit stops at their next step. Each has a safe stop: play_items and
+# play_next roll their staging back, seek and jump only abandon confirmation polls. The companion
+# shuffle (shuffle_reorder) has no rollback, so it is left to finish (it is bounded at 60 moves):
+# stopping it half way would leave the upcoming queue partly reordered.
+STOP_AT_STEP_KINDS = frozenset(("play_items", "play_next", "seek", "jump"))
+
+
+class LaneStopped(RuntimeError):
+    """DD-BUG-032: raised by ``between_steps()`` once the runtime shuts down."""
+
+
+def _join_executors(executors, timeout):
+    """Join the worker threads of ``executors`` within one shared ``timeout`` (seconds).
+    Returns the names of the workers still alive at the deadline."""
+    deadline = time.monotonic() + max(0.0, timeout)
+    current = threading.current_thread()
+    stragglers = []
+    for executor in executors:
+        for thread in list(getattr(executor, "_threads", ()) or ()):
+            if thread is current:
+                continue
+            thread.join(max(0.0, deadline - time.monotonic()))
+            if thread.is_alive():
+                stragglers.append(thread.name)
+    return stragglers
+
+
 class AudioLane:
     """``nanod-sonos``: one worker, two queues (section 1.1, C5-48).
 
@@ -379,6 +479,13 @@ class AudioLane:
         self._lock = threading.Lock()
         self._jobs = deque()
         self.ran = deque(maxlen=AUDIO_RAN_KEEP)   # the latest kinds, in the order they ran (diagnostics)
+        # DD-BUG-032: set by ``stop()`` (the runtime shuts down). The running exclusive job's next
+        # ``between_steps()`` raises LaneStopped when its kind is in STOP_AT_STEP_KINDS, so
+        # play_items / play_next take their own staging rollback and seek / jump drop their
+        # confirmation polls instead of finishing in a process that is quitting. Steps are never
+        # called inside a destructive phase (C5-37), so that phase still runs whole. Any other
+        # kind (the companion shuffle) runs to its end; its steps no longer run queued jobs.
+        self.stopping = False
 
     def submit(self, kind, function):
         future = Future()
@@ -408,11 +515,17 @@ class AudioLane:
             self._run(*job)
 
     def _run(self, kind, function, future):
+        if self.stopping:
+            future.cancel()
         if not future.set_running_or_notify_cancel():
             return
         seek = kind == "seek"
 
         def between_steps():
+            if self.stopping:
+                if kind in STOP_AT_STEP_KINDS:
+                    raise LaneStopped(LANE_STOPPED_MESSAGE)
+                return
             while True:
                 job = self._take(short_only=True, skip_seek=seek)
                 if job is None:
@@ -429,6 +542,13 @@ class AudioLane:
             jobs, self._jobs = list(self._jobs), deque()
         for _kind, _function, future in jobs:
             future.cancel()
+
+    def stop(self):
+        """DD-BUG-032: the runtime is closing: the queued jobs are cancelled and the running
+        exclusive job stops at its next step (its rollback runs) when its kind is in
+        STOP_AT_STEP_KINDS; the companion shuffle, which has no rollback, runs to its end."""
+        self.stopping = True
+        self.cancel()
 
 
 class LookaheadLane:
@@ -507,24 +627,114 @@ class LookaheadLane:
 
 class Runtime:
     def __init__(self, controller, sonos, apple, windows, device=None, artwork=None,
-                 accents=None, icons=None, *, stage=None, toasts=None, ledger=None, motion_probe=None):
+                 accents=None, icons=None, *, stage=None, toasts=None, ledger=None, motion_probe=None, ha=None,
+                 onshape=None, onshape_focus=None, onshape_session=None, app_library=None, app_modes=None,
+                 app_rules=None, app_order=None):
         """`accents` is an artwork.AccentService and `icons` a windows.IconWorker (both optional);
-        `stage` the explorer / Up next presenter and `toasts` the toast service (K4)."""
+        `stage` the explorer / Up next presenter and `toasts` the toast service (K4); `ha` the Home
+        Assistant adapter of the r3 Lights space (HomeAssistantAdapter or SimulatedHomeAssistant).
+        A0 (ONSHAPE.md): `onshape` the injector (onshape.OnshapeInjector; None = never injects: tests,
+        the simulator), `onshape_focus` the foreground watcher (``focused(now)``; app profiles: an
+        app_detect.AppDetector, ``detect(now, profiles)``) and `onshape_session` the lock-screen watcher
+        (closed with the runtime).
+
+        App profiles (plan 3, S1 DD-B; the interface lane DD-C builds on):
+
+        * ``app_library`` an app_profiles.Library (None = Onshape only, its built-in profile); ``app_modes``
+          {id: off | manual | auto} (settings.json; ``onshape`` is also ``onshape_mode``); ``app_rules`` {id:
+          {exe: [...], host: [...]}} the owner's extra detection rules; ``app_order`` the Settings order (a tie in
+          detection goes to the earlier one). The old ``onshape=`` / ``onshape_focus=`` / ``onshape_session=``
+          keep working: the one injector serves every profile.
+        * ``app_modes() -> {id: mode}``; ``set_app_mode(id, mode)`` (Off releases everything at once when that app
+          is active); ``app_rows() -> [{id, name, status, source, mode, detect_summary, active, focused, warnings,
+          icon24}]`` (never a title or URL); ``toggle_app(id) -> None | message`` (the tray's Manual: None when it
+          entered or left, else a short message why not); ``app_menu() -> [(id, label, checked)]``;
+          ``reload_profiles() -> [problems]`` (held input released first, then the library reloads, then the
+          active app re-activates / re-uploads); ``app_status()`` (status.json `app`). ``onshape_status()`` stays
+          status.json `onshape`.
+        * The knob: Onshape always draws the built-in canvas (id "onshape", crc 0) on an appCanvas knob. Every other
+          profile is uploaded on its first activation to a knob with appProfiles whose features cover it, and the
+          frames carry its id / crc / slot once the knob confirmed it; meanwhile (and on any other knob) the text
+          screen (heading = the profile's name, title = the live action, subtitle = its legend)."""
         self._controller = None
         self.sonos, self.apple, self.windows, self.device = sonos, apple, windows, device
         self.stage, self.toasts = stage, toasts
         self.audio = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nanod-sonos")
         self.library = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nanod-library")
         self.lookahead = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nanod-lookahead")
+        self.home_lane = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nanod-home")
+        self.ha = None
         self.audio_lane = AudioLane(self.audio)
         self.lookahead_lane = LookaheadLane(self.lookahead)
         self.results = Queue()
         self.closed = False
         self.device_connected = False
         self.device_supported = False
+        # DD-BUG-039: True while another app owns F24 on an attached knob (the strip's "Hotkey busy");
+        # cleared by every new connection and by a lost, errored or released knob.
+        self.hotkey_busy = False
+        # DD-BUG-039: True while the attached knob runs stock firmware (no controlCenter capability: the
+        # strip's "Firmware needed"); same lifetime as hotkey_busy.
+        self.device_stock_firmware = False
         self.presentation_level = 0
         self.button_order = [0, 1, 2, 3]
         self.held = set()
+        # A0: the held-key mask per raw button (bit = raw index), from `kd` / `release`, re-seeded from
+        # `ready.held`; cleared with every enter and on a lost knob.
+        self.held_mask = 0
+        # A0 Onshape mode (ONSHAPE.md): the setting (settings.json `onshape_mode`), Auto, the injector
+        # and its activation (the control id it acts for), the profile the inventory allows.
+        self.onshape = onshape
+        self.onshape_focus = onshape_focus
+        self._onshape_watching = False   # DD-BUG-012: the focus watcher was polled since Onshape mode left Off
+        self.onshape_session = onshape_session
+        self.onshape_setting = "off"
+        self.onshape_auto = OnshapeAuto()
+        self.onshape_focused = False
+        self.onshape_refusals = 0
+        self.onshape_detents = DEFAULT_DETENTS_PER_TURN
+        self._onshape_profile = PROFILES_ONSHAPE
+        self._onshape_active = None
+        self._onshape_exits_seen = 0
+        self._onshape_focus_failed = False
+        # The Home chord (all four buttons held 1.0 s, ONSHAPE.md): the raw buttons still down when it fired. Their
+        # later holds (kh) and releases are swallowed on any screen (a late hold 4 on Home would swap the knob's
+        # domain), each until its own release (or a ready mask without it, or a lost knob).
+        self._chord_swallow = set()
+        # A2 (ONSHAPE.md section 10): the knob draws the app canvas (capabilities appCanvas 1): the injector then
+        # runs the command wheel and parameter mode, and the Onshape frames carry the `app` object.
+        self.app_canvas = False
+        # App profiles (plan 3, S1 DD-B): the library, the modes, the owner's rules and order; one Auto per app (Onshape's
+        # is `onshape_auto`); the app in front (id, matched_by); the profile the app mode runs; the knob's appProfiles
+        # capability and what it has loaded this connection; the upload in progress.
+        self.app_library = app_library
+        self.app_rules = dict(app_rules) if isinstance(app_rules, dict) else {}
+        self.app_order = [pid for pid in (app_order or ()) if isinstance(pid, str)]
+        self._app_modes = {}
+        for pid, mode in (app_modes.items() if isinstance(app_modes, dict) else ()):
+            if isinstance(pid, str) and mode in APP_MODES:
+                self._app_modes[pid] = mode
+        if "onshape" in self._app_modes:
+            self.onshape_setting = self._app_modes["onshape"]
+        self._app_autos = {"onshape": self.onshape_auto}
+        self.app_focused = (None, None)
+        self._app_active_profile = None
+        self._app_entered_by = None
+        self._app_last_active = None
+        self._app_detents = DEFAULT_DETENTS_PER_TURN
+        self._app_effective = {}
+        self._knob_inventory = None
+        self.app_profiles_cap = None
+        self._app_loaded = set()
+        self._app_failed = set()
+        self._app_checked_for = None           # the app whose activation already re-checked the knob (DD-3)
+        self.app_upload = dict(APP_UPLOAD_IDLE)
+        # r3 (README 1, G-5): button 1 acts on RELEASE and a matured hold suppresses the tap. The
+        # knob's slot-0 `kd` waits here as (raw, control id) until its release (or a `ready` whose
+        # `ks` no longer holds it); its `kh` drops it. r3.1 (2026-09-29): button 4 (slot 3) too, so
+        # its 1.0 s hold (the secondary action) never also fires the tap. One entry per raw button:
+        # {raw: (control id, logical slot, monotonic press time)}.
+        self._pending_taps = {}
         self.last_hotkey = -10.0
         self.touch_seq = 0
         self.last_touch = None
@@ -581,6 +791,7 @@ class Runtime:
         self._media_counters = {kind: _media_counters() for kind in MEDIA_KINDS}
         self._media_failed = False
         self.music_signin_expired = False
+        self.music_signin_needed = False    # never connected, apart from expired (DD-BUG-023)
         self.warmup_page = None
         self._warmup_version = 0
         self._warmup_due = time.monotonic() + WARMUP_FIRST_SECONDS
@@ -594,6 +805,17 @@ class Runtime:
         self._events = []
         self.open_surfaces = set()
         self._snap_missing_logged = False
+        # r4 (firmware 1.0.0-cc5.7; HAPTICS.md): Settings > Knob sounds (the volume 0..100 %, default 100, and its
+        # level off / low / medium / high for a knobSound knob) and Reduced haptics, sent with every control of an r4
+        # knob (device.set_knob_feel); a recalibration in progress (no control is entered meanwhile, and its seconds
+        # are not a timeout) and the last one's result.
+        self.knob_volume = DEFAULT_KNOB_VOLUME
+        self.knob_sound = knob_sound_for_volume(DEFAULT_KNOB_VOLUME)
+        self.reduced_haptics = False
+        self.calibrating = False
+        self.calibration_result = None   # (ok, reason) of the last recalibration this session
+        self.feel_capable = False
+        self.volume_capable = False      # the knob takes the volume in percent (capabilities.knobVolume)
         # Motion (section 14.3): None = not configured yet (reduced motion off).
         self.motion_setting = None
         self.motion_probe = motion_probe or _system_animations_off
@@ -604,9 +826,14 @@ class Runtime:
         self._diag_requested = -1e9
         self._diag_logged = -1e9
         self.ledger = ledger if ledger is not None else self._default_ledger(sonos)
+        # DD-BUG-013: a persisted ledger follows the adapter's pinned room (resolved after the first
+        # connect when none was pinned): a new room's entry is loaded, never overwritten unread.
+        self._ledger_follows_room = ledger is None and self.ledger.autosave
+        self._ledger_room_lock = threading.Lock()
         self._shuffle_record_loaded = False
         self.attach(controller)
         self._wire_picker()
+        self.set_home_assistant(ha)
 
     @staticmethod
     def _default_ledger(sonos):
@@ -614,10 +841,31 @@ class Runtime:
         try:
             from .sonos import SonosAdapter
             if isinstance(sonos, SonosAdapter):
-                return QueueLedger(getattr(sonos, "room_uid", None) or "")
+                # DD-BUG-013: loaded, so Up next keeps the companion's own queue across a restart (a
+                # missing, corrupt or other-version file is an empty ledger).
+                return QueueLedger(getattr(sonos, "room_uid", None) or "").load()
         except Exception:
             pass
         return QueueLedger(autosave=False)
+
+    def _follow_ledger_room(self):
+        """DD-BUG-013: rebuild and load the persisted ledger when the adapter's room changed."""
+        if not self._ledger_follows_room:
+            return
+        room = getattr(self.sonos, "room_uid", None) or ""
+        if room == self.ledger.room_uid:
+            return
+        with self._ledger_room_lock:
+            if room == self.ledger.room_uid:
+                return
+            try:
+                ledger = QueueLedger(room).load()
+            except Exception as exc:  # the ledger is presentation: never fatal
+                _log.warning("Queue ledger not loaded (%s)", type(exc).__name__)
+                return
+            self.ledger = ledger
+            if self._controller is not None:
+                self._controller.ledger = ledger
 
     @property
     def controller(self):
@@ -637,8 +885,11 @@ class Runtime:
         controller.accent_lookup = self.accent_of
         controller.ledger = self.ledger
         controller.music_signin_expired = self.music_signin_expired
+        controller.music_signin_needed = self.music_signin_needed
         controller.button_order = self.button_order[:]
         controller.set_reduced_motion(self.reduced_motion)
+        controller.onshape_profile = self._onshape_profile
+        self._onshape_exits_seen = getattr(controller, "onshape_user_exits", 0)
         if replaced:
             self.last_frame = None
             self._accent_token = self._icon_token = None
@@ -992,7 +1243,7 @@ class Runtime:
             # artwork2 only: a v1 knob loads the focused cover on demand (ARTWORK2.md section 9).
             revision = (getattr(c.recent, "rev", 0), getattr(c.favourites, "rev", 0))
             signature = ((screen.mode, screen.view_id, revision), True, False)
-        elif screen.mode == "home" and self.warmup_page is not None and self._warmup_active():
+        elif screen.mode in ("home", "launcher") and self.warmup_page is not None and self._warmup_active():
             signature = (("warmup", self._warmup_version), False, False)
         if signature == self._prefetch_token:
             return
@@ -1048,7 +1299,7 @@ class Runtime:
         hit = self._cached_cover(c.state.get("artwork_url"))
         if hit:
             wanted.append(hit)
-        if c.screen.mode == "home" and self.warmup_page is not None and self._warmup_active():
+        if c.screen.mode in ("home", "launcher") and self.warmup_page is not None and self._warmup_active():
             for url in _cover_urls(self.warmup_page.get("items", ()))[:WARMUP_COVERS]:
                 hit = self._cached_cover(url)
                 if hit:
@@ -1077,7 +1328,7 @@ class Runtime:
                 len(screen.upnext.rows) if getattr(screen, "upnext", None) else 0,
                 c.state.get("artwork_url"), c.state.get("artwork_host"),
                 getattr(self.artwork, "version", None), self._icons_revision,
-                self._warmup_version if screen.mode == "home" and self._warmup_active() else None)
+                self._warmup_version if screen.mode in ("home", "launcher") and self._warmup_active() else None)
 
     def _push_media(self, frame):
         signature = self._media_signature(frame)
@@ -1191,11 +1442,22 @@ class Runtime:
         identity += ("hires" if cover is not None else "", id(big_icon) if big_icon is not None else None)
         return art, icon, self.artwork2, identity, cover, big_icon
 
-    def _hires_cover(self, result):
-        data = getattr(result, "hires_jpeg", None)
+    def clean_cover(self, frame):
+        """r3.1 Navigator: the playing / focused cover of ``frame`` without the knob's scrim (a PIL
+        image), or None when the current artwork result is not that cover or has no clean copy."""
+        art_key = frame.get("artKey") or "" if isinstance(frame, dict) else ""
+        result = self.artwork_result
+        if not art_key or result is None:
+            return None
+        if art_key not in (getattr(result, "jpeg_key", None), getattr(result, "key", None)):
+            return None
+        return self._hires_cover(result, field="clean_jpeg")
+
+    def _hires_cover(self, result, field="hires_jpeg"):
+        data = getattr(result, field, None)
         if not isinstance(data, bytes) or not data:
             return None
-        key = (getattr(result, "key", ""), getattr(result, "jpeg_key", None))
+        key = (field, getattr(result, "key", ""), getattr(result, "jpeg_key", None))
         hit = self._hires_covers.get(key)
         if hit is not None and hit[0] == data:
             self._hires_covers.move_to_end(key)
@@ -1219,10 +1481,16 @@ class Runtime:
             return
         if error is None:
             self.music_signin_expired = False
+            self.music_signin_needed = False
+        elif _signin_needed(error):             # never connected: not an expired sign-in (DD-BUG-023)
+            self.music_signin_expired = False
+            self.music_signin_needed = True
         elif getattr(error, "outcome", None) == "signin_expired" or getattr(error, "status", None) in (401, 403) \
                 or _needs_login(str(error).lower()):
             self.music_signin_expired = True
+            self.music_signin_needed = False
         self.controller.music_signin_expired = self.music_signin_expired
+        self.controller.music_signin_needed = self.music_signin_needed
 
     def _warmup_supported(self):
         return (callable(getattr(self.apple, "has_credentials", None))
@@ -1248,7 +1516,7 @@ class Runtime:
 
     def _warmup_home(self):
         return (self.device_connected and self.device_supported
-                and self.controller.screen.mode == "home")
+                and self.controller.screen.mode in ("home", "launcher"))
 
     def _warmup_active(self):
         return self._warmup_home() and self._warmup_permitted()
@@ -1268,12 +1536,17 @@ class Runtime:
                 continue
             self._warmup_inflight = None
             if error is not None:
-                if _needs_login(str(error).lower()):
+                if _signin_needed(error):       # never connected: not an expired sign-in (DD-BUG-023)
+                    self.music_signin_needed = True
+                    self.controller.music_signin_needed = True
+                elif _needs_login(str(error).lower()):
                     self.music_signin_expired = True
                 continue
             page = _page_copy(result.get("items") if isinstance(result, dict) else None)
             if page is not None:
                 self.music_signin_expired = False
+                self.music_signin_needed = False
+                self.controller.music_signin_needed = False
                 self._set_warmup_page(page)
         c = self.controller
         if c.screen.mode in ("recent", "explorer"):
@@ -1299,12 +1572,12 @@ class Runtime:
     def _warmup_job(self, serial):
         result = error = None
         try:
-            if self.closed or self.controller.screen.mode != "home":
+            if self.closed or self.controller.screen.mode not in ("home", "launcher"):
                 raise RuntimeError("Obsolete library request discarded")
             if self._lane_credentials():
                 result = self.apple.recent_preview(limit=PAGE_ITEMS)
         except Exception as exc:
-            result, error = None, failure(exc)
+            result, error = None, failure(exc, op="recent")
         self._warmup_results.put((serial, result, error))
 
     def frame(self):
@@ -1327,7 +1600,7 @@ class Runtime:
             progress.reset()
             return False
         controller = self.controller
-        if controller.screen.mode == "home":
+        if controller.screen.mode in ("home", "launcher"):
             progress.home(controller.confirmed_playing())
         post = progress.update(now)
         if post is None:
@@ -1354,6 +1627,71 @@ class Runtime:
             except Exception as exc:
                 _log.warning("LED tuning not applied (%s)", type(exc).__name__)
         return tuning
+
+    # ------------------------------------------------------------------ r4 knob feel and sound
+    def set_knob_feel(self, sound=None, reduced_haptics=None, volume=None):
+        """Settings > Knob (r4): the Knob sounds volume (0..100 %; an older caller's level off / low / medium / high
+        is taken as that level's top volume; a volume wins) and Reduced haptics. Both go to the bridge at once and
+        reach the knob with the next control, so an r4 knob re-enters now (after a turn settles)."""
+        changed = False
+        if sound is not None:
+            from .device import SOUND_LEVEL_VOLUMES
+            volume = SOUND_LEVEL_VOLUMES[KNOB_SOUND_VALUES.index(normal_knob_sound(sound))] if volume is None \
+                else volume
+        if volume is not None:
+            volume = normal_knob_volume(volume)
+            changed |= volume != self.knob_volume
+            self.knob_volume = volume
+            self.knob_sound = knob_sound_for_volume(volume)
+        if reduced_haptics is not None:
+            reduced_haptics = reduced_haptics is True
+            changed |= reduced_haptics != self.reduced_haptics
+            self.reduced_haptics = reduced_haptics
+        self._apply_knob_feel()
+        if (changed and (self.feel_capable or self.volume_capable) and self.device_connected
+                and self.device_supported and not self.calibrating):
+            try:
+                self.controller._request_passive("knob feel", now_if_waiting=True)
+                self.dispatch()
+            except Exception as exc:
+                _log.warning("Knob feel not re-entered (%s)", type(exc).__name__)
+
+    def _apply_knob_feel(self):
+        setter = getattr(self.device, "set_knob_feel", None) if self.device is not None else None
+        if callable(setter):
+            try:
+                setter(volume=self.knob_volume, reduced_haptics=self.reduced_haptics)
+            except Exception as exc:
+                _log.warning("Knob feel not applied (%s)", type(exc).__name__)
+
+    def can_recalibrate(self):
+        """A connected knob whose firmware has the r4 recalibration protocol."""
+        if not (self.device_connected and self.device_supported and self.device is not None):
+            return False
+        from .device import recalibration_capability
+        return recalibration_capability(getattr(self.device, "capabilities", {}) or {})
+
+    def recalibrate_motor(self, accept_direction=False):
+        """Settings > Knob > Recalibrate motor (r4, HAPTICS.md "Recalibration"). Returns a message when nothing
+        happened. The bridge releases the control, the knob aligns (seconds), saves and answers `calibrated`;
+        meanwhile nothing enters, and the controller enters again afterwards."""
+        if self.calibrating:
+            return "The knob is already recalibrating."
+        if not self.can_recalibrate():
+            return "Recalibration needs the knob connected with firmware 2.0.0 or later."
+        self.calibrating = True
+        self.controller.ready = False
+        self.device_status = "Recalibrating the knob’s motor · keep your hands off the knob"
+        self.device.submit("recalibrate", {"acceptDirection": bool(accept_direction)})
+        return None
+
+    def knob_feel_status(self):
+        """status.json `knobFeel`: the settings sent (the volume, and `sound`, its level), whether the knob runs them
+        (`capable`: the feel; `volumeCapable`: the volume in percent), recalibration."""
+        return {"sound": self.knob_sound, "volume": self.knob_volume, "reducedHaptics": self.reduced_haptics,
+                "capable": self.feel_capable, "volumeCapable": self.volume_capable, "calibrating": self.calibrating,
+                "lastCalibration": None if self.calibration_result is None else
+                {"ok": self.calibration_result[0], "reason": self.calibration_result[1]}}
 
     # ------------------------------------------------------------------ Motion (section 14.3)
     def set_motion(self, setting):
@@ -1430,6 +1768,65 @@ class Runtime:
         self.last_hotkey = time.monotonic()
         self.controller.open_windows()
         self.dispatch()
+
+    # ------------------------------------------------------------------ Home Assistant (r3 Lights)
+    def set_home_assistant(self, ha):
+        """Install (or replace, after a Settings save) the Home Assistant adapter. Its state stream
+        reaches the controller through the results queue (``("lights_state", state)``); the old
+        adapter is closed. None = Lights not set up."""
+        old, self.ha = self.ha, ha
+        if old is not None and old is not ha:
+            try:
+                old.close()
+            except Exception as exc:
+                _log.warning("Home Assistant adapter not closed (%s)", type(exc).__name__, exc_info=True)
+        if ha is None:
+            if old is not None:
+                self.results.put(("lights_state", {"configured": False, "online": False,
+                                                   "reason": "not_configured", "scenes": []}))
+            return
+        listener = getattr(ha, "set_listener", None)
+        if callable(listener):
+            listener(lambda state, ha=ha: self.results.put(("lights_state", state)) if self.ha is ha else None)
+        start = getattr(ha, "start", None)
+        if callable(start):
+            try:
+                start()
+            except Exception as exc:
+                _log.warning("Home Assistant adapter not started (%s)", type(exc).__name__, exc_info=True)
+        # The adapter's cached state now (never raises, no I/O: `connecting` until its stream is up),
+        # so Lights entered before the first stream update never reads "Lights not set up".
+        read = getattr(ha, "read_state", None)
+        if callable(read):
+            try:
+                self.results.put(("lights_state", read()))
+            except Exception as exc:
+                _log.warning("Home Assistant state not read (%s)", type(exc).__name__, exc_info=True)
+
+    def _home_op(self, effect, epoch):
+        """One `nanod-home` lane job. The brightness / temperature target is read when the job
+        starts (the volume pattern), so a burst of detents sends only its newest value."""
+        ha = self.ha
+        kind = effect["kind"]
+        if ha is None:
+            from .home_assistant import HomeAssistantError
+            raise HomeAssistantError("Lights are not set up", "not_configured")
+        if kind == "lights_read":
+            return ha.read_state()
+        self._check_epoch(epoch)
+        if kind == "lights_set":
+            intent = self.controller.lights_intent()
+            if not intent:
+                raise RuntimeError("Pending lights change discarded (nothing left to send)")
+            # r3.1: `targets` = the lights that are on (None: every available light); older adapters drop it.
+            return _call(ha.set_light, bri=intent.get("bri"), kelvin=intent.get("kelvin"),
+                         on_bri=effect.get("on_bri"), targets=effect.get("targets"),
+                         transition=effect.get("transition"))
+        if kind == "lights_power":
+            return ha.power(bool(effect.get("on")))
+        if kind == "scene_run":
+            return ha.run_scene(effect.get("entity_id"))
+        raise ValueError("Unknown operation")
 
     # ------------------------------------------------------------------ services
     def _check_epoch(self, epoch):
@@ -1674,6 +2071,7 @@ class Runtime:
         """Section 10.4: the base segment from `_final_song_ids`, a Play-next block from `_inserted`."""
         if not isinstance(result, dict):
             return
+        self._follow_ledger_room()
         kind = effect.get("kind")
         item = effect.get("item") or {}
         tracks = resolved.get("tracks") if isinstance(resolved, dict) else (resolved if isinstance(resolved, list) else [])
@@ -1703,8 +2101,11 @@ class Runtime:
         for effect in self.controller.drain():
             kind = effect["kind"]
             if kind == "device_enter":
+                if self.calibrating:
+                    continue   # r4: the knob is aligning its motor; the controller enters again when it is done
                 if self.device_connected and self.device_supported and effect["control"]["id"] == self.controller.control_id:
                     self.held.clear()
+                    self.held_mask = 0
                     self.device.submit("enter", effect["control"])
                 continue
             if kind == "resolve":
@@ -1729,7 +2130,10 @@ class Runtime:
             with self._action_lock:
                 epoch = self._action_epoch
                 self._latest_volume = self.controller.desired_volume
-            if kind in SHORT_OPS or kind in EXCLUSIVE_OPS:
+            if kind in HOME_OPS:
+                future = self.home_lane.submit(self._home_op, effect, epoch)
+                future.add_done_callback(lambda f, e=effect: self._done(e, f))
+            elif kind in SHORT_OPS or kind in EXCLUSIVE_OPS:
                 self._submit_audio(effect, epoch)
             elif kind == "play_items":
                 self._dispatch_start(effect, epoch)
@@ -1888,9 +2292,28 @@ class Runtime:
                 event = dict(event, on=self.reduced_motion)
             self.controller.presenter_event(event)
 
+    HA_RESYNC_S = 10.0   # 2026-09-30: the adapter's cached state re-read (no I/O) so a failed read can't stick
+
+    def _ha_resync(self, now):
+        """Every HA_RESYNC_S, hand the controller the Home Assistant adapter's cached state (read_state:
+        no I/O, never raises). A failed lights_read marks the lights offline and, before this, only the
+        next state change from Home Assistant corrected it (the Settings strip showed Not connected)."""
+        ha = getattr(self, "ha", None)
+        if ha is None or now < getattr(self, "_ha_resync_at", 0.0):
+            return
+        self._ha_resync_at = now + self.HA_RESYNC_S
+        read = getattr(ha, "read_state", None)
+        setter = getattr(self.controller, "lights_state", None)
+        if callable(read) and callable(setter):
+            try:
+                setter(read())
+            except Exception as exc:
+                _log.warning("Home Assistant state not re-read (%s)", type(exc).__name__, exc_info=True)
+
     def poll(self):
         if self.closed:
             return
+        self._follow_ledger_room()
         self._pump_windows()
         with self._action_lock:
             self._latest_volume = self.controller.desired_volume
@@ -1908,11 +2331,25 @@ class Runtime:
                 if callable(setter):
                     setter(item[1])
                 continue
+            if len(item) == 2 and item[0] == "lights_state":
+                setter = getattr(self.controller, "lights_state", None)
+                if callable(setter):
+                    setter(item[1])
+                continue
             request, result, error = item
             pending = getattr(self.controller, "pending", None)
             self._note_library(pending.get(request) if isinstance(pending, dict) else None, error)
             self.controller.complete(request, result, error)
         self._device_events()
+        tick = time.monotonic()                 # one clock read for both (the Onshape tests script the clock)
+        self._ha_resync(tick)
+        try:
+            self._poll_onshape(tick)
+        except Exception as exc:
+            self._onshape_release("exception")
+            if not self._onshape_focus_failed:
+                self._onshape_focus_failed = True
+                _log.warning("Onshape mode step failed (%s)", type(exc).__name__)
         self._poll_diag(time.monotonic())
         self._refresh_media()
         self._refresh_motion()
@@ -2060,13 +2497,471 @@ class Runtime:
         _log.debug("Knob re-entry timing: enterMsLast %s ms, enterMsMax %s ms (last re-entry: %s)",
                    "?" if last is None else last, "?" if peak is None else peak, cause or "?")
 
+    def held_for(self):
+        """Read-only (the Navigator's HOLD chips, r3.1): {logical slot: seconds held} of the buttons
+        1 and 4 whose press is still pending (released or matured into a hold: absent)."""
+        now = time.monotonic()
+        return {entry[1]: max(0.0, now - entry[2]) for entry in list(self._pending_taps.values()) if len(entry) > 2}
+
+    def _release_tap(self, raw=None):
+        """r3: a pending tap (button 1; r3.1 also button 4) acts now, on the control that is current.
+        Without `raw`: every pending tap (the oldest first)."""
+        raws = list(self._pending_taps) if raw is None else [raw]
+        for key in raws:
+            entry = self._pending_taps.pop(key, None)
+            if entry is not None and not self.on_button_probe:
+                self.controller.button(entry[1], self.controller.control_id)
+
     def _lost(self):
-        """disconnected / closed / error / released: section 13.4."""
+        """disconnected / closed / error / released: section 13.4 (A0: every Onshape input goes up)."""
+        self._pending_taps.clear()
         self.invalidate_actions()
         self.held.clear()
+        self.held_mask = 0
+        self._chord_swallow.clear()
+        self._onshape_release("lost", deactivate=True)
         self.controller.disconnected()
         self.dispatch()  # the overlay closes (disconnect) go out now
         self.windows.set_hotkey_enabled(False)
+
+    # ------------------------------------------------------------------ A0 Onshape mode (ONSHAPE.md)
+    def _onshape_mode(self):
+        """The app mode is on (Onshape's or any other profile's: the controller's `onshape` screen)."""
+        return getattr(self.controller.screen, "mode", "") == "onshape"
+
+    def _onshape_release(self, reason, deactivate=False):
+        """Every injected input up (queued to the injector; never waits)."""
+        injector = self.onshape
+        if injector is None:
+            return
+        try:
+            if deactivate:
+                injector.deactivate(reason)
+                self._onshape_active = None
+            else:
+                injector.release_all(reason)
+        except Exception:
+            pass
+
+    def set_onshape_mode(self, setting):
+        """settings.json `onshape_mode` (off / manual / auto), applied at once: Off leaves the mode."""
+        self.set_app_mode("onshape", setting)
+
+    def set_onshape_tuning(self, idle_ms=None):
+        setter = getattr(self.onshape, "set_idle_ms", None)
+        if callable(setter) and idle_ms is not None:
+            setter(idle_ms)
+
+    def onshape_available(self):
+        """The app mode needs a presentation-6 knob (the r3 navigation) that is connected."""
+        return bool(self.device_connected and self.device_supported and getattr(self.controller, "spaces", False))
+
+    def toggle_onshape(self):
+        """The tray's Onshape item and Settings' Manual (toggle_app("onshape"))."""
+        return self.toggle_app("onshape")
+
+    def onshape_menu_text(self):
+        return "Leave Onshape mode" if self._active_app() == "onshape" else "Onshape mode"
+
+    def onshape_fast_state(self):
+        """What the reader thread's fast path reads: off | pending | active (any app)."""
+        if self._onshape_mode():
+            return "active"
+        return "pending" if any(auto.pending for auto in self._app_autos.values()) else "off"
+
+    def onshape_status(self):
+        """status.json `onshape` (never a window title)."""
+        injector = self.onshape
+        try:
+            inner = injector.status() if injector is not None else {}
+        except Exception:
+            inner = {}
+        return {"mode": self.onshape_setting, "active": self._active_app() == "onshape",
+                "pending": bool(self.onshape_auto.pending), "focused": bool(self.onshape_focused),
+                "suppressed": bool(self.onshape_auto.suppressed), "profile": self._onshape_profile,
+                "refusals": self.onshape_refusals, "injector": inner}
+
+    # ------------------------------------------------------------------ app profiles (plan 3, S1 DD-B)
+    def _active_app(self):
+        app_id = getattr(self.controller, "app_id", None)
+        if callable(app_id):
+            return app_id()
+        return "onshape" if self._onshape_mode() else None
+
+    def app_mode(self, pid):
+        if pid == "onshape":
+            return self.onshape_setting
+        return self._app_modes.get(pid, "off")
+
+    def app_modes(self):
+        """{id: off | manual | auto} for every profile (Onshape's is `onshape_mode`)."""
+        out = {p.id: self.app_mode(p.id) for p in self._app_profiles()}
+        for pid, mode in self._app_modes.items():
+            out.setdefault(pid, mode)
+        return out
+
+    def set_app_mode(self, pid, mode):
+        """One app's mode, applied at once: Off leaves the app mode when that app is active, releasing everything."""
+        mode = normal_onshape_mode(mode)
+        if pid == "onshape":
+            self.onshape_setting = mode
+        if not isinstance(pid, str):
+            return
+        self._app_modes[pid] = mode
+        if mode == "off" and self._active_app() == pid:
+            self._onshape_release("off", deactivate=True)
+            self.controller.exit_onshape("onshape off" if pid == "onshape" else "app off")
+            self.dispatch()
+
+    def _app_profiles(self):
+        """Every profile the library has (Onshape's built-in one when it has none), in Settings order."""
+        profiles = []
+        library = self.app_library
+        if library is not None:
+            try:
+                profiles = list(library.profiles())
+            except Exception as exc:
+                _log.warning("App profiles unavailable (%s)", type(exc).__name__)
+                profiles = []
+        if not any(p.id == "onshape" for p in profiles):
+            from .onshape_app import builtin_onshape_profile
+            profiles.insert(0, builtin_onshape_profile())
+        if self.app_order:
+            from .app_detect import ordered
+            profiles = ordered(profiles, self.app_order)
+        return profiles
+
+    def _app_profile(self, pid):
+        return next((p for p in self._app_profiles() if p.id == pid), None)
+
+    def _effective(self, profile):
+        """The profile with the owner's rules merged (cached, so the same inputs give the same object)."""
+        from .app_detect import with_rules
+        rules = self.app_rules.get(profile.id)
+        key = (profile.id, id(profile), repr(rules))
+        hit = self._app_effective.get(profile.id)
+        if hit is not None and hit[0] == key and hit[2] is profile:
+            return hit[1]
+        effective = with_rules(profile, self.app_rules)
+        self._app_effective[profile.id] = (key, effective, profile)
+        return effective
+
+    def _auto(self, pid):
+        auto = self._app_autos.get(pid)
+        if auto is None:
+            auto = self._app_autos[pid] = OnshapeAuto()
+        return auto
+
+    def _app_feel(self, profile):
+        """(knob profile name, detents per turn) for a profile's knob slot: Slot.feel when the knob has it; a wheel or
+        drag slot BINARIS BEER (a drag turns fluid through the feel token); a slot with detents the installed profile
+        nearest to them; else BINARIS BEER."""
+        inventory = self._knob_inventory if isinstance(self._knob_inventory, dict) else {}
+        knob = profile.slots.get("knob")
+        name = None
+        if knob is not None and knob.feel and knob.feel in inventory:
+            name = knob.feel
+        elif knob is not None and knob.kind not in ("wheel", "drag") and knob.detents:
+            options = [(abs(_profile_detents(inventory[n], 0) - knob.detents), i, n)
+                       for i, n in enumerate(APP_FEEL_CHOICES) if n in inventory]
+            name = min(options)[2] if options else None
+        name = name or "BINARIS BEER"
+        return name, _profile_detents(inventory.get(name), DEFAULT_DETENTS_PER_TURN)
+
+    def _enter_app(self, pid, cause):
+        profile = self._app_profile(pid)
+        if profile is None:
+            return False
+        effective = self._effective(profile)
+        c = self.controller
+        if pid == "onshape":
+            c.onshape_profile = self._onshape_profile
+            detents = self.onshape_detents
+        else:
+            c.onshape_profile, detents = self._app_feel(effective)
+        enter = getattr(c, "enter_app", None)
+        ok = enter(effective, cause) if callable(enter) else c.enter_onshape(cause)
+        if ok:
+            self._app_active_profile = effective
+            self._app_entered_by = "auto" if cause == "auto" else "manual"
+            self._app_last_active = pid
+            self._app_detents = detents
+            self._pending_taps.clear()
+        return ok
+
+    def toggle_app(self, pid):
+        """The tray's Manual entry (and Settings): enter the app, or leave it (a user exit: its Auto waits for the app to
+        lose and regain the foreground). None when it entered or left, else a short message why not."""
+        from .controller import app_display_name
+        c = self.controller
+        if self._active_app() == pid:
+            c._onshape_exit_by_user("tray")
+            self.dispatch()
+            return None
+        profile = self._app_profile(pid)
+        if profile is None:
+            return "That app profile isn’t installed."
+        name = app_display_name(profile)
+        if self.app_mode(pid) == "off":
+            return f"Turn {name} on in Settings › Apps first."
+        if not self.onshape_available():
+            return f"{name} needs the knob connected (firmware with the r3 screens)."
+        if not self._enter_app(pid, "manual"):
+            return "Close the open screen on the knob first."
+        self.dispatch()
+        return None
+
+    def app_menu(self):
+        """The tray's App mode submenu: (id, label, checked = active now) per profile, in Settings order."""
+        from .controller import app_display_name
+        active = self._active_app()
+        return [(p.id, app_display_name(p), p.id == active) for p in self._app_profiles()]
+
+    def app_rows(self):
+        """Settings › Apps: one row per profile. Never a title or URL (detect_summary is programs and hosts)."""
+        from .app_detect import detect_summary
+        from .controller import app_display_name
+        active, focused = self._active_app(), self.app_focused[0]
+        rows = []
+        for p in self._app_profiles():
+            icon = None
+            raw = p.raw_karl.get("icon24") if isinstance(getattr(p, "raw_karl", None), dict) else None
+            if isinstance(raw, str):
+                try:
+                    data = base64.b64decode(raw, validate=True)
+                    icon = data if len(data) == 24 * 24 * 2 else None
+                except (ValueError, TypeError):
+                    icon = None
+            rows.append({"id": p.id, "name": app_display_name(p), "status": p.status, "source": p.source,
+                         "mode": self.app_mode(p.id), "detect_summary": detect_summary(p, self.app_rules),
+                         "active": p.id == active, "focused": p.id == focused, "warnings": list(p.warnings),
+                         "icon24": icon})
+        return rows
+
+    def reload_profiles(self):
+        """Release every held input, reload the library, then re-activate (and re-upload) the active app. Returns the
+        library's problems (plain words)."""
+        self._onshape_release("reload")
+        problems = []
+        library = self.app_library
+        if library is not None:
+            try:
+                problems = list(library.reload() or ())
+            except Exception as exc:
+                problems = [f"The profiles couldn’t be reloaded ({type(exc).__name__})"]
+        self._app_effective = {}
+        active = self._active_app()
+        if active is not None and active != "onshape":
+            profile = self._app_profile(active)
+            if profile is None:
+                self._onshape_release("reload", deactivate=True)
+                self.controller.exit_onshape("app gone")
+            else:
+                effective = self._effective(profile)
+                if effective is not self._app_active_profile:
+                    self._app_active_profile = effective
+                    enter = getattr(self.controller, "enter_app", None)
+                    if callable(enter):
+                        enter(effective, "reload")
+            self.dispatch()
+        elif active == "onshape" and self.app_library is not None:
+            profile = self._app_profile("onshape")
+            self._app_active_profile = self._effective(profile) if profile is not None else None
+        return problems
+
+    def app_status(self):
+        """status.json `app`: ids, how the app in front matched, the upload and the injector counters. Never a title,
+        URL or host."""
+        injector = self.onshape
+        inner = {}
+        try:
+            if injector is not None:
+                reader = getattr(injector, "app_status", None) or getattr(injector, "status", None)
+                inner = reader() if callable(reader) else {}
+        except Exception:
+            inner = {}
+        focused, matched_by = self.app_focused
+        return {"mode_by_id": self.app_modes(), "active": self._active_app(),
+                "pending": next((pid for pid, auto in self._app_autos.items() if auto.pending), None),
+                "focused": focused, "matched_by": matched_by if matched_by in ("exe", "host") else None,
+                "suppressed": sorted(pid for pid, auto in self._app_autos.items() if auto.suppressed),
+                "profile": getattr(self.controller, "onshape_profile", None) if self._onshape_mode() else None,
+                "upload": dict(self.app_upload), "injector": inner}
+
+    def _app_candidates(self, active):
+        """The profiles detection reads for: those not Off (Manual too, as Onshape mode always did: a Manual app's
+        focus loss releases at once) and the active one. Only Auto ones ever enter by themselves."""
+        return [self._effective(p) for p in self._app_profiles()
+                if self.app_mode(p.id) != "off" or p.id == active]
+
+    def _app_detect(self, now, active):
+        """(id, matched_by) of the app in front among the candidates; nothing is read with none (DD-BUG-012)."""
+        watcher = self.onshape_focus
+        candidates = self._app_candidates(active) if watcher is not None else []
+        if not candidates:
+            if watcher is not None and self._onshape_watching:
+                self._onshape_watching = False
+                pause = getattr(watcher, "pause", None)
+                if callable(pause):
+                    try:
+                        pause()
+                    except Exception:
+                        pass
+            return None, None
+        self._onshape_watching = True
+        try:
+            detect = getattr(watcher, "detect", None) if callable(getattr(type(watcher), "detect", None)) else None
+            if detect is not None:
+                found = detect(now, candidates)
+                return found if isinstance(found, tuple) and len(found) == 2 else (None, None)
+            if any(p.id == "onshape" for p in candidates):       # Onshape mode's FocusWatcher contract
+                return ("onshape", "host") if watcher.focused(now) else (None, None)
+        except Exception as exc:
+            if not self._onshape_focus_failed:
+                self._onshape_focus_failed = True
+                _log.warning("App focus watcher failed (%s)", type(exc).__name__)
+        return None, None
+
+    def _poll_onshape(self, now):
+        """One Tk tick: the injector's refusals / Undos to the knob, the Home chord, the app in front, each app's Auto,
+        and the injector's activation (and the profile's upload) for the current app control."""
+        c = self.controller
+        injector = self.onshape
+        if injector is not None:
+            for result in injector.take_events():
+                if result in REFUSALS:
+                    self.onshape_refusals += 1
+                c.onshape_input(result)
+        due = getattr(c, "onshape_chord_due", None)
+        if self._onshape_mode() and callable(due) and due():
+            # The Home chord: every injected input goes up first (queued before the deactivation below), the four
+            # buttons' later holds / releases are swallowed, then Home (a user exit: Auto waits, as the tray's Leave).
+            self._onshape_release("home")
+            self._chord_swallow = set(self.button_order)   # all four are down (the chord requires it)
+            c.onshape_home_chord()
+        active = self._active_app()
+        focused, matched_by = self._app_detect(now, active)
+        before = self.app_focused[0]
+        if before is not None and focused != before:
+            self._onshape_release("focus")      # held drags go up at once; Auto leaves 500 ms later
+            if before != focused:
+                _log.debug("App in front: %s (%s)", focused, matched_by)
+        self.app_focused = (focused, matched_by)
+        self.onshape_focused = focused == "onshape"
+        exits = getattr(c, "onshape_user_exits", 0)
+        if exits != self._onshape_exits_seen:
+            self._onshape_exits_seen = exits
+            self._auto(self._app_last_active or "onshape").suppress()
+        can_base = self.onshape_available() and c.can_enter_onshape()
+        enter = None
+        leave = False
+        for profile in self._app_profiles():
+            pid = profile.id
+            auto = self._auto(pid)
+            in_mode = active == pid
+            can = can_base and (active is None or (active != pid and self._app_entered_by == "auto"))
+            action = auto.update(now, self.app_mode(pid), focused == pid, in_mode, can)
+            if action == "exit" and in_mode:
+                leave = True
+            elif action == "enter" and enter is None:
+                enter = pid
+        if enter is not None:
+            self._enter_app(enter, "auto")
+        elif leave:
+            c.exit_onshape("onshape focus" if active == "onshape" else "app focus")
+        c.onshape_pending = any(auto.pending for auto in self._app_autos.values())
+        if injector is None:
+            return
+        active = self._active_app()
+        if self._onshape_mode() and self.device_connected and self.device_supported:
+            profile = self._app_active_profile if active != "onshape" or self.app_library is not None else None
+            if active != "onshape" and profile is None:
+                profile = self._effective(self._app_profile(active)) if self._app_profile(active) else None
+            onshape = active == "onshape"
+            app_flag = bool(self.app_canvas) if onshape else True
+            activation = (c.control_id, app_flag, active, id(profile))
+            if self._onshape_active != activation:
+                self._onshape_active = activation
+                if profile is None:
+                    injector.activate(c.control_id, self.button_order[:], self.onshape_detents, app=self.app_canvas)
+                else:
+                    detents = self.onshape_detents if onshape else self._app_detents
+                    injector.activate(c.control_id, self.button_order[:], detents, app=app_flag, profile=profile)
+            # A2: the wheel / parameter / echo state the injector publishes, for the frame's `app` object (Onshape: an
+            # appCanvas knob only; other apps: always, their text screen shows the wheel too).
+            getter = getattr(injector, "app_state", None)
+            c.onshape_app = getter() if callable(getter) and (self.app_canvas or not onshape) else None
+            if onshape or profile is None:
+                self._app_checked_for = None
+            c.app_canvas_ref = None if onshape or profile is None else self._app_canvas_ref(profile)
+        elif self._onshape_active is not None:
+            self._onshape_active = None
+            c.onshape_app = None
+            c.app_canvas_ref = None
+            self._app_checked_for = None
+            injector.deactivate("mode")
+
+    # ------------------------------------------------------------------ app profiles: the knob's canvas (plan 1c / 1f)
+    def _app_canvas_ref(self, profile):
+        """(id, crc) once the knob has `profile` loaded; else None (the text screen), starting its upload when the knob
+        can take it (appProfiles, features covered, size within its maximum) and none runs."""
+        cap = self.app_profiles_cap
+        if not self.app_canvas or cap is None or self.device is None:
+            return None
+        try:
+            wire = profile.wire()
+            crc, features = profile.wire_crc, profile.features
+        except Exception:
+            return None
+        if features & ~cap["features"] or len(wire) > cap["maxBytes"]:
+            return None                                   # text only on this knob (plan 1f)
+        key = (profile.id, crc)
+        if self._app_checked_for != profile.id:
+            # S3 review DD-3: a new activation of this app. The knob's store is an LRU (4 slots, 128 KB) that may have
+            # evicted it since: ask again (the bridge lists first, so a profile still there answers "present" and is
+            # not sent again) and keep the text screen until it answers, never an endless "Loading...".
+            self._app_checked_for = profile.id
+            self._app_loaded.discard(key)
+        if key in self._app_loaded:
+            return key
+        if key in self._app_failed or self.app_upload.get("state") == "uploading":
+            return None
+        self.app_upload = {"state": "uploading", "id": profile.id, "bytes": len(wire), "ms": 0, "error": None}
+        try:
+            self.device.submit("app_profile", {"id": profile.id, "crc": crc, "wire": wire})
+        except Exception as exc:
+            self._app_failed.add(key)
+            self.app_upload = {"state": "failed", "id": profile.id, "bytes": len(wire), "ms": 0,
+                               "error": type(exc).__name__}
+        return None
+
+    def _app_upload_event(self, event):
+        """The bridge's `app-profile` event: loaded (or already there) -> the canvas; failed -> text screens for this
+        connection and every held input released (plan 3b)."""
+        pid, crc, state = event.get("id"), event.get("crc"), event.get("state")
+        if not isinstance(pid, str) or type(crc) is not int:
+            return
+        ms = event.get("ms") if type(event.get("ms")) is int else 0
+        size = event.get("bytes") if type(event.get("bytes")) is int else 0
+        if state in ("loaded", "present"):
+            self._app_loaded.add((pid, crc))
+            self.app_upload = {"state": state, "id": pid, "bytes": size, "ms": ms, "error": None}
+            _log.info("App profile %s on the knob (%s, %d ms)", pid, state, ms)
+        elif state == "failed":
+            self._app_failed.add((pid, crc))
+            error = event.get("error") if isinstance(event.get("error"), str) else "failed"
+            self.app_upload = {"state": "failed", "id": pid, "bytes": size, "ms": ms, "error": error[:40]}
+            _log.warning("App profile %s upload failed (%s); text screens", pid, error[:40])
+            if self._active_app() == pid:
+                self._onshape_release("upload")
+
+    def _set_installed_profiles(self, profiles):
+        """DD-BUG-004: hand the connected knob's inventory (None = unknown) to the controller; returns the
+        required profile names it lacks."""
+        setter = getattr(self.controller, "set_installed_profiles", None)
+        if not callable(setter):
+            return ()
+        return setter(profiles if isinstance(profiles, dict) else None) or ()
 
     def _device_events(self):
         if not self.device:
@@ -2086,25 +2981,91 @@ class Runtime:
                 self._refresh_media()
                 capabilities = event.get("capabilities", {}) or {}
                 self.device_supported = bool(capabilities.get("controlCenter"))
+                self.device_stock_firmware = not self.device_supported
+                self.hotkey_busy = False
+                # App profiles: the knob's appProfiles capability; its store is RAM only, so every profile uploads again.
+                from .device import app_profiles_capability
+                self.app_profiles_cap = app_profiles_capability(capabilities)
+                self._app_loaded = set()
+                self._app_failed = set()
+                self._app_checked_for = None
+                self.app_upload = dict(APP_UPLOAD_IDLE)
+                self._knob_inventory = event.get("profiles") if isinstance(event.get("profiles"), dict) else None
+                # A0: the Onshape mode's profile is the finest one this knob has installed.
+                if isinstance(event.get("profiles"), dict):
+                    self._onshape_profile, self.onshape_detents = choose_onshape_profile(event["profiles"])
+                    self.controller.onshape_profile = self._onshape_profile
+                # DD-BUG-004: every control maps onto this knob's inventory (a renamed or deleted profile gets
+                # an installed stand-in and a precise status, never a refused enter and a reconnect loop).
+                missing = self._set_installed_profiles(event.get("profiles"))
                 level = capabilities.get("presentation", 0)
                 self.presentation_level = level if type(level) is int else 0
+                from .device import app_capability, feel_capability, knob_volume_capability
+                self.app_canvas = app_capability(capabilities)
+                # r4: the knob runs the feel tokens (Onshape's modifiers then re-enter for fluid.light), and the
+                # Knob sounds / Reduced haptics settings ride in its controls (the volume as is with knobVolume).
+                self.feel_capable = feel_capability(capabilities)
+                self.volume_capable = knob_volume_capability(capabilities)
+                self.controller.feel_supported = self.feel_capable
+                self.calibrating = False
+                self.calibration_result = None   # DD-BUG-051: a result never survives a replug
+                self._apply_knob_feel()
                 self._diag_requested = time.monotonic()   # the first diag a minute after the claim
                 self.device_status = ("Connected · verifying control interface" if self.device_supported
                                       else "Stock firmware · display/control extension required")
+                if missing and self.device_supported:
+                    self.device_status = self.controller.profile_status
                 if self.device_supported:
                     try:
                         self.windows.set_hotkey_enabled(True)
+                        # r3: the spaces navigation and Lights only for a presentation-6 knob.
+                        set_spaces = getattr(self.controller, "set_spaces", None)
+                        if callable(set_spaces):
+                            set_spaces(self.presentation_level >= SPACES_PRESENTATION)
                         self.controller.button_order = self.button_order[:]
                         self.controller.windows_hid_enabled = self._hotkey_registered()
                         self.controller.set_hardware(True)
                     except OSError:
                         self.device_supported = False
+                        self.hotkey_busy = True
                         self.device_status = "F24 is unavailable · close the conflicting hotkey app"
             elif kind == "ready":
                 self.controller.device_ready(event.get("id"))
-                self.device_status = "Knob ready · installed profiles active"
+                self.device_status = (getattr(self.controller, "profile_status", "")
+                                      or "Knob ready · installed profiles active")
+                held = event.get("held")
+                if type(held) is int:
+                    self.held_mask = sum(1 << raw for slot, raw in enumerate(self.button_order) if held & (1 << slot))
+                    self._chord_swallow = {raw for raw in self._chord_swallow if self.held_mask & (1 << raw)}
+                if self._onshape_mode() and event.get("id") == self.controller.control_id:
+                    self.controller.onshape_input("ready", held if type(held) is int else 0)
+                    continue
+                if type(held) is int:
+                    for raw, entry in list(self._pending_taps.items()):
+                        if not held & (1 << entry[1]):
+                            self._release_tap(raw)   # the release was lost while the knob re-entered
+            elif kind == "release":
+                raw = event.get("button")
+                self.held.discard(raw)
+                if type(raw) is int and 0 <= raw < 4:
+                    self.held_mask &= ~(1 << raw)
+                if raw in self._chord_swallow:
+                    self._chord_swallow.discard(raw)     # a Home chord button: its release does nothing
+                    self._pending_taps.pop(raw, None)
+                    continue
+                if self._onshape_mode():
+                    self._pending_taps.pop(raw, None)
+                    if raw in self.button_order:
+                        self.controller.onshape_input("up", self.button_order.index(raw))
+                    continue
+                if raw in self._pending_taps:
+                    self._release_tap(raw)
             elif kind == "position":
                 self.note_touch("turn")
+                if self._onshape_mode() and not self.on_button_probe:
+                    self.controller.onshape_input("turn", None, event.get("delta") or 0)
+                    self.controller.position(event.get("position", event.get("p")), event.get("id"))
+                    continue
                 if not self.on_button_probe:
                     self.controller.position(event.get("position", event.get("p")), event.get("id"))
             elif kind == "limit":
@@ -2118,8 +3079,37 @@ class Runtime:
                     if not self.on_button_probe:
                         self.controller.limit(direction, event.get("id"))
             elif kind == "hold":
-                if not self.on_button_probe:
-                    self.controller.hold(event.get("button"), event.get("id"))
+                logical = event.get("button")
+                if self._chord_swallow:
+                    raw = event.get("raw")
+                    if raw not in range(4) and type(logical) is int and 0 <= logical < len(self.button_order):
+                        raw = self.button_order[logical]
+                    if raw in self._chord_swallow:
+                        continue                         # a Home chord button still held: its hold does nothing
+                if self._onshape_mode():
+                    # A0: no hold acts here (1 is ZOOM, 4 PAN; Home is all four held 1.0 s, _poll_onshape).
+                    if not self.on_button_probe and type(logical) is int:
+                        self.controller.onshape_input("hold", logical)
+                    continue
+                if logical == 3:
+                    # r3.1 design (`hasHold4`): hold 4 exists on Home, Recently Added / Playlists, the
+                    # explorer and Up next only; elsewhere the `kh` passes and 4 acts on its release.
+                    hold_action = getattr(self.controller, "hold_action", None)
+                    try:
+                        has_hold = bool(hold_action()) if callable(hold_action) else False
+                    except Exception:
+                        has_hold = False
+                    if not has_hold:
+                        continue
+                if logical in (0, 3):
+                    raw = event.get("raw")
+                    if raw not in self._pending_taps and type(logical) is int and logical < len(self.button_order):
+                        raw = self.button_order[logical]
+                    # r3: a matured hold suppresses the tap (button 1; r3.1 button 4, whose hold
+                    # is the secondary action). Holds of buttons 2 and 3 are ignored (they act on press).
+                    self._pending_taps.pop(raw, None)
+                if not self.on_button_probe and logical in (0, 3):
+                    self.controller.hold(logical, event.get("id"))
             elif kind == "button":
                 raw = event.get("button", event.get("kd"))
                 edge = event.get("edge", "down")
@@ -2128,21 +3118,39 @@ class Runtime:
                     continue
                 if raw not in range(4):
                     continue
+                self._chord_swallow.discard(raw)         # pressed again: its release was lost
+                self.held_mask |= 1 << raw
                 self.note_touch("button")
                 if self.on_button_probe:
                     self.on_button_probe(raw)
                     continue
                 logical = self.button_order.index(raw)
+                if self._onshape_mode():
+                    # A0: every key acts on its release (a turn drops the tap); the injector does the input.
+                    self.controller.onshape_input("down", logical)
+                    continue
                 hid = event.get("hid") is True
+                if hid:
+                    continue  # this press also sent F24: the hotkey path already acted (VOC section 2.5)
+                if logical == 0 and getattr(self.controller, "spaces", False):
+                    self._pending_taps[raw] = (event.get("id"), 0, time.monotonic())   # r3: acts on its release
+                    continue
                 if logical == 3:
-                    if hid:
-                        continue  # the F24 path already acted (VOC section 2.5)
                     if (self.presentation_level < 5 and self._hotkey_registered()
                             and self.controller.screen.mode == "home"):
                         continue  # presentation 4: the hotkey owns Home's Win button
+                    if getattr(self.controller, "spaces", False):
+                        # r3.1: button 4 acts on its release; a 1.0 s hold (`kh`) replaces the tap.
+                        self._pending_taps[raw] = (event.get("id"), 3, time.monotonic())
+                        continue
                 self.controller.button(logical, event.get("id"), hid)
+            elif kind == "app-profile":
+                self._app_upload_event(event)
             elif kind in ("disconnected", "closed"):
                 self.device_connected = self.device_supported = False
+                self.hotkey_busy = self.device_stock_firmware = False
+                self.calibration_result = None   # DD-BUG-051
+                self._set_installed_profiles(None)   # DD-BUG-004: a later knob is not mapped on a stale inventory
                 self._refresh_media()
                 self._lost()
                 self.windows.hide()
@@ -2150,22 +3158,43 @@ class Runtime:
             elif kind == "error":
                 self.device_status = event.get("message", "Device error")
                 self.device_supported = False
+                self.hotkey_busy = self.device_stock_firmware = False   # DD-BUG-039: the error is the cause now
+                self.calibration_result = None   # DD-BUG-051
                 self._lost()
                 self.controller.ready = False
             elif kind == "diag":
                 self._diag_event(event)
+            elif kind == "calibrating":
+                self.calibrating = True
+                self.controller.ready = False
+                self.device_status = "Recalibrating the knob’s motor · keep your hands off the knob"
+            elif kind == "calibrated":
+                ok = event.get("ok") is True
+                reason = event.get("reason") or ""
+                self.calibrating = False
+                self.calibration_result = (ok, reason)
+                self.device_status = ("Motor recalibrated" if ok else
+                                      "Recalibration kept the old calibration" + (f" ({reason})" if reason else ""))
+                if self.device_connected and self.device_supported:
+                    self.controller.set_hardware(True)   # a fresh entry: the knob was released for the run
+                    self.dispatch()
             elif kind in ("artwork-ready", "artwork-error"):
                 self._artwork_event(event)
             elif kind in ("media-ready", "media-error"):
                 self._media_event(event)
             elif kind == "released":
                 self.device_supported = False
+                self.hotkey_busy = self.device_stock_firmware = False   # DD-BUG-039
+                self.calibration_result = None   # DD-BUG-051
                 self._lost()
                 self.controller.ready = False
                 self.device_status = "Host control released · disconnect and reconnect"
 
-    def shutdown(self, close_device=False):
-        """Stop this runtime: unsent actions, the picker, presentation services, lanes."""
+    def shutdown(self, close_device=False, join_timeout=None):
+        """Stop this runtime: unsent actions, the picker, presentation services, lanes.
+        ``join_timeout`` (seconds): also wait that long, in all, for the lane workers (close());
+        None (a mode switch on the Tk thread) does not wait: the running job still stops at its
+        next step."""
         first_error = None
 
         def step(action):
@@ -2178,18 +3207,37 @@ class Runtime:
 
         step(self.invalidate_actions)
         self.closed = True
+        for service in (self.onshape, self.onshape_focus, self.onshape_session):   # A0: release first
+            if service is not None:
+                step(service.close)
         step(self.windows.close)
         for service in (self.artwork, self.accent_service, self.icons):
             if service is not None:
                 step(service.close)
         if close_device and self.device:
             step(lambda: self.device.submit("close"))
-        step(self.audio_lane.cancel)
+        step(self.audio_lane.stop)   # DD-BUG-032: the running job stops at its next step
+        if self.ha is not None:
+            step(self.ha.close)
         self.audio.shutdown(wait=False, cancel_futures=True)
         self.library.shutdown(wait=False, cancel_futures=True)
         self.lookahead.shutdown(wait=False, cancel_futures=True)
+        self.home_lane.shutdown(wait=False, cancel_futures=True)
+        if join_timeout is not None:
+            step(lambda: self.join_lanes(join_timeout))
         if first_error is not None:
             raise first_error
 
+    def join_lanes(self, timeout=SHUTDOWN_JOIN_S):
+        """DD-BUG-032: wait (one shared deadline) for the lane workers after shutdown; a worker
+        still running at the deadline is logged by name. Returns those names."""
+        stragglers = _join_executors((self.audio, self.library, self.lookahead, self.home_lane), timeout)
+        if stragglers:
+            _log.warning("Shutdown: %d lane worker(s) still running after %.1f s: %s",
+                         len(stragglers), timeout, ", ".join(stragglers))
+        return stragglers
+
     def close(self):
-        self.shutdown(close_device=True)
+        """Quit: shutdown plus a bounded join of the lanes (DD-BUG-032), so the process that
+        releases the single-instance mutex no longer changes the Sonos queue."""
+        self.shutdown(close_device=True, join_timeout=SHUTDOWN_JOIN_S)

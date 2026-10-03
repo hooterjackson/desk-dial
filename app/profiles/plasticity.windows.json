@@ -1,0 +1,19 @@
+{
+  "overlay": 1,
+  "status": "community",
+  "detect": {
+    "exe": ["Plasticity.exe"]
+  },
+  "notes": [
+    "Karl's chords have no Cmd here; they map unchanged (Option -> Alt). No override was needed.",
+    "Verified against the Plasticity Manual (doc.plasticity.xyz, read 2026-10-03):",
+    "  EXTRUDE E, FILLET B, BOOLEAN Q, CUT C: 'Solid Commands'. MOVE G, ROTATE R, SCALE S, DUPLICATE Shift+D, MIRROR Alt+X: 'Common Commands'.",
+    "  Selection modes 1 / 2 / 3 / 4, ALL TYPES Tab, SELECT ALL A, INVERT Alt+A: 'Selection Mode' (2026.1 also uses 5 for all types).",
+    "  FRONT / RIGHT / TOP Num1 / Num3 / Num7, PERSPECTIVE Num5, zoom Ctrl+middle-drag, orbit middle-drag, pan right-drag: 'Operating the 3D Viewport'.",
+    "  ISOLATE '.': the manual's Isolate page. Command palette (search) F: 'Command Palette'.",
+    "Unverified (default mapping kept): DELETE Shift+X (the manual lists it for Delete Face), FOCUS '/', UNISOLATE Alt+'.',",
+    "  F3 tap Undo Ctrl+Z, and the parameter keys (Tab numeric entry, D distance, X / Y / Z axis, S uniform).",
+    "Unverified: that the palette phrases 'offset face' and 'hollow' pick the right command first.",
+    "Layout note: '.' and '/' are punctuation; on layouts where they need Shift (DE '/', FR '.' and '/') those commands are refused on the knob."
+  ]
+}

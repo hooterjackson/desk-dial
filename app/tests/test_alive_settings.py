@@ -30,7 +30,7 @@ from control_center.runtime import Runtime  # noqa: E402
 from control_center.simulation import SimulatedAppleMusic, SimulatedSonos, SimulatedWindows  # noqa: E402
 from test_alive_host import PROFILE_NAMES  # noqa: E402
 from test_alive_wire import AL4, WireSerial  # noqa: E402
-from test_cc_controller import FakeDevice, FakeVariable, FakeWidget, ManualExecutor  # noqa: E402
+from test_cc_controller import FakeDevice, FakeScale, FakeVariable, FakeWidget, ManualExecutor  # noqa: E402
 from test_cc_device import Clock as BridgeClock  # noqa: E402
 
 
@@ -124,7 +124,7 @@ class SettingsWindowTests(SettingsCase):
         for target, name, value in (
             (ui, "button", button), (ui, "label", lambda *a, **k: FakeWidget(**k)),
             (ui.tk, "Toplevel", FakeWidget), (ui.tk, "Frame", FakeWidget),
-            (ui.tk, "Entry", FakeWidget), (ui.tk, "StringVar", FakeVariable),
+            (ui.tk, "Entry", FakeWidget), (ui.tk, "StringVar", FakeVariable), (ui.tk, "Scale", FakeScale),
         ):
             patcher = patch.object(target, name, value)
             patcher.start()

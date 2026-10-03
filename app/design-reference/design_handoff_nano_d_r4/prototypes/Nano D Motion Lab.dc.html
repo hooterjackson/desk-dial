@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/styles.css">
+<script src="_ds/modernist-3a02cda9-4552-4441-b69f-106b5cb29ac0/_ds_bundle.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&amp;family=Archivo:wght@400;500;600;700&amp;display=swap">
+<script src="motion-lab.js"></script>
+<style>body{margin:0;background:var(--color-bg)}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent)}button:focus-visible,input:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}</style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:32px 32px 80px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:20px;border-bottom:2px solid var(--color-text);padding-bottom:16px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:720px">
+      <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-accent-700)">Nano D · Motion lab · exploration</div>
+      <h1 style="margin:0;font-family:var(--font-heading);font-size:36px;line-height:1.05;font-weight:700;letter-spacing:-0.02em">Knob motion, 21 prototypes</h1>
+      <div style="font-size:15px;line-height:1.5;color:var(--color-neutral-700);text-wrap:pretty">Each stage is the real 240 × 240 screen with the LED ring and button LEDs. Variants in a row play in sync on one clock. Red ticks on each scrubber mark where the haptic motor clicks.</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
+      <button onClick="{{ playAll }}" style="font:600 14px var(--font-body);padding:9px 14px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Play all</button>
+      <button onClick="{{ pauseAll }}" style="font:600 14px var(--font-body);padding:9px 14px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Pause all</button>
+      <button onClick="{{ toggleReduced }}" style="font:600 14px var(--font-body);padding:9px 14px;border:2px solid var(--color-text);background:{{ rdBg }};color:{{ rdFg }};cursor:pointer;text-align:left;border-radius:0">{{ rdLabel }}</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:0;border:2px solid var(--color-text);align-self:flex-start">
+    <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="5">
+      <button onClick="{{ tb.pick }}" style="font:600 14px var(--font-body);padding:10px 16px;border:0;border-right:2px solid var(--color-text);background:{{ tb.bg }};color:{{ tb.fg }};cursor:pointer;text-align:left;border-radius:0;display:flex;gap:8px;align-items:baseline"><span style="opacity:0.6;font-size:12px">{{ tb.n }}</span><span>{{ tb.label }}</span></button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ notReady }}" hint-placeholder-val="{{ false }}">
+    <div style="font-size:15px;color:var(--color-neutral-700)">Loading prototypes…</div>
+  </sc-if>
+
+  <sc-for list="{{ cards }}" as="c" hint-placeholder-count="2">
+    <div id="{{ c.anchor }}" style="display:flex;flex-direction:column;gap:16px;border-top:2px solid var(--color-text);padding-top:16px">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">{{ c.kicker }}</div>
+          <h2 style="margin:0;font-family:var(--font-heading);font-size:24px;line-height:1.15;font-weight:700">{{ c.title }}</h2>
+          <div style="font-size:14px;line-height:1.5;color:var(--color-neutral-700);max-width:560px;text-wrap:pretty">{{ c.brief }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <span style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700);width:64px">Trigger</span>
+            <sc-for list="{{ c.trigs }}" as="tg" hint-placeholder-count="3">
+              <button onClick="{{ tg.pick }}" style="font:600 13px var(--font-body);padding:7px 11px;border:2px solid var(--color-text);background:{{ tg.bg }};color:{{ tg.fg }};cursor:pointer;text-align:left;border-radius:0">{{ tg.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <span style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700);width:64px">Play</span>
+            <button onClick="{{ c.onPlay }}" style="font:600 13px var(--font-body);padding:7px 11px;min-width:64px;border:2px solid var(--color-text);background:var(--color-text);color:var(--color-bg);cursor:pointer;text-align:left;border-radius:0">{{ c.playLabel }}</button>
+            <button onClick="{{ c.onReplay }}" style="font:600 13px var(--font-body);padding:7px 11px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Replay</button>
+            <button onClick="{{ c.onLoop }}" style="font:600 13px var(--font-body);padding:7px 11px;border:2px solid var(--color-text);background:{{ c.loopBg }};color:{{ c.loopFg }};cursor:pointer;text-align:left;border-radius:0">Loop</button>
+            <div style="display:flex;border:2px solid var(--color-text)">
+              <sc-for list="{{ c.speeds }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.pick }}" style="font:600 13px var(--font-body);padding:7px 10px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;border:2px solid var(--color-text)">
+              <sc-for list="{{ c.modes }}" as="o" hint-placeholder-count="2">
+                <button onClick="{{ o.pick }}" style="font:600 13px var(--font-body);padding:7px 10px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;border:2px solid var(--color-text)">
+              <sc-for list="{{ c.sizes }}" as="o" hint-placeholder-count="2">
+                <button onClick="{{ o.pick }}" style="font:600 13px var(--font-body);padding:7px 10px;border:0;background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;text-align:left;border-radius:0">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700);width:64px">Scrub</span>
+            <div style="position:relative;flex:1;min-width:0;height:28px;display:flex;align-items:center">
+              <div style="position:absolute;left:8px;right:8px;top:0;height:6px">
+                <sc-for list="{{ c.ticks }}" as="tk" hint-placeholder-count="3">
+                  <div style="position:absolute;left:{{ tk.left }};top:0;width:2px;height:{{ tk.hgt }};background:var(--color-accent);margin-left:-1px"></div>
+                </sc-for>
+              </div>
+              <input type="range" min="0" max="{{ c.dur }}" step="1" value="{{ c.tv }}" onChange="{{ c.onScrub }}" style="width:100%;accent-color:var(--color-accent);margin:10px 0 0">
+            </div>
+            <span style="font-size:13px;font-variant-numeric:tabular-nums;width:92px;text-align:left">{{ c.tLabel }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+        <sc-for list="{{ c.stages }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:0;width:{{ s.w }};max-width:100%">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:2px solid var(--color-text);min-height:24px">
+              <span style="background:{{ s.badgeBg }};color:{{ s.badgeFg }};font-weight:700;font-size:13px;padding:3px 7px;line-height:1">{{ s.letter }}</span>
+              <span style="font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:3px 6px;background:{{ s.costBg }};color:{{ s.costFg }}">{{ s.cost }}</span>
+            </div>
+            <div style="line-height:0">{{ s.el }}</div>
+            <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text);margin-top:10px">
+              <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="7">
+                <div style="display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--color-neutral-300);font-size:12px;line-height:1.45">
+                  <div style="font-weight:700;color:var(--color-neutral-800)">{{ r.k }}</div>
+                  <div style="text-wrap:pretty;color:var(--color-text)">{{ r.v }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;border-top:2px solid var(--color-text);padding-top:16px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Shortlist</div>
+          <div style="font-family:var(--font-heading);font-size:32px;font-weight:700">{{ shortCount }}</div>
+          <div style="font-size:14px;line-height:1.5;color:var(--color-neutral-700)">Tick variants below. The shortlist is saved in this browser.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Cost mix of the recommended set</div>
+          <div style="font-size:15px;line-height:1.5">{{ recMix }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-700)">Shared motion tokens</div>
+          <sc-for list="{{ tokens }}" as="k" hint-placeholder-count="6">
+            <div style="font-size:12px;line-height:1.45;font-variant-numeric:tabular-nums"><span style="font-weight:700">{{ k.name }}</span> · {{ k.css }}</div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text)">
+        <div style="display:grid;grid-template-columns:120px minmax(0,1.4fr) 40px minmax(0,1fr) 84px minmax(0,1.6fr) 100px 90px;gap:12px;padding:10px 0;border-bottom:2px solid var(--color-text);font-size:12px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700">
+          <div>Area</div><div>Prototype</div><div>Var.</div><div>Name</div><div>Cost</div><div>Pre-rendered assets</div><div>Shortlist</div><div>Open</div>
+        </div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:120px minmax(0,1.4fr) 40px minmax(0,1fr) 84px minmax(0,1.6fr) 100px 90px;gap:12px;padding:9px 0;border-bottom:1px solid var(--color-neutral-300);font-size:13px;line-height:1.4;align-items:start">
+            <div style="color:var(--color-neutral-700)">{{ r.area }}</div>
+            <div style="font-weight:600">{{ r.title }}</div>
+            <div style="font-weight:700">{{ r.vid }}</div>
+            <div>{{ r.name }}<span style="color:var(--color-accent-700);font-weight:600">{{ r.rec }}</span></div>
+            <div><span style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:3px 6px;background:{{ r.costBg }};color:{{ r.costFg }}">{{ r.cost }}</span></div>
+            <div style="color:var(--color-neutral-700);font-size:12px">{{ r.frames }}</div>
+            <div><button onClick="{{ r.toggle }}" style="font:600 12px var(--font-body);padding:5px 9px;border:2px solid var(--color-text);background:{{ r.sBg }};color:{{ r.sFg }};cursor:pointer;text-align:left;border-radius:0">{{ r.sLabel }}</button></div>
+            <div><button onClick="{{ r.open }}" style="font:600 12px var(--font-body);padding:5px 9px;border:2px solid var(--color-text);background:transparent;color:var(--color-text);cursor:pointer;text-align:left;border-radius:0" style-hover="background:var(--color-neutral-200)">Open</button></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    let short = {};
+    try { short = JSON.parse(localStorage.getItem('nanoMotionShortlist') || '{}'); } catch (e) {}
+    this.state = { area: 'icons', reduced: false, cards: {}, short, ready: !!window.NanoMotion };
+    this._cache = {};
+  }
+  componentDidMount() {
+    const boot = () => { if (!window.NanoMotion) { this._bt = setTimeout(boot, 60); return; } this.initCards(); };
+    boot();
+    this._last = performance.now();
+    const loop = ts => {
+      const dt = Math.min(64, ts - this._last); this._last = ts;
+      const S = this.state, M = window.NanoMotion;
+      if (M && S.ready) {
+        let any = false; const next = {};
+        for (const p of M.protos) { const c = S.cards[p.id]; if (!c || !c.playing) continue; any = true;
+          const dur = p.triggers.find(x => x.id === c.trig).dur; let t = c.t + dt * c.speed, playing = true;
+          if (t >= dur + 500) { if (c.loop) t = 0; else { t = dur; playing = false; } }
+          next[p.id] = Object.assign({}, c, { t, playing }); }
+        if (any) this.setState(s => ({ cards: Object.assign({}, s.cards, next) }));
+      }
+      this._raf = requestAnimationFrame(loop);
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); clearTimeout(this._bt); }
+  initCards() {
+    const M = window.NanoMotion, cards = {};
+    for (const p of M.protos) cards[p.id] = { t: 0, playing: p.area === 'icons', loop: true, speed: 1, trig: p.triggers[0].id, mode: 'proposed', size: 1 };
+    this.setState({ cards, ready: true });
+  }
+  upd(id, patch) { this.setState(s => ({ cards: Object.assign({}, s.cards, { [id]: Object.assign({}, s.cards[id], patch) }) })); }
+  setArea(a) {
+    const M = window.NanoMotion; if (!M) return this.setState({ area: a });
+    this.setState(s => { const cards = {}; for (const p of M.protos) { const c = s.cards[p.id]; if (c) cards[p.id] = Object.assign({}, c, { playing: p.area === a }); } return { area: a, cards }; });
+    window.scrollTo(0, 0);
+  }
+  saveShort(short) { try { localStorage.setItem('nanoMotionShortlist', JSON.stringify(short)); } catch (e) {} this.setState({ short }); }
+  stage(p, c, vr, id) {
+    const M = window.NanoMotion, trig = p.triggers.find(x => x.id === c.trig), t = Math.min(c.t, trig.dur);
+    const vid = vr.id || 'today', key = p.id + vid, sig = [Math.round(t), c.trig, this.state.reduced, c.size].join('|');
+    const hit = this._cache[key]; if (hit && hit.sig === sig) return hit.el;
+    let out; try { out = vr.render({ h: React.createElement, t, trig: c.trig, reduced: this.state.reduced, id }); } catch (e) { console.error(p.id, vid, e); out = { ring: Array.from({ length: 60 }, () => [[255, 60, 40], 0.3]), kids: [] }; }
+    const ticks = p.hap ? p.hap(c.trig, vid) : (trig.hap || []);
+    const el = M.device(React.createElement, Object.assign({ s: c.size, id, haptic: M.hapticAt(ticks, t) }, out));
+    this._cache[key] = { sig, el }; return el;
+  }
+  renderVals() {
+    const S = this.state, M = window.NanoMotion;
+    const sel = (on) => ({ bg: on ? 'var(--color-text)' : 'var(--color-bg)', fg: on ? 'var(--color-bg)' : 'var(--color-text)' });
+    const COST = { Cheap: ['var(--color-neutral-200)', 'var(--color-text)'], Medium: ['var(--color-accent-100)', 'var(--color-accent-800)'], Costly: ['var(--color-accent)', '#FFFFFF'] };
+    const areas = M ? M.areas : [];
+    const tabs = areas.concat([{ id: 'compare', label: 'Compare & shortlist', n: '05' }]).map(a => Object.assign({ n: a.n, label: a.label, pick: () => this.setArea(a.id) }, sel(S.area === a.id)));
+    const base = { tabs, notReady: !S.ready || !M, playAll: () => {}, pauseAll: () => {}, toggleReduced: () => this.setState({ reduced: !S.reduced }),
+      rdLabel: S.reduced ? 'Reduced motion: on' : 'Reduced motion: off', rdBg: S.reduced ? 'var(--color-text)' : 'transparent', rdFg: S.reduced ? 'var(--color-bg)' : 'var(--color-text)',
+      cards: [], isCompare: S.area === 'compare', rows: [], shortCount: '', recMix: '', tokens: [] };
+    if (!S.ready || !M) return base;
+    const inArea = M.protos.filter(p => p.area === S.area);
+    base.playAll = () => this.setState(s => { const cards = Object.assign({}, s.cards); inArea.forEach(p => { cards[p.id] = Object.assign({}, cards[p.id], { playing: true }); }); return { cards }; });
+    base.pauseAll = () => this.setState(s => { const cards = Object.assign({}, s.cards); inArea.forEach(p => { cards[p.id] = Object.assign({}, cards[p.id], { playing: false }); }); return { cards }; });
+    const areaLabel = id => (areas.find(a => a.id === id) || {}).label || '';
+    base.cards = inArea.map((p, pi) => {
+      const c = S.cards[p.id], trig = p.triggers.find(x => x.id === c.trig), tv = Math.min(Math.round(c.t), trig.dur);
+      const list = c.mode === 'today' ? [p.today] : p.variants;
+      const ticks = (p.hap ? p.hap(c.trig, c.mode === 'today' ? 'today' : (p.variants.find(v => v.rec) || p.variants[0]).id) : (trig.hap || [])).map(x => { const tt = Array.isArray(x) ? x[0] : x, w = Array.isArray(x) ? x[1] : 1; return { left: (tt / trig.dur * 100).toFixed(2) + '%', hgt: w > 1 ? '10px' : '6px' }; });
+      const stages = list.map(vr => { const vid = vr.id || 'T', sp = vr.spec, cc = COST[vr.cost] || COST.Cheap;
+        const rows = [{ k: 'Animates', v: sp.anim }, { k: 'Timing', v: sp.timing }, { k: 'Easing', v: sp.ease }, { k: 'Frames', v: sp.frames }, { k: 'FPS', v: sp.fps }, { k: 'Haptic', v: sp.haptic }, { k: 'Reduced', v: sp.reduced }];
+        return { letter: vr.id || 'Today', name: (vr.name === 'Today' ? 'r3.1 today' : vr.name) + (vr.rec ? '  ★' : ''), cost: vr.cost, costBg: cc[0], costFg: cc[1],
+          badgeBg: vr.id ? 'var(--color-accent)' : 'var(--color-text)', badgeFg: vr.id ? '#FFFFFF' : 'var(--color-bg)', w: (300 * c.size) + 'px', rows,
+          el: this.stage(p, c, vr, (p.id + vid + c.size).replace(/[^a-z0-9]/gi, '')) }; });
+      return { anchor: 'p-' + p.id, kicker: areaLabel(p.area) + ' · ' + String(pi + 1).padStart(2, '0'), title: p.title, brief: p.brief,
+        trigs: p.triggers.map(x => Object.assign({ label: x.label, pick: () => this.upd(p.id, { trig: x.id, t: 0, playing: true }) }, sel(c.trig === x.id))),
+        playLabel: c.playing ? 'Pause' : 'Play', onPlay: () => this.upd(p.id, { playing: !c.playing, t: !c.playing && c.t >= trig.dur ? 0 : c.t }),
+        onReplay: () => this.upd(p.id, { t: 0, playing: true }), onLoop: () => this.upd(p.id, { loop: !c.loop }), loopBg: c.loop ? 'var(--color-text)' : 'transparent', loopFg: c.loop ? 'var(--color-bg)' : 'var(--color-text)',
+        speeds: [0.25, 0.5, 1].map(s => Object.assign({ label: s + '×', pick: () => this.upd(p.id, { speed: s }) }, sel(c.speed === s))),
+        modes: [['today', 'Today'], ['proposed', 'Proposed']].map(([m, l]) => Object.assign({ label: l, pick: () => this.upd(p.id, { mode: m }) }, sel(c.mode === m))),
+        sizes: [1, 2].map(s => Object.assign({ label: s + '×', pick: () => this.upd(p.id, { size: s }) }, sel(c.size === s))),
+        dur: trig.dur, tv, onScrub: e => this.upd(p.id, { t: +e.target.value, playing: false }), tLabel: (tv / 1000).toFixed(2) + ' / ' + (trig.dur / 1000).toFixed(2) + ' s', ticks, stages };
+    });
+    if (S.area === 'compare') {
+      const rows = [], mix = { Cheap: 0, Medium: 0, Costly: 0 };
+      M.protos.forEach(p => p.variants.forEach(v => { const key = p.id + ':' + v.id, on = !!S.short[key], cc = COST[v.cost];
+        if (v.rec) mix[v.cost]++;
+        rows.push({ area: areaLabel(p.area), title: p.title, vid: v.id, name: v.name, rec: v.rec ? '  ★ recommended' : '', cost: v.cost, costBg: cc[0], costFg: cc[1], frames: v.spec.frames,
+          sLabel: on ? 'Shortlisted' : 'Add', sBg: on ? 'var(--color-text)' : 'transparent', sFg: on ? 'var(--color-bg)' : 'var(--color-text)',
+          toggle: () => { const s = Object.assign({}, S.short); if (s[key]) delete s[key]; else s[key] = 1; this.saveShort(s); },
+          open: () => { this.setArea(p.area); setTimeout(() => { const el = document.getElementById('p-' + p.id); if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16); }, 80); } }); }));
+      base.rows = rows;
+      const n = Object.keys(S.short).length; base.shortCount = n === 1 ? '1 variant' : n + ' variants';
+      base.recMix = `${mix.Cheap} cheap · ${mix.Medium} medium (frame strips) · ${mix.Costly} costly, across ${M.protos.length} prototypes.`;
+      base.tokens = M.springs.map(s => ({ name: 'SP.' + s.name, css: s.css })).concat(M.beziers.filter(b => b.name !== 'lin').map(b => ({ name: 'E.' + b.name, css: b.css })));
+    }
+    return base;
+  }
+}
+</script>
+</body>
+</html>

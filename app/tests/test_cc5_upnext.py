@@ -93,10 +93,10 @@ class ContextTests(Fixture):
 
     def test_album_and_playlist_contexts(self):
         ids = [str(1000 + n) for n in range(1, 13)]
-        self.c.ledger.record_start(Segment(kind="album", name="Hounds of Love", artist="Kate Bush", year=1985), ids)
+        self.c.ledger.record_start(Segment(kind="album", name="Paper Lanterns", artist="Mira Vale", year=1985), ids)
         self.upnext()
-        self.assertEqual(self.c.upnext_view()["context"], {"kind": "album", "title": "Hounds of Love",
-                                                           "sub": "Kate Bush · 1985"})
+        self.assertEqual(self.c.upnext_view()["context"], {"kind": "album", "title": "Paper Lanterns",
+                                                           "sub": "Mira Vale · 1985"})
         self.press(0)
         self.c.ledger.record_start(Segment(kind="playlist", name="PAPER LANTERN Ep. 1", favourite=True, count=34,
                                            duration_ms=7_500_000), ids)
@@ -576,6 +576,20 @@ class ShuffleOffRecordEndToEndTests(unittest.TestCase):
         c.complete(job["request"], Runtime._audio_op(self.runtime_for(rig, c), job, 0, lambda: None))
         self.assertNotEqual(v7.ids(rig.speaker.items), at_on)
         if restart:                                                    # a new companion: the runtime loads it
+            # DD-BUG-013: the new companion's ledger is read back from the persisted file, not the
+            # in-memory object, so the restart case proves the file round-trip.
+            import tempfile
+            folder = tempfile.TemporaryDirectory()
+            self.addCleanup(folder.cleanup)
+            persisted_path = v7.Path(folder.name) / "queue-ledger.json"
+            persisted = QueueLedger(ledger.room_uid, path=persisted_path, autosave=False)
+            persisted.base, persisted.playnext = ledger.base, list(ledger.playnext)
+            persisted.save()
+            reloaded = QueueLedger(ledger.room_uid, path=persisted_path, autosave=False).load()
+            self.assertIsNot(reloaded, ledger)
+            self.assertEqual(reloaded.base, ledger.base)
+            self.assertEqual(reloaded.playnext, ledger.playnext)
+            ledger = reloaded
             c = self.e2e.upnext(rig, ledger, 7)
             self.assertIsNone(c.shuffle_record_order)
             c.shuffle_record(shuffle_record_order(rig.adapter.load_shuffle_record()))

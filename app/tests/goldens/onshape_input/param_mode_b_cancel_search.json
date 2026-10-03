@@ -1,0 +1,10 @@
+{
+"batches": [
+ {"events": [["key", 18, false], ["key", 67, false], ["key", 67, true], ["key", 18, true]], "inputs": [{"flags": 0, "scan": 56, "type": "key", "vk": 18}, {"flags": 0, "scan": 46, "type": "key", "vk": 67}, {"flags": 2, "scan": 46, "type": "key", "vk": 67}, {"flags": 2, "scan": 56, "type": "key", "vk": 18}], "t": 0.3},
+ {"events": [["char", "c", false], ["char", "c", true], ["char", "h", false], ["char", "h", true], ["char", "a", false], ["char", "a", true], ["char", "m", false], ["char", "m", true], ["char", "f", false], ["char", "f", true], ["char", "e", false], ["char", "e", true], ["char", "r", false], ["char", "r", true]], "inputs": [{"flags": 4, "scan": 99, "type": "key", "vk": 0}, {"flags": 6, "scan": 99, "type": "key", "vk": 0}, {"flags": 4, "scan": 104, "type": "key", "vk": 0}, {"flags": 6, "scan": 104, "type": "key", "vk": 0}, {"flags": 4, "scan": 97, "type": "key", "vk": 0}, {"flags": 6, "scan": 97, "type": "key", "vk": 0}, {"flags": 4, "scan": 109, "type": "key", "vk": 0}, {"flags": 6, "scan": 109, "type": "key", "vk": 0}, {"flags": 4, "scan": 102, "type": "key", "vk": 0}, {"flags": 6, "scan": 102, "type": "key", "vk": 0}, {"flags": 4, "scan": 101, "type": "key", "vk": 0}, {"flags": 6, "scan": 101, "type": "key", "vk": 0}, {"flags": 4, "scan": 114, "type": "key", "vk": 0}, {"flags": 6, "scan": 114, "type": "key", "vk": 0}], "t": 0.55},
+ {"events": [["key", 13, false], ["key", 13, true]], "inputs": [{"flags": 0, "scan": 28, "type": "key", "vk": 13}, {"flags": 2, "scan": 28, "type": "key", "vk": 13}], "t": 0.95},
+ {"events": [["key", 27, false], ["key", 27, true]], "inputs": [{"flags": 0, "scan": 1, "type": "key", "vk": 27}, {"flags": 2, "scan": 1, "type": "key", "vk": 27}], "t": 2.1}
+],
+"feedback": [],
+"status": {"action": "zoom", "active": true, "commands": 3, "commandsSkipped": 0, "dragging": false, "drags": 0, "errors": 0, "focusRefused": 0, "idleMs": 800, "moves": 0, "refusals": 0, "releases": {}, "scrolls": 0, "short": 0, "typed": 1, "undo": 0, "undoSkipped": 0, "wheel": 0}
+}

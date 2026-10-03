@@ -40,6 +40,10 @@ CURVES = {
     "SPR": (0.34, 1.45, 0.64, 1.0),    # snap tray, toast scale, the heart (overshoots)
     "EASE": (0.25, 0.1, 0.25, 1.0),    # CSS `ease`, only where App A is silent
     "LINEAR": None,                    # probes and witnesses only
+    # r4 (design_handoff_nano_d_r4 README 3.1): SPRING.snap, response 0.36 s, damping 0.72 (k 304.6, c 25.1), as the
+    # r3.1 prototype's cssSpring(): the step response over its settle time (416 ms), the last point forced to 1.
+    # Used by the Navigator's content swap (M14: M1 timing, in sync with the knob; firmware kSpringLut).
+    "SNAP": ("spring", 0.36, 0.72),
 }
 
 OFFSET_BOUND_PX = 0.5
@@ -149,9 +153,58 @@ class _Linear:
         return 1.0
 
 
+class Spring:
+    """A damped spring's step response x(u) on u in [0, 1] (the settle time), mass 1: k = (2 pi / r)^2,
+    c = 4 pi z / r (make_motion.py's SPRINGS; the prototype's cssSpring). value(1) is 1 exactly (a continuous
+    linear correction of the <= 0.4 % left at the settle time, so the piecewise fit converges)."""
+
+    __slots__ = ("response", "damping", "w0", "z", "wd", "settle_ms")
+
+    def __init__(self, response: float, damping: float):
+        self.response, self.damping = response, damping
+        k = (2 * math.pi / response) ** 2
+        c = 4 * math.pi * damping / response
+        self.w0 = math.sqrt(k)
+        self.z = c / (2 * self.w0)
+        self.wd = self.w0 * math.sqrt(1 - self.z * self.z) if self.z < 1 else 0.0
+        self.settle_ms = self._settle()
+
+    def f(self, ms: float) -> float:
+        t = ms / 1000.0
+        if t <= 0:
+            return 0.0
+        if self.z < 1:
+            return 1 - math.exp(-self.z * self.w0 * t) * (math.cos(self.wd * t) + (self.z * self.w0 / self.wd) * math.sin(self.wd * t))
+        return 1 - math.exp(-self.w0 * t) * (1 + self.w0 * t)
+
+    def _settle(self) -> float:
+        for ms in range(40, 1600, 8):
+            if all(abs(1 - self.f(ms + j)) <= 0.004 for j in range(0, 121, 8)):
+                return float(ms)
+        return 1200.0
+
+    def value(self, u: float) -> float:
+        """f(u S) plus a linear correction that makes value(1) exactly 1 without a jump (|f(S) - 1| <= 0.004)."""
+        u = max(0.0, min(1.0, u))
+        return self.f(u * self.settle_ms) + (1.0 - self.f(self.settle_ms)) * u
+
+    def slope(self, u: float) -> float:
+        """dy/du (analytic: x'(t) = (w0^2 / wd) e^(-z w0 t) sin(wd t), times the settle time)."""
+        t = max(0.0, min(1.0, u)) * self.settle_ms / 1000.0
+        if self.z < 1:
+            dxdt = (self.w0 * self.w0 / self.wd) * math.exp(-self.z * self.w0 * t) * math.sin(self.wd * t)
+        else:
+            dxdt = self.w0 * self.w0 * t * math.exp(-self.w0 * t)
+        return dxdt * self.settle_ms / 1000.0 + (1.0 - self.f(self.settle_ms))
+
+
 def curve(name: str):
     spec = CURVES[name]
-    return _Linear() if spec is None else CubicBezier(*spec)
+    if spec is None:
+        return _Linear()
+    if spec[0] == "spring":
+        return Spring(spec[1], spec[2])
+    return CubicBezier(*spec)
 
 
 def _hermite(p0, p1, m0, m1, h):
@@ -290,7 +343,7 @@ def table(name: str, tol_unit: float) -> SegTable:
     return t
 
 
-PREWARM_NAMES = ("OUT", "IN", "SPR", "EASE")
+PREWARM_NAMES = ("OUT", "IN", "SPR", "EASE", "SNAP")
 PREWARM_LEVELS = range(-17, LEVEL_MAX + 1)
 
 

@@ -128,6 +128,7 @@ INSET_LOGICAL_PX = 24
 UNLIT_SEGMENT = (0x1F, 0x1F, 0x1F, 0.0)
 BLANK_RING = (UNLIT_SEGMENT,) * 60
 FULLSCREEN_NOTIFICATION_STATES = frozenset({3, 4})  # QUNS_RUNNING_D3D_FULL_SCREEN, QUNS_PRESENTATION_MODE
+SUPPRESS_NAVIGATOR = "navigator"   # r3: held while the Navigator replaces the floating knob (presentation >= 6)
 
 # Engine events (backend -> engine). The Win32 backend maps window messages to these.
 EV_FRAME, EV_TOUCH, EV_STOP, EV_SUPPRESS = "frame", "touch", "stop", "suppress"
@@ -2572,7 +2573,10 @@ class KnobOverlay:
     def set_suppressed(self, reason, on):
         """Hold (on=True) or release one suppression reason: e.g. 'picker' (the
         Windows picker overlaps ``rect``) or 'disconnected'. While any reason
-        holds, the knob slides out at once and touches are ignored."""
+        holds, the knob slides out at once and touches are ignored. r3: the
+        reason 'navigator' (``SUPPRESS_NAVIGATOR``) is held for as long as the
+        Navigator stands in for the floating knob (a presentation-6 knob;
+        ``ui.ControlCenterApp._render_navigator``, DESKTOP_STAGE 24)."""
         reason = str(reason)
         mail = self._mail
         with mail.lock:
