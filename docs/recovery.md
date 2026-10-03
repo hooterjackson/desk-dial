@@ -19,7 +19,7 @@ The Nano_D++ has 4 MB of flash, laid out exactly as in Karl's firmware v1.0.0. D
 
 So there are two ways back:
 
-- **Firmware only:** write the app area of your backup at `0x10000`. Your calibration, settings and profiles stay as they are now.
+- **Firmware only:** write the app area of your backup at `0x10000`. Your settings and profiles stay as they are now. Your calibration stays too, unless the knob calibrated itself under Desk Dial firmware (see below).
 - **Everything:** write the whole 4 MB backup at `0`. The knob returns to exactly the moment you made the backup, with its firmware, calibration, settings and profiles.
 
 ## Go back to your own firmware
@@ -27,6 +27,8 @@ So there are two ways back:
 You need the `my-nanod-backup.bin` you made in [Step 2 of the flashing guide](flashing.md#step-2-back-up-the-whole-knob-do-not-skip).
 
 ### Restore the firmware only (recommended)
+
+If the knob calibrated itself while it ran Desk Dial firmware, older firmware does not find that calibration and calibrates again on first start. The knob turns on its own for a few seconds; leave it untouched on the desk. To get the exact old calibration back, restore the whole backup.
 
 1. Cut the app area out of the backup:
 

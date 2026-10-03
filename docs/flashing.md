@@ -10,7 +10,7 @@ You will:
 4. check what was written,
 5. restart the knob.
 
-Every command here uses [esptool](https://github.com/espressif/esptool), Espressif's own flashing tool. The guide never erases the whole chip and never writes over the bootloader. Your knob's calibration, its settings and Karl's profiles stay where they are.
+Every command here uses [esptool](https://github.com/espressif/esptool), Espressif's own flashing tool. The guide never erases the whole chip and never writes over the bootloader. Your knob's calibration, its settings and Karl's profiles stay on the knob.
 
 > **Only for a Nano_D++.** Desk Dial has been tested on one knob, the author's. Read [compatibility](compatibility.md) first. Do not flash a Ratchet H1 or any other board with this file.
 
@@ -160,6 +160,8 @@ If you are coming from v1.0 or v1.1, update Desk Dial **before** you flash. See 
 ## Going back to your old firmware
 
 The quick way back uses only the firmware part of your backup. Your current calibration and settings stay as they are.
+
+If the knob calibrated itself while it ran Desk Dial firmware, older firmware does not find that calibration and calibrates again on first start. The knob turns on its own for a few seconds; leave it untouched on the desk. To get the exact old calibration back, restore the whole backup ([recovery](recovery.md#restore-the-whole-backup)).
 
 1. Cut the app area out of your backup:
 
