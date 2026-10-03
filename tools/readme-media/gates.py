@@ -74,6 +74,10 @@ ALLOWLIST = {
     "docs/setup/onshape.md": {"Google Chrome", "Figma"},
     "docs/faq.md": {"Spotify", "homeassistant.local", "Figma"},
     "docs/features/apps.md": {"Figma"},               # a supported app (app profiles, v2.0.0)
+    # the release package's guides (deep-dive owned): Figma as a supported app, Home Assistant's default host
+    "docs/compatibility.md": {"Figma"},
+    "docs/recovery.md": {"Figma"},
+    "docs/troubleshooting.md": {"Figma", "homeassistant.local"},
     "tools/readme-media/apps_strip.py": {"Figma"},     # the label under Karl's Figma icon
     "tools/readme-media/headlines.py": {"Figma"},      # the Apps chapter headline
     "README.md": {"Spotify", "Figma"},
