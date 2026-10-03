@@ -22,7 +22,7 @@ body:
       label: Desk Dial version
       description: |
         In File Explorer, right-click `DeskDial.exe` › Properties › Details, and copy the "Product version" line.
-      placeholder: "e.g. {{RELEASE}}"
+      placeholder: "e.g. v2.0.0"
     validations:
       required: true
 
@@ -32,7 +32,7 @@ body:
       label: Knob firmware
       description: |
         Open Settings from the Desk Dial tray icon. The status strip at the top shows the knob as "Connected · USB · firmware …". Copy the text after "firmware". If the strip says "Not connected", write that instead.
-      placeholder: "e.g. {{RELEASE}}, or Not connected"
+      placeholder: "e.g. v2.0.0, or Not connected"
     validations:
       required: true
 

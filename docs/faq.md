@@ -53,7 +53,7 @@ Follow the [flashing guide](flashing.md). It covers backing up, flashing the Des
 
 ### Which app version works with which firmware?
 
-See the [compatibility table](compatibility.md). In short: the knob needs the Desk Dial firmware from the matching release ({{RELEASE}}); with Karl's stock firmware the app connects, backs up the profiles, and then stops at "Stock firmware · display/control extension required".
+See the [compatibility table](compatibility.md). In short: the knob needs the Desk Dial firmware from the matching release (v2.0.0); with Karl's stock firmware the app connects, backs up the profiles, and then stops at "Stock firmware · display/control extension required".
 
 ## Troubleshooting
 

@@ -2,7 +2,7 @@
 
 The Music space is where the knob drives your Sonos speaker and your Apple Music library. You reach it from Home by tapping button 1. Turn the knob for volume, browse what you recently added, jump around the queue, seek inside a song, and queue things to play next, all without touching the PC.
 
-Desk Dial is tested on one knob (the author's) with one Sonos household. Everything below describes Desk Dial {{RELEASE}}.
+Desk Dial is tested on one knob (the author's) with one Sonos household. Everything below describes Desk Dial v2.0.0.
 
 <picture><source srcset="../media/music-volume.webp" type="image/webp"><img src="../media/music-volume.gif" alt="The knob turns and the volume arc on its screen grows with each click; the LED ring fills in warm light and turns amber near the top." width="480"></picture>
 

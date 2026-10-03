@@ -4,7 +4,7 @@ Desk Dial lives in the Windows tray. Right-click its icon and choose Settings to
 
 A note at the top of the General page tells you which changes apply straight away: album artwork, LEDs, Motion and the switcher background apply when saved; other changes need the knob to reconnect, or Desk Dial to be quit from the tray and opened again. The Save settings button sits at the bottom of the window and saves every page except Home Assistant, which has its own Save.
 
-Desk Dial is tested on one knob (the author's). This page describes Desk Dial {{RELEASE}}.
+Desk Dial is tested on one knob (the author's). This page describes Desk Dial v2.0.0.
 
 ## General
 
@@ -137,7 +137,7 @@ These are plain keys in `data\settings.json`. Edit the file while Desk Dial is n
 
 - `onshape_idle_ms` · default 800 · range 200 to 5000. In Onshape mode, how long after the last knob click a held orbit, tilt or pan drag is released. Lower is snappier, higher tolerates slower turning.
 - `onshape_content_classes` · default `["Chrome_RenderWidgetHostHWND"]`. The window classes Desk Dial treats as the browser's page content when deciding whether the pointer is over the Onshape model. Change it only if a browser build renames its content window.
-- `upnext_button3` · `"like"` or `"playnext"`. The code can make button 3 in Up next a Play next button instead of Like. In Desk Dial {{RELEASE}} the value is fixed to Like inside the app and the key is not yet read from settings.json; it is listed so you know what the name means when it appears.
+- `upnext_button3` · `"like"` or `"playnext"`. The code can make button 3 in Up next a Play next button instead of Like. In Desk Dial v2.0.0 the value is fixed to Like inside the app and the key is not yet read from settings.json; it is listed so you know what the name means when it appears.
 - `led_drive`, `led_dither`, `led_pink`, `led_vol_full` · tuning values for the LED ring, kept exactly as written when present. For hands-on tuning only; leave them out.
 
 ## Limits and known issues

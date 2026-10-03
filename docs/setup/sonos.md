@@ -2,7 +2,7 @@
 
 Desk Dial turns the knob into a volume dial and transport control for one Sonos speaker, or for the group that speaker is part of. Setup is one field: the speaker's IP address. Nothing is installed on the speaker and nothing changes in your Sonos app.
 
-Tested on one knob (the author's) with one Sonos household. Version {{RELEASE}}.
+Tested on one knob (the author's) with one Sonos household. Version v2.0.0.
 
 <picture><source srcset="../media/music-volume.webp" type="image/webp"><img src="../media/music-volume.gif" alt="The knob is turned a few clicks and the volume number on its screen rises while the speaker gets louder" width="480"></picture>
 

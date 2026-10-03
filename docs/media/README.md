@@ -6,8 +6,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | file | bytes | dimensions | frames | fps |
 |---|---:|---|---:|---:|
 | app-icons.png | 53,728 | 1240x420 | 1 |  |
-| cheat-sheet-dark.png | 180,617 | 1240x1754 | 1 |  |
-| cheat-sheet.png | 177,396 | 1240x1754 | 1 |  |
+| cheat-sheet-dark.png | 179,163 | 1240x1754 | 1 |  |
+| cheat-sheet.png | 177,191 | 1240x1754 | 1 |  |
 | desktop-explorer-16x9.gif | 2,140,047 | 720x406 | 60 | 8 |
 | desktop-explorer-16x9.webp | 1,775,628 | 1120x630 | 134 | 18.05 |
 | desktop-explorer-32x9.gif | 2,624,189 | 960x270 | 88 | 12.61 |

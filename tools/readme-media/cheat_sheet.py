@@ -5,7 +5,7 @@ Outputs (render(knob_anim, work, out_dir, stills_json, button_maps_json)):
   <out_dir>/cheat-sheet.png        light theme, downscaled to 1240 px wide, under the 300 KB still cap
   <out_dir>/cheat-sheet-dark.png   the same page in the dark theme
   <out_dir>/../cheat-sheet.pdf     the light page at full size (Pillow PDF, 300 dpi) -> docs/cheat-sheet.pdf
-The footer carries the literal text {{RELEASE}} for the release step to substitute. Fictional data only.
+The footer names the public release (RELEASE below). Fictional data only.
 """
 from __future__ import annotations
 
@@ -20,8 +20,9 @@ MARGIN = 150
 COLS, ROWS = 2, 6
 TILE = 330                     # LCD diameter on the page
 HOLD_1 = "hold 1 (0.6 s) = Home from anywhere"
-FOOTER_LEFT = "{{RELEASE}}"
-FOOTER_RIGHT = "Desk Dial · a hold matures at 0.6 s (button 1) or 1.0 s (button 4) · fictional library"
+RELEASE = "v2.0.0"                     # the public version: firmware and app ship together
+FOOTER_LEFT = f"Desk Dial {RELEASE}"
+FOOTER_RIGHT = "Desk Dial · hold button 1 for 0.6 s, button 4 for 1 s · fictional library"
 
 THEMES = {
     "light": {"bg": (248, 248, 250), "ink": (24, 26, 32), "muted": (112, 117, 128), "accent": (178, 112, 34),

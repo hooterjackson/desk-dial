@@ -245,7 +245,7 @@ Talk: [Issues](../../issues) here, or Karl's [Discord](https://discord.gg/mVTvpp
 
 ## What's new since the last release
 
-{{RELEASE}}
+**v2.0.0**, upgrading from v1.1. The knob firmware and the app now share one version number and are released together.
 
 - **Home Assistant** lights and scenes: brightness, colour temperature, scenes, all off and back on.
 - **The Navigator**, a glass card on the PC that mirrors the knob's state. It replaces the floating knob of the earlier release, which is no longer shown; the tray's "Show knob" does nothing with the current firmware.

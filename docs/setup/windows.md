@@ -2,7 +2,7 @@
 
 The window picker shows your open windows as live previews on the screen. Turn the knob to browse them, tap a button to switch, or snap two windows side by side. It needs nothing beyond Desk Dial itself.
 
-Tested on one knob and one PC (the author's). Version {{RELEASE}}.
+Tested on one knob and one PC (the author's). Version v2.0.0.
 
 <picture><source srcset="../media/desktop-picker-16x9.webp" type="image/webp"><img src="../media/desktop-picker-16x9.gif" alt="A row of live window previews slides across a frosted desktop as the knob turns; the centre one grows and its name appears under it" width="480"></picture>
 

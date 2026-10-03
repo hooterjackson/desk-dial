@@ -2,7 +2,7 @@
 
 Desk Dial turns a knob with a motor inside into something that feels different on every screen. The motor makes the clicks you feel, the end stops that push back, the tension when you hold a button, and the small knock when a hold lands. A tiny speaker inside the knob gives each of those a sound. This page describes what you feel and hear, what each sound means, and the settings that change it.
 
-The knob is a Nano_D++ by Karl Malota running Desk Dial's firmware ({{RELEASE}}). Everything here is tested on one knob (the author's).
+The knob is a Nano_D++ by Karl Malota running Desk Dial's firmware (v2.0.0). Everything here is tested on one knob (the author's).
 
 <picture><source srcset="../media/feel-and-sound.webp" type="image/webp"><img src="../media/feel-and-sound.gif" alt="The knob turning through its volume clicks, hitting an end stop and springing back, then a button held until the ring fills and the knob gives one knock" width="480"></picture>
 

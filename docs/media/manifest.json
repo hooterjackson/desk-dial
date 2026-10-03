@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-03T03:57:31+00:00",
+  "generated_at": "2026-10-03T03:59:42+00:00",
   "firmware": {
     "version": "1.0.0-cc5.7",
     "git": "1bf6b69b09031f39266b9c1991648237ddeb0c6c",
@@ -11,8 +11,8 @@
     "tree": "ff46240ca7650e2a34466d38d366a7e9254e130d3686445ab9c3292ab6a4fefe"
   },
   "pipeline": {
-    "git": "05b568a6f05c67aae404a43c2b5d704de0975fa1",
-    "tree": "3c4e8a147de48baab3ed4e9feb54cc62631b7bae584ae2d330a504b7e45ce282"
+    "git": "2db272fcfaa24f9800ef9ff650de1e24348eb152",
+    "tree": "62b29669b001abad14035df76981ecf4766b16c6fce9a8391fc04e86a900b0d6"
   },
   "files": [
     {
@@ -32,8 +32,8 @@
       "name": "cheat-sheet-dark.png",
       "scene": "cheat-sheet",
       "source": "firmware LCD renderer",
-      "bytes": 180617,
-      "sha256": "799e9243d94c08a17b43e129e0491d2933bcfb43a3789fb10b5bcbffa9e2e019",
+      "bytes": 179163,
+      "sha256": "d3a41e7fd4bba8b9c2a7ef0ef1ce8546c4816067ebed35e803b598911b6e2c70",
       "width": 1240,
       "height": 1754,
       "frames": 1,
@@ -45,8 +45,8 @@
       "name": "cheat-sheet.png",
       "scene": "cheat-sheet",
       "source": "firmware LCD renderer",
-      "bytes": 177396,
-      "sha256": "93e3cfd55faddedcf85dd70a585afa91f4feb36850b774deb88b15b961b1d15d",
+      "bytes": 177191,
+      "sha256": "a6edad77148132d6dada2f09990443e57a5eccb0f7c0f3a946f594e7e882882c",
       "width": 1240,
       "height": 1754,
       "frames": 1,

@@ -2,7 +2,7 @@
 
 The knob has a ring of 60 LEDs under its rim and two LEDs under each of the four buttons. Desk Dial uses them as a second display you can read without looking at the screen: how loud, where you are in a list, which window is next, whether a hold is about to land. This page describes what the ring shows at rest, what it shows while you use it, the short "moments" it plays on an action, and what the Motion and LEDs settings change. The last section covers the screen's own motion, which the same setting controls.
 
-Everything here is from the current firmware ({{RELEASE}}) and is tested on one knob (the author's).
+Everything here is from the current firmware (v2.0.0) and is tested on one knob (the author's).
 
 <picture><source srcset="../media/leds-moments.webp" type="image/webp"><img src="../media/leds-moments.gif" alt="The knob's LED ring playing its moments one after another: a pink bloom, a half-ring wash, a scatter of warm sparks, a comet lapping the ring, a warm glow at one end, a red glow at the bottom, and an arc filling while a button is held" width="480"></picture>
 
