@@ -1,6 +1,6 @@
 # Building the Desk Dial app
 
-This guide runs Desk Dial v2.0.0 from the source in the `app/` folder, runs its tests, and builds the same `DeskDial.exe` bundle the release ships. You only need it if you want to change the app or check the release yourself. To use Desk Dial, download `DeskDial-windows-x64.zip` from the [latest release](https://github.com/hooterjackson/desk-dial/releases/latest), unzip it and run `DeskDial.exe`.
+This guide runs Desk Dial v2.0.0 from the source in the `app/` folder, runs its tests, and builds the same `DeskDial.exe` bundle the release ships. You only need it if you want to change the app or check the release yourself. To use Desk Dial, download `DeskDial-<version>-windows-x64.zip` (for this release `DeskDial-2.0.0-windows-x64.zip`) from the [latest release](https://github.com/hooterjackson/desk-dial/releases/latest), unzip it and run `DeskDial.exe`.
 
 Desk Dial is a Windows program. Everything here assumes Windows 10 or 11 and PowerShell.
 
@@ -93,7 +93,7 @@ The bundle goes into a versioned folder, `desktop-dist-<version>\DeskDial\`, hol
 
 Right-click the new `DeskDial.exe`, choose **Properties**, then **Details**. *You should see* product name Desk Dial and product version 2.0.0.
 
-The release zip `DeskDial-windows-x64.zip` is this `DeskDial\` folder, zipped.
+The release zip `DeskDial-<version>-windows-x64.zip` is this `DeskDial\` folder, zipped.
 
 ## Windows SmartScreen and unsigned builds
 
@@ -105,7 +105,7 @@ Neither the release `DeskDial.exe` nor your own build carries a code-signing cer
 If the zip came from the internet, Windows marks every file inside it as downloaded. You can clear the mark before you unzip, which also avoids the warning: right-click the zip, choose **Properties**, tick **Unblock** and click **OK**. In PowerShell:
 
 ```powershell
-Unblock-File .\DeskDial-windows-x64.zip
+Unblock-File .\DeskDial-*-windows-x64.zip
 ```
 
 A bundle you built yourself carries no download mark, so SmartScreen does not usually ask.
