@@ -44,11 +44,11 @@ class FailedSnapshotTests(AdapterCase):
         self.break_scene_create(answer)
         with patch.object(ha_module, "CALL_TIMEOUT", 0.2), self.assertLogs(ha_module._log, "WARNING"):
             self.adapter.power(False)                   # the evening snapshot fails
-        self.assertEqual(self.server.calls[-1], ("light", "turn_off", {}, {"entity_id": "light.den"}),
+        self.assertEqual(self.server.calls[-1], ("light", "turn_off", {}, {"entity_id": "light.hall"}),
                          "the lights still go off")
         self.assertFalse(self.adapter.read_state()["snapshot"])
         self.adapter.power(True)
-        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.den"}),
+        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.hall"}),
                          "never the morning snapshot")
 
     def test_turn_on_after_failed_snapshot_does_not_replay_old_snapshot(self):

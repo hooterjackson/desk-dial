@@ -64,10 +64,10 @@ class TemplateAdminOnlyTests(unittest.TestCase):
         return adapter
 
     def test_rest_fallback_with_admin_only_template_refused_stays_online(self):
-        http = NonAdminHttp([light("light.den_desk"), light("light.den_floor", brightness=64)])
+        http = NonAdminHttp([light("light.hall_desk"), light("light.hall_floor", brightness=64)])
         adapter = self.make(http)
         # The WebSocket had resolved the area (registry), then dropped: the REST window begins.
-        adapter._set_resolution(True, "Hall", ["light.den_desk", "light.den_floor"], [], {})
+        adapter._set_resolution(True, "Hall", ["light.hall_desk", "light.hall_floor"], [], {})
         adapter._rest_refresh()
         state = adapter.read_state()
         self.assertNotEqual(state["reason"], "auth")
@@ -77,7 +77,7 @@ class TemplateAdminOnlyTests(unittest.TestCase):
         self.assertIn(("POST", "/api/services/light/turn_on"), http.requests)
 
     def test_never_resolved_reads_as_unavailable_not_auth(self):
-        adapter = self.make(NonAdminHttp([light("light.den_desk")]))
+        adapter = self.make(NonAdminHttp([light("light.hall_desk")]))
         adapter._rest_refresh()
         state = adapter.read_state()
         self.assertNotEqual(state["reason"], "auth")
@@ -88,12 +88,12 @@ class TemplateAdminOnlyTests(unittest.TestCase):
             def get(self, url, **kwargs):
                 return Response(401, {})
         adapter = self.make(Revoked([]))
-        adapter._set_resolution(True, "Hall", ["light.den_desk"], [], {})
+        adapter._set_resolution(True, "Hall", ["light.hall_desk"], [], {})
         adapter._rest_refresh()
         self.assertEqual(adapter.read_state()["reason"], "auth")
 
     def test_settings_says_the_area_list_needs_the_websocket_or_an_admin_token(self):
-        adapter = self.make(NonAdminHttp([light("light.den_desk")]))
+        adapter = self.make(NonAdminHttp([light("light.hall_desk")]))
         with patch.object(ha_module, "_default_ws_factory", lambda: None):
             result = adapter.test_connection()
         self.assertTrue(result["ok"])

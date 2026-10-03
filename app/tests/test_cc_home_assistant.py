@@ -57,7 +57,7 @@ def light_state(on=True, brightness=158, kelvin=3200, **attributes):
     attrs = {"friendly_name": "Hall lights", "brightness": brightness if on else None, "color_temp_kelvin": kelvin,
              "min_color_temp_kelvin": 2000, "max_color_temp_kelvin": 6535, "supported_color_modes": ["color_temp"]}
     attrs.update(attributes)
-    return {"entity_id": "light.den", "state": "on" if on else "off", "attributes": attrs}
+    return {"entity_id": "light.hall", "state": "on" if on else "off", "attributes": attrs}
 
 
 class FakeSocket:
@@ -146,7 +146,7 @@ class FakeServer:
             if message["domain"] == "light":
                 data = message.get("service_data") or {}
                 on = message["service"] == "turn_on"
-                old = self.states["light.den"]["attributes"]
+                old = self.states["light.hall"]["attributes"]
                 new = light_state(on, brightness=round(data.get("brightness_pct", round(old.get("brightness") or 158)
                                                                 * 100 / 255) * 255 / 100),
                                   kelvin=data.get("color_temp_kelvin", old.get("color_temp_kelvin")))
@@ -220,7 +220,7 @@ def wait_for(condition, timeout=3.0):
 class AdapterCase(unittest.TestCase):
     def make(self, server=None, http=None, token=TOKEN, **kwargs):
         self.server = server or FakeServer()
-        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", token, "light.den", SCENES,
+        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", token, "light.hall", SCENES,
                                        ws_factory=self.server.connect, http=http or FakeHttp(), **kwargs)
         self.addCleanup(adapter.close)
         return adapter
@@ -256,7 +256,7 @@ class ConnectionTests(AdapterCase):
         # Entities that are not configured are ignored.
         self.server.change({"entity_id": "light.kitchen", "state": "on", "attributes": {}})
         time.sleep(0.05)
-        self.assertEqual(adapter.read_state()["entity"], "light.den")
+        self.assertEqual(adapter.read_state()["entity"], "light.hall")
 
     def test_auth_invalid(self):
         adapter = self.make(token="wrong-token")
@@ -315,7 +315,7 @@ class ConnectionTests(AdapterCase):
 
     def test_rest_fallback_without_websocket(self):
         http = FakeHttp()
-        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "light.den", SCENES,
+        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "light.hall", SCENES,
                                        ws_factory=lambda url, timeout: None, http=http, rest_poll=0.02)
         self.addCleanup(adapter.close)
         with patch.object(ha_module, "BACKOFF", (0.05,)):
@@ -325,7 +325,7 @@ class ConnectionTests(AdapterCase):
         adapter.set_light(bri=40)
         post = [r for r in http.requests if r[0] == "POST"][-1]
         self.assertEqual(post[1], "http://homeassistant.local:8123/api/services/light/turn_on")
-        self.assertEqual(post[3], {"entity_id": "light.den", "brightness_pct": 40, "transition": 0.4})
+        self.assertEqual(post[3], {"entity_id": "light.hall", "brightness_pct": 40, "transition": 0.4})
         self.assertEqual(post[2]["Authorization"], "Bearer " + TOKEN)
         self.assertFalse(post[4], "redirects are never followed")
 
@@ -348,7 +348,7 @@ class ServiceTests(AdapterCase):
     def test_brightness_and_temperature_calls(self):
         result = self.adapter.set_light(bri=40)
         self.assertEqual(self.server.calls[-1], ("light", "turn_on", {"brightness_pct": 40, "transition": 0.4},
-                                                 {"entity_id": "light.den"}))
+                                                 {"entity_id": "light.hall"}))
         self.assertEqual(result["_applied"], {"bri": 40, "kelvin": None})
         self.adapter.set_light(kelvin=3456)
         self.assertEqual(self.server.calls[-1][2], {"color_temp_kelvin": 3500, "transition": 0.4}, "100 K steps")
@@ -365,13 +365,13 @@ class ServiceTests(AdapterCase):
         self.adapter.power(False)
         self.assertEqual([c[:2] for c in self.server.calls], [("scene", "create"), ("light", "turn_off")])
         self.assertEqual(self.server.calls[0][2], {"scene_id": "desk_dial_snapshot",
-                                                   "snapshot_entities": ["light.den"]})
+                                                   "snapshot_entities": ["light.hall"]})
         self.adapter.power(True)
         self.assertEqual(self.server.calls[-1], ("scene", "turn_on", {}, {"entity_id": "scene.desk_dial_snapshot"}))
 
     def test_turn_on_without_a_snapshot_turns_the_light_on(self):
         self.adapter.power(True)
-        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.den"}))
+        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.hall"}))
 
     def test_scenes_run_by_type(self):
         self.adapter.run_scene("scene.focus")
@@ -383,13 +383,13 @@ class ServiceTests(AdapterCase):
     def test_the_allowlist_refuses_before_any_io(self):
         before = len(self.server.sockets[0].sent)
         refused = [("light", "turn_on", {"entity_id": "light.kitchen"}),
-                   ("light", "turn_on", {"entity_id": "light.den", "rgb_color": [255, 0, 0]}),
-                   ("light", "turn_on", {"entity_id": "light.den", "brightness_pct": 0}),
-                   ("light", "turn_on", {"entity_id": "light.den", "color_temp_kelvin": 9000}),
+                   ("light", "turn_on", {"entity_id": "light.hall", "rgb_color": [255, 0, 0]}),
+                   ("light", "turn_on", {"entity_id": "light.hall", "brightness_pct": 0}),
+                   ("light", "turn_on", {"entity_id": "light.hall", "color_temp_kelvin": 9000}),
                    ("switch", "turn_on", {"entity_id": "switch.kettle"}),
                    ("scene", "turn_on", {"entity_id": "scene.party"}),
-                   ("scene", "create", {"scene_id": "other", "snapshot_entities": ["light.den"]}),
-                   ("scene", "create", {"scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.den", "lock.door"]}),
+                   ("scene", "create", {"scene_id": "other", "snapshot_entities": ["light.hall"]}),
+                   ("scene", "create", {"scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.hall", "lock.door"]}),
                    ("script", "turn_on", {"entity_id": "script.unknown"}),
                    ("script", "turn_on", {"entity_id": "scene.focus"}),
                    ("automation", "trigger", {"entity_id": "script.movie"}),
@@ -436,15 +436,15 @@ class ServiceTests(AdapterCase):
 
 class ReadStateTests(unittest.TestCase):
     def test_read_state_never_raises(self):
-        adapter = HomeAssistantAdapter("http://ha.local:8123", TOKEN, "light.den", SCENES)
-        adapter._states["light.den"] = light_state()
+        adapter = HomeAssistantAdapter("http://ha.local:8123", TOKEN, "light.hall", SCENES)
+        adapter._states["light.hall"] = light_state()
         adapter._online = True
         with patch.object(ha_module, "light_facts", side_effect=RuntimeError("boom")):
             state = adapter.read_state()
         self.assertEqual((state["online"], state["reason"]), (False, "failed"))
 
     def test_not_configured(self):
-        adapter = HomeAssistantAdapter("", "", "light.den")
+        adapter = HomeAssistantAdapter("", "", "light.hall")
         self.assertEqual(adapter.read_state()["reason"], "not_configured")
         adapter.start()
         self.assertIsNone(adapter._thread, "nothing connects without an address and a token")
@@ -452,8 +452,8 @@ class ReadStateTests(unittest.TestCase):
             adapter.set_light(bri=10)
 
     def test_unavailable_light(self):
-        adapter = HomeAssistantAdapter("http://ha.local:8123", TOKEN, "light.den")
-        adapter._states["light.den"] = {"entity_id": "light.den", "state": "unavailable", "attributes": {}}
+        adapter = HomeAssistantAdapter("http://ha.local:8123", TOKEN, "light.hall")
+        adapter._states["light.hall"] = {"entity_id": "light.hall", "state": "unavailable", "attributes": {}}
         adapter._online = True
         state = adapter.read_state()
         self.assertEqual((state["online"], state["reason"]), (False, "unavailable"))
@@ -470,7 +470,7 @@ class SettingsProbeTests(unittest.TestCase):
                                        ws_factory=lambda url, timeout: None)
         result = adapter.test_connection()
         self.assertTrue(result["ok"])
-        self.assertEqual(result["entities"]["light"], [("light.den", "Hall lights")])
+        self.assertEqual(result["entities"]["light"], [("light.hall", "Hall lights")])
         self.assertEqual(result["entities"]["scene"], [("scene.focus", "Focus")], "Desk Dial's snapshot is hidden")
         self.assertEqual(result["entities"]["script"], [("script.movie", "script.movie")])
         self.assertNotIn("switch", result["entities"])
@@ -546,7 +546,7 @@ class CredentialTests(unittest.TestCase):
         self.assertNotIn("ha_token", store.value)
 
     def test_build_adapter_needs_url_light_and_token(self):
-        config = {"ha_base_url": "http://ha.local:8123", "ha_light_entity": "light.den",
+        config = {"ha_base_url": "http://ha.local:8123", "ha_light_entity": "light.hall",
                   "ha_scenes": [{"entity_id": "scene.focus"}]}
         self.assertIsNone(build_adapter(config, FakeStore()))
         self.assertIsNone(build_adapter({**config, "ha_base_url": ""}, FakeStore({"ha_token": TOKEN})))
@@ -586,19 +586,19 @@ class AreaServer(FakeServer):
                 "config/device_registry/list": "devices"}
 
     def __init__(self, **kwargs):
-        states = [area_light("light.den_desk", name="Desk lamp"),
-                  area_light("light.den_floor", brightness=77, kelvin=2700, name="Floor lamp",
+        states = [area_light("light.hall_desk", name="Desk lamp"),
+                  area_light("light.hall_floor", brightness=77, kelvin=2700, name="Floor lamp",
                              min_color_temp_kelvin=2700, max_color_temp_kelvin=5000),
-                  area_light("light.den_strip", on=False, name="Shelf strip", supported_color_modes=["brightness"]),
-                  area_light("light.den_all", name="Hall group",
-                             entity_id=["light.den_desk", "light.den_floor", "light.den_strip"]),
-                  area_light("light.den_hidden"), area_light("light.den_indicator"),
+                  area_light("light.hall_strip", on=False, name="Shelf strip", supported_color_modes=["brightness"]),
+                  area_light("light.hall_all", name="Hall group",
+                             entity_id=["light.hall_desk", "light.hall_floor", "light.hall_strip"]),
+                  area_light("light.hall_hidden"), area_light("light.hall_indicator"),
                   area_light("light.kitchen", name="Kitchen"), area_light("light.moved_out", name="Moved out"),
-                  scene_state("scene.den_relax", "Relax", ["light.den_desk"]),
-                  scene_state("scene.evening", "Evening", ["light.den_desk", "light.kitchen"]),
-                  scene_state("scene.kitchen_cook", "Cook", ["light.kitchen", "light.den_desk"]),
+                  scene_state("scene.hall_relax", "Relax", ["light.hall_desk"]),
+                  scene_state("scene.evening", "Evening", ["light.hall_desk", "light.kitchen"]),
+                  scene_state("scene.kitchen_cook", "Cook", ["light.kitchen", "light.hall_desk"]),
                   scene_state("scene.whole_house", "Whole house", ["light.kitchen"]),
-                  {"entity_id": "script.den_movie", "state": "off", "attributes": {"friendly_name": "Movie night"}},
+                  {"entity_id": "script.hall_movie", "state": "off", "attributes": {"friendly_name": "Movie night"}},
                   {"entity_id": "automation.wake", "state": "on", "attributes": {"friendly_name": "Wake"}},
                   {"entity_id": "switch.kettle", "state": "off", "attributes": {}}]
         super().__init__(states=states, **kwargs)
@@ -607,19 +607,19 @@ class AreaServer(FakeServer):
         self.devices = [{"id": "dev_floor", "area_id": "hall", "disabled_by": None},
                         {"id": "dev_kitchen", "area_id": "kitchen", "disabled_by": None}]
         self.entities = [
-            {"entity_id": "light.den_desk", "area_id": "hall", "device_id": None, "platform": "hue"},
-            {"entity_id": "light.den_floor", "area_id": None, "device_id": "dev_floor", "platform": "zha"},
-            {"entity_id": "light.den_strip", "area_id": "hall", "device_id": None, "platform": "esphome"},
-            {"entity_id": "light.den_all", "area_id": "hall", "device_id": None, "platform": "group"},
-            {"entity_id": "light.den_hidden", "area_id": "hall", "hidden_by": "user", "platform": "hue"},
-            {"entity_id": "light.den_disabled", "area_id": "hall", "disabled_by": "user", "platform": "hue"},
-            {"entity_id": "light.den_indicator", "area_id": None, "device_id": "dev_floor",
+            {"entity_id": "light.hall_desk", "area_id": "hall", "device_id": None, "platform": "hue"},
+            {"entity_id": "light.hall_floor", "area_id": None, "device_id": "dev_floor", "platform": "zha"},
+            {"entity_id": "light.hall_strip", "area_id": "hall", "device_id": None, "platform": "esphome"},
+            {"entity_id": "light.hall_all", "area_id": "hall", "device_id": None, "platform": "group"},
+            {"entity_id": "light.hall_hidden", "area_id": "hall", "hidden_by": "user", "platform": "hue"},
+            {"entity_id": "light.hall_disabled", "area_id": "hall", "disabled_by": "user", "platform": "hue"},
+            {"entity_id": "light.hall_indicator", "area_id": None, "device_id": "dev_floor",
              "entity_category": "config", "platform": "zha"},
             {"entity_id": "light.kitchen", "area_id": None, "device_id": "dev_kitchen", "platform": "hue"},
             {"entity_id": "light.moved_out", "area_id": "kitchen", "device_id": "dev_floor", "platform": "zha"},
-            {"entity_id": "scene.den_relax", "area_id": "hall", "platform": "homeassistant"},
+            {"entity_id": "scene.hall_relax", "area_id": "hall", "platform": "homeassistant"},
             {"entity_id": "scene.kitchen_cook", "area_id": "kitchen", "platform": "homeassistant"},
-            {"entity_id": "script.den_movie", "area_id": "hall", "platform": "script"},
+            {"entity_id": "script.hall_movie", "area_id": "hall", "platform": "script"},
             {"entity_id": "automation.wake", "area_id": None, "platform": "automation"},
         ]
         self.subscriptions = {}
@@ -683,7 +683,7 @@ class AreaServer(FakeServer):
         self.registry_event("entity_registry_updated", action="create", entity_id=entity)
 
 
-def den_scenes(state):
+def hall_scenes(state):
     return [scene["entity_id"] for scene in state["scenes"]]
 
 
@@ -706,11 +706,11 @@ class AreaCase(unittest.TestCase):
 
 
 class AreaResolutionTests(AreaCase):
-    def test_the_den_resolves_and_aggregates(self):
+    def test_the_hall_resolves_and_aggregates(self):
         adapter = self.started()
         state = adapter.read_state()
         self.assertEqual((state["area_id"], state["name"], state["count"]), ("hall", "Hall", 3))
-        self.assertEqual(state["entities"], ["light.den_desk", "light.den_floor", "light.den_strip"],
+        self.assertEqual(state["entities"], ["light.hall_desk", "light.hall_floor", "light.hall_strip"],
                          "own area, device area; never a group, hidden, disabled or config light")
         # on = any; bri = mean of the on lights (62 and 30); kelvin = mean of the on colour lights
         # (3200, 2700 -> 3000 in 100 K steps); range = the one the colour lights share.
@@ -733,8 +733,8 @@ class AreaResolutionTests(AreaCase):
         # Manual first (its label), then by name: the area's own scene and script and the scene
         # touching a Hall light without an area of its own; never the kitchen's scene (it touches the
         # desk lamp but belongs to the kitchen), a scene elsewhere or Desk Dial's snapshot.
-        self.assertEqual(den_scenes(state), ["automation.wake", "scene.evening", "script.den_movie",
-                                             "scene.den_relax"])
+        self.assertEqual(hall_scenes(state), ["automation.wake", "scene.evening", "script.hall_movie",
+                                             "scene.hall_relax"])
         self.assertEqual([s["label"] for s in state["scenes"]], ["Good morning", "Evening", "Movie night", "Relax"])
         self.assertEqual([s["type"] for s in state["scenes"]], ["automation", "scene", "script", "scene"])
 
@@ -742,13 +742,13 @@ class AreaResolutionTests(AreaCase):
         adapter = self.started()
         before = len(self.seen)
         self.server.change(area_light("light.kitchen", brightness=20))
-        self.server.change(area_light("light.den_desk", brightness=255))
+        self.server.change(area_light("light.hall_desk", brightness=255))
         self.assertTrue(wait_for(lambda: adapter.read_state()["bri"] == 65))   # (100 + 30) / 2
         self.assertEqual(len(self.seen), before + 1, "only the Hall light's change reached the listener")
 
     def test_a_removed_light_leaves_the_aggregate(self):
         adapter = self.started()
-        self.server._event("state_changed", {"entity_id": "light.den_floor", "new_state": None})
+        self.server._event("state_changed", {"entity_id": "light.hall_floor", "new_state": None})
         self.assertTrue(wait_for(lambda: adapter.read_state()["bri"] == 62))
         self.assertEqual(adapter.read_state()["count"], 3, "still in the registry until it is removed there")
 
@@ -773,20 +773,20 @@ class AreaResolutionTests(AreaCase):
 
 
 class LiveRegistryTests(AreaCase):
-    def test_a_new_light_added_to_the_den_appears_without_a_restart(self):
+    def test_a_new_light_added_to_the_hall_appears_without_a_restart(self):
         with patch.object(ha_module, "RECV_TIMEOUT", 0.02), patch.object(ha_module, "REGISTRY_DEBOUNCE", 0.05):
             adapter = self.started()
-            self.server.add_light("light.den_reading", name="Reading lamp", brightness=255, kelvin=4000)
+            self.server.add_light("light.hall_reading", name="Reading lamp", brightness=255, kelvin=4000)
             self.assertTrue(wait_for(lambda: adapter.read_state()["count"] == 4), adapter.read_state())
         state = adapter.read_state()
-        self.assertIn("light.den_reading", state["entities"])
+        self.assertIn("light.hall_reading", state["entities"])
         self.assertEqual((state["on_count"], state["bri"]), (3, 64), "(62 + 30 + 100) / 3")
         self.assertTrue(any(seen.get("count") == 4 for seen in self.seen), "the listener heard it")
         self.assertEqual(len(self.server.sockets), 1, "no reconnect, no restart")
         # The new light is in the snapshot of the next All off; commands still target the area.
         adapter.power(False)
         self.assertEqual(self.server.calls[0][2]["snapshot_entities"],
-                         ["light.den_desk", "light.den_floor", "light.den_reading", "light.den_strip"])
+                         ["light.hall_desk", "light.hall_floor", "light.hall_reading", "light.hall_strip"])
         self.assertEqual(self.server.calls[1][3], {"area_id": "hall"})
 
     def test_a_light_moved_in_by_its_device(self):
@@ -796,8 +796,8 @@ class LiveRegistryTests(AreaCase):
             self.server.registry_event("device_registry_updated", action="update", device_id="dev_kitchen")
             self.assertTrue(wait_for(lambda: "light.kitchen" in adapter.read_state()["entities"]))
             self.server.entities[0]["area_id"] = "kitchen"       # the desk lamp moves out
-            self.server.registry_event("entity_registry_updated", action="update", entity_id="light.den_desk")
-            self.assertTrue(wait_for(lambda: "light.den_desk" not in adapter.read_state()["entities"]))
+            self.server.registry_event("entity_registry_updated", action="update", entity_id="light.hall_desk")
+            self.assertTrue(wait_for(lambda: "light.hall_desk" not in adapter.read_state()["entities"]))
 
     def test_an_area_rename(self):
         with patch.object(ha_module, "RECV_TIMEOUT", 0.02), patch.object(ha_module, "REGISTRY_DEBOUNCE", 0.05):
@@ -853,13 +853,13 @@ class RepliesAreCheckedTests(AreaCase):
         http = FakeHttp()
         http.refuse_hidden_test = True        # an older HA: the plain template is used
         http.template_answer = json.dumps({"known": True, "name": "Hall",
-                                           "lights": ["light.den_desk", "light.den_floor", "light.den_all"],
-                                           "extras": ["script.den_movie", "scene.desk_dial_snapshot"]})
+                                           "lights": ["light.hall_desk", "light.hall_floor", "light.hall_all"],
+                                           "extras": ["script.hall_movie", "scene.desk_dial_snapshot"]})
         adapter = self.started(server=server, http=http)
         state = adapter.read_state()
-        self.assertEqual(state["entities"], ["light.den_desk", "light.den_floor"], "the group is skipped by its state")
-        self.assertIn("script.den_movie", den_scenes(state))
-        self.assertNotIn("scene.desk_dial_snapshot", den_scenes(state))
+        self.assertEqual(state["entities"], ["light.hall_desk", "light.hall_floor"], "the group is skipped by its state")
+        self.assertIn("script.hall_movie", hall_scenes(state))
+        self.assertNotIn("scene.desk_dial_snapshot", hall_scenes(state))
         templates = [r[3]["template"] for r in http.requests if r[1].endswith("/api/template")]
         self.assertEqual(len(templates), 2)
         self.assertIn("set a = 'hall'", templates[0])
@@ -916,7 +916,7 @@ class AreaServiceTests(AreaCase):
     def test_a_turn_changes_only_the_lights_that_are_on(self):
         """r3.1: every light that is on gets the same value; the lights that are off stay off."""
         result = self.adapter.set_light(bri=40)
-        on = ["light.den_desk", "light.den_floor"]
+        on = ["light.hall_desk", "light.hall_floor"]
         self.assertEqual(self.server.calls[-1], ("light", "turn_on", {"brightness_pct": 40, "transition": 0.4}, {"entity_id": on}))
         self.assertEqual(result["_applied"], {"bri": 40, "kelvin": None})
         self.assertEqual(result["_targets"], on)
@@ -930,44 +930,44 @@ class AreaServiceTests(AreaCase):
     def test_a_turn_from_all_off_switches_on_every_available_light(self):
         self.adapter.power(False)
         self.assertTrue(wait_for(lambda: not self.adapter.read_state()["on"]))
-        self.server.change(area_light("light.den_floor", on=False, name="Floor lamp"))
-        self.server.change({"entity_id": "light.den_strip", "state": "unavailable", "attributes": {}})
+        self.server.change(area_light("light.hall_floor", on=False, name="Floor lamp"))
+        self.server.change({"entity_id": "light.hall_strip", "state": "unavailable", "attributes": {}})
         self.assertTrue(wait_for(lambda: self.adapter.read_state()["unavailable_count"] == 1))
         self.adapter.set_light(bri=1)
         self.assertEqual(self.server.calls[-1], ("light", "turn_on", {"brightness_pct": 1, "transition": 0.4},
-                                                 {"entity_id": ["light.den_desk", "light.den_floor"]}),
+                                                 {"entity_id": ["light.hall_desk", "light.hall_floor"]}),
                          "never the unavailable strip")
 
     def test_the_controller_can_name_the_targets(self):
-        self.adapter.set_light(bri=70, targets=["light.den_floor"])
-        self.assertEqual(self.server.calls[-1][3], {"entity_id": ["light.den_floor"]})
+        self.adapter.set_light(bri=70, targets=["light.hall_floor"])
+        self.assertEqual(self.server.calls[-1][3], {"entity_id": ["light.hall_floor"]})
         before = len(self.server.calls)
         with self.assertRaises(HomeAssistantError) as caught:
-            self.adapter.set_light(bri=70, targets=["light.den_floor", "light.kitchen"])
+            self.adapter.set_light(bri=70, targets=["light.hall_floor", "light.kitchen"])
         self.assertEqual(caught.exception.outcome, "not_allowed")
         self.assertEqual(len(self.server.calls), before)
 
     def test_per_light_rows_and_the_last_level(self):
         state = self.adapter.read_state()
         self.assertEqual(state["lights"], [
-            {"entity_id": "light.den_desk", "name": "Desk lamp", "on": True, "bri": 62, "kelvin": 3200,
+            {"entity_id": "light.hall_desk", "name": "Desk lamp", "on": True, "bri": 62, "kelvin": 3200,
              "available": True},
-            {"entity_id": "light.den_floor", "name": "Floor lamp", "on": True, "bri": 30, "kelvin": 2700,
+            {"entity_id": "light.hall_floor", "name": "Floor lamp", "on": True, "bri": 30, "kelvin": 2700,
              "available": True},
-            {"entity_id": "light.den_strip", "name": "Shelf strip", "on": False, "bri": 0, "kelvin": None,
+            {"entity_id": "light.hall_strip", "name": "Shelf strip", "on": False, "bri": 0, "kelvin": None,
              "available": True}])
         self.assertEqual(state["unavailable_count"], 0)
-        self.server.change({"entity_id": "light.den_strip", "state": "unavailable", "attributes": {}})
+        self.server.change({"entity_id": "light.hall_strip", "state": "unavailable", "attributes": {}})
         self.assertTrue(wait_for(lambda: self.adapter.read_state()["unavailable_count"] == 1))
-        row = next(r for r in self.adapter.read_state()["lights"] if r["entity_id"] == "light.den_strip")
-        self.assertEqual((row["name"], row["available"]), ("den_strip", False), "no name without a state")
+        row = next(r for r in self.adapter.read_state()["lights"] if r["entity_id"] == "light.hall_strip")
+        self.assertEqual((row["name"], row["available"]), ("hall_strip", False), "no name without a state")
         self.assertEqual(self.adapter.read_state()["count"], 3, "an unavailable light still counts")
 
     def test_all_off_snapshots_the_resolved_lights_and_turn_on_restores(self):
         self.adapter.power(False)
         self.assertEqual(self.server.calls[0][:3], ("scene", "create", {
-            "scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.den_desk", "light.den_floor",
-                                                                     "light.den_strip"]}))
+            "scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.hall_desk", "light.hall_floor",
+                                                                     "light.hall_strip"]}))
         self.assertEqual(self.server.calls[1], ("light", "turn_off", {}, {"area_id": "hall"}))
         self.assertTrue(wait_for(lambda: not self.adapter.read_state()["on"]))
         state = self.adapter.read_state()
@@ -978,26 +978,26 @@ class AreaServiceTests(AreaCase):
     def test_turn_on_after_the_area_changed_uses_the_area_not_an_old_snapshot(self):
         self.adapter.power(False)
         with self.adapter._lock:
-            self.adapter._snapshot_members = ["light.den_desk"]      # taken before a light joined
+            self.adapter._snapshot_members = ["light.hall_desk"]      # taken before a light joined
         self.adapter.power(True)
         self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"area_id": "hall"}))
 
     def test_the_allowlist_is_area_scoped(self):
         before = len(self.server.sockets[0].sent)
         refused = [("light", "turn_on", {"entity_id": "light.kitchen"}),
-                   ("light", "turn_on", {"entity_id": ["light.den_desk", "light.kitchen"]}),
+                   ("light", "turn_on", {"entity_id": ["light.hall_desk", "light.kitchen"]}),
                    ("light", "turn_on", {"entity_id": []}),
-                   ("light", "turn_on", {"entity_id": ["light.den_desk", "light.den_desk"]}),
-                   ("light", "turn_on", {"entity_id": ["light.den_all"]}),
-                   ("light", "turn_on", {"entity_id": ["light.den_desk"], "rgb_color": [255, 0, 0]}),
+                   ("light", "turn_on", {"entity_id": ["light.hall_desk", "light.hall_desk"]}),
+                   ("light", "turn_on", {"entity_id": ["light.hall_all"]}),
+                   ("light", "turn_on", {"entity_id": ["light.hall_desk"], "rgb_color": [255, 0, 0]}),
                    ("light", "turn_on", {"area_id": "kitchen", "brightness_pct": 10}),
                    ("light", "turn_on", {"area_id": "hall", "entity_id": "light.kitchen"}),
                    ("light", "turn_on", {"area_id": "hall", "rgb_color": [255, 0, 0]}),
                    ("light", "turn_off", {"area_id": "kitchen"}),
-                   ("light", "turn_off", {"entity_id": "light.den"}),
-                   ("scene", "create", {"scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.den_desk"]}),
+                   ("light", "turn_off", {"entity_id": "light.hall"}),
+                   ("scene", "create", {"scene_id": "desk_dial_snapshot", "snapshot_entities": ["light.hall_desk"]}),
                    ("scene", "create", {"scene_id": "desk_dial_snapshot",
-                                        "snapshot_entities": ["light.den_desk", "light.den_floor", "light.den_strip",
+                                        "snapshot_entities": ["light.hall_desk", "light.hall_floor", "light.hall_strip",
                                                               "light.kitchen"]}),
                    ("scene", "turn_on", {"entity_id": "scene.kitchen_cook"}),
                    ("scene", "turn_on", {"entity_id": "scene.whole_house"}),
@@ -1013,16 +1013,16 @@ class AreaServiceTests(AreaCase):
 
     def test_scene_entries_carry_a_preview_or_none(self):
         scenes = {s["entity_id"]: s for s in self.adapter.read_state()["scenes"]}
-        self.assertEqual((scenes["script.den_movie"]["bri"], scenes["script.den_movie"]["kelvin"]), (None, None))
-        self.server.change(scene_state("scene.den_relax", "Relax", ["light.den_desk"]) |
-                           {"attributes": {"friendly_name": "Relax", "entity_id": ["light.den_desk"], "brightness": 40}})
+        self.assertEqual((scenes["script.hall_movie"]["bri"], scenes["script.hall_movie"]["kelvin"]), (None, None))
+        self.server.change(scene_state("scene.hall_relax", "Relax", ["light.hall_desk"]) |
+                           {"attributes": {"friendly_name": "Relax", "entity_id": ["light.hall_desk"], "brightness": 40}})
         self.assertTrue(wait_for(lambda: {s["entity_id"]: s for s in self.adapter.read_state()["scenes"]}
-                                 ["scene.den_relax"]["bri"] == 40))
+                                 ["scene.hall_relax"]["bri"] == 40))
 
     def test_the_area_scenes_run(self):
-        self.adapter.run_scene("scene.den_relax")
+        self.adapter.run_scene("scene.hall_relax")
         self.adapter.run_scene("scene.evening")
-        self.adapter.run_scene("script.den_movie")
+        self.adapter.run_scene("script.hall_movie")
         self.assertEqual([c[:2] for c in self.server.calls], [("scene", "turn_on"), ("scene", "turn_on"),
                                                               ("script", "turn_on")])
         with self.assertRaises(HomeAssistantError):
@@ -1031,9 +1031,9 @@ class AreaServiceTests(AreaCase):
 
 class AreaRestTests(unittest.TestCase):
     def test_rest_fallback_resolves_through_the_template(self):
-        http = FakeHttp(states=[area_light("light.den_desk", name="Desk lamp"),
-                                area_light("light.den_floor", brightness=77, kelvin=2700)])
-        http.template_answer = json.dumps({"known": True, "name": "Hall", "lights": ["light.den_desk", "light.den_floor"],
+        http = FakeHttp(states=[area_light("light.hall_desk", name="Desk lamp"),
+                                area_light("light.hall_floor", brightness=77, kelvin=2700)])
+        http.template_answer = json.dumps({"known": True, "name": "Hall", "lights": ["light.hall_desk", "light.hall_floor"],
                                            "extras": []})
         adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "", area_id="hall",
                                        ws_factory=lambda url, timeout: None, http=http, rest_poll=0.02)
@@ -1045,7 +1045,7 @@ class AreaRestTests(unittest.TestCase):
         self.assertEqual((state["transport"], state["name"], state["count"], state["bri"]), ("rest", "Hall", 2, 46))
         adapter.set_light(bri=40)
         post = [r for r in http.requests if r[1].endswith("/api/services/light/turn_on")][-1]
-        self.assertEqual(post[3], {"entity_id": ["light.den_desk", "light.den_floor"], "brightness_pct": 40, "transition": 0.4})
+        self.assertEqual(post[3], {"entity_id": ["light.hall_desk", "light.hall_floor"], "brightness_pct": 40, "transition": 0.4})
         self.assertFalse(post[4], "redirects are never followed")
         template = [r for r in http.requests if r[1].endswith("/api/template")][0][3]["template"]
         self.assertIn("is_hidden_entity", template)
@@ -1062,10 +1062,10 @@ class AreaProbeTests(unittest.TestCase):
         self.assertEqual(result["areas"], [("attic", "Attic", 0), ("hall", "Hall", 3), ("kitchen", "Kitchen", 2)])
         self.assertEqual(result["default_area"],"attic", "no configured area: the first one")
         self.assertEqual(result["version"], "2026.9.0", "from the WebSocket hello when /api/config has none")
-        den = result["area_details"]["hall"]
-        self.assertEqual([(row["name"], row["on"], row["bri"]) for row in den["lights"]],
+        hall = result["area_details"]["hall"]
+        self.assertEqual([(row["name"], row["on"], row["bri"]) for row in hall["lights"]],
                          [("Desk lamp", True, 62), ("Floor lamp", True, 30), ("Shelf strip", False, 0)])
-        self.assertEqual([(row["name"], row["type"]) for row in den["scenes"]],
+        self.assertEqual([(row["name"], row["type"]) for row in hall["scenes"]],
                          [("Evening", "scene"), ("Movie night", "script"), ("Relax", "scene")])
         self.assertEqual([row["name"] for row in result["area_details"]["kitchen"]["scenes"]],
                          ["Cook", "Evening", "Whole house"])
@@ -1083,9 +1083,9 @@ class AreaProbeTests(unittest.TestCase):
         self.assertEqual(result["areas"], [("hall", "Hall", 3), ("office", "Office", 2)])
         self.assertEqual(result["default_area"], "hall")
         # The r3.1 template form (ids per area) also fills the live lists from /api/states.
-        http = FakeHttp(states=[area_light("light.den_desk", name="Desk lamp"),
-                                scene_state("scene.relax", "Relax", ["light.den_desk"])])
-        http.areas_answer = json.dumps([["hall", "Hall", ["light.den_desk"], ["scene.relax", "script.gone"]]])
+        http = FakeHttp(states=[area_light("light.hall_desk", name="Desk lamp"),
+                                scene_state("scene.relax", "Relax", ["light.hall_desk"])])
+        http.areas_answer = json.dumps([["hall", "Hall", ["light.hall_desk"], ["scene.relax", "script.gone"]]])
         adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "", http=http,
                                        ws_factory=lambda url, timeout: None)
         result = adapter.test_connection()
@@ -1116,9 +1116,9 @@ class AreaHelperTests(unittest.TestCase):
     def test_valid_area_and_default(self):
         for good in ("hall", "living_room", "4f2a9c"):
             self.assertTrue(ha_module.valid_area(good))
-        for bad in ("", "Hall", "den room", "den'", None, "x" * 101):
+        for bad in ("", "Hall", "hall room", "hall'", None, "x" * 101):
             self.assertFalse(ha_module.valid_area(bad))
-        self.assertEqual(ha_module.default_area([("a", "Attic", 0), ("d", " den ", 2)]), "a")
+        self.assertEqual(ha_module.default_area([("a", "Attic", 0), ("d", " hall ", 2)]), "a")
         self.assertEqual(ha_module.default_area([("a", "Attic", 0)], "a"), "a")
 
     def test_scene_previews(self):
@@ -1149,7 +1149,7 @@ class AreaConfigTests(unittest.TestCase):
         return adapter, " ".join(captured.output)
 
     def test_build_adapter_prefers_the_area_and_logs_why_not(self):
-        config = {"ha_base_url": "http://ha.local:8123", "ha_area": "hall", "ha_light_entity": "light.den"}
+        config = {"ha_base_url": "http://ha.local:8123", "ha_area": "hall", "ha_light_entity": "light.hall"}
         adapter, text = self.logs(config, FakeStore({"ha_token": TOKEN}))
         self.assertEqual((adapter.area_id, adapter.light_entity, adapter.configured), ("hall", "", True))
         self.assertIn("area hall", text)
@@ -1177,7 +1177,7 @@ class AreaConfigTests(unittest.TestCase):
         self.assertNotIn(TOKEN, text)
         self.assertNotIn("homeassistant.local", text, "not even the address")
         self.assertEqual((status["area_id"], status["name"], status["count"], status["online"]), ("hall", "Hall", 3, True))
-        self.assertIn("scene.den_relax", status["scenes"])
+        self.assertIn("scene.hall_relax", status["scenes"])
 
 
 class SimulatedAreaTests(unittest.TestCase):

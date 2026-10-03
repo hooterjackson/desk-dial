@@ -52,7 +52,7 @@ class BackoffResetTests(AdapterCase):
 
 class AttemptSequenceTests(unittest.TestCase):
     def test_attempts_reset_on_ok_and_grow_on_failures(self):
-        adapter = ha_module.HomeAssistantAdapter("http://homeassistant.local:8123", base.TOKEN, "light.den", (),
+        adapter = ha_module.HomeAssistantAdapter("http://homeassistant.local:8123", base.TOKEN, "light.hall", (),
                                                  ws_factory=lambda url, timeout: None, http=base.FakeHttp())
         self.addCleanup(adapter.close)
         outcomes = ["error", "error", "ok", "error", "ok"]

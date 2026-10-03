@@ -23,7 +23,7 @@ class DefaultAreaTests(unittest.TestCase):
         self.assertEqual(ha.default_area([]), "")
         self.assertEqual(ha.default_area(None, "hall"), "")
 
-    def test_no_den_literal_in_module(self):
+    def test_no_room_literal_in_module(self):
         source = inspect.getsource(ha)
         self.assertNotIn('"Hall"', source)
         self.assertNotIn('== "hall"', source)

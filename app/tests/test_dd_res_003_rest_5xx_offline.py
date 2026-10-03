@@ -48,9 +48,9 @@ class BadGatewayHttp(FakeHttp):
 class RestFailureStatusTests(unittest.TestCase):
     def area(self):
         state = light_state()
-        state["entity_id"] = "light.den_desk"
+        state["entity_id"] = "light.hall_desk"
         http = BadGatewayHttp(states=[state])
-        http.template_answer = json.dumps({"known": True, "name": "Hall", "lights": ["light.den_desk"], "extras": []})
+        http.template_answer = json.dumps({"known": True, "name": "Hall", "lights": ["light.hall_desk"], "extras": []})
         clock = Clock()
         adapter = HomeAssistantAdapter(BASE, "t0k", "", area_id="hall", http=http, clock=clock,
                                        ws_factory=lambda url, timeout: None)
@@ -59,7 +59,7 @@ class RestFailureStatusTests(unittest.TestCase):
 
     def single(self):
         http = BadGatewayHttp()
-        adapter = HomeAssistantAdapter(BASE, "t0k", "light.den", http=http, ws_factory=lambda url, timeout: None)
+        adapter = HomeAssistantAdapter(BASE, "t0k", "light.hall", http=http, ws_factory=lambda url, timeout: None)
         self.addCleanup(adapter.close)
         return adapter, http
 

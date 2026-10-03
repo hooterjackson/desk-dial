@@ -44,7 +44,7 @@ class ReconnectPrunesTests(AdapterCase):
             self.reconnect(adapter)
             self.assertTrue(wait_for(lambda: adapter.read_state()["snapshot"] is False))
         adapter.power(True)
-        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.den"}))
+        self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"entity_id": "light.hall"}))
 
     def test_a_snapshot_still_there_after_a_reconnect_is_kept(self):
         with patch.object(ha_module, "BACKOFF", (0.02,)):
@@ -52,7 +52,7 @@ class ReconnectPrunesTests(AdapterCase):
             adapter.start()
             self.assertTrue(wait_for(lambda: adapter.read_state()["online"]))
             adapter.power(False)
-            self.server.states[SNAPSHOT] = scene_state(SNAPSHOT, "desk dial", ["light.den"])
+            self.server.states[SNAPSHOT] = scene_state(SNAPSHOT, "desk dial", ["light.hall"])
             self.reconnect(adapter)
         self.assertTrue(adapter.read_state()["snapshot"])
         adapter.power(True)
@@ -67,7 +67,7 @@ class ReconnectPrunesTests(AdapterCase):
             del self.server.states["scene.focus"]
             self.reconnect(adapter)
             self.assertTrue(wait_for(lambda: "scene.focus" not in adapter._states))
-        self.assertIn("light.den", adapter._states)
+        self.assertIn("light.hall", adapter._states)
 
 
 class AreaReconnectTests(AreaCase):
@@ -76,16 +76,16 @@ class AreaReconnectTests(AreaCase):
             adapter = self.started()
             adapter.power(False)
             self.assertTrue(adapter.read_state()["snapshot"])
-            self.assertIn("scene.den_relax", [s["entity_id"] for s in adapter.read_state()["scenes"]])
+            self.assertIn("scene.hall_relax", [s["entity_id"] for s in adapter.read_state()["scenes"]])
             self.server.states.pop(SNAPSHOT, None)
-            del self.server.states["scene.den_relax"]       # deleted: gone from the registry too
-            self.server.entities = [e for e in self.server.entities if e["entity_id"] != "scene.den_relax"]
+            del self.server.states["scene.hall_relax"]       # deleted: gone from the registry too
+            self.server.entities = [e for e in self.server.entities if e["entity_id"] != "scene.hall_relax"]
             self.server.sockets[-1].close()
             self.assertTrue(wait_for(lambda: len(self.server.sockets) >= 2
                                      and adapter.read_state()["transport"] == "ws"
                                      and adapter.read_state()["snapshot"] is False))
-        self.assertTrue(wait_for(lambda: "scene.den_relax" not in adapter._states))
-        self.assertNotIn("scene.den_relax", [s["entity_id"] for s in adapter.read_state()["scenes"]])
+        self.assertTrue(wait_for(lambda: "scene.hall_relax" not in adapter._states))
+        self.assertNotIn("scene.hall_relax", [s["entity_id"] for s in adapter.read_state()["scenes"]])
         adapter.power(True)
         self.assertEqual(self.server.calls[-1], ("light", "turn_on", {}, {"area_id": "hall"}))
 
@@ -93,7 +93,7 @@ class AreaReconnectTests(AreaCase):
 class RestForgetsTheSnapshotTests(unittest.TestCase):
     def adapter(self, http, scenes=()):
         # No scenes: two watched entities, read one by one (REST_EACH_MAX).
-        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "light.den", scenes,
+        adapter = HomeAssistantAdapter("http://homeassistant.local:8123", TOKEN, "light.hall", scenes,
                                        ws_factory=lambda url, timeout: None, http=http, rest_poll=0.02)
         self.addCleanup(adapter.close)
         return adapter
@@ -102,7 +102,7 @@ class RestForgetsTheSnapshotTests(unittest.TestCase):
         http = FakeHttp(states=[light_state()])
         adapter = self.adapter(http)
         with adapter._lock:
-            adapter._snapshot, adapter._snapshot_members = True, ["light.den"]
+            adapter._snapshot, adapter._snapshot_members = True, ["light.hall"]
         self.assertTrue(adapter._rest_refresh())
         self.assertFalse(adapter.read_state()["snapshot"])
 

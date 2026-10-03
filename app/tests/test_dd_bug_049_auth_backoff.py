@@ -40,7 +40,7 @@ class AuthBackoffTests(unittest.TestCase):
         times = []
         connect = server.connect
         server.connect = lambda url, timeout: (times.append(time.monotonic()), connect(url, timeout))[1]
-        adapter = HomeAssistantAdapter(BASE, "wrong-token", "light.den", ws_factory=server.connect, http=FakeHttp())
+        adapter = HomeAssistantAdapter(BASE, "wrong-token", "light.hall", ws_factory=server.connect, http=FakeHttp())
         self.addCleanup(adapter.close)
         with patch.object(ha_module, "AUTH_BACKOFF", 0.1), patch.object(ha_module, "AUTH_BACKOFF_MAX", 100.0):
             adapter.start()
@@ -56,7 +56,7 @@ class AuthBackoffTests(unittest.TestCase):
 
     def test_a_rest_401_backs_off_too(self):
         http = FakeHttp(status=401)
-        adapter = HomeAssistantAdapter(BASE, "wrong-token", "light.den", ws_factory=lambda url, timeout: None,
+        adapter = HomeAssistantAdapter(BASE, "wrong-token", "light.hall", ws_factory=lambda url, timeout: None,
                                        http=http, rest_poll=0.02)
         self.addCleanup(adapter.close)
         with patch.object(ha_module, "AUTH_BACKOFF", 0.2), patch.object(ha_module, "AUTH_BACKOFF_MAX", 100.0), \
@@ -71,7 +71,7 @@ class AuthBackoffTests(unittest.TestCase):
 
 class ForbiddenTests(unittest.TestCase):
     def test_a_403_is_forbidden_not_a_rejected_token(self):
-        adapter = HomeAssistantAdapter(BASE, "t0k", "light.den", ws_factory=lambda url, timeout: None,
+        adapter = HomeAssistantAdapter(BASE, "t0k", "light.hall", ws_factory=lambda url, timeout: None,
                                        http=FakeHttp(status=403))
         self.addCleanup(adapter.close)
         with self.assertRaises(HomeAssistantError) as caught:
@@ -80,7 +80,7 @@ class ForbiddenTests(unittest.TestCase):
         adapter._rest_refresh()
         self.assertEqual(adapter.read_state()["reason"], "forbidden")
         with self.assertRaises(HomeAssistantError) as caught:
-            adapter.call_service("light", "turn_on", {"entity_id": "light.den", "brightness_pct": 30})
+            adapter.call_service("light", "turn_on", {"entity_id": "light.hall", "brightness_pct": 30})
         self.assertEqual(caught.exception.outcome, "forbidden")
         result = adapter.test_connection()
         self.assertEqual((result["ok"], result["outcome"]), (False, "forbidden"))

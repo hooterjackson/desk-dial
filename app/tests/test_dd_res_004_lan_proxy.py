@@ -38,7 +38,7 @@ class LanClientsIgnoreSystemProxy(unittest.TestCase):
     def test_lan_clients_ignore_system_proxy(self):
         url = "http://homeassistant.local:8123"
         with patch.dict(os.environ, PROXY_ENV):
-            adapter = HomeAssistantAdapter(url, "t0k", "light.den")
+            adapter = HomeAssistantAdapter(url, "t0k", "light.hall")
             session = adapter._session()
             self.addCleanup(session.close)
             settings = session.merge_environment_settings(url + "/api/states", {}, None, None, None)

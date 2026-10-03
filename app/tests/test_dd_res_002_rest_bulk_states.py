@@ -22,11 +22,11 @@ def area_states(lights=30, scenes=20):
     states = []
     for n in range(lights):
         state = light_state(brightness=100 + n)
-        state["entity_id"] = f"light.den_{n:02d}"
+        state["entity_id"] = f"light.hall_{n:02d}"
         states.append(state)
     for n in range(scenes):
-        states.append({"entity_id": f"scene.den_{n:02d}", "state": "2026-09-28",
-                       "attributes": {"friendly_name": f"Hall scene {n:02d}", "entity_id": ["light.den_00"]}})
+        states.append({"entity_id": f"scene.hall_{n:02d}", "state": "2026-09-28",
+                       "attributes": {"friendly_name": f"Hall scene {n:02d}", "entity_id": ["light.hall_00"]}})
     return states
 
 
@@ -77,22 +77,22 @@ class RestBulkTests(unittest.TestCase):
     def test_a_light_gone_from_the_bulk_read_leaves_the_aggregate(self):
         adapter, http, clock = self.make_area()
         adapter._rest_refresh()
-        del http.states["light.den_29"]
+        del http.states["light.hall_29"]
         clock.now += 2
         adapter._rest_refresh()
         rows = {row["entity_id"]: row for row in adapter.read_state()["lights"]}
-        self.assertFalse(rows["light.den_29"]["available"])
+        self.assertFalse(rows["light.hall_29"]["available"])
 
     def test_a_small_single_light_setup_reads_its_entities(self):
         http = FakeHttp()
-        adapter = HomeAssistantAdapter(BASE, "t0k", "light.den", ws_factory=lambda url, timeout: None, http=http)
+        adapter = HomeAssistantAdapter(BASE, "t0k", "light.hall", ws_factory=lambda url, timeout: None, http=http)
         self.addCleanup(adapter.close)
         adapter._rest_refresh()
         self.assertEqual([r[1] for r in http.requests],
-                         [BASE + "/api/states/light.den", BASE + "/api/states/scene.desk_dial_snapshot"])
+                         [BASE + "/api/states/light.hall", BASE + "/api/states/scene.desk_dial_snapshot"])
 
     def test_the_poll_stretches_after_repeated_websocket_failures(self):
-        adapter = HomeAssistantAdapter(BASE, "t0k", "light.den", http=FakeHttp())
+        adapter = HomeAssistantAdapter(BASE, "t0k", "light.hall", http=FakeHttp())
         self.assertEqual([adapter._rest_poll_for(n) for n in range(5)], [2.0, 2.0, 2.0, 10.0, 10.0])
 
 
