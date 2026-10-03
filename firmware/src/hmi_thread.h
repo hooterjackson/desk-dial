@@ -21,7 +21,7 @@ typedef enum {
 // KeyEvt.type values the HMI queues for the COM task (1.0.0-cc5.4, PRESENTATION_V5 section 11;
 // hmi_api.h's KeyEvt layout is unchanged): AceButton's kEventPressed (0) and kEventReleased (1)
 // as before, and kKeyEvtHold (AceButton's kEventLongPressed, 4) for a hold (kh), queued only on the
-// claimed path for the raw at physical slot 0. A claimed key down that also sent F24 carries
+// claimed path ([r3.1] for every raw: 600 ms at physical slot 0, 1000 ms elsewhere). A claimed key down that also sent F24 carries
 // kKeyEvtHid in bit 7 ("hid":1 on its kd, 11.4); the COM task masks the type with kKeyEvtTypeMask.
 constexpr uint8_t kKeyEvtHold = AceButton::kEventLongPressed;
 constexpr uint8_t kKeyEvtHid = 0x80;
@@ -120,6 +120,7 @@ class HmiThread : public Thread<HmiThread> {
         uint8_t num_key_codes = 0;
         uint8_t last_num_key_codes = 0;
         uint8_t current_key_codes[6] = { 0 };
+        uint8_t last_key_codes[6] = { 0 };      // the key codes of the last keyboard report TinyUSB accepted
         uint8_t keyState = 0;
         uint8_t current_mouse_buttons = 0;
         uint8_t last_mouse_buttons = 0;
@@ -128,7 +129,15 @@ class HmiThread : public Thread<HmiThread> {
 
         // button handler
         void handleKeyAction(keyAction& action, uint8_t eventType);
+        // Every pass: the offline system volume decision (offline_update()); entering the mode releases what the
+        // PC still holds, since the profile's release actions are suppressed while it runs (FW-BUG-014).
+        void offlineTick(uint32_t now);
+        // Every key code, mouse button and gamepad button marked down is let go (handleHid() sends the empty
+        // reports on the next passes) and a pending F24 release is dropped with it. Also when a new hmiConfig is
+        // taken, whose release actions no longer match what the old one pressed (FW-BUG-015).
+        void releaseHeldHid();
         void handleHid();
+        void handleConsumer();   // 1.0.0-cc5.7 (plan F3): the offline system volume's Consumer reports
 
         // knob
         float lastValue;

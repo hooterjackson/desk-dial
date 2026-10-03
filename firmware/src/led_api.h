@@ -14,7 +14,9 @@ typedef struct {
 
 
     // Light Settings
-    bool led_enable = true; 
+    // Profile "ledEnable". false keeps the native (profile) ring and button LEDs dark (HmiThread::nativeLeds /
+    // nativeKeyLeds, FW-BUG-039); the host-claimed alive engine does not read it. Default true.
+    bool led_enable = true;
 
     uint8_t led_brightness = 100; // 0-255
 

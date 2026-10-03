@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 28 px
  * Bpp: 1
- * Opts: --bpp 1 --size 28 --font /Users/karolmalota/SquareLine/assets/idlecat-Regular-2.otf -o /Users/karolmalota/SquareLine/assets/ui_font_idleArrow28.c --format lvgl -r 0x46-0x47 --no-compress --no-prefilter
+ * Opts: --bpp 1 --size 28 --font /Users/<user>/SquareLine/assets/idlecat-Regular-2.otf -o /Users/<user>/SquareLine/assets/ui_font_idleArrow28.c --format lvgl -r 0x46-0x47 --no-compress --no-prefilter
  ******************************************************************************/
 
 #include "../ui.h"

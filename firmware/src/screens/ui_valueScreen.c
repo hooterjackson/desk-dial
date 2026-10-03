@@ -1,5 +1,9 @@
 #include "../ui.h"
 
+// FW-DES-007: the offline PC volume view (defined in cc_display.cpp, C linkage) and its source (hmi_thread.cpp).
+void cc_native_pc_volume_attach(lv_obj_t* group, lv_obj_t* number, lv_obj_t* arc, bool (*source)(int32_t* steps));
+bool hmi_pc_volume_source(int32_t* steps);
+
 
 void ui_valueScreen_screen_init(void)
 {
@@ -192,5 +196,11 @@ lv_obj_set_style_text_color(ui_IdleCatShadow, lv_color_hex(0x9C9C9C), LV_PART_MA
 lv_obj_set_style_text_opa(ui_IdleCatShadow, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_IdleCatShadow, &ui_font_IdleCat, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_add_flag( ui_IdleCatShadow, LV_OBJ_FLAG_HIDDEN );   // Hide Default
+
+/* 
+    FW-DES-007: offline PC volume (no Desk Dial, the knob sends volume keys and cannot read the PC level):
+    a fixed "PC volume" label with a brief + / - tick replaces the number and the half arc while the mode runs.
+*/
+cc_native_pc_volume_attach(ui_dataScreen, ui_posIndicator, ui_Arc1, hmi_pc_volume_source);
 
 }

@@ -81,3 +81,9 @@
 
 #define SYSEX_BINARIS_ID 0xB1
 #define SYSEX_NANO_ID 0x01
+
+#ifdef __cplusplus
+// FW-BUG-017 (main.cpp): false when LVGL's objects were compiled with another lv_conf.h than src/ (their
+// lv_obj_t sizes differ, e.g. LV_OBJ_STYLE_CACHE 0 vs 1): the image mixes two layouts and must not draw.
+bool cc_lvgl_layout_ok();
+#endif

@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 60 px
  * Bpp: 1
- * Opts: --bpp 1 --size 60 --font /Users/karolmalota/SquareLine/assets/idlecat-Regular.otf -o /Users/karolmalota/SquareLine/assets/ui_font_IdleCat.c --format lvgl -r 0x41-0x45 --no-compress --no-prefilter
+ * Opts: --bpp 1 --size 60 --font /Users/<user>/SquareLine/assets/idlecat-Regular.otf -o /Users/<user>/SquareLine/assets/ui_font_IdleCat.c --format lvgl -r 0x41-0x45 --no-compress --no-prefilter
  ******************************************************************************/
 
 #include "../ui.h"

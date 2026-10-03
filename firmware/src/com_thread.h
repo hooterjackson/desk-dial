@@ -48,6 +48,10 @@ class ComThread : public Thread<ComThread> {
         void handleProfilesCommand(JsonVariant p);
         void handleMessages();
         void handleEvents();
+        void serviceCalibration();   // 1.0.0-cc5.7 (plan F2)
+
+        bool cal_primed = false;
+        uint32_t cal_result_seen = 0, cal_state_seen = 0;
 
         void dispatchLedConfig();
         void dispatchHapticConfig();

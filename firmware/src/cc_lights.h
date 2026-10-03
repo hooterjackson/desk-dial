@@ -29,7 +29,13 @@
 
 constexpr uint8_t CC_RING_LEDS = 60;
 
-enum CCFlashKind : uint8_t { CC_FLASH_NONE, CC_FLASH_OK, CC_FLASH_ERR };
+// CC_FLASH_WASH (3, append-only): the alive engine's LIGHTS-family ok, a 700 ms green wash of the whole ring
+// (ALIVE.md section 15, presentation 6); the V4 model never produces it.
+// CC_FLASH_REFUSED (4) and CC_FLASH_HOME (5), append-only (ALIVE.md 15.7, Desk Dial r3): the unavailable-press
+// flash (bottom segments 26..34 red, 320 ms) and the matured hold-1 flash (the whole ring warm 0.68, 400 ms).
+// [r3.1] CC_FLASH_LAND (6) and CC_FLASH_QUEUE (7): the button-4 hold landings (ALIVE.md 15.8).
+enum CCFlashKind : uint8_t { CC_FLASH_NONE, CC_FLASH_OK, CC_FLASH_ERR, CC_FLASH_WASH, CC_FLASH_REFUSED, CC_FLASH_HOME,
+                             CC_FLASH_LAND, CC_FLASH_QUEUE };
 
 // One ring or button light before drive scaling. Plain aggregate (C++11).
 struct CCLedCell {

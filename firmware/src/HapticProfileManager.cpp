@@ -1,8 +1,10 @@
 
 #include "./HapticProfileManager.h"
 #include "./DeviceSettings.h"
+#include "haptic_bounds.h"   // haptic_profile_sanitize() (1.0.0-cc5.5 F1)
 #include "SPIFFS.h"
 #include "audio/audio_api.h"
+#include "cc_serial_out.h"     // cc_send_note(): bounded diagnostics (FW-BUG-001)
 
 #include "class/hid/hid.h"
 
@@ -29,6 +31,7 @@ HapticProfileManager::~HapticProfileManager() { };
 
 
 HapticProfile* HapticProfileManager::add(String name) {
+  if (name.length()==0) return nullptr; // FW-SEC-001: "" marks a free slot, never a profile
   for (int i=0; i<MAX_PROFILES; i++) {
     if (profiles[i].profile_name=="") {
       profiles[i].profile_name = name;
@@ -64,22 +67,22 @@ HapticProfile* HapticProfileManager::operator[](int index) {
 
 
 HapticProfile* HapticProfileManager::get(String name) {
-  for (int i=0; i<MAX_PROFILES; i++) {
-    if (profiles[i].profile_name==name) {
-      return &profiles[i];
-    }
-  }
-  return nullptr;
+  // FW-SEC-001: an empty name finds nothing (it used to find the first FREE slot; haptic_bounds.h).
+  const int i = haptic_profile_find(profiles, MAX_PROFILES, name);
+  return i>=0 ? &profiles[i] : nullptr;
 };
 
 
 
 void HapticProfileManager::remove(String name) {
-  for (int i=0; i<MAX_PROFILES; i++) {
-    if (profiles[i].profile_name==name) {
-      profiles[i].profile_name = "";
-      return;
-    }
+  const int i = haptic_profile_find(profiles, MAX_PROFILES, name);
+  if (i<0) return;
+  profiles[i].profile_name = "";
+  // FW-SEC-001: removing the current profile makes the next named profile current (never a blank slot). Only
+  // when no profile is left does it stay on the freed slot (the "load" reload, fromSPIFFS(), replaces it).
+  if (current_profile==&profiles[i]) {
+    const int next = haptic_profile_next_named(profiles, MAX_PROFILES, i);
+    if (next>=0) current_profile = &profiles[next];
   }
 };
 
@@ -166,7 +169,7 @@ String HapticProfileManager::getPrevProfileName(){
 
 
 void HapticProfileManager::fromSPIFFS() {
-  Serial.println("Loading profiles from SPIFFS...");
+  cc_send_note("Loading profiles from SPIFFS...");  // FW-BUG-001: never waits (COM task, watchdog off)
   // load profiles from SPIFFS
   int count = 0;
   File dir = SPIFFS.open(PROFILES_DIRECTORY, "r");
@@ -174,32 +177,28 @@ void HapticProfileManager::fromSPIFFS() {
     File file = dir.openNextFile();
     while (file) {
       if (!file.isDirectory() && String(file.name()).endsWith(".json")) {
-          Serial.print("Loading profile: ");
-          Serial.println(file.name());
+          cc_send_note((String("Loading profile: ") + file.name()).c_str());
           // load the profile
           JsonDocument doc;
           DeserializationError error = deserializeJson(doc, file);
           if (error) {
-            Serial.print("ERROR: Failed to parse profile: ");
-            Serial.println(file.name());
+            cc_send_note((String("ERROR: Failed to parse profile: ") + file.name()).c_str());
           }
           else {
             HapticProfile* profile = add(doc["name"].as<String>());
             if (profile!=nullptr) {
-              Serial.print("Added profile: ");
-              Serial.println(profile->profile_name);
+              cc_send_note((String("Added profile: ") + profile->profile_name).c_str());
               JsonObject obj = doc.as<JsonObject>();
               *profile = obj;
               profile->dirty = (obj["version"].isNull() || obj["version"].as<int>()!=PROFILE_VERSION);
               if (profile->dirty && obj["version"].is<int>())
                 updateProfile(profile, obj["version"].as<int>());
-              if (current_profile==nullptr)
+              if (current_profile==nullptr || current_profile->profile_name=="") // FW-SEC-001: never a freed slot
                 current_profile = profile; // set first loaded profile as current TODO remember last profile used
               count++;
             }
             else {
-              Serial.print("ERROR: Failed to add profile: ");
-              Serial.println(file.name());
+              cc_send_note((String("ERROR: Failed to add profile: ") + file.name()).c_str());
             }
           }
       }
@@ -209,12 +208,11 @@ void HapticProfileManager::fromSPIFFS() {
     dir.close();
   }
   if (count==0) {
-    Serial.println("No profiles found.");
+    cc_send_note("No profiles found.");
     // add a default profile
     HapticProfile* profile = add("Default Profile"); // structs are initialized with default values
     if (profile!=nullptr) {
-      Serial.print("Added profile ");
-      Serial.println(profile->profile_name);
+      cc_send_note((String("Added profile ") + profile->profile_name).c_str());
       // only for the default profile, set a default key-mapping
       profile->hmi_config.keys[0].num_pressed_actions = 1;
       profile->hmi_config.keys[0].pressed[0].type = keyActionType::KA_PROFILE_NEXT;
@@ -250,30 +248,29 @@ void HapticProfileManager::fromSPIFFS() {
       current_profile = profile;
     }
     else {
-      Serial.println("FATAL: Failed to add default profile.");
+      cc_send_note("FATAL: Failed to add default profile.");
       while (1);
     }
   }
   else {
-    Serial.print(count);
-    Serial.println(" profiles loaded.");
+    cc_send_note((String(count) + " profiles loaded.").c_str());
   }
 };
 
 
 
 void HapticProfileManager::toSPIFFS() {
-  Serial.println("Saving profiles to SPIFFS...");
+  cc_send_note("Saving profiles to SPIFFS...");  // FW-BUG-001: never waits (COM task, watchdog off)
   File dir = SPIFFS.open(PROFILES_DIRECTORY, "r");
   if (!dir) {
-    Serial.println("Creating profiles directory...");
+    cc_send_note("Creating profiles directory...");
     if (!SPIFFS.mkdir(PROFILES_DIRECTORY)){
-      Serial.println("ERROR: Failed to create profiles directory.");
+      cc_send_note("ERROR: Failed to create profiles directory.");
       return;
     }
     dir = SPIFFS.open(PROFILES_DIRECTORY, "r");
     if (!dir) {
-      Serial.println("ERROR: Failed to open profiles directory.");
+      cc_send_note("ERROR: Failed to open profiles directory.");
       return;
     }
   }
@@ -282,21 +279,14 @@ void HapticProfileManager::toSPIFFS() {
   while (file) {
     String filename = file.name();
     if (!file.isDirectory() && String(filename).endsWith(".json")) {
-      bool found = false;
-      for (int i=0; i<MAX_PROFILES; i++) {
-        if (profiles[i].profile_name!="") {
-          if (String(filename).endsWith(profiles[i].profile_name+".json")) {
-            found = true;
-            break;
-          }
-        }
-      }
+      // FW-BUG-038: exactly "<name>.json" (haptic_bounds.h), never a suffix match: a deleted "Master Volume.json"
+      // is removed although "Volume" lives.
+      const bool found = haptic_profile_file_kept(profiles, MAX_PROFILES, filename.c_str());
       file.close();
       if (!found) {
         String remove = PROFILES_DIRECTORY;
         remove += "/" + filename;
-        Serial.print("Removing deleted profile: ");
-        Serial.println(remove);
+        cc_send_note((String("Removing deleted profile: ") + remove).c_str());
         SPIFFS.remove(remove);
       }
     }
@@ -305,8 +295,7 @@ void HapticProfileManager::toSPIFFS() {
   // then save any dirty profiles to SPIFFS
   for (int i=0; i<MAX_PROFILES; i++) {
     if (profiles[i].profile_name!="" && profiles[i].dirty) {
-      Serial.print("Saving profile: ");
-      Serial.println(profiles[i].profile_name);
+      cc_send_note((String("Saving profile: ") + profiles[i].profile_name).c_str());
       String filename = PROFILES_DIRECTORY;
       filename += "/";
       filename += profiles[i].profile_name;
@@ -321,8 +310,7 @@ void HapticProfileManager::toSPIFFS() {
         profiles[i].dirty = false;
       }
       else {
-        Serial.print("ERROR: Failed to save profile: ");
-        Serial.println(profiles[i].profile_name);
+        cc_send_note((String("ERROR: Failed to save profile: ") + profiles[i].profile_name).c_str());
       }
     }
   }
@@ -356,9 +344,17 @@ HapticProfile::~HapticProfile() { };
 HapticProfile& HapticProfile::operator=(JsonObject& obj) {
   // if (!obj["id"].isNull())
   //   profile_id = obj["id"].as<int>();
-  update_field(obj, name, profile_name);
+  // FW-SEC-001: a rename keeps a usable name: "" would free this slot under the profile (and the current profile).
+  if (obj["name"].is<String>() && haptic_profile_name_ok(obj["name"].as<String>())) {
+    profile_name = obj["name"].as<String>(); dirty = true;
+  }
   update_field(obj, desc, profile_desc);
   update_field(obj, profileTag, profile_tag);
+  // FW-BUG-027: desc <= 50 and tag <= 20 bytes (cut at a UTF-8 boundary), whether updated or loaded from a file.
+  { const unsigned keep = haptic_profile_text_keep(profile_desc, kHapticProfileDescMaxBytes);
+    if (keep < profile_desc.length()) { profile_desc = profile_desc.substring(0, keep); dirty = true; } }
+  { const unsigned keep = haptic_profile_text_keep(profile_tag, kHapticProfileTagMaxBytes);
+    if (keep < profile_tag.length()) { profile_tag = profile_tag.substring(0, keep); dirty = true; } }
   // led config fields
   update_field(obj, ledEnable, led_config.led_enable);
   update_field(obj, ledBrightness, led_config.led_brightness);
@@ -432,6 +428,9 @@ HapticProfile& HapticProfile::operator=(JsonObject& obj) {
           update_field(haptic, outputRamp, hmi_config.knob.values[i].haptic.output_ramp);
           update_field(haptic, detentStrength, hmi_config.knob.values[i].haptic.detent_strength);
         }
+        // 1.0.0-cc5.5 (F1): detentCount >= 1, vernier >= 1, endPos >= startPos, for a profile loaded from
+        // SPIFFS and one updated by a command alike (haptic_bounds.h; a valid profile is unchanged).
+        haptic_profile_sanitize(hmi_config.knob.values[i].haptic);
         String type = value["type"].as<String>();
         if (type=="midi") {
           hmi_config.knob.values[i].type = knobValueType::KV_MIDI;
@@ -515,9 +514,14 @@ void HapticProfile::keyActionFromJSON(JsonObject& obj, keyAction& action) {
       update_field(obj, val, action.midi.val);
     }
     else if (type=="key") {
+      // FW-BUG-040: hid shares a union with midi/mouse/pad; a binding that changes type to "key" starts from an
+      // empty key list (not hid.num = the old midi.channel, key_codes[0] = the old cc), and a new keyCodes list
+      // leaves no stale code past its own count.
+      if (action.type != keyActionType::KA_KEY) memset(&action.hid, 0, sizeof action.hid);
       action.type = keyActionType::KA_KEY;
       if (!obj["keyCodes"].isNull()) {
         JsonArray keys = obj["keyCodes"].as<JsonArray>();
+        memset(action.hid.key_codes, 0, sizeof action.hid.key_codes);
         action.hid.num = min((int)keys.size(), MAX_KEY_KEYCODES);
         for (int k=0; k<action.hid.num; k++) {
           action.hid.key_codes[k] = keys[k].as<uint8_t>();
@@ -545,7 +549,8 @@ void HapticProfile::keyActionFromJSON(JsonObject& obj, keyAction& action) {
       }
       dirty = true;
     }
-    else if (type=="profile" && obj["name"].is<String>()) {
+    // FW-BUG-011: "profile" is the documented type; "profiles" is what earlier firmware wrote to SPIFFS (still read).
+    else if ((type=="profile" || type=="profiles") && obj["name"].is<String>()) {
       action.type = keyActionType::KA_PROFILE_CHANGE;
       action.profile = obj["name"].as<String>();
       dirty = true;
@@ -712,7 +717,7 @@ void HapticProfile::keyActionToJSON(JsonObject& obj, keyAction& action){
       obj["buttons"] = action.pad.buttons;
       break;
     case keyActionType::KA_PROFILE_CHANGE:
-      obj["type"] = "profiles";
+      obj["type"] = "profile"; // FW-BUG-011: the type keyActionFromJSON() reads (was "profiles": lost on reboot)
       obj["name"] = action.profile;
       break;
     case keyActionType::KA_PROFILE_NEXT:

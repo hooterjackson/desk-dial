@@ -22,13 +22,6 @@ void cc_art_init() {
     store.init(memory);
 }
 namespace {
-bool validKey(const char* key) {
-    const size_t size = strlen(key);
-    if (!size || size > 64) return false;
-    for (size_t i = 0; i < size; ++i)
-        if (!isalnum(static_cast<unsigned char>(key[i])) && key[i] != '_' && key[i] != '-') return false;
-    return true;
-}
 bool uintValue(JsonVariant v) { return v.is<uint32_t>() && !v.is<bool>(); }
 }
 bool cc_art_available() { return store.available(); }
@@ -42,7 +35,7 @@ void cc_art_command(JsonVariant c, uint32_t currentId, const char* currentKey) {
     cc_crumb_com(!strcmp(op, "begin") ? CC_COM_OP_ART_BEGIN : !strcmp(op, "data") ? CC_COM_OP_ART_DATA
                  : !strcmp(op, "commit") ? CC_COM_OP_ART_COMMIT : CC_COM_OP_ART_OTHER,
                  CC_COM_STAGE_LINE, c["offset"] | 0U);
-    if (!uintValue(c["id"]) || !id || id != currentId || !validKey(key) || strcmp(key, currentKey)) error = "Stale artwork selection";
+    if (!uintValue(c["id"]) || !id || id != currentId || !cc_art_valid_key(key) || strcmp(key, currentKey)) error = "Stale artwork selection";
     else if (!store.available()) error = "Artwork memory unavailable";
     else {
         xSemaphoreTake(mutex, portMAX_DELAY);
@@ -63,8 +56,7 @@ void cc_art_command(JsonVariant c, uint32_t currentId, const char* currentKey) {
         xSemaphoreGive(mutex);
     }
     JsonDocument out; auto ack = out["artAck"].to<JsonObject>();
-    ack["id"] = id; ack["key"] = key; ack["op"] = op; ack["offset"] = offset;
-    if (error) ack["error"] = error;
+    cc_art_ack(ack, id, key, op, offset, error);
     cc_send_json(out);
 }
 const uint8_t* cc_art_pixels(const char* key) {

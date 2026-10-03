@@ -96,7 +96,7 @@ $env:PLATFORMIO_CORE_DIR='<pio-core>'
 ```
 
 - Environment `nanofoc_d`. Dependencies are pinned in `platformio.ini`: LVGL 9.0.0, ArduinoJson 7.0.2, FastLED 3.6.0 and the others.
-- The short `PLATFORMIO_CORE_DIR` (the `pio-knob` junction points at `work/platformio-core`) avoids GCC's command-line length limit on Windows.
+- The short `PLATFORMIO_CORE_DIR` (the `pio-knob` junction points at `tools/platformio-core`) avoids GCC's command-line length limit on Windows.
 - Output: `.pio/build/nanofoc_d/firmware.bin`.
 
 Building does not flash. Installation writes the application image to the
@@ -205,6 +205,12 @@ index and the detent origin change.
  "diag":1}}
 ```
 
+- 1.0.0-cc5.6 adds `"appCanvas":1` after `"glyphs"` ([App canvas](#app-canvas-a2-100-cc56)).
+- 1.0.0-cc5.7 adds `"feel":1,"hapticFx":1,"knobSound":1,"offlineVolume":1,"recalibration":1,"knobVolume":1` after `"appCanvas"`
+  ([Feel and sound](#feel-and-sound-r4-100-cc57)).
+- App profiles add `"appProfiles":1,"appProfileSlots":4,"appProfileMaxBytes":32768,"appProfileFeatures":31` after
+  `"knobVolume"` ([App profiles](#app-profiles-upload-and-store)); `appCanvas:1` stays.
+
 - `artwork.available` is false when the PSRAM cover store could not be allocated. Text controls are unaffected.
 - `artwork2` (1.0.0-cc5.3) is added after `artwork`, with the fields in ARTWORK2.md section 1
   order; every other key is byte-identical to cc5.2. `artwork2.available` is false when either
@@ -229,6 +235,10 @@ index and the detent origin change.
 | `windowsButton` | Raw button index 0..3 |
 | `buttonOrder` | Optional. A permutation of 0..3 mapping physical left-to-right positions to raw indices. Default identity. |
 | `windowsHidEnabled` | Optional boolean, default true |
+| `feel` | 1.0.0-cc5.7, optional: an r4 feel token ([Feel and sound](#feel-and-sound-r4-100-cc57)); absent = the preset's legacy feel |
+| `reducedHaptics` | 1.0.0-cc5.7, optional boolean, default false |
+| `sound` | 1.0.0-cc5.7, optional int 0..3 (off, Low, Medium, High = volume 0 / 40 / 70 / 100 %), default 0 |
+| `soundVolume` | 1.0.0-cc5.7 (`knobVolume`, 2026-09-30), optional int 0..100: the master volume percent; overrides `sound` |
 | `frame` | A complete contract-v4 frame |
 
 Errors:
@@ -238,6 +248,7 @@ Errors:
 - `"Invalid button order"`
 - `"Windows HID enable must be a boolean"`
 - `"Control ID must advance; wait for release before reconnecting"`: the ID did not advance, or a release is in progress.
+- 1.0.0-cc5.7: `"Invalid feel token"`, `"Reduced haptics must be a boolean"`, `"Invalid sound level"`.
 
 Once motor, LEDs and LCD have applied the entry, the knob replies
 `{"ready":id,"p":position}`. The frame embedded in `control` is what the knob
@@ -263,6 +274,137 @@ The host sends a current frame at least every **500 ms**. The companion's
 DeviceBridge re-sends the latest frame after 0.5 s without one, and the runtime
 sends a frame whenever it changes. An identical (heartbeat) frame starts no
 animation and re-sets no text.
+
+### Feel and sound (r4, 1.0.0-cc5.7)
+
+The normative spec is [HAPTICS.md](HAPTICS.md) (plan stages F2 and F3). On the wire:
+
+- **Control** `feel` (`detent.value`, `detent.dimmer`, `detent.list`, `detent.coarse`, `detent.fine`, `fluid.scrub`,
+  `fluid.light`, `free.spin`), `reducedHaptics` and `sound` (0..3), each per control, never stored; a release restores
+  the native profile, legacy and silent. A control without them runs the 1.0.0-cc5.6 haptic loop exactly.
+- **Frame** `haptic`: `{"token": "confirm.tick" | "confirm.thump" | "confirm.off" | "nudge.left" | "nudge.right" |
+  "refuse.buzz" | "error.buzz", "seq": 1..0x7FFFFFFF}` on any layout, the strict rule (`Invalid control frame`). Each new
+  seq plays once; a claim seeds it. Desk Dial keeps the newest event in every frame until the next.
+- **Recalibration**: `{"recalibrate":true}` or `{"recalibrate":{"acceptDirection":true}}` (refused while claimed, as
+  before) answers `{"calibrating":true}`, then `{"calibrated":{"ok":bool,"reason":...}}` (HAPTICS.md section 11). The
+  plain-text "Recalibrating motor" line is gone.
+- **Offline volume**: the HID interface gains a Consumer Control collection as report ID 4; while no host has the port
+  open for 2 s the knob steps the PC's volume (HAPTICS.md section 9). Nothing else about USB changes.
+- **Diag** (additive): `supplyVolts`, `feel`, `reducedHaptics`, `soundLevel`, `fxPlayed`, `fxPulses`, `fxDropped`,
+  `wallHits`, `wallDir`, `foldbackPct`, `foldbackEvents`, `tripLatched`, `spinTrips`, `offlineVolume`, `calState`,
+  `calOutcome`, `audioReady`, `audioPlayed`, `audioUnderruns`, `audioDropped`,
+  `audioSuperseded` (waiting sound requests outranked by a louder one, or by a newer one of equal gain).
+
+Compatibility: Desk Dial 7.2.x on this firmware sends none of these and gets the cc5.6 feel, no sound, the same walls
+(the r4 wall law runs only with a feel token) and the same protocol; Desk Dial 7.3 on cc5.6 / cc5.5 sends none of them
+(device.py gates each on its capability) and keeps today's profiles.
+
+### App canvas (A2, 1.0.0-cc5.6)
+
+Karl Malota's app UI for Onshape on the knob (adapted from `katbinaris/NanoD_RatchetH1` @
+`feat/firmware-esp-idf-quadra`, with permission; every ported file credits him in its header). The
+capabilities reply adds `"appCanvas":1` (after `glyphs`; nothing else changes). A host that never sends
+the frame's `app` object sees 1.0.0-cc5.5 D exactly.
+
+**The `app` object** (optional, top level of any frame, any layout; `cc_frame_parse.cpp` `parse_app`, the
+host reading is `device.app_parse`, both held to one table by `harness/app_canvas_tests.py`):
+
+```json
+"app": {"id": "onshape", "crc": 0, "slot": "zoom" | "orbit" | "pan" | "tilt" | "knob" | "f1" … "f4",
+        "refused": false, "flash": 12,
+        "wheel": {"ring": 0, "index": 2},
+        "param": {"ring": 0, "index": 2, "mode": "A" | "B", "value": 300, "step": 1, "bump": 0},
+        "echo":  {"ring": 0, "index": 2, "seq": 4}}
+```
+
+| Field | Rule (anything else rejects the whole frame) | Meaning |
+|---|---|---|
+| `id` | required, 1..11 characters of `[a-z0-9_-]` (app profiles; before: only `"onshape"`) | the profile: an uploaded one ([App profiles](#app-profiles-upload-and-store)), or the built-in Onshape (`cc_app_onshape.c`) for `"onshape"` with `crc` 0 |
+| `crc` | optional int 0..0xFFFFFFFF, default 0 (app profiles) | the CRC-32 of the uploaded profile the host means; 0 = the built-in Onshape |
+| `slot` | required, `zoom` / `orbit` / `pan` / `tilt` (tilt: the 1.0.0-cc5.6 rebuild for Desk Dial 7.2.2.0; an older host never sends it), or `knob` / `f1` / `f2` / `f3` / `f4` (app profiles: the profile's own slots, values 4..8 after the legacy 0..3) | the cube scene the knob's turn drives; a profile slot takes its label and micro-interaction from the profile |
+| `refused` | optional bool | the action line reads POINT AT MODEL (amber) |
+| `flash` | optional int 0..0x7FFFFFFF | a change = the 260 ms amber Undo flash (F3 UNDO) |
+| `wheel` | optional; `ring` 0..7, `index` 0..32 (app profiles; before 0..15) | present = the command wheel is shown; index 0 = cancel |
+| `param` | optional; `ring` 0..7, `index` 1..32, `mode` `A`/`B`, `value` int ±99,999,999 (thousandths), `step` 0..2, `bump` optional int 0..0x7FFFFFFF, `axis` optional int 0..3, `plane` optional bool (app profiles) | parameter mode: A shows `value` as the change (+0.30), B as the value; `step` lights 0.01 / KNOB 0.1 / 1.0; a `bump` change nudges the card 3 px for 90 ms; `axis` the live constraint X / Y / Z / uniform (absent = the profile's `axis_default`), `plane` true = the plane of that axis (the axis key with Shift) |
+| `echo` | optional; `ring` 0..7, `index` 1..32, `seq` 1..0x7FFFFFFF | a `seq` change replays that command's card for 1.1 s |
+
+Unknown keys inside `app` are ignored. Ring / index values outside the profile draw as "cancel" (the
+wheel) or fall back to the main screen (param, echo).
+
+**The one non-strict rule (app profiles, APP_PROFILES.md section 8):** a well-formed `id` that is not loaded, or a
+`crc` that differs from the loaded copy, is **accepted**; the LCD thread then draws the neutral "Loading…" app screen
+(`cc_app_store_acquire()` returns NULL) instead of rejecting the frame. A malformed `id` or `crc` still rejects it.
+`CCAppState::id` is the id text (`char[12]`, `""` without an `app` object; `cc_app_present()`), plus `crc`.
+`sizeof(CCFrame)` is 1,316 B (+16 from 1,300 B; xtensa g++, ILP32).
+
+**Drawing.** While a frame with `app` is current the LCD thread does not call `lv_timer_handler()` (LVGL is
+paused: no refresh, no flush, no LVGL heap use) and `CCAppCanvas` (`cc_app_canvas.*`) draws the UI into a
+PSRAM 240 × 240 RGB565 frame (115,200 B) with plain rect fills (`cc_app_gfx.*`: a thin shim in place of
+LovyanGFX; the Silkscreen 8 / 10 px pixel fonts, the Onshape icons). Each frame is pushed in ten 24-row
+chunks through LVGL's own two internal draw buffers, idle meanwhile, as DMA bounce buffers (`draw_buf`,
+`draw_buf2`; `pushImageDMA` on the one TFT_eSPI instance, its transaction and MOSI routing unchanged), then
+`dmaWait`. When the frame loses its `app` (or the session ends) the active LVGL screen is invalidated and
+the host frame re-rendered, so LVGL redraws in full. The PSRAM frame and the plasma tables (~8.6 KB) are
+allocated once at LCD start; without them an app frame shows the LVGL text screen (A0's). The canvas
+pushes count in `lcdFps` and `lcdFlushUs`; no new diag field.
+
+**Local, not host-driven:** the cube follows the knob's own sensor angle (`cc_app_angle_read()`, 1e-4 rad,
+one aligned word the FOC task writes each pass from the angle it already reads) with Karl's stepped poses
+(32 per turn, zoom in 1/8 doublings, pan in 2 px) and the 220 ms ease to the nearest 45° + k·90° pose when
+orbit ends; in `tilt` the view's pitch follows the knob instead (the same 32-per-turn steps about the 30° rest,
+a vertical ring beside the cube carries the marker) and eases back to the 30° rest over 220 ms when tilt ends;
+a jump above 2 rad between passes (a re-anchor) is ignored. The keycaps light from the HMI's
+live key mask (physical order through `buttonOrder`); parameter mode's "RELEASE: OK / CANCEL" bar runs from
+the local button-3 press (600 ms). The idle plasma starts after 5 s without knob motion, a key change or a
+new app state, and any of them ends it.
+
+**Pacing:** a moving cube, a wheel slide, the flash / echo / nudge edges and every new state draw at most
+once per `CC_LCD_PERIOD_MS` (D 16 ms, F 12 ms), and a moving cube only when its stepped pose changes;
+looping animations (card keyframes, the plasma, the hold bar) redraw every 33 ms (Karl's ~30 fps); a still
+screen draws nothing. Frame time ≈ draw (~1.1–1.9 ms, model) + 11.8 ms push at 80 MHz: ~60 fps on D,
+~73–77 fps on F for moving screens (`app-canvas-report.json`; diag `lcdFps` measures it on the knob).
+Asleep (`cc_sleep`): nothing is drawn.
+
+**LEDs:** unchanged. The frame around the `app` object is A0's text frame (ring `off`), which the HMI's
+ALIVE engine renders as today.
+
+### App profiles (upload and store)
+
+The contract is [APP_PROFILES.md](APP_PROFILES.md) (wire 1): the DDAP wire profile, the `appProfile` messages and
+the frame additions above. The profile model is adapted from Karl Malota's (katbinaris) app profiles,
+`feat/firmware-esp-idf-quadra`, with permission. The knob side:
+
+- **Decoder** (`cc_app_store.c`, pure C99): `cc_app_decode()` checks every rule of APP_PROFILES.md sections 2-4 in
+  a first pass that also sizes the result, then fills one allocation (the profile, its rings, commands, scenes,
+  keyframes, elements, params, NUL-terminated strings and icons). Strict: the CRC-32, the exact `total`, unknown or
+  inconsistent feature bits (the header's bits must be exactly what the content uses), every string, enum, range,
+  count and index; the reason code and offset of section 6, nothing partly loaded. A search or macro command must
+  carry an empty key.
+- **Store:** RAM only (PSRAM through `cc_app_store_device.cpp`; nothing is written to flash, a reboot empties it):
+  4 entries, 128 KB of decoded profiles, LRU by last draw (an upload counts as a draw). The LCD thread draws through
+  `cc_app_store_acquire(id, crc)` / `cc_app_store_release()`: an acquired profile is never freed; eviction or
+  replacement retires it and its last release frees it. `("onshape", 0)` is the built-in Onshape unless an upload
+  with crc 0 exists. A static FreeRTOS mutex guards the records (COM writes, LCD reads).
+- **Upload** (`cc_app_store_msg.cpp`; the COM task routes `{"appProfile":...}` before every other command; RAM only,
+  so it is allowed during a claim and never renews the lease): one at a time (a `begin` drops the earlier upload),
+  offsets strictly in order, a PSRAM staging buffer of `bytes` (<= 32768) from `begin` to `end`, base64 decoded
+  straight into it, dropped after 2000 ms without `begin` / `data` (checked every COM pass and by each message).
+  Replies: a successful `begin` has none (the first `data` line's `ack` follows); `data` -> `{"ack":next}`; `end` ->
+  `{"id","crc","ok":true}`; `list` -> `{"loaded":[{"id","crc"}...]}`, most recently drawn first, uploads only.
+  Errors: `crc` (begin's crc is not the CRC-32 of the received bytes before the trailer, or not a u32), `size`
+  (bytes 0 or > 32768, b64 empty, > 3000 characters or not padded standard base64, a chunk past `bytes`, `end` before
+  every byte), `order` (data / end without an upload, an offset other than the next byte, an id that is not 1..11 of
+  `[a-z0-9_-]`, a malformed field, an unknown op), `busy` (no staging memory; the store cannot make room because
+  acquired profiles hold the budget), `wire` (wire not 1), `decode:<code>@<offset>` (the decoder; `11@16` when the
+  blob names another id than `begin`; `13@0` when PSRAM is exhausted). Any error ends the upload.
+- **Internal heap:** a data line is at most ~3,050 B (the 4096 B line limit holds). ArduinoJson 7.0.2 copies the b64
+  string while parsing; growing it to 4095 characters makes a 4,104 B block, which the S3 malloc policy
+  (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` 4096) places in PSRAM. Measured on an ILP32 build
+  (`harness/app_store_tests.py`): 4,179 B peak in internal-sized blocks, 4,164 B held after the parse
+  (the 3,009 B string, the 1 KB variant pool, the keys), 8,204 B for every block together; the media data line
+  (2,732 characters) costs the same within ~270 B. The staging buffer and the decoded profiles are PSRAM only.
+- **Tests:** `harness/app_store_tests.py` (MSVC /W4 /WX; the fuzz and a COM-vs-LCD thread stress also
+  under /fsanitize=address).
 
 ### Lease
 
@@ -309,6 +451,16 @@ Turns are sent as `{"id":id,"p":position}`: absolute positions within the entry'
 
 Buttons are sent as `{"id":id,"ks":mask,"kd":n}` or `{"id":id,"ks":mask,"ku":n}`.
 They use raw indices; frame legends and LED pairs follow `buttonOrder`.
+
+**Key state on position lines (1.0.0-cc5.5, F1).** A position line of the ready control is
+`{"id":id,"p":position,"ks":mask}`. Its `ks` is the mask the knob last reported (on a `kd`, `ku`, `kh` or
+`ready` line) AND the buttons down now, so it can only **clear** bits, never set them: a press is always
+reported by its own `kd`, and a key-up that was lost (the key event queue, 16 events since 1.0.0-cc5.5, was
+full) is cleared by the next turn. While a key event is still queued the line repeats the last reported mask,
+so it never runs ahead of a `ku` on its way (the HMI queues a `ku` before it publishes the cleared bit; COM
+reads the live mask, then the queue). An older host that copies any `ks` into its pressed mask (Desk Dial v7)
+therefore never loses a `kd` or a `ku` to a position line; a newer one clears the bits and reports each as a
+release. Native (unclaimed) position lines are unchanged.
 
 - **Tagging.** While claimed, only events tagged with the current ID are sent, and only after its `ready` reply went out. Nothing is emitted while entering or releasing, and events are never replayed after a release or reconnect.
 - **F24.** When `windowsHidEnabled` is true, the Windows button emits one 60 ms USB HID F24 pulse in addition to its tagged event, if the frame's legend for it is enabled. The host de-duplicates the two paths. Simulated sessions set `windowsHidEnabled:false`.
@@ -377,6 +529,32 @@ fields ignores the others. Sizes are in bytes:
 | `mediaEvictions` | Valid slots evicted by a `begin` since boot (reusing an invalid slot is not an eviction). 1.0.0-cc5.3 | `cc_media` |
 | `jpegDecodes`, `jpegDecodeErrors` | Cover decodes the LCD attempted and those that failed, since boot. 1.0.0-cc5.3 | `cc_jpeg`, counted in `cc_jpeg_decode_240` |
 | `jpegDecodeMsMax`, `jpegDecodeMsLast` | The longest and the last cover decode, in ms rounded up (`esp_timer_get_time`), failed decodes included. 1.0.0-cc5.3 | `cc_jpeg` |
+
+**1.0.0-cc5.5 (F1, safety and measurement).** Appended by `cc_diag_live()`, all additive (the capabilities
+are unchanged):
+
+| Field | Meaning | Source |
+|---|---|---|
+| `usbMidiOk`, `usbHidOk` | TinyUSB accepted the MIDI and HID interfaces at boot (booleans). A refusal is reported, never waited on | `HmiThread::init_usb()` in `setup()` |
+| `hidRetries` | HID reports TinyUSB refused (endpoint busy) since boot; each is retried on the next HMI pass. At most one report goes out per pass, and a report is marked sent only when TinyUSB accepts it | `HmiThread::handleHid()` |
+| `pdRead` | The STUSB4500 RDO_STATUS read (I2C 0x28, register 0x91, four bytes LSB first, up to three tries) worked | `HmiThread::init_pd()` in `setup()`, before the threads |
+| `pdPdo` | RDO bits 30:28: the position of the source PDO the knob requested (1..7); 0 = no explicit contract (plain Type-C / USB 5 V) or the read failed | same |
+| `pdVolts` | The voltage of the knob's own sink PDO at that position (DPM_SNK_PDO1..3, bits 19:10 x 50 mV, whole volts): 5 or 9 as `init_pd()` programs PDO1 / PDO2; 0 = unknown (no contract, a position past three, a failed read). PD sources list their fixed supplies in ascending voltage from 5 V, so position 2 is the 9 V offer of a charger that has one | same |
+| `pdRdo` | The raw 32-bit RDO; only when `pdRead` | same |
+| `focLoopHz` | FOC loop passes in the last completed second; 0 when no second completed for 2 s | `cc_diag_foc_pass()`, once per FOC pass |
+| `focLoopUsMax` | The longest pass-to-pass interval since the previous read (µs; reset on read). A recalibration or a blocked pass shows here | same |
+| `uqAbsMax` | The largest \|`motor.voltage.q`\| since the previous read, in **millivolts** (reset on read). The haptic PID peaks at 0.4 x 5.3 = 2.12 V | same |
+| `uqCapMs` | Milliseconds since boot with \|Uq\| at the motor voltage cap (within 0.1 %) | same |
+| `uqCapMv` | That cap, `motor.voltage_limit`, in millivolts: 2200 | same |
+
+The motor output cap: `foc_thread.cpp` sets `motor.voltage_limit = 2.2` before `motor.init()` (phase
+resistance 5.3 kept; it acts as the gain of torque voltage mode). `motor.init()` also clamps the alignment
+voltage to it. No `{"R":…}` register write can raise it: after every write `voltage_limit` and
+`voltage_sensor_align` are brought back into [0, 2.2]; writes of `REG_PHASE_VOLTAGE` (0x16),
+`REG_DRIVER_VOLTAGE_LIMIT` (0x53) and `REG_DRIVER_VOLTAGE_PSU` (0x55) are refused and answered with the
+unchanged value (`HapticCommander.h`). The motor driver (STSPIN233 VS) runs from VBUS through a load switch
+with no regulator: on a 9 V PD contract (`pdVolts` 9) the same 2.2 V command is about 1.8 times the drive of a
+5 V contract, because `voltage_power_supply` stays 5 until F2 scales it from the contract.
 
 **Reboot detection.** A host compares two replies: a different `bootCount`, or a
 smaller `uptimeMs` with the same `bootCount`, means the knob reset in between.
@@ -761,7 +939,7 @@ decoder's RGB888 is within PSNR ≥ 40 dB of Pillow's RGB888 decode, and the glu
 bit-exact to the section 7 rounding of that RGB888. It is met: worst decoder 43.14 dB with
 Pillow 12.3, 0 glue mismatches (`jpeg_tests.py --section10-rule decoder-rgb888` exits 0). The
 text before the ruling (RGB565 against Pillow after RGB565 rounding) measured 39.40 dB for
-`cover-heligoland-album`: rounding both sides turns TJpgDec's ±1 RGB888 differences (a floored
+`cover-glass weather-album`: rounding both sides turns TJpgDec's ±1 RGB888 differences (a floored
 IDCT and replicated chroma, shared by the ROM's R0.01b) into whole RGB565 steps, which is why
 the ruling does not compare RGB565 with RGB565. `jpeg_tests.py` still reports that reading, the
 RGB565-vs-unrounded-RGB888 reading (worst 40.08 dB) and 4:4:4 host encoding (worst 40.71 dB at

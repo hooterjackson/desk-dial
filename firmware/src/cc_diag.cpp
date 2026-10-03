@@ -3,6 +3,13 @@
 #include "cc_jpeg.h"
 #include "cc_media.h"
 #include "cc_sleep.h"
+#include "cc_haptic_fx.h"
+#include "cc_wall.h"
+#include "cc_boot_cal.h"     // CCMotorCal: the diag motorCal names (FW-BUG-030)
+#include "foc_thread.h"      // cc_foc_feel_diag() (1.0.0-cc5.7)
+#include "audio/audio.h"     // audioPlayer.counters() (1.0.0-cc5.7)
+#include "nanofoc_d.h"       // cc_lvgl_layout_ok() (FW-BUG-017, main.cpp)
+#include "cc_fw_version.h"   // cc_fw_build(): the internal build id (FW-PUB-004)
 #include <Arduino.h>
 #include <esp_attr.h>
 #include <esp_err.h>
@@ -58,6 +65,10 @@ constexpr const char* kLcdSteps[] = {"wait", "host", "render", "refresh", "timer
 constexpr const char* kHmiSteps[] = {"wait", "config", "buttons", "hid", "leds", "show",
                                      "show-ring", "show-buttons", "led-recover"};
 constexpr const char* kLiveNames[] = {"hmi", "lcd", "com", "foc"};
+// FW-BUG-030: diag motorCal, indexed by cc_boot_cal.h CCMotorCal.
+constexpr const char* kMotorCal[] = {"starting", "aligning", "ready", "unstored", "failed"};
+static_assert(CC_MOTOR_CAL_STARTING == 0 && CC_MOTOR_CAL_ALIGNING == 1 && CC_MOTOR_CAL_READY == 2 &&
+              CC_MOTOR_CAL_UNSTORED == 3 && CC_MOTOR_CAL_FAILED == 4, "kMotorCal follows CCMotorCal");
 
 template <size_t N>
 const char* name_of(const char* const (&names)[N], uint32_t index) {
@@ -178,6 +189,79 @@ void cc_crumb_hmi(uint8_t step) {
 }
 void cc_live_foc() { live_foc_ticks = static_cast<uint32_t>(xTaskGetTickCount()); }
 
+namespace {
+// 1.0.0-cc5.5 (F1): USB interfaces and the PD contract (setup(), before the threads), and the HID and
+// FOC loop measurements (cc_diag.h). Each word has one writer; the COM task only reads, except that it
+// zeroes the two maxima after a read (a pass landing in between loses its maximum, never more).
+struct Power {
+    bool usbChecked = false, usbMidiOk = false, usbHidOk = false;
+    bool pdChecked = false, pdRead = false;
+    bool pdNvmRewritten = false;            // FW-BUG-022: init_pd() rewrote the sink PDO table this boot
+    uint32_t pdRdo = 0, pdMillivolts = 0;
+};
+Power power;
+volatile uint32_t hid_retries = 0;          // HMI task
+struct FocWork {                            // FOC task only
+    bool started = false;
+    uint32_t lastUs = 0, windowStartUs = 0, windowLoops = 0, capUs = 0;
+};
+FocWork foc_work;
+constexpr uint32_t kFocWindowUs = 1000000;
+volatile uint32_t foc_hz = 0;               // passes per second over the last completed window
+volatile uint32_t foc_hz_ticks = 0;         // xTaskGetTickCount() when foc_hz was published
+volatile uint32_t foc_us_max = 0;           // longest pass-to-pass interval since the last read (µs)
+volatile uint32_t foc_uq_max_mv = 0;        // largest |Uq| since the last read (mV)
+volatile uint32_t foc_cap_ms = 0;           // time at the voltage cap since boot (ms)
+volatile uint32_t foc_cap_mv = 0;           // the cap (mV), set by the first pass
+}
+
+void cc_boot_usb(bool midiOk, bool hidOk) {
+    power.usbMidiOk = midiOk; power.usbHidOk = hidOk; power.usbChecked = true;
+}
+void cc_boot_pd(bool readOk, uint32_t rdo, uint32_t sinkMillivolts) {
+    power.pdRead = readOk; power.pdRdo = readOk ? rdo : 0; power.pdMillivolts = readOk ? sinkMillivolts : 0;
+    power.pdChecked = true;
+}
+void cc_diag_hid_retry() { hid_retries = hid_retries + 1u; }
+uint32_t cc_boot_pd_volts() { return power.pdChecked && power.pdRead ? (power.pdMillivolts + 500u) / 1000u : 0u; }
+void cc_boot_pd_nvm_rewritten() { power.pdNvmRewritten = true; }
+bool cc_boot_pd_contract(uint32_t& position, uint32_t& millivolts, bool& nvmRewritten) {
+    const bool read = power.pdChecked && power.pdRead;
+    position = read ? (power.pdRdo >> 28) & 0x7u : 0u;
+    millivolts = read ? power.pdMillivolts : 0u;
+    nvmRewritten = power.pdNvmRewritten;
+    return read;
+}
+
+void cc_diag_foc_pass(uint32_t nowUs, float uq, float capV) {
+    FocWork& w = foc_work;
+    const float magnitude = uq < 0.0f ? -uq : uq;
+    const uint32_t mv = static_cast<uint32_t>(magnitude * 1000.0f + 0.5f);
+    if (mv > foc_uq_max_mv) foc_uq_max_mv = mv;
+    if (!w.started) {
+        w.started = true;
+        w.lastUs = w.windowStartUs = nowUs;
+        foc_cap_mv = static_cast<uint32_t>(capV * 1000.0f + 0.5f);
+        return;
+    }
+    const uint32_t dt = nowUs - w.lastUs;
+    w.lastUs = nowUs;
+    if (dt > foc_us_max) foc_us_max = dt;
+    // At the cap: within 0.1 % of it (SimpleFOC clamps Uq to exactly voltage_limit).
+    if (capV > 0.0f && magnitude >= capV * 0.999f) {
+        w.capUs += dt;
+        if (w.capUs >= 1000u) { foc_cap_ms = foc_cap_ms + w.capUs / 1000u; w.capUs %= 1000u; }
+    }
+    ++w.windowLoops;
+    const uint32_t elapsed = nowUs - w.windowStartUs;
+    if (elapsed >= kFocWindowUs) {
+        foc_hz = static_cast<uint32_t>((static_cast<uint64_t>(w.windowLoops) * 1000000u + elapsed / 2u) / elapsed);
+        foc_hz_ticks = static_cast<uint32_t>(xTaskGetTickCount());
+        w.windowLoops = 0;
+        w.windowStartUs = nowUs;
+    }
+}
+
 void cc_diag_boot(JsonObject d) {
     d["resetReason"] = name_of(kResetNames, boot.reason);
     d["resetCode"] = boot.reason;
@@ -228,6 +312,11 @@ void cc_diag_boot(JsonObject d) {
     }
     static constexpr const char* kRxQueue[] = {"unknown", "internal", "psram", "default"};
     d["rxQueue"] = name_of(kRxQueue, boot.rxQueue);
+    // FW-BUG-017: "mixed" when LVGL and src/ were compiled with different lv_conf.h files (the screen stays off).
+    d["lvglLayout"] = cc_lvgl_layout_ok() ? "ok" : "mixed";
+    // FW-PUB-004: settings "firmwareVersion" carries the public version ("<public>+<build id>.<letter>"), so the
+    // diag keeps the internal build id the tooling and manifests key on (cc_fw_build(), cc_fw_version.h).
+    d["firmwareBuild"] = cc_fw_build();
 }
 
 namespace {
@@ -330,6 +419,51 @@ void cc_diag_live(JsonObject d) {
     d["idleMs"] = sleep.idleMs;
     d["sleepDimMs"] = kCCSleepDimMs;
     d["sleepOffMs"] = kCCSleepOffMs;
+    // 1.0.0-cc5.5 (F1, cc_diag.h): USB interfaces, HID retries, the PD contract and the FOC loop.
+    if (power.usbChecked) { d["usbMidiOk"] = power.usbMidiOk; d["usbHidOk"] = power.usbHidOk; }
+    d["hidRetries"] = static_cast<uint32_t>(hid_retries);
+    if (power.pdChecked) {
+        d["pdRead"] = power.pdRead;
+        d["pdPdo"] = power.pdRead ? (power.pdRdo >> 28) & 0x7u : 0u;
+        d["pdVolts"] = (power.pdMillivolts + 500u) / 1000u;
+        if (power.pdRead) d["pdRdo"] = power.pdRdo;
+    }
+    const uint32_t ticks = static_cast<uint32_t>(xTaskGetTickCount());
+    const bool focCurrent = foc_hz_ticks != 0 && age_ms(ticks, foc_hz_ticks) * portTICK_PERIOD_MS < 2000u;
+    d["focLoopHz"] = focCurrent ? static_cast<uint32_t>(foc_hz) : 0u;
+    d["focLoopUsMax"] = static_cast<uint32_t>(foc_us_max);
+    foc_us_max = 0;                          // reset on read
+    d["uqAbsMax"] = static_cast<uint32_t>(foc_uq_max_mv);
+    foc_uq_max_mv = 0;                       // reset on read
+    d["uqCapMs"] = static_cast<uint32_t>(foc_cap_ms);
+    d["uqCapMv"] = static_cast<uint32_t>(foc_cap_mv);
+    // 1.0.0-cc5.7 (r4 FEEL + SOUND; cc_diag.h): the FOC task's feel words, the wall counter, recalibration, audio.
+    CCFocFeelDiag feel;
+    cc_foc_feel_diag(feel);
+    d["supplyVolts"] = (static_cast<uint32_t>(feel.supplyDeciVolts) + 5u) / 10u;
+    d["supplyAssumed"] = feel.supplyAssumed;   // FW-BUG-022: no readable contract voltage, the supply was assumed
+    d["feel"] = cc_feel_name(feel.feel);
+    d["reducedHaptics"] = feel.reduced;
+    // feel.sound is the master volume percent (2026-09-30): soundVolume, and soundLevel its nearest `sound` level.
+    d["soundLevel"] = static_cast<uint32_t>(cc_sound_level_of_volume(feel.sound));
+    d["soundVolume"] = static_cast<uint32_t>(feel.sound);
+    d["fxPlayed"] = feel.fxPlayed; d["fxPulses"] = feel.fxPulses; d["fxDropped"] = feel.fxDropped;
+    d["wallHits"] = cc_wall_count(); d["wallDir"] = static_cast<int>(cc_wall_dir());
+    d["foldbackPct"] = static_cast<uint32_t>(feel.foldPct); d["foldbackEvents"] = feel.foldEvents;
+    d["tripLatched"] = feel.tripLatched; d["spinTrips"] = feel.trips;
+    d["offlineVolume"] = feel.offline;
+    // Rest sleep (2026-09-30): asleep now, and how often it fell asleep / woke since boot.
+    d["restAsleep"] = feel.restAsleep; d["restSleeps"] = feel.restSleeps; d["restWakes"] = feel.restWakes;
+    // FW-BUG-030: the motor is calibrated (never enabled otherwise) and the boot alignment's state.
+    d["motorReady"] = feel.motorReady;
+    d["motorCal"] = name_of(kMotorCal, feel.motorCal);
+    const cc_haptic_detail::Shared& shared = cc_haptic_detail::shared();
+    d["calState"] = cc_cal_state_name(shared.calState);
+    d["calOutcome"] = shared.calResult ? cc_cal_outcome_name(shared.calOutcome) : "";
+    const CCSoundCounters sound = audioPlayer.counters();
+    d["audioReady"] = sound.ready; d["audioPlayed"] = sound.played;
+    d["audioUnderruns"] = sound.underruns; d["audioDropped"] = sound.dropped;
+    d["audioSuperseded"] = sound.superseded;   // waiting requests outranked by a louder or newer equal-gain one (FW-BUG-021)
 }
 
 void cc_diag_media(JsonObject d) {

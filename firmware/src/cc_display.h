@@ -1,6 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "cc_presentation.h"
+#include "cc_lcd_logic.h"
 
 // Host-owned LCD screen (presentation 5: PRESENTATION_V5.md section 8, "K1"; presentation-4
 // frames draw with the same v5 geometry and inks, section 2.3). Platform-neutral: compiled
@@ -101,21 +102,20 @@ void cc_display_offline(bool nativeInput);
 // True while the offline layer is up (cc_display_offline() since the last render).
 bool cc_display_offline_shown();
 
-// The offline layer's "first native input" (section 8.10; AL 8.1: an FOC position change or a
-// button state change while unclaimed), from what the caller samples on every pass while the
-// layer shows: the FOC position and a native button edge counter (every debounced press and
-// release the unclaimed button handler saw; 0 when the caller has no such source). A counter, not
-// the key mask: a press and its release can both fall between two samples. Latched until reset.
-struct CCOfflineInput {
-    bool armed;          // the reference values below were taken (the layer's first pass)
-    bool native;         // native input seen since then (kept until the next claim)
-    uint16_t pos;        // FOC position at the first pass
-    uint32_t keyEdges;   // button edge counter at the first pass
-};
-// Every pass while the offline layer shows (before cc_display_offline()); returns `native`.
-bool cc_offline_input_update(CCOfflineInput& input, uint16_t pos, uint32_t keyEdges);
-// The offline layer was left (a claim, a handback): the next update takes new references.
-void cc_offline_input_reset(CCOfflineInput& input);
+// r4 input moments (design_handoff_nano_d_r4 README 3.2; MOTION.md). Both run on the LVGL thread.
+// The physical buttons down now (bit n = physical slot n, left to right = the footer icons), every LCD pass (a
+// changed mask is the edge): M7 the press squash on the footer icon of a pressed button and its spring-back on
+// release; M10 the hold fill of the button-4 icon while slot 3 is held on a holdMarker screen (1000 ms; an early
+// release drains it; a landing, the first new ok feedback within 1.5 s of its maturity, pops it, M8).
+void cc_display_input(uint8_t keysDown);
+// A wall hit (cc_wall.h: a detent refused at a bound; dir +1 past the end / max, -1 past the start / min), once per
+// new hit: M13 the content moves 9 px towards the wall in 90 ms E.out and rebounds on SPRING.wall (not under
+// reduced motion, offline or before the first render).
+void cc_display_wall(int8_t dir);
+
+// The offline layer's "first native input" (section 8.10): CCOfflineInput, cc_offline_input_update() and
+// cc_offline_input_reset() live in cc_lcd_logic.h (header-only, FW-BUG-042), with the native motion counter the
+// LCD thread feeds them.
 
 // lcdLateRefrs / lcdMaxGapMs (section 12.3: "intervals > 1.5 x period while animating; worst
 // gap"), measured on the ANIMATION cadence, not between refreshes that flushed pixels. LVGL runs
@@ -138,7 +138,10 @@ struct CCAnimCadence {
 void cc_anim_cadence_sample(CCAnimCadence& cadence, uint32_t animTimerLastRunMs, bool animating, uint32_t periodMs);
 // The sample from LVGL's own state (lv_anim_get_timer(), lv_anim_count_running()): call it after
 // every lv_timer_handler() pass, on the LVGL thread. Returns true when a counter moved.
-bool cc_anim_cadence_poll(CCAnimCadence& cadence);
+// lvglPaused: lv_timer_handler() did not run this pass (the app canvas is up, lcd_thread's app_on). A paused
+// pass ends the episode like "no animation" (FW-BUG-044): the animations stay listed while the timer cannot
+// run, so without it the first run after the app session would be one interval as long as the session.
+bool cc_anim_cadence_poll(CCAnimCadence& cadence, bool lvglPaused);
 
 // Render diagnostics (counters since boot, plus the last render's outcome). lcd_thread uses
 // lastChanged/lastAnimated to present a non-animated change immediately (lv_refr_now) instead of
@@ -157,7 +160,18 @@ struct CCDisplayStats {
     uint32_t artDecodeAborts;    // R5 decodes that completed aborted (artDecodeAborts)
     uint32_t artDecodeStale;     // R5 completions discarded because the key moved on (artDecodeStale)
     uint32_t inkFades;     // footer / idle ink crossfades started (section 5.2, 160 ms)
-    uint32_t lineFades;    // meta / status text-at-rest fades started (section 8.5.4, 160 ms)
+    uint32_t lineFades;    // meta / status text-at-rest fades started (section 8.5.4; r4 M6: + the 10 px rise)
+    // r4 motion (README section 3.2; MOTION.md).
+    uint32_t glides;       // M4 / M5 glides started (a detent on a list, a new song)
+    uint32_t trackChanges; // M5
+    uint32_t presses;      // M7 squashes started
+    uint32_t pops;         // M8 landing pops started
+    uint32_t morphs;       // M9 Play <-> Pause morphs started
+    uint32_t holdFills;    // M10 hold fills started
+    uint32_t landings;     // M10 fills that landed (a new feedback within the window)
+    uint32_t walls;        // cc_display_wall() calls
+    uint32_t wallBounces;  // M13 bounces started (not under reduced motion, offline or before a render)
+    uint32_t a8Direct;     // A8 masks drawn straight from flash (the renderer's own decoder)
     int32_t lastSlide;     // last render: +20 (deeper, enters from the right), -20 (back) or 0
     bool lastScreenChange; // last render started a screen change (slide or, from offline / reduced, fade only)
     bool lastChanged;      // last render changed anything on screen
@@ -171,7 +185,9 @@ const CCDisplayStats& cc_display_stats();
 struct CCLcdPerf {
     uint32_t lcdFps;          // refreshes that reached the panel in the last full second
     uint32_t lcdFpsAnimMin;   // lowest 1 s lcdFps while animations ran (reset on read; 0 = none)
-    uint32_t lcdRefrUsMax;    // LV_EVENT_REFR_START -> REFR_READY (+ the final dmaWait), us
+    // LV_EVENT_REFR_START -> REFR_READY (+ the final dmaWait), us, of the refreshes that reached the panel in the
+    // last full second (FW-PERF-010: windowed like lcdFps; 0 when none did). Before it they were since boot.
+    uint32_t lcdRefrUsMax;
     uint32_t lcdRefrUsAvg;
     uint32_t lcdRenderUsMax;  // time inside cc_display_render(), us
     uint32_t lcdFlushUs;      // flush share of the last second, us (SPI transfer or DMA wait)
@@ -189,7 +205,7 @@ struct CCLcdPerf {
     uint32_t stackArtDec;     // decode-task stack free bytes (0 when artAsync is 0)
     // 12.6 errata E-lcd (binaries D and E): lcdMosiSig read at init and once per second, buildBinary at init.
     uint32_t lcdMosiSig;      // GPIO matrix output signal on TFT_MOSI: 103 FSPID (good), 102 FSPIQ (A's defect)
-    uint32_t buildBinary;     // CC_BUILD_BINARY: 1..5 = ladder binary A..E (diag "build"), 0 = none
+    uint32_t buildBinary;     // CC_BUILD_BINARY: 1..6 = ladder binary A..F (diag "build"), 0 = none
 };
 // A copy of the counters; resets lcdFpsAnimMin (section 12.3 "reset on read"). Device only.
 CCLcdPerf cc_lcd_perf_read();

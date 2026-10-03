@@ -30,7 +30,11 @@ static_assert(68 * (255 + 132 + 36) * 150 == 16920 * 255, "B = 68 * (255 + 132 +
 static_assert(powerBudget == 16920.0f, "powerBudget is B = 16920 exactly");
 static_assert(CC_RING_LEDS + 4 * buttonLedsPerSlot == 68, "B covers the 60 ring + 8 button LEDs");
 static_assert(CC_FX_TYPES == 17, "durations[] / foreground[] cover every effect type");
-static_assert(CC_ALIVE_CLASS_Q == 8, "the alpha tables cover every class");
+static_assert(CC_ALIVE_CLASS_F == 13, "the alpha tables cover every class");
+static_assert(sizeof(alphaAwakeWarm) / sizeof(alphaAwakeWarm[0]) == CC_ALIVE_CLASS_W + 1, "alpha table size");
+static_assert(sizeof(alphaAwakeSemantic) / sizeof(alphaAwakeSemantic[0]) == CC_ALIVE_CLASS_W + 1, "alpha table size");
+static_assert(sizeof(alphaResting) / sizeof(alphaResting[0]) == CC_ALIVE_CLASS_W + 1, "alpha table size");
+static_assert(arcStart + arcLength - 60 == 23, "the r3 arc ends at 22; 23..37 stay free");
 
 // sRGB EOTF at e = i/256, i = 0..256 (section 9, [D3]); linear interpolation
 // between entries stays within 6e-6 of the formula (alive_tests checks 1e-4).
@@ -327,6 +331,88 @@ int draw_lap(const CCFrame& f, CCAliveTargets& out) {
     return h;
 }
 
+// [r3] 15.2 the Lights arc: segment of arc position k (0..44).
+int arc_segment(int k) { return mdi(arcStart + k); }
+
+// [r3] 15.2 bri: the arc filled to n = round(45 v / 100) segments in the Kelvin colour (ACCENT, never sat()),
+// class 3 (1.0) while turning (layout lightsbig) else L (0.34); the rest OFF ([user 2026-09-29]; class T unused). Cursor: the last filled
+// segment (arc position 0 when n == 0).
+int draw_bri(const CCFrame& f, int v, bool turning, CCAliveTargets& out) {
+    const uint32_t rgb = cc_kelvin_rgb(f.ringKelvin);
+    const int n = (v * arcLength + 50) / 100;
+    // [user 2026-09-29] (ALIVE.md 15.2) the unfilled arc is OFF: no track (0.08 drifted to olive on the LEDs).
+    for (int k = 0; k < n && k < arcLength; ++k)
+        put(out, arc_segment(k), CC_ALIVE_ROLE_ACCENT, turning ? CC_ALIVE_CLASS_3 : CC_ALIVE_CLASS_L, rgb);
+    return arc_segment(n > 0 ? n - 1 : 0);
+}
+
+// [r3] 15.2 ctemp: the whole arc in the selected Kelvin colour; marker m = round(44 value / 100) class 3 (1.0),
+// below it class 3 while turning else F (0.50), above it OFF ([user 2026-09-29]; class R unused). Cursor: the marker.
+int draw_ctemp(const CCFrame& f, bool turning, CCAliveTargets& out) {
+    const uint32_t rgb = cc_kelvin_rgb(f.ringKelvin);
+    const int v = f.ringValue <= 100 ? f.ringValue : 100;
+    const int m = (v * (arcLength - 1) + 50) / 100;
+    // [user 2026-09-29] (ALIVE.md 15.2) the remainder above the marker is OFF (0.12 drifted to olive).
+    for (int k = 0; k <= m; ++k)
+        put(out, arc_segment(k), CC_ALIVE_ROLE_ACCENT,
+            k == m || turning ? CC_ALIVE_CLASS_3 : CC_ALIVE_CLASS_F, rgb);
+    return arc_segment(m);
+}
+
+// [r3] 15.2 clusters: N (1..20) clusters of 3 segments around centres round(60 s / N) of the whole ring (wrapping
+// at 0), WARM; the selected one class 3 (1.0) drawn last, the others O (0.18). Cursor: the selected centre.
+int draw_clusters(const CCFrame& f, int index, CCAliveTargets& out) {
+    const int n = f.ringCount;
+    if (n < 1 || n > CC_CLUSTERS_MAX || index < 0 || index >= n) return 0;
+    int selected = 0;
+    for (int c = 0; c < n; ++c) {
+        const int centre = (120 * c + n) / (2 * n);
+        if (c == index) {
+            selected = centre;
+            continue;
+        }
+        for (int k = -1; k <= 1; ++k) put(out, centre + k, CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_O);
+    }
+    for (int k = -1; k <= 1; ++k) put(out, selected + k, CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_3);
+    return mdi(selected);
+}
+
+// [r3] 15.7 marker: a white marker +-1 (ACCENT class 3) at pos = round(44 index / max(1, count - 1)) (half up);
+// the rest of the arc is OFF ([user 2026-10-03], like the Lights arcs and the queue ring: no sub-floor dim
+// segments; the design's rest class M, WARM 0.10, is not drawn; CC_ALIVE_CLASS_M stays in the enum, unused).
+// Cursor: the marker's centre.
+int draw_marker(const CCFrame& f, int index, CCAliveTargets& out) {
+    const int n = f.ringCount;
+    if (n < 1 || index < 0 || index >= n) return 0;
+    const int span = n - 1 > 1 ? n - 1 : 1;
+    const int pos = (2 * index * (arcLength - 1) + span) / (2 * span);
+    for (int k = pos - 1; k <= pos + 1; ++k)
+        if (k >= 0 && k < arcLength) put(out, arc_segment(k), CC_ALIVE_ROLE_ACCENT, CC_ALIVE_CLASS_3, markerRgb);
+    return arc_segment(pos);
+}
+
+// [r3.1] 15.9 queue (the whole-queue Tracks and Up next; r3.1 prototype R.queue): row j sits at arc position
+// round(44 j / max(1, count - 1)). The playing row (`now`) is one warm-white segment (queueNowRgb, class W 0.60),
+// the focus (the local index while turning) +-1 in its row's album colour (sat(); WARM without one) at class 3,
+// over it. The rest of the arc is OFF ([user 2026-09-29]: no sub-floor dim segments; the design's 0.10).
+int draw_queue(const CCFrame& f, int index, CCAliveTargets& out) {
+    const int n = f.ringCount;
+    if (n < 1 || index < 0 || index >= n || !(f.ringIndex < n)) return 0;
+    const int span = n - 1 > 1 ? n - 1 : 1;
+    const int pos = (2 * index * (arcLength - 1) + span) / (2 * span);
+    if (f.ringNow >= 0 && f.ringNow < n) {
+        const int now = static_cast<int>(f.ringNow);
+        put(out, arc_segment((2 * now * (arcLength - 1) + span) / (2 * span)), CC_ALIVE_ROLE_ACCENT,
+            CC_ALIVE_CLASS_W, queueNowRgb);
+    }
+    const ListInfo li = list_info(f, f.ringIndex);
+    const uint32_t acc = list_accent(f, li, -1, index);
+    for (int k = pos - 1; k <= pos + 1; ++k)
+        if (k >= 0 && k < arcLength)
+            put(out, arc_segment(k), acc ? CC_ALIVE_ROLE_ACCENT : CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_3, acc);
+    return arc_segment(pos);
+}
+
 // 5.2: the alpha of a lit (role, class) target.
 float ring_alpha(uint8_t role, uint8_t cls, bool asleep, bool volFull) {
     if (asleep) return alphaResting[cls];
@@ -348,7 +434,9 @@ CCAliveCell button_target(const CCFrame& f, uint8_t j, uint8_t family, bool& pau
         bool accent = false;
         const uint32_t s = b.color && f.coloredLeds ? cc_alive_sat(b.color & 0xFFFFFFu, accent) : 0u;
         if (accent) return lit(s, CC_ALIVE_ROLE_ACCENT, CC_ALIVE_CLASS_3, buttonOn);   // 5 VOC-D02
-        return lit(0, CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_3, buttonOn);                  // 6
+        // 6; [r3] (15.4, 15.7) the active mode at 0.90 in LIGHTS and on every r3 screen (a crumb).
+        return lit(0, CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_3,
+                   family == CC_ALIVE_LIGHTS || f.crumb != CC_CRUMB_NONE ? buttonActive : buttonOn);
     }
     if (b.lit == CC_LIT_OFF) return lit(0, CC_ALIVE_ROLE_WARM, CC_ALIVE_CLASS_1, buttonOff);   // 7
     if (j == 3 && (icon == CC_ICON_PLAY || icon == CC_ICON_PREV || icon == CC_ICON_NEXT || icon == CC_ICON_SWITCH))
@@ -417,6 +505,9 @@ uint8_t cc_alive_family(const CCFrame& f) {
         case CC_LAYOUT_SEEK: return CC_ALIVE_TRACKS;
         case CC_LAYOUT_UPNEXT: return CC_ALIVE_UPNEXT;
         case CC_LAYOUT_WINDOWS: return CC_ALIVE_WINDOWS;
+        case CC_LAYOUT_LIGHTS:
+        case CC_LAYOUT_LIGHTSBIG:
+        case CC_LAYOUT_SCENES: return CC_ALIVE_LIGHTS;   // [r3] 15.1
         default: return CC_ALIVE_HOME;                    // unreachable: the parser rejects other tokens
     }
 }
@@ -451,7 +542,18 @@ bool cc_alive_local(const CCFrame& frame, int32_t localPos, int32_t localMax, in
         case CC_RING_TRANSPORT:
             if (localMax == 2 && frame.activity != CC_PENDING) index = pos;
             return index >= 0;
-        default:                                          // off, and [M11] never the lap
+        case CC_RING_BRI:                                 // [r3] 15.6: the brightness profile
+            // DD-DES-003: two frames. Off: 0..100, 0 = off. On: 0..99 = 1..100 % (the wall at the 1 % floor).
+            if (localMax == 100) value = pos;
+            else if (localMax == 99) value = pos + 1;
+            return value >= 0;
+        case CC_RING_CLUSTERS:                            // [r3] 15.6: the scenes list (max count - 1)
+        case CC_RING_MARKER:                              // [r3] 15.7: the r3 Windows list (max count - 1)
+        case CC_RING_QUEUE:                               // [r3.1] 15.9: the queue (max count - 1)
+            if (frame.ringCount >= 1 && localMax == static_cast<int32_t>(frame.ringCount) - 1 &&
+                frame.activity != CC_PENDING && frame.activity != CC_LOADING) index = pos;
+            return index >= 0;
+        default:                                          // off, [M11] never the lap, [r3] never ctemp
             return false;
     }
 }
@@ -460,7 +562,7 @@ bool cc_alive_apply_local(const CCFrame& frame, int32_t localPos, int32_t localM
     out = frame;
     int32_t value = -1, index = -1;
     if (!cc_alive_local(frame, localPos, localMax, value, index)) return false;
-    if (value >= 0) out.ringValue = static_cast<uint8_t>(value);
+    if (value >= 0) out.ringValue = static_cast<uint8_t>(value);   // level and [r3] bri
     if (index >= 0) out.ringIndex = static_cast<uint16_t>(index);
     return true;
 }
@@ -553,6 +655,22 @@ void cc_alive_targets(const CCFrame* frame, const CCAliveTargetState& state, CCA
                                     state.pendingMs, out);
             break;
         case CC_RING_LAP: cursor = draw_lap(f, out); break;
+        // [r3] 15.2: turning = the lightsbig reveal (the host shows it while the knob turns, 1.4 s after).
+        case CC_RING_BRI:
+            cursor = draw_bri(f, state.localValue >= 0 ? static_cast<int>(state.localValue <= 100 ? state.localValue : 100)
+                                                       : (f.ringValue <= 100 ? f.ringValue : 100),
+                              f.layoutId == CC_LAYOUT_LIGHTSBIG, out);
+            break;
+        case CC_RING_CTEMP: cursor = draw_ctemp(f, f.layoutId == CC_LAYOUT_LIGHTSBIG, out); break;
+        case CC_RING_CLUSTERS:
+            cursor = draw_clusters(f, state.localIndex >= 0 ? static_cast<int>(state.localIndex) : f.ringIndex, out);
+            break;
+        case CC_RING_MARKER:                              // [r3] 15.7
+            cursor = draw_marker(f, state.localIndex >= 0 ? static_cast<int>(state.localIndex) : f.ringIndex, out);
+            break;
+        case CC_RING_QUEUE:                               // [r3.1] 15.9
+            cursor = draw_queue(f, state.localIndex >= 0 ? static_cast<int>(state.localIndex) : f.ringIndex, out);
+            break;
         default: break;                                   // 5.1.7 off: dark, cursor 0
     }
     out.cursor = static_cast<uint8_t>(cursor);
@@ -570,6 +688,21 @@ void cc_alive_targets(const CCFrame* frame, const CCAliveTargetState& state, CCA
         for (int k = -2; k <= 2; ++k)
             flash_put(out, cursor + k, ok ? CC_ALIVE_ROLE_GREEN : CC_ALIVE_ROLE_RED,
                       iabs(k) == 2 ? alphaFlashEdge : alphaOverride);
+    } else if (state.flash == CC_FLASH_WASH) {            // [r3] 15.5 LIGHTS ok: the whole ring GREEN 0.68
+        for (int i = 0; i < kRing; ++i) flash_put(out, i, CC_ALIVE_ROLE_GREEN, lightsWashAlpha);
+    } else if (state.flash == CC_FLASH_REFUSED) {         // [r3] 15.7 / r4 3.4 the deny glow: bottom 255,60,40 0.9
+        for (int i = refusedFirst; i <= refusedLast; ++i)
+            out.ring[i] = lit(refusedRgb, CC_ALIVE_ROLE_ACCENT, CC_ALIVE_CLASS_4, refusedAlpha);
+    } else if (state.flash == CC_FLASH_HOME) {            // [r3] 15.7 the matured hold: the ring WARM 0.68
+        for (int i = 0; i < kRing; ++i) flash_put(out, i, CC_ALIVE_ROLE_WARM, homeFlashAlpha);
+    } else if (state.flash == CC_FLASH_LAND) {            // r4 M12: the landing is the engine's sweep, no wash
+    } else if (state.flash == CC_FLASH_QUEUE) {           // [r3.1] 15.8 the queue landing: the ring GREEN 0.68
+        for (int i = 0; i < kRing; ++i) flash_put(out, i, CC_ALIVE_ROLE_GREEN, landFlashAlpha);
+    }
+    if (state.holdFill > 0) {                            // [r3] 15.7 the hold-1 progress ring replaces the ring
+        for (int i = 0; i < kRing; ++i) out.ring[i] = dark();
+        for (int k = 0; k < state.holdFill && k < arcLength; ++k)
+            flash_put(out, arc_segment(k), CC_ALIVE_ROLE_WARM, 1.0f);
     }
     for (int i = 0; i < kRing; ++i)
         out.ring[i].volRed = out.ring[i].cls != CC_ALIVE_CLASS_NONE && out.ring[i].role == CC_ALIVE_ROLE_RED;
@@ -585,10 +718,13 @@ void cc_alive_targets(const CCFrame* frame, const CCAliveTargetState& state, CCA
     out.pausedPlay = pausedPlay && !asleep;
     // 5.4 tint: the cursor's accent while browsing a list family, awake. [R2] Only an ACCENT
     // cursor tints: a sat() that fell back to WARM, a flash, the Up next card (no cell) give none.
+    // FW-BUG-024: no tint while a flash override owns the ring (the deny glow's cells are ACCENT).
     const CCAliveCell& at = out.ring[cursor];
+    const bool flashFree = state.flash == CC_FLASH_NONE || state.flash == CC_FLASH_LAND;
     const bool list = out.family == CC_ALIVE_RECENT || out.family == CC_ALIVE_EXPLORER ||
                       out.family == CC_ALIVE_UPNEXT || out.family == CC_ALIVE_WINDOWS;
-    if (list && !asleep && at.cls != CC_ALIVE_CLASS_NONE && at.role == CC_ALIVE_ROLE_ACCENT) {
+    if (list && flashFree && !asleep && f.ringStyle != CC_RING_MARKER && f.ringStyle != CC_RING_QUEUE && at.cls != CC_ALIVE_CLASS_NONE &&
+        at.role == CC_ALIVE_ROLE_ACCENT) {                // [r3] 15.7: never the white marker; [r3.1] nor the queue
         out.tintOn = true;
         unpack(at.rgb, out.tint);
     }
@@ -1100,6 +1236,14 @@ CCAlive::CCAlive() {
 }
 
 void CCAlive::reset(uint32_t now) {
+    memset(eased_, 0, sizeof(eased_));
+    memset(easedB_, 0, sizeof(easedB_));
+    memset(prevE_, 0, sizeof(prevE_));
+    memset(prevEB_, 0, sizeof(prevEB_));
+    easeResidue_ = 0.0f;
+    wallOn_ = sweepOn_ = false;
+    wallAt_ = sweepAt_ = now;
+    wallSeg_ = 0;
     animator_.reset();
     animator_.setReducedMotion(false);
     palette_ = cc_alive_palette();
@@ -1143,6 +1287,12 @@ void CCAlive::reset(uint32_t now) {
     progPos_ = progDur_ = progAt_ = 0;
     homePlaying_ = -1;
     rng_ = rngSeed;
+    holdDown_ = holdMatured_ = feedbackRefused_ = false;
+    holdAt_ = 0;
+    hold4Down_ = hold4Matured_ = false;
+    hold4At_ = 0;
+    landingOpen_ = false;
+    landingAt_ = 0;
     playAt(CC_FX_REVEAL, now, 0.0f);                      // 8.1: power-up is offline + reveal
 }
 
@@ -1160,6 +1310,9 @@ void CCAlive::claim(uint32_t now) {
     pressCount_ = detentCount_ = limitCount_ = 0;
     vel_ = 0.0f;
     hasRot_ = false;
+    holdDown_ = holdMatured_ = false;
+    hold4Down_ = hold4Matured_ = false;
+    landingOpen_ = false;
 }
 
 void CCAlive::release(uint32_t now) {
@@ -1170,6 +1323,10 @@ void CCAlive::release(uint32_t now) {
     flash_ = CC_FLASH_NONE;
     holdMs_ = 0;
     pressCount_ = detentCount_ = limitCount_ = 0;
+    holdDown_ = holdMatured_ = false;
+    hold4Down_ = hold4Matured_ = false;
+    landingOpen_ = false;
+    wallOn_ = sweepOn_ = false;
     playAt(CC_FX_DOWN, now, static_cast<float>(prevCursor_));   // snapshots the damped state now
 }
 
@@ -1193,10 +1350,26 @@ void CCAlive::limit(uint32_t now, int8_t dir) {
 }
 
 void CCAlive::press(uint32_t now, uint8_t slot) {
-    if (!claimed_ || slot > 3 || pressCount_ >= 8) return;
+    if (!claimed_ || slot > 3) return;
+    if (slot == 0) {                                      // [r3] 15.7: the hold-1 progress ring starts here
+        holdDown_ = true;
+        holdMatured_ = false;
+        holdAt_ = now;
+    }
+    if (slot == 3) {                                      // [r3.1] the button-4 hold ring starts here
+        hold4Down_ = true;
+        hold4Matured_ = false;
+        hold4At_ = now;
+    }
+    if (pressCount_ >= 8) return;
     presses_[pressCount_].now = now;
     presses_[pressCount_].value = slot;
     ++pressCount_;
+}
+
+void CCAlive::keyUp(uint32_t /*now*/, uint8_t slot) {
+    if (slot == 0) holdDown_ = holdMatured_ = false;
+    if (slot == 3) hold4Down_ = hold4Matured_ = false;
 }
 
 void CCAlive::setClock(uint32_t now, uint16_t minute) {
@@ -1265,8 +1438,30 @@ void CCAlive::feedback(const CCFrame& f, uint32_t now, const CCAliveFrameExtra& 
     feedbackColor_ = feedbackMoment_ == CC_MOMENT_SNAP || feedbackMoment_ == CC_MOMENT_STARTED
                      ? (f.feedbackColor & 0xFFFFFFu) : 0u;
     colorMode_ = f.coloredLeds;
+    feedbackRefused_ = !ok && f.feedbackMoment == CC_MOMENT_REFUSED;   // [r3] 15.7: an unavailable press
+    // [r3.1] 15.8: the first new seq after a button-4 hold matured closes its landing window; within 1500 ms a
+    // plain ok lands as CC_FLASH_LAND and ok + queued as CC_FLASH_QUEUE (no sweep, no moment hold).
+    if (landingOpen_) {
+        const bool open = static_cast<uint32_t>(now - landingAt_) < landingWindowMs;
+        landingOpen_ = false;
+        if (open && ok && !feedbackSkip_ &&
+            (feedbackMoment_ == CC_MOMENT_NONE || feedbackMoment_ == CC_MOMENT_QUEUED)) {
+            flash_ = feedbackMoment_ == CC_MOMENT_QUEUED ? CC_FLASH_QUEUE : CC_FLASH_LAND;
+            flashStart_ = now;
+            holdMs_ = 0;
+            // r4 M12: the domain swap sweeps from 12 o'clock; FW-DES-002: under reduced motion (r4 7) every LED
+            // eases at once (a blend, no sweep).
+            if (flash_ == CC_FLASH_LAND && !animator_.reducedMotion()) {
+                sweepOn_ = true;
+                sweepAt_ = now;
+            }
+            return;
+        }
+    }
     if (!ok || feedbackSkip_ || feedbackMoment_ == CC_MOMENT_NONE) {
-        flash_ = ok ? CC_FLASH_OK : CC_FLASH_ERR;         // rows a, b, i, j
+        flash_ = ok ? CC_FLASH_OK : feedbackRefused_ ? CC_FLASH_REFUSED : CC_FLASH_ERR;   // rows a, b, i, j
+        // [r3] 15.5: a plain ok (no skip, no moment) in the LIGHTS family is the 700 ms green wash.
+        if (ok && !feedbackSkip_ && cc_alive_family(f) == CC_ALIVE_LIGHTS) flash_ = CC_FLASH_WASH;
         flashStart_ = now;
         holdMs_ = 0;
         return;
@@ -1293,9 +1488,11 @@ bool CCAlive::feedbackEffect(uint32_t now, float at) {
     e.at = at;
     bool accent = false;
     if (feedbackKind_ == CC_FEEDBACK_ERR) {                                   // a
-        playAt(CC_FX_FAIL, now, at);
+        if (!feedbackRefused_) playAt(CC_FX_FAIL, now, at);                   // [r3] 15.7: no shake
         return false;
     }
+    if (flash_ == CC_FLASH_WASH) return false;            // [r3] 15.5: the wash is a target override
+    if (flash_ == CC_FLASH_LAND || flash_ == CC_FLASH_QUEUE) return false;   // [r3.1] 15.8: the landings too
     if (feedbackSkip_ != 0) {                                                 // b [M21]
         e.type = CC_FX_SWEEP;
         e.at = static_cast<float>(prevCursor_);
@@ -1398,8 +1595,10 @@ void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32
 void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32_t localMax,
                      const CCAliveFrameExtra& extra) {
     uint32_t dt = 0;                                      // section 4 frame gaps
+    uint32_t easeDt = 0;                                  // r4: the easer integrates the real gap (<= 1 s)
     if (!firstRender_) {
         dt = static_cast<uint32_t>(now - lastRender_);
+        easeDt = dt > 1000u ? 1000u : dt;
         if (dt > maxFrameGapMs) dt = maxFrameGapMs;
     }
     firstRender_ = false;
@@ -1419,15 +1618,69 @@ void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32
         pending = cc_alive_pending(*frame, localValue);
         playing = static_cast<int8_t>(family == CC_ALIVE_HOME && extra.playing >= 0 ? (extra.playing ? 1 : 0) : -1);
         pendingMs = onsets(*frame, now);
+        // DD-BUG-053 [r3.1] 15.8: a button-4 hold that matures on this render opens its landing window BEFORE the
+        // frame's feedback is read, so a host frame landing on the same render as the 1000 ms mark (ok + queued)
+        // lands as CC_FLASH_QUEUE, not as an ordinary moment. Same guards as the maturity block below (not the app
+        // canvas, holdMarker, hold 1 not running); that block keeps the fill and the 600 ms wait. App profiles: app.id
+        // is a char array, so `app.id == 0` compiled as an always-false pointer test and closed this path silently.
+        if (hold4Down_ && !hold4Matured_ && frame->holdMarker && !cc_app_present(frame->app) &&
+            !(holdDown_ && frame->crumb != CC_CRUMB_NONE) && static_cast<uint32_t>(now - hold4At_) >= hold4RingMs) {
+            hold4Matured_ = true;
+            landingOpen_ = true;
+            landingAt_ = now;
+        }
         feedback(*frame, now, extra);
         extEvent = !seeding_ && prevFamily_ == CC_ALIVE_HOME && family == CC_ALIVE_HOME && !prevExternal_ &&
                    frame->ringExternal;
         if (family == CC_ALIVE_HOME) song(now, playing);
     }
+    // [r3] 15.7 the hold-1 progress ring on a frame with a crumb (never the launcher Home): the fill from 12 %
+    // of the 600 ms hold, then (once) the WARM home flash when it matures.
+    int16_t holdFill = 0;
+    // 1.0.0-cc5.6 (A2): never on the app canvas (a frame with `app`): there 1 is ZOOM and 4 PAN, and Desk Dial's
+    // Home is all four buttons held 1 s (ONSHAPE.md) -- no hold-1 / hold-4 ring, flash or landing.
+    const bool appCanvas = live && cc_app_present(frame->app);
+    const bool hold1 = live && !appCanvas && holdDown_ && frame->crumb != CC_CRUMB_NONE;
+    if (hold1) {
+        hold4Down_ = false;                               // [r3.1] hold 1 wins: a held button 4 is dropped
+        const uint32_t held = now - holdAt_;
+        if (held >= holdRingMs) {
+            if (!holdMatured_) {
+                holdMatured_ = true;
+                flash_ = CC_FLASH_HOME;
+                flashStart_ = now;
+            }
+        } else if (held * 100u >= holdRingMs * holdShowPct) {
+            holdFill = static_cast<int16_t>((held * arcLength + holdRingMs / 2u) / holdRingMs);
+        }
+    }
+    // [r3.1] ALIVE.md 15.8 the button-4 hold ring while slot 3 is held on a frame with holdMarker (any screen,
+    // the launcher too): the fill from 15 % of the 1000 ms hold; at maturity the full arc waits (<= 600 ms) for
+    // the host's landing feedback (feedback()). While the hold-1 ring runs (button 1 also held on a crumb
+    // screen) hold 1 wins: that button-4 press draws nothing more (it is dropped above), until its next press.
+    if (landingOpen_ && static_cast<uint32_t>(now - landingAt_) >= landingWindowMs) landingOpen_ = false;
+    if (live && !appCanvas && hold4Down_ && frame->holdMarker) {
+        const uint32_t held = now - hold4At_;
+        if (held >= hold4RingMs) {
+            if (!hold4Matured_) {                         // [r3.1] 15.8: the landing is the host's (feedback)
+                hold4Matured_ = true;
+                landingOpen_ = true;
+                landingAt_ = now;
+            }
+            if (landingOpen_ && static_cast<uint32_t>(now - landingAt_) < landingWaitMs) holdFill = arcLength;
+        } else if (held * 100u >= hold4RingMs * hold4ShowPct) {
+            holdFill = static_cast<int16_t>((held * arcLength + hold4RingMs / 2u) / hold4RingMs);
+        }
+    }
     // The flash window (ok 650 ms, err 900 ms) and the [M22] moment hold are time-based: they
     // also end on a claimed render without a frame.
     if (flash_ != CC_FLASH_NONE) {
-        const uint32_t duration = flash_ == CC_FLASH_OK ? CCLed::flashOkMs : CCLed::flashErrMs;
+        const uint32_t duration = flash_ == CC_FLASH_OK ? CCLed::flashOkMs
+                                  : flash_ == CC_FLASH_WASH ? lightsWashMs
+                                  : flash_ == CC_FLASH_REFUSED ? refusedFlashMs
+                                  : flash_ == CC_FLASH_HOME ? homeFlashMs
+                                  : flash_ == CC_FLASH_LAND ? landFlashMs
+                                  : flash_ == CC_FLASH_QUEUE ? queueFlashMs : CCLed::flashErrMs;
         if (static_cast<uint32_t>(now - flashStart_) >= duration) flash_ = CC_FLASH_NONE;
     }
     if (holdMs_ && static_cast<uint32_t>(now - holdStart_) >= holdMs_) holdMs_ = 0;
@@ -1453,6 +1706,7 @@ void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32
     state.localValue = localValue;
     state.localIndex = localIndex;
     state.volFull = volFull_;
+    state.holdFill = holdFill;
     cc_alive_targets(live ? frame : nullptr, state, targets_);
     targets_.todB = todB(now);
     // 8.4 song hand [R3]: resting on Home, the last Home frame said playing:true (absent is not
@@ -1501,6 +1755,9 @@ void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32
             animator_.play(e);
         }
         for (uint8_t k = 0; k < limitCount_; ++k) {       // 3. bound (6.2), no tick [D4]
+            wallOn_ = true;                               // r4 3.3: the end LEDs glow (r4Layer)
+            wallAt_ = limits_[k].now;
+            wallSeg_ = seg;
             CCAliveEffect e = cc_alive_effect(CC_FX_BOUND, now);
             e.at = at;
             e.dir = static_cast<int8_t>(limits_[k].value);
@@ -1541,6 +1798,64 @@ void CCAlive::render(uint32_t now, const CCFrame* frame, int32_t localPos, int32
     pressCount_ = detentCount_ = limitCount_ = 0;
     prevAsleep_ = sleeping;
     animator_.step(now, dt, targets_, palette_, ringE_, buttonE_);
+    r4Layer(now, easeDt);
+}
+
+// r4 (ALIVE.md 16): the wall glow blended over the animator's e, then the 50 ms output easer (with the M12 sweep's
+// per-LED start). ringE_ / buttonE_ become what the LEDs show. dt: the real gap since the last render (<= 1 s, not
+// the animator's 50 ms cap), so a render after a gap (a hidden mirror) lands where a continuous one would.
+void CCAlive::r4Layer(uint32_t now, uint32_t dt) {
+    if (wallOn_) {
+        const float t = static_cast<float>(static_cast<uint32_t>(now - wallAt_));
+        float g = 0.0f;
+        if (t < glowRiseMs) g = eo(t / glowRiseMs);
+        else if (t < glowRiseMs + glowFallMs) g = 1.0f - eio((t - glowRiseMs) / glowFallMs);
+        else wallOn_ = false;
+        if (g > 0.0f) {
+            float c[3];
+            unpack(wallGlowRgb, c);
+            for (int q = 0; q < 3; ++q) c[q] *= wallGlowAlpha;
+            tone(c);
+            for (int k = -wallGlowHalf; k <= wallGlowHalf; ++k) {
+                float* e = ringE_[mdi(static_cast<int>(wallSeg_) + k)];
+                for (int q = 0; q < 3; ++q) e[q] += (c[q] - e[q]) * g;
+            }
+        }
+    }
+    const uint32_t sweepMs = static_cast<uint32_t>(now - sweepAt_);
+    if (sweepOn_ && sweepMs >= landFlashMs) sweepOn_ = false;
+    // First-order hold: the animator's e is taken to move linearly across the frame, and the 50 ms easer is
+    // integrated exactly over it (s1 = x1 + (s0 - x0) a - (x1 - x0) b, a = e^-dt/tau, b = tau / dt (1 - a)), so a
+    // smooth effect curve eases the same at 60 or 360 Hz; a step is spread over the frame it arrives in.
+    const float fdt = static_cast<float>(dt);
+    const float a = dt ? expf(-fdt / easeTauMs) : 1.0f;
+    const float b = dt ? easeTauMs / fdt * (1.0f - a) : 1.0f;
+    float residue = 0.0f;
+    for (int i = 0; i < kRing; ++i) {
+        float* shown = eased_[i];
+        float* prev = prevE_[i];
+        const bool held = sweepOn_ && static_cast<float>(sweepMs) < sweepStepMs * static_cast<float>(i);
+        for (int q = 0; q < 3; ++q) {
+            const float x1 = ringE_[i][q];
+            if (!held && dt) shown[q] = x1 + (shown[q] - prev[q]) * a - (x1 - prev[q]) * b;
+            // A tail below easeSnap lands on the target (float32 and the float64 twin agree; no 1e-40 tails).
+            if (fabsf(x1 - shown[q]) < easeSnap) shown[q] = x1;
+            prev[q] = x1;
+            residue = fmax2(residue, fabsf(x1 - shown[q]));
+            ringE_[i][q] = shown[q];
+        }
+    }
+    for (int j = 0; j < 4; ++j)
+        for (int q = 0; q < 3; ++q) {
+            const float x1 = buttonE_[j][q];
+            float& shown = easedB_[j][q];
+            if (dt) shown = x1 + (shown - prevEB_[j][q]) * a - (x1 - prevEB_[j][q]) * b;
+            if (fabsf(x1 - shown) < easeSnap) shown = x1;
+            prevEB_[j][q] = x1;
+            residue = fmax2(residue, fabsf(x1 - shown));
+            buttonE_[j][q] = shown;
+        }
+    easeResidue_ = residue;
 }
 
 void CCAlive::output(uint8_t drive, bool dither, uint32_t (&ring)[CC_RING_LEDS], uint32_t (&buttons)[4]) {

@@ -1,4 +1,5 @@
 #pragma once
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -15,14 +16,29 @@ enum CCLayout : uint8_t {
     CC_LAYOUT_NOW_PLAYING, CC_LAYOUT_VOLUME, CC_LAYOUT_IDLE, CC_LAYOUT_RECENT,
     CC_LAYOUT_TRACKS, CC_LAYOUT_WINDOWS, CC_LAYOUT_NOTICE,
     // v5 (7..9): "seek", "explorer", "upnext".
-    CC_LAYOUT_SEEK, CC_LAYOUT_EXPLORER, CC_LAYOUT_UPNEXT
+    CC_LAYOUT_SEEK, CC_LAYOUT_EXPLORER, CC_LAYOUT_UPNEXT,
+    // Presentation 6 (10..12, PRESENTATION_V5.md section 19, Desk Dial r3 release 1): "lights" (text),
+    // "lightsbig" (the brightness / temperature reveal), "scenes" (the scenes list).
+    CC_LAYOUT_LIGHTS, CC_LAYOUT_LIGHTSBIG, CC_LAYOUT_SCENES
 };
 enum CCTitleTone : uint8_t { CC_TITLE_INK, CC_TITLE_MUTED };
-enum CCLineTone : uint8_t { CC_LINE_META, CC_LINE_SECONDARY, CC_LINE_ERROR, CC_LINE_SUCCESS };
+enum CCLineTone : uint8_t {
+    CC_LINE_META, CC_LINE_SECONDARY, CC_LINE_ERROR, CC_LINE_SUCCESS,
+    CC_LINE_WARM   // presentation 6 (4, section 19.9): "warm" #FFBE69 (Knob: temperature, the Seek status)
+};
 enum CCFeedbackKind : uint8_t { CC_FEEDBACK_OK, CC_FEEDBACK_ERR };
 enum CCRingStyle : uint8_t {
     CC_RING_OFF, CC_RING_LEVEL, CC_RING_SELECTION, CC_RING_TRANSPORT,
-    CC_RING_LAP   // v5 (4): "lap", the Seek ring (index = target s, count = D s; section 4.3)
+    CC_RING_LAP,  // v5 (4): "lap", the Seek ring (index = target s, count = D s; section 4.3)
+    // Presentation 6 (5..7, section 19.3): "bri" (value = brightness %, kelvin = arc colour), "ctemp"
+    // (value = position 0..100, kelvin = the selected K), "clusters" (count 1..20 scenes, index selected).
+    CC_RING_BRI, CC_RING_CTEMP, CC_RING_CLUSTERS,
+    // Presentation 6 (8, section 19.9): "marker" (count >= 1, index < count): the r3 Windows ring, a white
+    // marker at the index's place on the r3 arc, the rest of the arc warm 0.10.
+    CC_RING_MARKER,
+    // [r3.1] (9, section 19.10): "queue" (count >= 1, index < count; `now` -1..count-1 = the playing row): the
+    // whole-queue Tracks and Up next ring on the r3 arc (ALIVE.md 15.9).
+    CC_RING_QUEUE
 };
 // Button icon vocabulary (section 3). CC_ICON_NONE is the wire token "".
 enum CCIcon : uint8_t {
@@ -32,7 +48,9 @@ enum CCIcon : uint8_t {
     // v5 (13..21, PRESENTATION_V5 section 9.1): "expand", "clock", "playlists", "playnext",
     // "seek", "shuffle", "heart", "snapleft", "snapright".
     CC_ICON_EXPAND, CC_ICON_CLOCK, CC_ICON_PLAYLISTS, CC_ICON_PLAYNEXT, CC_ICON_SEEK,
-    CC_ICON_SHUFFLE, CC_ICON_HEART, CC_ICON_SNAPLEFT, CC_ICON_SNAPRIGHT
+    CC_ICON_SHUFFLE, CC_ICON_HEART, CC_ICON_SNAPLEFT, CC_ICON_SNAPRIGHT,
+    // Presentation 6 (22..27, section 19.5): "bulb", "thermo", "power", "wand", "house", "album".
+    CC_ICON_BULB, CC_ICON_THERMO, CC_ICON_POWER, CC_ICON_WAND, CC_ICON_HOUSE, CC_ICON_ALBUM
 };
 // Section 5.9 button tones (v5 section 5.2 appends on / off and, [r2.2], liked; the knob derives
 // every tone, none is parsed from the wire).
@@ -46,14 +64,34 @@ enum CCButtonLit : uint8_t { CC_LIT_NONE, CC_LIT_ON, CC_LIT_OFF };
 // v5 `feedback.moment` (section 6.1): 0 none; kept only with kind ok.
 enum CCFeedbackMoment : uint8_t {
     CC_MOMENT_NONE, CC_MOMENT_QUEUED, CC_MOMENT_SHUFFLE, CC_MOMENT_LIKE, CC_MOMENT_UNLIKE,
-    CC_MOMENT_SNAP, CC_MOMENT_STARTED
+    CC_MOMENT_SNAP, CC_MOMENT_STARTED,
+    // Presentation 6 (7, section 19.9): "refused", kept only with kind err: the r3 unavailable-press flash
+    // (bottom segments 26..34 red for 320 ms instead of the fail shake).
+    CC_MOMENT_REFUSED
 };
+
+// Presentation 6 `crumb` (section 19.9; README r3 section 2.1): the pre-rendered arc breadcrumb of an r3 screen
+// (cc_crumbs.h). 0 = none (the launcher Home, every presentation-5 frame): the flat heading shows instead.
+enum CCCrumb : uint8_t {
+    CC_CRUMB_NONE, CC_CRUMB_MUSIC, CC_CRUMB_RECENT, CC_CRUMB_ONSCREEN_RECENT, CC_CRUMB_ONSCREEN_PLAYLISTS,
+    CC_CRUMB_TRACKS, CC_CRUMB_UPNEXT, CC_CRUMB_WINDOWS, CC_CRUMB_LIGHTS, CC_CRUMB_SCENES,
+    CC_CRUMB_PLAYLISTS     // Desk Dial r3.1: MUSIC › PLAYLISTS (Recently Added's Favourite playlists source)
+};
+
+// Presentation 6 `valueUnit` (section 19.2): the unit drawn after the lightsbig digits. 0 "%" (the default,
+// and the only unit of every other layout), 1 "K".
+enum CCValueUnit : uint8_t { CC_UNIT_PERCENT, CC_UNIT_KELVIN };
 
 // Entries the ring carries at most (section 4 window rule).
 constexpr uint16_t CC_RING_WINDOW = 20;
 // v5 `lap` ring: 1 <= count <= CC_LAP_COUNT_MAX and index < count, else reject (section 4.3;
 // VOC-K1e LAP_COUNT_MAX; the host offers Seek only for D <= 59,999 s).
 constexpr uint16_t CC_LAP_COUNT_MAX = 59999;
+// Presentation 6 (section 19.3): ring.kelvin 2200..6500 (required on bri / ctemp) and the clusters ring's
+// 1 <= count <= CC_CLUSTERS_MAX, index < count.
+constexpr uint16_t CC_KELVIN_MIN = 2200;
+constexpr uint16_t CC_KELVIN_MAX = 6500;
+constexpr uint16_t CC_CLUSTERS_MAX = 20;
 
 struct CCButton {
     char label[17] = {};                   // <= 16 B (section 5.1)
@@ -67,6 +105,48 @@ struct CCButton {
     uint32_t color = 0;
     uint8_t lit = CC_LIT_NONE;             // v5 CCButtonLit (section 5.1)
 };
+
+// App canvas (A2, 1.0.0-cc5.6; CONTROL_CENTER.md "App canvas"): the frame's optional `app` object, sent only to a
+// knob whose capabilities carry appCanvas 1. Present and valid -> the LCD thread draws the app's own UI (Karl
+// Malota's Onshape screens, cc_app_canvas.h) instead of the LVGL host screen; the rest of the frame (A0's text,
+// buttons, ring off) stays the fallback and still drives the LEDs. Invalid -> the frame is rejected (the strict
+// rule). Ranges are generic here; the renderer treats a ring / index outside its profile as "cancel".
+// Append-only (the wire token order): tilt came with the 1.0.0-cc5.6 rebuild for Desk Dial 7.2.2.0.
+// App profiles (APP_PROFILES.md section 8): knob / f1..f4 name the profile's own slots (Karl's app_slot_t order),
+// appended after the legacy Onshape tokens, whose values stay.
+enum CCAppSlot : uint8_t { CC_APP_SLOT_ZOOM = 0, CC_APP_SLOT_ORBIT = 1, CC_APP_SLOT_PAN = 2, CC_APP_SLOT_TILT = 3,
+                           CC_APP_SLOT_KNOB = 4, CC_APP_SLOT_F1 = 5, CC_APP_SLOT_F2 = 6, CC_APP_SLOT_F3 = 7,
+                           CC_APP_SLOT_F4 = 8 };
+constexpr uint8_t CC_APP_RING_MAX = 7;        // ring 0..7
+constexpr uint8_t CC_APP_INDEX_MAX = 32;      // wheel entry 0..32 (0 = cancel; app profiles: 32 commands per ring)
+constexpr size_t CC_APP_ID_CAPACITY = 12;     // app.id: 1..11 of [a-z0-9_-] and the NUL
+constexpr int32_t CC_APP_VALUE_MAX = 99999999; // param.value, thousandths (|value| <= 99,999.999)
+struct CCAppState {
+    // App profiles (APP_PROFILES.md section 8): the profile id, "" = no app object (the LVGL host screen). Any valid
+    // id is accepted; the LCD thread draws it through cc_app_store_acquire(id, crc), "Loading..." when not loaded.
+    char id[CC_APP_ID_CAPACITY] = {};
+    uint32_t crc = 0;                // the wire profile's CRC-32 (0 = the built-in Onshape)
+    uint8_t slot = CC_APP_SLOT_ZOOM; // CCAppSlot: what the knob's turn does now (the cube scene)
+    bool refused = false;            // the action line reads "POINT AT MODEL" (the injector refused)
+    bool refusedFocus = false;       // DD-SEC-001: with refused, "CLICK MODEL FIRST" (keyboard focus not in the page)
+    uint32_t flash = 0;              // a change = the amber tap flash (Undo); 0..0x7FFFFFFF
+    bool wheel = false;              // the command wheel is shown
+    uint8_t wheelRing = 0, wheelIndex = 0;
+    bool param = false;              // parameter mode
+    uint8_t paramRing = 0, paramIndex = 1;
+    bool paramTyped = false;         // mode "B" (type: value is the value); "A" (scroll: value is the change)
+    uint8_t paramStep = 1;           // 0 fine (button 1 held), 1 knob alone, 2 coarse (button 4 held)
+    int32_t paramValue = 0;          // thousandths
+    uint32_t paramBump = 0;          // a change = the end-stop nudge
+    uint32_t echoSeq = 0;            // a change = replay this command's card for 1.1 s (0 = none yet)
+    uint8_t echoRing = 0, echoIndex = 1;
+    // App profiles (APP_PROFILES.md section 8), param mode's live constraint: axis 0..3 (X, Y, Z, uniform), -1 = absent
+    // (the profile's axis_default); plane = the axis key with Shift (a plane instead of an axis).
+    int8_t paramAxis = -1;
+    bool paramPlane = false;
+};
+// True when the frame carries an `app` object (the app canvas draws instead of the LVGL host screen).
+inline bool cc_app_present(const CCAppState& app) { return app.id[0] != '\0'; }
 
 struct CCFrame {
     // Required legacy text (byte capacities = size - 1, section 3).
@@ -117,7 +197,8 @@ struct CCFrame {
     // (the two LED tuning fields only with `alive`). Defaults = absent. Header only: the parser
     // and the engine read them once their packages land. Laid out so the three words come first
     // and the eight single bytes pack into two words (+20 B per CCFrame, +4 B per CCButton).
-    int32_t ringNow = -1;                  // -1 none; -1..count-1, kept only on selection + upnext
+    int32_t ringNow = -1;                  // -1 none; -1..count-1, kept only on selection + upnext and
+                                           // [r3.1] on the queue ring (any layout)
                                            // (int32_t: `now` reaches 65,534, section 4.1)
     uint32_t feedbackColor = 0;            // 0..0xFFFFFF raw (0 = warm), only with moment snap/started
     uint32_t ledPink = 0;                  // 0..0xFFFFFF, latched (0 = the built-in PINK; section 7.3)
@@ -129,7 +210,32 @@ struct CCFrame {
     bool ledPinkPresent = false;
     bool ledVolFullPresent = false;
     bool ledVolFull = false;               // latched (section 7.3); unset = false
+    // Presentation 6 (PRESENTATION_V5.md section 19). Defaults = absent / stripped. +134 B per CCFrame.
+    uint16_t ringKelvin = 0;               // 2200..6500 on bri / ctemp (required there), 0 elsewhere
+    uint8_t valueUnit = CC_UNIT_PERCENT;   // CCValueUnit, kept on lightsbig only
+    char prevTitle[65] = {}, nextTitle[65] = {};   // scenes only: the rows above / below the current one
+    uint8_t crumb = CC_CRUMB_NONE;         // section 19.9: the arc breadcrumb (CCCrumb), every layout
+    // [r3.1] (section 19.10): `holdMarker` (bool, absent = false, every layout): button 4 has a hold action on
+    // this screen. The LCD draws the hold tick under the button-4 footer icon (not in the idle icon view) and
+    // the LEDs draw the button-4 hold ring only on such a screen (ALIVE.md 15.8).
+    bool holdMarker = false;
+    // A2 (1.0.0-cc5.6): the app canvas state (CCAppState above); id 0 when the frame has no `app`.
+    CCAppState app;
+    // r4 FEEL (1.0.0-cc5.7, plan F2; HAPTICS.md "Events"): the optional `haptic` event, sent only to a knob whose
+    // capabilities carry hapticFx 1: {"token": a CCFx wire token (cc_haptic_fx.h), "seq": 1..0x7FFFFFFF}. The COM task
+    // plays each new seq once (control_center.cpp; a claim only seeds it). 0 / 0 when absent. Every layout.
+    uint8_t hapticFx = 0;
+    uint32_t hapticSeq = 0;
 };
+
+// [r3.1] (section 19.10): the cover's image_opa. artDim 112 (0.35 / 0.8 of the pre-composited cover), else a
+// paused Home / Music cover (playing false, kept on Home layouts only) 255 like a playing one (user ruling
+// 2026-09-29: 143 over the scrim read as "no artwork"), else 255 (0.8).
+constexpr uint8_t CC_ART_DIM_OPA = 112;
+constexpr uint8_t CC_ART_PAUSED_OPA = 255;
+inline uint8_t cc_art_image_opa(const CCFrame& f) {
+    return f.artDim ? CC_ART_DIM_OPA : f.playing == 0 ? CC_ART_PAUSED_OPA : 255;
+}
 
 // LCD inks (PRESENTATION_V5.md section 8.3; VOC section 11). Tones and footer colours follow
 // section 5.2 (v5; V4's section 5.9 was the presentation-4 subset).
@@ -150,6 +256,7 @@ constexpr uint32_t tile = 0x444444;         // Windows letter tile (no app accen
 constexpr uint32_t tileInitial = 0xF2F2F2;  // initial on the #444 tile (AW2 section 7)
 constexpr uint32_t accentInitial = 0xFFFFFF;  // initial on an app-accent tile (section 5.3)
 constexpr uint32_t disabledGlyph = 0x555555;
+constexpr uint32_t warm = 0xFFBE69;         // presentation 6 line tone "warm" (README r3 section 9)
 constexpr uint32_t shadow = 0x000000;       // text-shadow twins (section 8.5.3)
 }
 
@@ -161,6 +268,10 @@ constexpr uint32_t stop = 0xFF8474;
 constexpr uint32_t go = 0x6ED996;
 constexpr uint32_t nav = 0xE6E6E6;
 constexpr uint32_t on = 0xFFFFFF;           // lit on (row 6; accent_ink()'s fallback)
+constexpr uint32_t accentFallback = 0xFFFFFF;  // accent_ink()'s fallback (section 5.3)
+// Presentation 6 (section 19.9; README r3 L-9 "act"): lit on without an app colour on an r3 screen (a crumb):
+// the active mode or tab (Temperature on, the explorer tab, Seek Set, Shuffle on).
+constexpr uint32_t act = 0xFFBE69;
 constexpr uint32_t off = 0x7A7A7A;          // lit off (row 7)
 constexpr uint32_t liked = 0xA3244A;        // [r2.2] row 4: the filled heart (never PINK, never sat())
 }
@@ -226,6 +337,43 @@ inline bool cc_button_available(const CCFrame& frame, uint8_t index) {
     return index < 4 && frame.buttons[index].enabled;
 }
 
+// Presentation 6 (section 19.4): the Lights layouts (ALIVE family LIGHTS).
+inline bool cc_lights_layout(uint8_t layout) {
+    return layout == CC_LAYOUT_LIGHTS || layout == CC_LAYOUT_LIGHTSBIG || layout == CC_LAYOUT_SCENES;
+}
+
+// Presentation 6 (section 19.6; README r3 section 3): Kelvin -> RGB, Tanner Helland's approximation, for the
+// bri / ctemp rings (white-only bulbs, 2200..6500 K). t = K / 100;
+//   r = t <= 66 ? 255 : 329.7 (t - 60)^-0.1332
+//   g = t <= 66 ? 99.47 ln t - 161.12 : 288.12 (t - 60)^-0.0755
+//   b = t >= 66 ? 255 : 138.52 ln(t - 10) - 305.04
+// each clamped to 0..255 and rounded half up in double precision (the Python twin, alive_lights.kelvin_rgb,
+// is the same expression; alive_tests checks every K of 2200..6500 against it and that no channel lies within
+// 1e-6 of a .5 tie, so the result does not depend on the libm). K outside 2200..6500 is clamped first.
+// 2200 K = 255,146,39; 2700 K = 255,167,87; 3200 K = 255,184,123; 6500 K = 255,254,250 (the design's
+// "3200 K ~ 255,183,112" does not follow its own formula; the formula wins). The closest channel to a tie
+// over 2200..6500 is 3.1e-5 away.
+// Calibration hook: CC_KELVIN_GAIN scales each channel afterwards, out = (c * gain + 127) / 255 (255 = as
+// designed). It is where the ring's real white point is matched to the bulbs (a bluish LED white would take
+// e.g. {255, 236, 210}); both ports read the same three integers (alive_lights.KELVIN_GAIN) and the parity
+// tests pin them. The result is an ACCENT colour of the alive engine: drawn as is, never through sat().
+constexpr uint8_t CC_KELVIN_GAIN[3] = {255, 255, 255};
+inline uint32_t cc_kelvin_rgb(uint32_t kelvin) {
+    if (kelvin < CC_KELVIN_MIN) kelvin = CC_KELVIN_MIN;
+    if (kelvin > CC_KELVIN_MAX) kelvin = CC_KELVIN_MAX;
+    const double t = static_cast<double>(kelvin) / 100.0;
+    const double c[3] = {t <= 66.0 ? 255.0 : 329.7 * pow(t - 60.0, -0.1332),
+                         t <= 66.0 ? 99.47 * log(t) - 161.12 : 288.12 * pow(t - 60.0, -0.0755),
+                         t >= 66.0 ? 255.0 : 138.52 * log(t - 10.0) - 305.04};
+    uint32_t out = 0;
+    for (int k = 0; k < 3; ++k) {
+        const double x = c[k] < 0.0 ? 0.0 : (c[k] > 255.0 ? 255.0 : c[k]);
+        const uint32_t v = static_cast<uint32_t>(floor(x + 0.5));
+        out = (out << 8) | ((v * CC_KELVIN_GAIN[k] + 127u) / 255u);
+    }
+    return out;
+}
+
 // The Home layouts of the section 5.2 go rule (row 9) and of the display's `home` group.
 inline bool cc_home_layout(uint8_t layout) {
     return layout == CC_LAYOUT_NOW_PLAYING || layout == CC_LAYOUT_VOLUME || layout == CC_LAYOUT_IDLE ||
@@ -255,7 +403,7 @@ inline uint8_t cc_button_tone(const CCFrame& frame, uint8_t slot) {
     return CC_TONE_NAV;
 }
 
-// Footer / idle-row ink of a tone (0 = hidden). Tone `on` is #FFFFFF here; a lit button with an app
+// Footer / idle-row ink of a tone (0 = hidden). Tone `on` is #FFFFFF here (r3 screens: act, cc_button_ink); a lit button with an app
 // colour draws accent_ink(color) instead (cc_button_ink).
 inline uint32_t cc_footer_ink(uint8_t tone) {
     switch (tone) {
@@ -334,7 +482,7 @@ inline bool cc_luminance_ok(uint32_t color) {
 // >= 0.10 (j = 8 is white). Navy 0x000080 -> sat 0x0000FF -> j = 2 -> 0x4040FF.
 inline uint32_t cc_accent_ink(uint32_t color) {
     uint32_t s = 0;
-    if (color == 0 || !cc_sat(color, s)) return CCFooterInk::on;
+    if (color == 0 || !cc_sat(color, s)) return CCFooterInk::accentFallback;
     for (uint32_t j = 0; j <= 8u; ++j) {
         uint32_t lifted = 0;
         for (int shift = 16; shift >= 0; shift -= 8) {
@@ -343,7 +491,7 @@ inline uint32_t cc_accent_ink(uint32_t color) {
         }
         if (cc_luminance_ok(lifted)) return lifted;
     }
-    return CCFooterInk::on;
+    return CCFooterInk::accentFallback;
 }
 
 // LCD footer / idle-row ink of button `index` (section 5.2 rows 1-10): the tone's ink, except tone
@@ -351,6 +499,7 @@ inline uint32_t cc_accent_ink(uint32_t color) {
 inline uint32_t cc_button_ink(const CCFrame& frame, uint8_t index) {
     const uint8_t tone = cc_button_tone(frame, index);
     if (tone == CC_TONE_ON && frame.buttons[index].color != 0) return cc_accent_ink(frame.buttons[index].color);
+    if (tone == CC_TONE_ON && frame.crumb != CC_CRUMB_NONE) return CCFooterInk::act;   // presentation 6 (19.9)
     return cc_footer_ink(tone);
 }
 
@@ -378,6 +527,7 @@ inline uint32_t cc_line_ink(uint8_t tone) {
         case CC_LINE_SECONDARY: return CCInk::context;
         case CC_LINE_ERROR: return CCInk::error;
         case CC_LINE_SUCCESS: return CCInk::success;
+        case CC_LINE_WARM: return CCInk::warm;
         default: return CCInk::meta;
     }
 }

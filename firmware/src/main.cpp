@@ -9,6 +9,8 @@
 #include "cc_artwork.h"
 #include "cc_diag.h"
 #include "cc_media.h"
+#include "cc_app_store_msg.h"
+#include "cc_fw_version.h"
 #include <esp_heap_caps.h>
 #include <esp32s3/spiram.h>   // esp_spiram_is_initialized() (IDF 4.4, ESP32-S3)
 #include <esp_task_wdt.h>
@@ -23,6 +25,16 @@ LcdThread lcd_thread(0);
 ComThread com_thread(0);
 
 STUSB4500 usb;
+
+
+// FW-BUG-017: LVGL's own objects record sizeof(lv_obj_t) as they were compiled (lv_obj_class.instance_size); this unit
+// sees the size src/ was compiled with. They differ when an lv_conf.h change reached only part of the build (a stale
+// incremental build; lv_conf.h comes in through a macro include the dependency scan cannot see), and then every
+// lv_obj_t field after the difference (user_data, ...) lands in another field. scripts/lvconf_guard.py prevents it at
+// build time; this reports it at boot.
+bool cc_lvgl_layout_ok() {
+  return lv_obj_class.instance_size == sizeof(lv_obj_t);
+}
 
 
 void setup() {
@@ -89,7 +101,11 @@ void setup() {
   delay(100);
   Serial.println("Welcome to Nano_D++!");
   Serial.print("Firmware version: ");
-  Serial.println(NANO_FIRMWARE_VERSION);
+  Serial.println(cc_fw_version());   // FW-PUB-004: the public version, build id and binary
+  if (!cc_lvgl_layout_ok()) {
+    Serial.println("ERROR: LVGL was compiled with another lv_conf.h than src/ (lv_obj_t sizes differ). "
+                   "Run `pio run -t clean`, then build again.");
+  }
   Serial.println("Initializing...");
   // before we begin, load our global settings...
   DeviceSettings& settings = DeviceSettings::getInstance();
@@ -122,6 +138,9 @@ void setup() {
   // artwork2 media stores (1.0.0-cc5.3): 25 x 32 KB covers and 49 x 2 KB icons in PSRAM,
   // and their mutex, before any thread starts. Fail-soft: artwork2.available false.
   cc_media_init();
+  // App profiles (APP_PROFILES.md section 7): the RAM-only profile store's hooks (PSRAM, a static mutex), before
+  // the LCD task can draw a profile or the COM task upload one. Allocates nothing until an upload.
+  cc_app_store_device_init();
 
   // Read-only: is a core dump stored in the coredump partition? (never erased here)
   cc_boot_check_coredump();
