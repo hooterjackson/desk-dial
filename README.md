@@ -108,7 +108,7 @@
 
 <p align="center">Soft for volume, heavier for brightness, coarse for windows, smooth for scrubbing. A tock as you turn, a thud at a wall. When you let go, the motor goes quiet.</p>
 
-<p align="center"><a href="docs/features/feel-and-sound.md"><picture><source srcset="docs/media/feel-and-sound.webp" type="image/webp"><img src="docs/media/feel-and-sound.gif" alt="The knob turning through volume clicks into the end stop and letting go, with two strips underneath: the motor's torque against the angle (teeth for the clicks, a cliff at the wall, a flat line once the knob rests) and the sound the speaker plays at each moment (tock, thud, thump)" width="720"></picture></a></p>
+<p align="center"><a href="docs/features/feel-and-sound.md"><picture><source srcset="docs/media/feel-wide.webp" type="image/webp"><img src="docs/media/feel-wide.gif" alt="The knob turning the volume up to the end, with two strips beside it that draw themselves as it goes: what you feel, an orange line of evenly spaced clicks, then the wall pushing back, then a flat line once the motor rests; and what you hear, a white mark for every tock and two heavier orange marks for the thuds at the wall" width="880"></picture></a></p>
 
 <p align="center"><a href="docs/features/feel-and-sound.md">How the feel works ›</a></p>
 

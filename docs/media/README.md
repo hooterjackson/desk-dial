@@ -22,6 +22,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | feel-and-sound.webp | 1,191,814 | 720x664 | 158 | 27.68 |
 | feel-gallery-dark.png | 69,334 | 760x942 | 1 |  |
 | feel-gallery.png | 63,750 | 760x942 | 1 |  |
+| feel-wide.gif | 1,923,635 | 844x476 | 59 | 9.08 |
+| feel-wide.webp | 1,137,828 | 1280x720 | 174 | 27.18 |
 | head-feel-dark.png | 14,292 | 1760x422 | 1 |  |
 | head-feel.png | 14,050 | 1760x422 | 1 |  |
 | head-hero-dark.png | 22,435 | 1760x443 | 1 |  |

@@ -1080,6 +1080,32 @@
       "fps": null,
       "duration_ms": 0,
       "data": "fictional"
+    },
+    {
+      "name": "feel-wide.gif",
+      "scene": "feel-wide",
+      "source": "firmware feel laws + knob model",
+      "bytes": 1923635,
+      "sha256": "f7e08a63038433bc0a93fafc01a935277756f6481772db438b4d449bda07434e",
+      "width": 844,
+      "height": 476,
+      "frames": 59,
+      "fps": 9.08,
+      "duration_ms": 6500,
+      "data": "fictional"
+    },
+    {
+      "name": "feel-wide.webp",
+      "scene": "feel-wide",
+      "source": "firmware feel laws + knob model",
+      "bytes": 1137828,
+      "sha256": "a1e09905cea7ec097dc9d3ec9bdbb0caf37071d37b2eac3a6ac6272a0bf87bb4",
+      "width": 1280,
+      "height": 720,
+      "frames": 174,
+      "fps": 27.18,
+      "duration_ms": 6402,
+      "data": "fictional"
     }
   ]
 }
