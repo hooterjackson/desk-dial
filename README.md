@@ -271,7 +271,6 @@ Full list in the [CHANGELOG](CHANGELOG.md).
 ## Limits and known issues
 
 - Tested on one knob, mine. Other knobs may need "Recalibrate motor"; that path is not yet tested on real hardware.
-- Sonos: a default room id can make a different household fail with "The selected Sonos room is no longer available" — being fixed.
 - Home Assistant over `http://` sends the token unencrypted on your network (Settings warns about it); self-signed `https://` is not yet tested on real hardware.
 - The exe is unsigned; Smart App Control can block it. No installer, auto-start or uninstaller ships today.
 - Onshape: Chrome and Edge only; tilt direction, tool search hits and non-US keyboard layouts are unverified; shortcuts are sent as US virtual keys.

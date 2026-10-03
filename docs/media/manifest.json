@@ -1,18 +1,18 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-02T20:17:33+00:00",
+  "generated_at": "2026-10-03T03:57:31+00:00",
   "firmware": {
     "version": "1.0.0-cc5.7",
-    "git": "dafe3128de8f9249170af4ecf2be6c190af0663d",
-    "dirty": true
+    "git": "1bf6b69b09031f39266b9c1991648237ddeb0c6c",
+    "dirty": false
   },
   "app": {
     "version": "7.3.2.0",
-    "tree": "acfbcd82f06c99624fbf1b2fa8f499d05860e5474550a1335f814416b7a82e8b"
+    "tree": "ff46240ca7650e2a34466d38d366a7e9254e130d3686445ab9c3292ab6a4fefe"
   },
   "pipeline": {
-    "git": "52c108489b1223a3bc1e45f6266ad1b26ead186e",
-    "tree": "46e1057aad57afd26d627f6f702b0ed1ab575633f10b8a77a8d716448e70076a"
+    "git": "05b568a6f05c67aae404a43c2b5d704de0975fa1",
+    "tree": "3c4e8a147de48baab3ed4e9feb54cc62631b7bae584ae2d330a504b7e45ce282"
   },
   "files": [
     {
@@ -617,8 +617,8 @@
       "name": "settings-general.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 16606,
-      "sha256": "3b23ab1d1ec16c8b63b62682c215b04681ded1abed4de131e91152af67184b4c",
+      "bytes": 17229,
+      "sha256": "fdf74a7de5eabdd55358ea0634fc84e2eb04b185f30f60722d659dfc423d70a0",
       "width": 616,
       "height": 890,
       "frames": 1,
@@ -630,10 +630,10 @@
       "name": "settings-home-assistant.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 22597,
-      "sha256": "db0e52265030106afdc1090bbf5daeff4717f4692a6650abaaeef3403e58de4b",
+      "bytes": 26049,
+      "sha256": "b3a4a776f72961d24502b8fa49e6efe9ecba3c418737f9a310c134d02c042fcc",
       "width": 616,
-      "height": 1093,
+      "height": 1317,
       "frames": 1,
       "fps": null,
       "duration_ms": 0,
@@ -643,8 +643,8 @@
       "name": "settings-knob.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 25940,
-      "sha256": "396d8046a86e9a6a44721f2ec4badfdc548a9de5d3ad84af4001da277d688728",
+      "bytes": 26291,
+      "sha256": "126afebc435e49ca4339f88efe59cfa94f508b211ae269c8c04e57bb2a85504c",
       "width": 616,
       "height": 1392,
       "frames": 1,
@@ -656,8 +656,8 @@
       "name": "settings-music.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 18905,
-      "sha256": "64289d4aa84baf39282864642264f99c29b8f1386994620e5acf86a92c405e2c",
+      "bytes": 19131,
+      "sha256": "149016292bd882cddd92d58bfefbe7741941f7e08e8acfa09cb2f8b1fff05b16",
       "width": 616,
       "height": 1093,
       "frames": 1,
@@ -669,8 +669,8 @@
       "name": "settings-windows.png",
       "scene": "app-settings",
       "source": "app stage renderer",
-      "bytes": 15260,
-      "sha256": "ce54e2d8fc61641cca36bba2c9eb9f05b8eedfad87c644d1e26838c5194f077c",
+      "bytes": 15520,
+      "sha256": "39fb808d124d5c5ef61bd97942742d395330bbe7e46a5d3e2a8786cab4823fe3",
       "width": 616,
       "height": 1093,
       "frames": 1,

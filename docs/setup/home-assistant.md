@@ -95,6 +95,5 @@ Everything else in Desk Dial works without it: music, the Windows picker and Ons
 - **One area, lights only.** Switches, covers, fans and media players in the area are ignored. Colour (hue) is not controlled, only brightness and colour temperature.
 - **Plain http sends the token unencrypted** on your local network. Settings warns about it; use https where you can.
 - **Self-signed certificates are rejected.** Certificate checking is always on and there is no override. Use a trusted certificate or http on a network you trust.
-- **Re-authorising Apple Music with a new .p8 key erases the saved Home Assistant token.** You will see **Token rejected** or **Not connected** afterwards; paste the token again and Save. Set up Apple Music first.
 - **At most 20 scenes** are listed.
 - The project is tested on one knob (the author's) against one Home Assistant installation.

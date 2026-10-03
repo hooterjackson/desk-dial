@@ -208,5 +208,4 @@ Every line the knob can show in Music, in one sentence each.
 - Playlists shows only playlists you have favourited in Apple Music.
 - Sonos is polled once a second, so a change made in the Sonos app can take up to a second to reach the knob.
 - Desk Dial controls one speaker's group, chosen by address. There is no speaker discovery and no room picker.
-- Being fixed: a default room identifier left in the settings makes a different Sonos household fail with "The selected Sonos room is no longer available".
 - Album covers on the knob need Settings › Music › Album artwork On and are cached in memory only.

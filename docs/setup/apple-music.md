@@ -88,7 +88,6 @@ When Apple refuses the user token, Desk Dial shows **Sign-in expired** in the Se
 ## Limits and known issues
 
 - **The only thing Desk Dial writes to Apple Music is Like.** It adds the song to your Favourites. There is no Unlike: Apple refused that request for this kind of sign-in, so Desk Dial does not even contain the code for it. On a song you already liked, the knob says **Unfavourite in Music app**; do it there.
-- **Re-authorising with a new .p8 key clears the saved Home Assistant token.** Choosing a key file and pressing Authorize replaces the whole credential file with the new Apple credentials, so a Home Assistant token stored there is lost and you must enter it again in Settings › Home Assistant. Pressing Authorize *without* choosing a new key file keeps everything. Set up Apple Music first, then Home Assistant.
 - **Apple's consent page needs an internet connection** to load Apple's MusicKit script. If the page says "Apple Music could not load", check your connection and retry.
 - **One account per PC.** Desk Dial stores one set of Apple credentials. Authorising with another Apple ID replaces the first.
 - **Windows only.** The encrypted store uses Windows DPAPI; there is no equivalent on other systems.

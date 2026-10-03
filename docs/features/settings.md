@@ -24,7 +24,7 @@ The Navigator is the small glass card at the left edge of your main monitor that
 <p><img src="../media/settings-music.png" alt="Desk Dial Settings, Music page: the speaker IP, Apple Team ID and MusicKit Key ID fields with placeholder values, Choose .p8 key, Album artwork On, Authorize Apple Music" width="420"></p>
 **Speaker IP** · a text field · default a placeholder address
 
-The IPv4 address of one Sonos speaker on your network, for example 192.0.2.20. You find it in the Sonos app under the speaker's About settings. Desk Dial controls the group that speaker belongs to. There is no discovery: the address has to be typed. A changed address takes effect after you quit Desk Dial from the tray and open it again. (In this build the field's label still carries a room name from the author's own home; it is being generalised.)
+The IPv4 address of one Sonos speaker on your network, for example 192.0.2.20. You find it in the Sonos app under the speaker's About settings. Desk Dial controls the group that speaker belongs to. There is no discovery: the address has to be typed. A changed address takes effect after you quit Desk Dial from the tray and open it again.
 
 **Apple Team ID** · a text field
 
@@ -144,7 +144,6 @@ These are plain keys in `data\settings.json`. Edit the file while Desk Dial is n
 
 - Most changes need a reconnect or a restart; only album artwork, LEDs, Motion, the switcher background and Knob sounds apply at once.
 - No speaker discovery: the Sonos address is typed by hand, and a changed address needs a restart.
-- Being fixed: a default room identifier in the settings makes a different Sonos household fail with "The selected Sonos room is no longer available".
 - The speaker field is still labelled with the author's room name.
 - The Home Assistant token travels unencrypted over `http://`; Settings warns about it but still allows it.
 - Recalibrate motor is not yet tested on real hardware.

@@ -51,11 +51,11 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 172,718 | 418x484 | 55 | 5.8 |
 | onshape-knob.webp | 200,518 | 418x484 | 75 | 7.73 |
-| settings-general.png | 16,606 | 616x890 | 1 |  |
-| settings-home-assistant.png | 22,597 | 616x1093 | 1 |  |
-| settings-knob.png | 25,940 | 616x1392 | 1 |  |
-| settings-music.png | 18,905 | 616x1093 | 1 |  |
-| settings-windows.png | 15,260 | 616x1093 | 1 |  |
+| settings-general.png | 17,229 | 616x890 | 1 |  |
+| settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
+| settings-knob.png | 26,291 | 616x1392 | 1 |  |
+| settings-music.png | 19,131 | 616x1093 | 1 |  |
+| settings-windows.png | 15,520 | 616x1093 | 1 |  |
 | social-preview.png | 61,863 | 1280x640 | 1 |  |
 | sound-bank-dark.png | 63,263 | 1100x674 | 1 |  |
 | sound-bank.png | 59,148 | 1100x674 | 1 |  |

@@ -31,7 +31,7 @@ Desk Dial does not search the network for speakers. You type the address yoursel
 3. Type the address in the speaker IP field at the top. It must be a valid IP address; otherwise Save refuses with "Enter a valid speaker IP and each index 0, 1, 2, 3 once."
 4. Click Save.
 
-A speaker change does not take effect straight away. The note under Save says so: quit Desk Dial from the tray and open it again. After that, the new speaker is used.
+Once the speaker answers, Desk Dial remembers which room it is, and forgets that room as soon as you change the address, so the new speaker's room is learned instead. A speaker change does not take effect straight away. The note under Save says so: quit Desk Dial from the tray and open it again. After that, the new speaker is used.
 
 Your speaker IP is kept in plain text in `%LOCALAPPDATA%\DeskDial\data\settings.json`. No password or account is needed for Sonos, so none is stored.
 
@@ -63,7 +63,6 @@ Nothing to open. Desk Dial only makes outgoing connections to the speaker and as
 
 ## Limits and known issues
 
-- **Being fixed:** the current build ships with the author's own speaker pinned by its Sonos identity. On another household this makes the knob report "The selected Sonos room is no longer available" instead of using the address you typed. The fix removes the pinned identity so the typed address is used as intended.
 - There is no speaker discovery. You must find and type the address yourself, and if your router hands the speaker a new address the knob stops working until you update Settings.
 - A speaker change needs a restart of Desk Dial (quit from the tray, open again).
 - One speaker group at a time. Other groups are not shown and cannot be chosen from the knob.
