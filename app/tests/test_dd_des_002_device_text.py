@@ -39,7 +39,7 @@ class DeviceTextTests(unittest.TestCase):
         self.assertEqual(self.both("1\ufe0f\u20e3 Top"), ("1 Top", "1 Top"))                 # keycap
 
     def test_transliteration_is_kept_when_every_part_is_a_glyph(self):
-        self.assertEqual(_device_text("Linn\u00e9a Holm \u00b7 \u201cJ\u00f3ga\u201d", ASCII, 96), 'Linnea Holm / "Tide Song"')
+        self.assertEqual(_device_text("Linn\u00e9a Holm \u00b7 \u201cT\u00edde S\u00f3ng\u201d", ASCII, 96), 'Linnea Holm / "Tide Song"')
         self.assertEqual(_device_text("Linn\u00e9a Holm", LATIN, 96), "Linn\u00e9a Holm")
         self.assertEqual(self.both("\ufb01ne \uff21 \u2122"), ("fine A TM", "fine A TM"))
         self.assertEqual(_device_text("\u00bd time", ASCII, 96), "1/2 time")
