@@ -180,6 +180,22 @@ def render(key: str, theme: str, faces: dict) -> Image.Image:
     return img.resize((W // SS, int(H) // SS), Image.LANCZOS)
 
 
+def typeset(draw, app: Path, work: Path, text: str, px: float, weight: float, xy, fill, tracking=TRACKING):
+    """Draw one kerned line with its left end at xy (x, baseline); for other images (social preview)."""
+    global TRACKING
+    face = Face(Path(app) / "assets" / "fonts" / "Archivo.ttf", weight, WIDTH, Path(work))
+    saved, TRACKING = TRACKING, tracking
+    try:
+        chars, width = face.layout(text, px)
+    finally:
+        TRACKING = saved
+    font = face.pil(int(round(px)))
+    for ch, x in chars:
+        if ch != " ":
+            draw.text((xy[0] + x, xy[1]), ch, font=font, fill=fill, anchor="ls")
+    return width
+
+
 def render_all(app: Path, out: Path, work: Path, keys=None, log=print) -> list[Path]:
     work.mkdir(parents=True, exist_ok=True)
     src = Path(app) / "assets" / "fonts" / "Archivo.ttf"

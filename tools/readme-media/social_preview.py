@@ -7,22 +7,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter
 
 from scenes_registry import LCD
 
 W, H = 1280, 640
 BG = (13, 14, 17)
-
-
-def _font(app, name, size, weight=None):
-    f = ImageFont.truetype(str(Path(app) / "assets" / "fonts" / name), size)
-    if weight:
-        try:
-            f.set_variation_by_name(weight)
-        except Exception:
-            pass
-    return f
 
 
 def render(ctx, recording_path, photo=None, at_ms=5800):
@@ -46,16 +36,15 @@ def render(ctx, recording_path, photo=None, at_ms=5800):
         knob = frames[0]
     kx, ky = 70 + (560 - knob.width) // 2, (H - knob.height) // 2
     img.paste(knob, (kx, ky))
-    title = _font(ctx.app, "Archivo.ttf", 92, "Bold")
-    body = _font(ctx.app, "Archivo.ttf", 34, "Regular")
-    small = _font(ctx.app, "Archivo.ttf", 26, "Regular")
+    import headlines as T                  # the README's kerned Archivo, so the two read as one family
+    tw = ctx.work / "social-type"
+    tw.mkdir(parents=True, exist_ok=True)
     x = 690
-    d.text((x, 150), "Desk Dial", font=title, fill=(245, 245, 247))
-    lines = ["A haptic knob for your desk:", "speakers, music, lights, windows", "and Onshape under one dial."]
-    for i, line in enumerate(lines):
-        d.text((x, 275 + i * 46), line, font=body, fill=(200, 204, 214))
-    d.text((x, 445), "Windows app + firmware for the Nano_D++", font=small, fill=(255, 132, 36))
-    d.text((x, 482), "github.com/hooterjackson/desk-dial", font=small, fill=(120, 124, 134))
+    T.typeset(d, ctx.app, tw, "Desk Dial", 104, 760, (x, 238), (245, 245, 247))
+    for i, line in enumerate(["A haptic knob for music,", "lights, windows and CAD."]):
+        T.typeset(d, ctx.app, tw, line, 40, 560, (x, 316 + i * 50), (174, 178, 188), tracking=-0.01)
+    T.typeset(d, ctx.app, tw, "Windows app and firmware for the Nano_D++", 25, 560, (x, 452), (255, 132, 36), tracking=0)
+    T.typeset(d, ctx.app, tw, "github.com/hooterjackson/desk-dial", 25, 500, (x, 490), (120, 124, 134), tracking=0)
     out = ctx.out / "social-preview.png"
     q = img.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.FLOYDSTEINBERG)
     q.save(out, optimize=True)

@@ -78,7 +78,7 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | settings-knob.png | 26,291 | 616x1392 | 1 |  |
 | settings-music.png | 19,131 | 616x1093 | 1 |  |
 | settings-windows.png | 15,520 | 616x1093 | 1 |  |
-| social-preview.png | 61,863 | 1280x640 | 1 |  |
+| social-preview.png | 61,320 | 1280x640 | 1 |  |
 | sound-bank-dark.png | 63,263 | 1100x674 | 1 |  |
 | sound-bank.png | 59,148 | 1100x674 | 1 |  |
 | story-day.gif | 1,764,619 | 276x320 | 156 | 8.67 |

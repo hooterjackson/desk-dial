@@ -679,19 +679,6 @@
       "data": "fictional"
     },
     {
-      "name": "social-preview.png",
-      "scene": "social-preview",
-      "source": "firmware LCD renderer",
-      "bytes": 61863,
-      "sha256": "7055b5a771f9f4363397a2973538814f5bd4e2f2c5f210466525689fe787414b",
-      "width": 1280,
-      "height": 640,
-      "frames": 1,
-      "fps": null,
-      "duration_ms": 0,
-      "data": "fictional"
-    },
-    {
       "name": "sound-bank-dark.png",
       "scene": "sound-bank",
       "source": "firmware sound bank",
@@ -1050,6 +1037,19 @@
       "sha256": "0c53193fd3651f1fe478cc226874b640ae70c71db979c2795e8d007c42c8926a",
       "width": 1760,
       "height": 422,
+      "frames": 1,
+      "fps": null,
+      "duration_ms": 0,
+      "data": "fictional"
+    },
+    {
+      "name": "social-preview.png",
+      "scene": "social-preview",
+      "source": "firmware LCD renderer",
+      "bytes": 61320,
+      "sha256": "87c8c985dc95a6c3dd7e0efd6ecc29298feb9b76ef678d7fb597b08ca428e905",
+      "width": 1280,
+      "height": 640,
       "frames": 1,
       "fps": null,
       "duration_ms": 0,
