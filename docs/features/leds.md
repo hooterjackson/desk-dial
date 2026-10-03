@@ -22,7 +22,7 @@ When the knob has slept for 60 minutes every LED goes off with the screen; see [
 
 **Lights.** Brightness is an arc from 7:30 clockwise through the top, filled to the level in the colour of the lights' current colour temperature (orange for 2200 K, blue-white for 6500 K); the arc brightens to full while you turn and rests at a third. Colour temperature fills the whole arc in the selected temperature's colour with a brighter marker at the value. These tints show in both LED settings. Scenes shows one three-segment mark per scene with the selected one brightest.
 
-**The Windows picker.** A dim warm arc with a white three-segment marker at the window you are previewing.
+**The Windows picker.** A white three-segment marker at the window you are previewing; the rest of the ring is off.
 
 **Working.** While the PC is still carrying out an action, a small warm comet laps the ring once every 1.4 s.
 

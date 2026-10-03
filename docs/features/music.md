@@ -44,7 +44,7 @@ Tap 2 in Music to open your Apple Music library's Recently Added list on the kno
 
 - **Turn** to browse. The screen says "3 / 25 · Artist name" as you go.
 - **Tap 3** to switch between Recently Added and your favourite playlists. The screen confirms "Favourite playlists" or "Recently Added" and starts at the top of the other list. The button is lit amber while Playlists is shown.
-- **Tap 4** to play the item you are on. The queue is replaced and the knob returns to the Music screen with "Starting…".
+- **Tap 4** to play the item you are on. You feel a thump as you press. The queue is replaced and the knob returns to the Music screen with "Starting…".
 - **Hold 4** (one second) to queue the item to play next instead. The knob says "Queued · Album name" once it is in; while Desk Dial is still working it says "Finding songs…" or "Queueing… 3 of 12".
 - **Tap 2** for Full screen: the same list opens on your PC as a row of large covers, so you can browse by eye. Button 2 and 3 then pick the list (Recent or Playlists), 4 plays, hold 4 queues, 1 closes it. It also closes on its own after 60 seconds without input.
 
@@ -61,7 +61,7 @@ Tap 3 in Music to open Tracks. When Sonos is playing from its queue, Tracks is t
 <picture><source srcset="../media/music-tracks-seek.webp" type="image/webp"><img src="../media/music-tracks-seek.gif" alt="The knob scrolls through numbered rows of the queue, then a tap on button 3 opens Seek: the arc sweeps across the song in 5 second steps." width="480"></picture>
 
 - **Turn** to browse. The screen says "Skip to 9 / 24 · 4 plays" or "Back to 3 / 24 · 4 plays".
-- **Tap 4** to jump to the row you are on. Sonos plays it, the screen says "Playing 9 / 24", and the knob nudges in the direction you jumped. On the row that is already playing, 4 is dimmed ("Turn to browse the queue").
+- **Tap 4** to jump to the row you are on. The knob nudges in the direction you jumped as you press, Sonos plays it, and the screen says "Playing 9 / 24". On the row that is already playing, 4 is dimmed ("Turn to browse the queue").
 - **Tap 2** opens Up next on the PC (below).
 - **Tap 3** opens Seek (below).
 - **Tap 1** goes back to Music.
@@ -87,10 +87,10 @@ From Tracks, tap 2 to open Up next on the PC: the queue as a list, with covers, 
 
 <picture><source srcset="../media/desktop-upnext-16x9.webp" type="image/webp"><img src="../media/desktop-upnext-16x9.gif" alt="A tall list of songs with small covers on the PC screen; the highlighted row moves down as the knob turns and a heart appears when a song is liked." width="480"></picture>
 
-- **Tap 4 (Play)** plays the row you are on and closes the list.
+- **Tap 4 (Play)** plays the row you are on and closes the list; like a jump in Tracks, the knob nudges in the direction you jumped as you press.
 - **Hold 4 (Play next)** moves the row to right after the current song: "Plays next · Song title". The playing row cannot be moved ("Already playing").
-- **Tap 2 (Shuffle)** shuffles the rest of the queue, or puts it back in order. With 60 or fewer songs left, Desk Dial reorders the queue itself, keeps anything you queued with Play next at the front, and remembers the original order so Shuffle off restores it ("Shuffle off · in order"). With more songs left it switches Sonos's own shuffle mode on instead ("Sonos is shuffling"; the list then shows a "Shuffled by Sonos" card because Sonos does not reveal its order). The button is lit while shuffle is on.
-- **Tap 3 (Like)** adds the song to your Apple Music favourites: "Liked", and the button lights up. Like only adds. On a song you already like the button is lit and pressing it says "Unfavourite in Music app". Songs that are not in the Apple Music catalogue say "Not an Apple Music song".
+- **Tap 2 (Shuffle)** shuffles the rest of the queue, or puts it back in order. With 60 or fewer songs left, Desk Dial reorders the queue itself, keeps anything you queued with Play next at the front, and remembers the original order so Shuffle off restores it ("Shuffle off · in order"). With more songs left it switches Sonos's own shuffle mode on instead ("Sonos is shuffling"; the list then shows a "Shuffled by Sonos" card because Sonos does not reveal its order). The button is lit while shuffle is on. The press ticks; nothing more comes when Sonos answers.
+- **Tap 3 (Like)** adds the song to your Apple Music favourites: "Liked", and the button lights up. Like only adds. On a song you already like the button is lit and pressing it says "Unfavourite in Music app". Songs that are not in the Apple Music catalogue say "Not an Apple Music song". The press ticks; only a failure adds a buzz.
 - **Tap 1** closes the list. It also closes on its own after 60 seconds without input.
 
 For streams Up next is dimmed in Tracks: "Up next is in Music app" (AirPlay), "Radio · no Up next", "Line-in · no Up next".

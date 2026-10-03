@@ -37,7 +37,7 @@ If you can hear the knob humming while nobody touches it, that is a bug. Open Se
 
 The knob returns to its own screen. Once the PC drops the connection it shows "Waiting for PC" with "Open Desk Dial on your PC" underneath, and reconnects on its own when the app comes back.
 
-The firmware is also designed to act as a plain volume knob while no program on the PC holds its port: after the port has been closed for 2 seconds it sends Windows volume up and down, 36 clicks per turn with no end stop. This part has not yet been tested on real hardware.
+The firmware is also designed to act as a plain volume knob while no program on the PC holds its port: after the port has been closed for 2 seconds it sends Windows volume up and down, 36 clicks per turn with no end stop. Its screen then reads "PC volume" and shows a brief + or − on each step; there is no number or arc, because the knob cannot read the PC's volume level. This part has not yet been tested on real hardware.
 
 ### Can I use several knobs?
 

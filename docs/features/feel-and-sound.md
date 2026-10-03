@@ -57,14 +57,14 @@ Onshape has no holds of this kind: there, hold 1, 2 and 4 are modifiers and Home
 
 ## Confirmations, nudges and refusals
 
-Every press you make gets a reply through the motor and the speaker:
+Every press you make gets a reply through the motor and the speaker, once, at the moment you press. When an action goes out to the speaker or to Home Assistant, there is no second haptic when it answers; only a failure adds one (the buzz below).
 
 | What happened | What you feel | What you hear |
 |---|---|---|
-| Any accepted press (open a list, Back, Home, Play or Pause, switch source) | one short tick | a wooden tock |
-| A hold lands; Play from a list; Queue or Play next; Turn on; Scene run | two strong pulses 12 ms apart (the thump) | a low thump |
+| Any accepted press (open a list, Back, Home, Play or Pause, switch source, Shuffle, Like) | one short tick | a wooden tock |
+| A hold lands; Play from a list or the full-screen explorer; Queue or Play next; Turn on; Scene run | two strong pulses 12 ms apart (the thump) | a low thump |
 | All off (Lights) | one firmer pulse | a softer thump |
-| Skip to a track, snap a window left or right | one pulse that leans the way you went (a nudge) | a thud |
+| Skip, jump to a song in Tracks or Up next, snap a window left or right | one pulse that leans the way you went (a nudge) | a thud |
 | A button that is not available right now | three quick pulses 30 ms apart (the buzz), at most once a second | three quiet tocks |
 | Something failed on the PC or the network | three strong pulses 70 ms apart | three thuds |
 
@@ -74,7 +74,7 @@ A refused press also shows its reason on the knob's screen in red for 2 s and li
 
 A knob with a motor can hum faintly at rest, because the motor keeps answering the tiny noise of its position sensor. Desk Dial's firmware puts the motor to sleep instead: 250 ms after you let go, with the knob sitting still on a click, the motor goes silent and the knob is free. It wakes the moment you turn it about one click (never less than 2.5 degrees, so a touch does not wake it), when a screen change moves the clicks under it, or when anything plays (a tick, a thump, a hold). On waking, the clicks ease back in over about a tenth of a second rather than snapping on.
 
-Resting against a wall is rest too: the wall pushes nothing until you move the knob about one click into it, then it fades in.
+Resting against a wall is rest too. Pushing past the end wakes the motor straight away, so the wall's force and its thud arrive together.
 
 ## The two deeper sleeps
 
