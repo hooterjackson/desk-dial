@@ -85,6 +85,8 @@ Rest sleep is about the motor. The knob as a whole also sleeps:
 
 From the deep sleep, the first press or the first 2° of turn only wakes the knob. That input is swallowed: a press that wakes it does not open anything, and the turn that wakes it does not change the value. The motor comes back once the knob has been still for a moment and re-anchors its clicks where it finds the shaft, so the value never jumps. Messages from the PC never wake the knob and never reset the timers; only your hand does.
 
+The dim and the deep sleep are not yet tested on real hardware.
+
 ## The four sounds
 
 The knob has four sounds, each built from a short synthesised tone when the knob starts up. Every sound follows a haptic: if the motor does not play a pulse, the speaker says nothing.
@@ -120,8 +122,6 @@ The note under these settings reads: "Every turn, wall and press has a sound and
 
 **Motion** (Settings › General): Match Windows, Full or Reduced. Match Windows follows the Windows "Animation effects" switch. Reduced reaches the knob too: the screen replaces its moves with 160 ms fades and the ring drops its decorative effects. The eight screen moments and what Reduced does to each are listed on the [LEDs](leds.md) page.
 
-**Recalibrate motor** (Settings › Knob). Re-aligns the motor's sensor, about 10 s with your hands off the knob; the screens come back when it is done. The knob refuses to recalibrate while a screen is active, so the app first releases it. If the run finds the motor direction has changed, it stops and asks once more; pressing the button again accepts the new direction. Not yet tested on real hardware.
-
 ## Safety limits under test
 
 Two protections are in the current firmware. Both were tuned against a model of the knob, not on the real one.
@@ -133,7 +133,6 @@ Two protections are in the current firmware. Both were tuned against a model of 
 ## Limits and known issues
 
 - The feel per screen, the walls, the sounds and rest sleep have been checked by hand on one knob. The fold-back and the spin trip have only been tested in a model (above).
-- Recalibrate motor has not yet been tested on real hardware.
 - With Karl's stock firmware, or with an older Desk Dial, the knob keeps the stock feel and makes no sound. The per-screen feels, the sounds and the pulses are only sent to a knob whose firmware reports that it supports them; see the [compatibility table](../compatibility.md) and the [firmware protocol](../../firmware/CONTROL_CENTER.md).
 - The tock is deliberately quiet at the default volume; the thump is the loudest sound. If you hear nothing at all, check Knob sounds is On and the volume is above 0.
 - The model behind the gallery assumes a motor constant, a rotor inertia and a friction value (none of them measured), so the mN·m scale is indicative only.

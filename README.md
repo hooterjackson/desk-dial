@@ -135,7 +135,7 @@
 
 ## Small project, straight answers
 
-- **Tested on one knob, mine.** Other knobs may need Recalibrate motor in Settings; that path and a few others are not yet tested on real hardware, and the [known limits](docs/faq.md#limits-and-known-issues) name each one.
+- **Tested on one knob, mine,** including a 9-hour session connected to Desk Dial. A few paths are not yet tested on real hardware, and the [known limits](docs/faq.md#limits-and-known-issues) name each one.
 - **The app isn't signed,** so Windows SmartScreen will warn you the first time (choose **More info**, then **Run anyway**). Smart App Control on Windows 11 can block it outright; see the [FAQ](docs/faq.md).
 - **There is no installer.** Desk Dial is a folder you unzip, and nothing starts with Windows unless you set that up.
 

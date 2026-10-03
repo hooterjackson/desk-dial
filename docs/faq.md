@@ -118,7 +118,7 @@ Never attach anything from `data\`, `backups\` or the `credentials.bin` file. Th
 
 ## Limits and known issues
 
-- Tested on one knob, the author's. Recalibrate motor, which other knobs may need, has not yet been tested on real hardware.
+- Tested on one knob, the author's. Not yet tried on real hardware: the knob dimming after 10 minutes and sleeping after 60, and the app profiles other than Onshape.
 - A self-signed `https://` certificate on Home Assistant has not yet been tested on real hardware and will likely be rejected.
 - Onshape: the tilt direction and tool-search hits are unverified.
 - Spotify and other streaming services are not supported; Sonos and Apple Music only.

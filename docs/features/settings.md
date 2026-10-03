@@ -112,9 +112,6 @@ The clicks the knob's speaker plays with its detents. Both apply the moment you 
 
 On makes the steps softer and the clicks silent, and replaces a thump or buzz with one soft pulse. The walls at the ends of a range still stop the knob. Saved with Save settings; the knob takes it with the next screen it is sent.
 
-**Recalibrate motor** · a button
-
-Aligns the knob's motor again; takes about 10 seconds, during which you keep your hands off the knob and its screens come back when done. If the previous run reported that the motor's direction changed, pressing it again accepts the new direction. Not yet tested on real hardware.
 
 
 ## Apps
@@ -155,5 +152,4 @@ These are plain keys in `data\settings.json`. Edit the file while Desk Dial is n
 - No speaker discovery: the Sonos address is typed by hand, and a changed address needs a restart.
 - The speaker field is still labelled with the author's room name.
 - The Home Assistant token travels unencrypted over `http://`; Settings warns about it but still allows it.
-- Recalibrate motor is not yet tested on real hardware.
 - No installer, no auto-start and no uninstaller ship today; see the README for the manual steps.
