@@ -70,7 +70,7 @@ The guarded runner in `tools/` runs the same tests with Tk windows, serial ports
 .\.venv\Scripts\python.exe ..\tools\run_no_tk.py "test_*.py"
 ```
 
-*You should see* a final line like `RESULT: ran 5431, failures 0, errors 0, skipped 77`. The exact counts change between versions. Skipped tests are live probes that only run when you set the environment variable named in their skip reason.
+*You should see* a final line like `RESULT: ran 5078, failures 0, errors 0, skipped 130`. The exact counts change between versions. Each skip prints its reason. Most are Tk windows (the guarded runner blocks Tk) or live probes that only run when you set the environment variable named in the reason. The rest need files a public clone does not have: the author's install runbooks and release records, or generated fixtures such as `tests/fixtures/alive_oracle.json` (the reason names the command that makes it).
 
 A few tests read the `firmware/`, `harness/` and `tools/` folders next to `app/`. Run them from a full clone of the repository.
 
