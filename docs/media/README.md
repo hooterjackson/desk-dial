@@ -53,8 +53,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | hero.gif | 2,833,055 | 864x528 | 71 | 8.88 |
 | hero.webp | 1,613,266 | 1440x880 | 157 | 19.82 |
 | knob-screens.png | 207,493 | 928x814 | 1 |  |
-| leds-moments.gif | 2,769,629 | 596x508 | 76 | 10 |
-| leds-moments.webp | 1,171,176 | 902x770 | 173 | 22.99 |
+| leds-moments.gif | 2,789,672 | 596x508 | 76 | 10 |
+| leds-moments.webp | 1,195,436 | 902x770 | 174 | 23.13 |
 | lights-brightness.gif | 1,228,482 | 475x550 | 80 | 9.98 |
 | lights-brightness.webp | 507,350 | 475x550 | 143 | 16.99 |
 | lights-power.gif | 1,873,643 | 475x550 | 97 | 11.58 |
@@ -65,8 +65,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | lights-temperature.webp | 428,234 | 475x550 | 114 | 13.71 |
 | motion-gallery.gif | 2,188,122 | 838x486 | 60 | 10.66 |
 | motion-gallery.webp | 1,019,264 | 838x486 | 114 | 19.19 |
-| music-hold-queue.gif | 2,303,296 | 475x550 | 76 | 11.31 |
-| music-hold-queue.webp | 487,028 | 475x550 | 109 | 15.29 |
+| music-hold-queue.gif | 2,415,098 | 475x550 | 82 | 12.29 |
+| music-hold-queue.webp | 540,888 | 475x550 | 113 | 15.85 |
 | music-lists.gif | 2,541,784 | 356x412 | 128 | 15.67 |
 | music-lists.webp | 707,952 | 475x550 | 162 | 18.18 |
 | music-playpause.gif | 1,157,145 | 475x550 | 42 | 7.32 |
@@ -81,8 +81,8 @@ Rendered by `tools/readme-media/render_all.py` from fictional data (see `tools/r
 | navigator.webp | 1,193,242 | 1120x630 | 185 | 13.54 |
 | onshape-knob.gif | 196,030 | 475x550 | 55 | 5.8 |
 | onshape-knob.webp | 232,202 | 475x550 | 75 | 7.73 |
-| ring-moments.gif | 2,145,366 | 684x544 | 76 | 10 |
-| ring-moments.webp | 1,030,576 | 1036x824 | 163 | 21.66 |
+| ring-moments.gif | 2,286,445 | 684x544 | 76 | 10 |
+| ring-moments.webp | 1,156,426 | 1036x824 | 167 | 22.2 |
 | settings-general.png | 17,229 | 616x890 | 1 |  |
 | settings-home-assistant.png | 26,049 | 616x1317 | 1 |  |
 | settings-knob.png | 26,291 | 616x1392 | 1 |  |
