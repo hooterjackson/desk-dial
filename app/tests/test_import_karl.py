@@ -237,9 +237,12 @@ class BuildTests(Case):
 
 class ImportTests(Case):
     def test_bundled_files_record(self):
-        """profiles/karl/SOURCE.json describes the committed files exactly (Karl's 55e47cb)."""
+        """profiles/karl/SOURCE.json describes the committed files exactly, at whichever of Karl's commits they were
+        last imported from (55e47cb at first, 4b546d33 after public PR #1): a full commit sha, not a pinned one, so a
+        reviewed import never has to edit this test."""
         record = json.loads((PROFILES / "karl" / "SOURCE.json").read_text())
-        self.assertEqual(record["commit"], "55e47cbb313416ca678936b51e5c1988ef5590d4")
+        self.assertRegex(record["commit"], r"^[0-9a-f]{40}$")
+        self.assertEqual((record["repo"], record["branch"]), (import_karl.KARL_REPO, import_karl.KARL_BRANCH))
         files = {p.name for p in (PROFILES / "karl").glob("*.json")} - {"SOURCE.json"}
         self.assertEqual(set(record["files"]), files)
         for name, info in record["files"].items():
