@@ -1,7 +1,7 @@
 {
   "repo": "https://github.com/katbinaris/NanoD_RatchetH1",
   "branch": "feat/firmware-esp-idf-quadra",
-  "commit": "55e47cbb313416ca678936b51e5c1988ef5590d4",
+  "commit": "4b546d33a752c73557af7b1b76eee4e6f30a086b",
   "origin": "built-ins",
   "exporter": "tools/profiles/import_karl.py (Karl's tools/profile_json_test, unchanged)",
   "cjson": "v1.7.18",
