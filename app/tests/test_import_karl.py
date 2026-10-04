@@ -254,6 +254,27 @@ class ImportTests(Case):
         self.assertIn("No change.", text)
         self.assertIn("- `onshape`: unchanged (20801 B)", text)
 
+    def test_unchanged_import_keeps_source_json_so_no_pr_opens(self):
+        """A new commit of Karl's that leaves every profile byte-identical changes nothing on disk: SOURCE.json keeps
+        the commit the files were imported from, so the Action finds no diff and opens no review PR (PR #1 was only
+        SOURCE.json's commit field)."""
+        src = self.karl_json(self.tmp / "src")
+        out = self.karl_json(self.tmp / "out")
+        self.run_quiet(self.args(from_json=src, commit="old-commit"))
+        before = (out / "SOURCE.json").read_bytes()
+        changed, text = self.run_quiet(self.args(from_json=src, commit="new-commit"))
+        self.assertFalse(changed)
+        self.assertEqual((out / "SOURCE.json").read_bytes(), before)
+        self.assertIn("No change.", text)
+        self.assertIn("SOURCE.json kept (still `old-commit`)", text)
+
+    def test_unchanged_import_still_writes_a_missing_source_json(self):
+        src = self.karl_json(self.tmp / "src")
+        out = self.karl_json(self.tmp / "out")
+        (out / "SOURCE.json").unlink(missing_ok=True)
+        self.run_quiet(self.args(from_json=src, commit="first"))
+        self.assertEqual(json.loads((out / "SOURCE.json").read_text())["commit"], "first")
+
     def test_changes_are_summarised(self):
         src = self.karl_json(self.tmp / "src", ("onshape", "figma", "plasticity", "blender"))
         self.karl_json(self.tmp / "out")

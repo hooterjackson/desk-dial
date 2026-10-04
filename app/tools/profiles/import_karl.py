@@ -350,7 +350,10 @@ def source_record(commit, files, origin):
                       for name, raw in sorted(files.items())}}
 
 
-def write_out(out, files, record):
+def write_out(out, files, record, changed=True):
+    """Write the profiles and SOURCE.json. With no profile changed, an existing SOURCE.json is kept as it is: it names
+    the commit the files were imported from, and rewriting only its commit field for an unrelated commit of Karl's
+    would give the Action a diff and open a review PR with nothing to review. True when SOURCE.json was kept."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     for name, raw in files.items():
@@ -358,7 +361,10 @@ def write_out(out, files, record):
     for stale in out.glob("*.json"):
         if stale.name not in files and stale.name != "SOURCE.json":
             stale.unlink()
+    if not changed and (out / "SOURCE.json").is_file():
+        return True
     ap._atomic_write(out / "SOURCE.json", (json.dumps(record, indent=2) + "\n").encode("ascii"))
+    return False
 
 
 # ------------------------------------------------------------------ main
@@ -383,7 +389,9 @@ def run(args, work):
         origin = "built-ins"
     files = load_new(dump_dir)
     summary, changed = summarize(args.out, files, args.sidecars, commit)
-    write_out(args.out, files, source_record(commit, files, origin))
+    if write_out(args.out, files, source_record(commit, files, origin), changed):
+        kept = json.loads((Path(args.out) / "SOURCE.json").read_text(encoding="ascii")).get("commit", "?")
+        summary += f"SOURCE.json kept (still `{kept}`): no profile changed, so there is nothing to review.\n"
     if args.summary:
         Path(args.summary).write_text(summary, encoding="ascii", newline="\n")
     print(summary, end="")
