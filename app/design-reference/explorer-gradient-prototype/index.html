@@ -1,0 +1,646 @@
+<title>Explorer Gradient Lab</title>
+<style>
+/* Layout: one full-bleed 32:9 stage (the explorer mock, laid out in 1280×720 units × k like StageLayout),
+   with a floating tuning panel and a frame-rate chip on top. Single dark look: this is an OLED overlay. */
+:root {
+  color-scheme: dark;
+  --void: #000000;          /* OLED black, the stage ground */
+  --frost: #0e0e10;         /* today's neutral frost base (DESKTOP_STAGE §12) */
+  --ink: #f2f1ee;           /* card titles, panel text */
+  --ink-dim: #a7a5a0;       /* artists, hints */
+  --panel: rgba(18, 18, 20, 0.82);
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #f0b35a;        /* the knob's amber "lit" button colour */
+  --good: #7fd48a;
+  --warn: #f0b35a;
+  --bad: #ff7a6b;
+  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --ui-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--void); color: var(--ink); font-family: var(--ui); overflow: hidden; }
+
+#stage { position: fixed; inset: 0; overflow: hidden; background: var(--void); }
+.layer { position: absolute; inset: 0; }
+#bg-paper > canvas { display: block; }
+#bg-current { background: var(--frost); }
+#bg-current canvas { position: absolute; transition: opacity 600ms var(--out); opacity: 0; }
+#bg-blobs { background: var(--void); }
+#blob-group { position: absolute; inset: 0; transition: transform 900ms var(--out); }
+.blob { position: absolute; border-radius: 50%; animation: drift var(--dur) ease-in-out infinite alternate; animation-delay: var(--delay); }
+.blob > i { position: absolute; inset: 0; border-radius: 50%; transition: opacity 600ms var(--out); }
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(var(--dx), var(--dy)) scale(1.12); }
+  100% { transform: translate(calc(var(--dx) * -0.6), calc(var(--dy) * 0.8)) scale(0.94); }
+}
+#tint { background: rgb(8, 8, 10); pointer-events: none; }
+
+/* explorer mock */
+#explorer { pointer-events: none; }
+.card { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; will-change: transform, opacity;
+  transition: transform 420ms var(--out), opacity 420ms var(--out), box-shadow 420ms var(--out); border-radius: 0.6%; overflow: hidden; }
+.card img { display: block; width: 100%; height: 100%; }
+.card .shade { position: absolute; inset: 0; background: #0b0b0c; transition: opacity 420ms var(--out); }
+.label { position: absolute; text-align: center; transition: opacity 160ms linear; }
+.label .t { font-family: var(--ui-display); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label .a { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dots { position: absolute; display: flex; justify-content: center; }
+.dots i { display: block; border-radius: 50%; background: var(--ink); }
+.tabs { position: absolute; display: flex; justify-content: center; }
+.tab { color: var(--ink-dim); font-weight: 600; position: relative; transition: color 240ms linear; }
+.tab.on { color: var(--ink); }
+.tab::after { content: ""; position: absolute; left: 0; right: 0; bottom: -0.45em; height: 0.12em; border-radius: 1em; background: var(--ink); opacity: 0; transition: opacity 320ms var(--out); }
+.tab.on::after { opacity: 1; }
+.hints { position: absolute; display: flex; justify-content: center; pointer-events: auto; }
+.hint { display: inline-flex; align-items: center; gap: 0.5em; color: var(--ink-dim); background: none; border: 0; font: inherit; cursor: pointer; padding: 0.2em 0.4em; border-radius: 0.4em; }
+.hint:hover { color: var(--ink); }
+.hint:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint b { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; border-radius: 0.35em; border: 1px solid var(--line); color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.hint.lit b { border-color: var(--accent); color: var(--accent); }
+
+/* HUD + panel */
+.ui { font-size: 12.5px; line-height: 1.4; }
+#hud { position: fixed; z-index: 5; top: calc(12px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px));
+  font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 32px); }
+#hud .fps { font-weight: 600; }
+#hud .ok { color: var(--good); } #hud .meh { color: var(--warn); } #hud .low { color: var(--bad); }
+#panel { position: fixed; z-index: 6; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  width: min(320px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow: auto; background: var(--panel);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 14px; }
+#panel h1 { margin: 0; font-family: var(--ui-display); font-size: 15px; font-weight: 600; text-wrap: balance; }
+#panel h1 small { display: block; font-family: var(--ui); font-weight: 400; font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+#panel h2 { margin: 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-dim); font-weight: 600; }
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: 8px; }
+.seg button { font: inherit; color: var(--ink-dim); background: none; border: 0; border-radius: 6px; padding: 6px 4px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: rgba(255,255,255,0.12); color: var(--ink); }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+.row label { color: var(--ink); }
+.row output { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 11.5px; }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.row select { grid-column: 2; font: inherit; color: var(--ink); background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.btn { font: inherit; color: var(--ink); background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px; cursor: pointer; text-align: center; }
+.btn:hover { background: rgba(255,255,255,0.12); }
+.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.btn:focus-visible, .seg button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatches { display: flex; gap: 4px; height: 18px; }
+.swatches i { flex: 1; border-radius: 4px; border: 1px solid var(--line); }
+.keys { color: var(--ink-dim); display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+.keys kbd { font-family: var(--mono); color: var(--ink); font-size: 11px; }
+.foot { color: var(--ink-dim); font-size: 11.5px; border-top: 1px solid var(--line); padding-top: 10px; }
+.foot a { color: var(--ink); }
+#copybox { width: 100%; height: 90px; font-family: var(--mono); font-size: 11px; color: var(--ink); background: rgba(0,0,0,0.4); border: 1px solid var(--line); border-radius: 6px; }
+#toast { position: fixed; z-index: 7; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(8px);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; opacity: 0; transition: opacity 200ms linear, transform 200ms var(--out); pointer-events: none; white-space: nowrap; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#fail { position: fixed; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(520px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+body.ui-hidden #panel, body.ui-hidden #hud { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .card, .card .shade, #blob-group { transition-duration: 1ms; }
+  .blob { animation: none; }
+}
+</style>
+
+<div id="stage">
+  <div id="bg-paper" class="layer"></div>
+  <div id="bg-current" class="layer" hidden></div>
+  <div id="bg-blobs" class="layer" hidden><div id="blob-group"></div></div>
+  <div id="tint" class="layer"></div>
+  <div id="explorer" class="layer"></div>
+</div>
+
+<div id="hud" class="ui" aria-live="off"><span class="fps">– fps</span><span class="ft">p95 – ms</span><span class="res">–</span></div>
+
+<aside id="panel" class="ui" aria-label="Tuning">
+  <h1>Explorer gradient lab<small>Desk Dial · full-screen Music explorer background · prototype</small></h1>
+
+  <div class="sec">
+    <h2>Background</h2>
+    <div class="seg" role="group" aria-label="Background mode">
+      <button id="mode-paper" type="button" aria-pressed="true">Paper shader</button>
+      <button id="mode-current" type="button" aria-pressed="false">Current</button>
+      <button id="mode-blobs" type="button" aria-pressed="false">Blobs</button>
+    </div>
+    <div class="swatches" id="swatches" aria-label="Current palette"></div>
+  </div>
+
+  <div class="sec" id="sec-shader">
+    <h2>Shader</h2>
+    <div class="row"><label for="s-distortion">Distortion</label><output for="s-distortion"></output><input id="s-distortion" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="s-swirl">Swirl</label><output for="s-swirl"></output><input id="s-swirl" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="s-speed">Drift speed</label><output for="s-speed"></output><input id="s-speed" type="range" min="0" max="3" step="0.05"></div>
+    <div class="row"><label for="s-scale">Scale</label><output for="s-scale"></output><input id="s-scale" type="range" min="0.3" max="2.5" step="0.01"></div>
+    <div class="row"><label for="s-grainMixer">Grain (edges)</label><output for="s-grainMixer"></output><input id="s-grainMixer" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="s-grainOverlay">Grain (overlay)</label><output for="s-grainOverlay"></output><input id="s-grainOverlay" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="s-world">Shape on 32:9</label><select id="s-world"><option value="stretch">Stretch to screen</option><option value="wide">16:9 world, cover</option></select></div>
+  </div>
+
+  <div class="sec">
+    <h2>Palette</h2>
+    <div class="row"><label for="s-colors">Colours</label><output for="s-colors"></output><input id="s-colors" type="range" min="2" max="9" step="1"></div>
+    <div class="row"><label for="s-lcap">Lightness cap (OLED)</label><output for="s-lcap"></output><input id="s-lcap" type="range" min="0.3" max="0.95" step="0.01"></div>
+    <div class="row"><label for="s-sat">Saturation</label><output for="s-sat"></output><input id="s-sat" type="range" min="0.5" max="2" step="0.05"></div>
+    <div class="row"><label for="s-dim">Dim</label><output for="s-dim"></output><input id="s-dim" type="range" min="0" max="0.85" step="0.01"></div>
+  </div>
+
+  <div class="sec">
+    <h2>Motion</h2>
+    <div class="row"><label for="s-debounce">Debounce</label><output for="s-debounce"></output><input id="s-debounce" type="range" min="0" max="600" step="10"></div>
+    <div class="row"><label for="s-xfade">Colour transition</label><output for="s-xfade"></output><input id="s-xfade" type="range" min="100" max="2000" step="20"></div>
+    <div class="row"><label for="s-kick">Turn impulse</label><output for="s-kick"></output><input id="s-kick" type="range" min="0" max="2" step="0.05"></div>
+  </div>
+
+  <div class="sec">
+    <h2>Performance</h2>
+    <div class="row"><label for="s-render">Render scale</label><select id="s-render"><option value="1">100 %</option><option value="0.5">50 %</option><option value="0.25">25 %</option><option value="0.125">12.5 %</option></select></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="b-auto" type="button" aria-pressed="false">Auto-rotate</button>
+    <button class="btn" id="b-full" type="button">Full screen</button>
+    <button class="btn" id="b-files" type="button">Use my covers</button>
+    <button class="btn" id="b-reset" type="button">Reset</button>
+    <button class="btn" id="b-copy" type="button" style="grid-column: 1 / -1">Copy settings</button>
+  </div>
+  <textarea id="copybox" hidden readonly aria-label="Settings JSON"></textarea>
+  <input id="files" type="file" accept="image/*" multiple hidden>
+
+  <div class="keys">
+    <kbd>← →</kbd><span>Turn one detent (also the mouse wheel)</span>
+    <kbd>Shift ←→</kbd><span>Fast spin, 8 detents</span>
+    <kbd>2</kbd><span>Recently Added ⇄ Playlists</span>
+    <kbd>M</kbd><span>Next background mode</span>
+    <kbd>F</kbd><span>Full screen</span>
+    <kbd>H</kbd><span>Hide this panel and the fps chip</span>
+  </div>
+  <div class="foot">Covers and titles are made up. Your own covers stay in this browser tab.
+    Background shader: <a href="https://github.com/paper-design/shaders" target="_blank" rel="noopener">Paper Shaders</a> 0.0.81, Apache-2.0.</div>
+</aside>
+
+<div id="toast" class="ui" role="status"></div>
+<div id="fail" class="ui" hidden></div>
+
+<script type="module">
+// ---------------------------------------------------------------------------------------------
+// Paper Shaders, pinned. If it cannot load (offline, no WebGL2) the page falls back to Blobs.
+let Paper = null;
+try {
+  Paper = await import("https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.81/dist/index.js");
+} catch (e) { console.warn("Paper Shaders failed to load", e); }
+
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------------------------------------------------------------------------------------------
+// Settings (per-viewer convenience in localStorage; the page works without it)
+const DEFAULTS = {
+  mode: "paper", distortion: 0.8, swirl: 0.1, speed: 0.6, scale: 1, grainMixer: 0, grainOverlay: 0, world: "stretch",
+  colors: 6, lcap: 0.55, sat: 1.2, dim: 0.35, debounce: 200, xfade: 600, kick: 1, render: 1,
+};
+let S = { ...DEFAULTS };
+try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings") || "{}")); } catch {}
+const save = () => { try { localStorage.setItem("egl.settings", JSON.stringify(S)); } catch {} };
+
+// ---------------------------------------------------------------------------------------------
+// OKLab (Björn Ottosson's reference matrices)
+const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const gam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+function rgbToLab(r, g, b) {
+  r = lin(r); g = lin(g); b = lin(b);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+          1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+          0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+function labToRgb([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+          -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+          -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map((c) => clamp(gam(clamp(c, 0, 1)), 0, 1));
+}
+function labToLinear([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+          -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+}
+// Pull chroma in (same L and hue) until the colour fits sRGB, so a boosted colour never clips to a pure channel
+function toGamut([L, a, b]) {
+  const fits = (f) => labToLinear([L, a * f, b * f]).every((c) => c >= -1e-4 && c <= 1 + 1e-4);
+  if (fits(1)) return [L, a, b];
+  let lo = 0, hi = 1; for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+  return [L, a * lo, b * lo];
+}
+const toHex = (rgb) => "#" + rgb.map((c) => Math.round(c * 255).toString(16).padStart(2, "0")).join("");
+
+// ---------------------------------------------------------------------------------------------
+// Fictional library. Covers are drawn here; nothing is fetched.
+function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+const RECENT_SEED = [
+  ["Glass Harbour", "Mira Solenne"], ["Low Orbit Choir", "The Quiet Engines"], ["Copper Field Days", "Anouk Varga"],
+  ["Night Ferry", "Tamsin Rowe"], ["Saltwater Static", "Kei Morrow"], ["Paper Lanterns", "Odile & The Tides"],
+  ["Signal Bloom", "Haru Lindqvist"], ["Cinder Avenue", "Brass Weather"], ["Velvet Hours", "Juno Okafor"],
+  ["Atlas of Small Things", "Pellucid"], ["Northbound", "Fen Marlowe"], ["Lemon Grove Tapes", "Sunday Arcade"],
+  ["Deep Field", "Ilse Navarro"], ["Rose Quartz Radio", "The Halcyon Set"], ["Tidal Memory", "Ama Kinsella"],
+  ["Ultraviolet Kitchen", "Moss & Margin"], ["Ember Season", "Cato Reyes"], ["Blue Hours", "Wren Abernathy"],
+];
+const PLAYLIST_SEED = ["Morning Mix", "Late Drive", "Focus Room", "Sunday Records", "Rainy Window", "Loud Workout", "Dinner Party", "Deep Night"];
+const STYLES = ["sun", "bands", "grid", "blobs", "type", "rings"];
+
+function hsl(h, s, l) { return `hsl(${((h % 360) + 360) % 360} ${s}% ${l}%)`; }
+function drawCover(ctx, title, size) {
+  const R = rng(hash(title)), h0 = R() * 360, scheme = [0, 30, 150, 180, 210][Math.floor(R() * 5)];
+  const h1 = h0 + scheme, style = STYLES[hash(title + "s") % STYLES.length];
+  const dark = R() < 0.45;
+  const g = ctx.createLinearGradient(0, 0, size * R(), size);
+  g.addColorStop(0, hsl(h0, 55 + R() * 35, dark ? 14 + R() * 12 : 45 + R() * 25));
+  g.addColorStop(1, hsl(h0 + 25, 50 + R() * 40, dark ? 6 + R() * 10 : 25 + R() * 25));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  if (style === "sun") {
+    const r = size * (0.18 + R() * 0.2), x = size * (0.3 + R() * 0.4), y = size * (0.3 + R() * 0.35);
+    const sg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    sg.addColorStop(0, hsl(h1, 90, 70)); sg.addColorStop(1, hsl(h1 + 20, 85, 50));
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = hsl(h0 + 180, 30, 10); ctx.fillRect(0, size * (0.68 + R() * 0.12), size, size);
+  } else if (style === "bands") {
+    let y = 0; while (y < size) { const hgt = size * (0.04 + R() * 0.16); ctx.fillStyle = hsl(R() < 0.5 ? h0 : h1, 35 + R() * 40, 18 + R() * 50); ctx.fillRect(0, y, size, hgt); y += hgt; }
+  } else if (style === "grid") {
+    const n = 3 + Math.floor(R() * 3), c = size / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (R() < 0.6) { ctx.fillStyle = hsl(R() < 0.5 ? h0 : h1, 40 + R() * 40, 22 + R() * 45); ctx.fillRect(i * c + c * 0.06, j * c + c * 0.06, c * 0.88, c * 0.88); }
+  } else if (style === "blobs") {
+    for (let i = 0; i < 6; i++) { const x = R() * size, y = R() * size, r = size * (0.15 + R() * 0.35); const bg = ctx.createRadialGradient(x, y, 0, x, y, r);
+      bg.addColorStop(0, hsl(i % 2 ? h0 : h1, 80, 55 + R() * 20)); bg.addColorStop(1, hsl(h0, 60, 30, 0).replace(")", " / 0)"));
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size); }
+  } else if (style === "type") {
+    ctx.fillStyle = hsl(h1, 85, dark ? 62 : 92); ctx.font = `800 ${size * 0.62}px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textBaseline = "alphabetic"; ctx.fillText(title[0], size * 0.08, size * 0.9);
+  } else {
+    for (let i = 7; i > 0; i--) { ctx.fillStyle = hsl(i % 2 ? h0 : h1, 60 + R() * 30, 15 + i * 8); ctx.beginPath(); ctx.arc(size * 0.5, size * 0.55, (size * 0.62 * i) / 7, 0, Math.PI * 2); ctx.fill(); }
+  }
+  // fine grain so covers read as print, not flat vector
+  const img = ctx.getImageData(0, 0, size, size), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (R() - 0.5) * 14; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  ctx.putImageData(img, 0, 0);
+}
+function makeCanvas(size) { const c = document.createElement("canvas"); c.width = c.height = size; return c; }
+function itemFromCanvas(canvas, title, artist) {
+  return { title, artist, canvas, src: canvas.toDataURL("image/jpeg", 0.88), palette: null };
+}
+const RECENT = RECENT_SEED.map(([t, a]) => { const c = makeCanvas(512); drawCover(c.getContext("2d"), t, 512); return itemFromCanvas(c, t, a); });
+const PLAYLISTS = PLAYLIST_SEED.map((name, i) => {
+  const c = makeCanvas(512), x = c.getContext("2d"), R = rng(hash(name));
+  for (let q = 0; q < 4; q++) { const src = RECENT[Math.floor(R() * RECENT.length)].canvas; x.drawImage(src, (q % 2) * 256, Math.floor(q / 2) * 256, 256, 256); }
+  return itemFromCanvas(c, name, `Playlist · ${12 + Math.floor(R() * 60)} songs`);
+});
+const LISTS = { recent: RECENT, favourites: PLAYLISTS };
+
+// ---------------------------------------------------------------------------------------------
+// Palette: k-means in OKLab on a 64 px copy (today's ambient also starts from 64 px), biggest cluster first
+const K = 9;
+function clusters(item) {
+  if (item.palette) return item.palette;
+  const c = makeCanvas(64), x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(item.canvas, 0, 0, 64, 64);
+  const d = x.getImageData(0, 0, 64, 64).data, pts = [];
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 127) pts.push(rgbToLab(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255));
+  // farthest-point init from the mean: deterministic, so a cover always gives the same palette
+  const mean = [0, 1, 2].map((j) => pts.reduce((s, p) => s + p[j], 0) / pts.length);
+  const dist = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+  const cent = [];
+  let far = pts.reduce((b, p) => (dist(p, mean) > dist(b, mean) ? p : b), pts[0]); cent.push(far.slice());
+  while (cent.length < K) { far = pts.reduce((b, p) => { const dp = Math.min(...cent.map((q) => dist(p, q))); return dp > b[1] ? [p, dp] : b; }, [pts[0], -1])[0]; cent.push(far.slice()); }
+  let count = new Array(K).fill(0);
+  for (let it = 0; it < 10; it++) {
+    const sum = cent.map(() => [0, 0, 0]); count = new Array(K).fill(0);
+    for (const p of pts) { let bi = 0, bd = Infinity; for (let k = 0; k < K; k++) { const dd = dist(p, cent[k]); if (dd < bd) { bd = dd; bi = k; } } sum[bi][0] += p[0]; sum[bi][1] += p[1]; sum[bi][2] += p[2]; count[bi]++; }
+    for (let k = 0; k < K; k++) if (count[k]) cent[k] = sum[k].map((v) => v / count[k]);
+  }
+  item.palette = cent.map((lab, k) => ({ lab, share: count[k] / pts.length })).filter((c) => c.share > 0).sort((a, b) => b.share - a.share);
+  return item.palette;
+}
+// Shape for the background: cap lightness (OLED), scale chroma, add a near-black anchor in the lead hue
+function shapedPalette(item) {
+  const cl = clusters(item), n = S.colors;
+  const shape = ([L, a, b], lcap) => { const C = Math.hypot(a, b) * S.sat, h = Math.atan2(b, a), c = Math.min(C, 0.3);
+    return toGamut([Math.min(L, lcap), c * Math.cos(h), c * Math.sin(h)]); };
+  const lead = cl[0].lab, hue = Math.atan2(lead[2], lead[1]), ch = Math.min(0.05, Math.hypot(lead[1], lead[2]) * 0.5);
+  const out = [[0.09, ch * Math.cos(hue), ch * Math.sin(hue)]];
+  for (let i = 0; out.length < n; i++) out.push(shape(cl[i % cl.length].lab, S.lcap));
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// State
+let source = "recent", focus = 0;
+const list = () => LISTS[source];
+let shown = [];                  // OKLab per slot, what the background shows now
+let from = [], to = [], tStart = 0, tweenOn = false;
+let debounceTimer = null, lastTarget = null;
+
+// ---------------------------------------------------------------------------------------------
+// Layout (StageLayout: 1280×720 units, k = min(W/1280, H/720), centred; wide when W/k > 1281)
+let W = innerWidth, H = innerHeight, k = 1, x0 = 0, y0 = 0, wide = true;
+const T32 = { x: [0, 300, 500, 680, 850, 1010, 1170, 1330, 1490], s: [1, 0.6, 0.46, 0.42, 0.4, 0.4, 0.4, 0.4, 0.4],
+  o: [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.54, 0.5, 0], sh: [0, 0.24, 0.34, 0.42, 0.48, 0.52, 0.55, 0.58, 0.6] };
+const T16 = { x: [0, 300, 470, 590, 660], s: [1, 0.6, 0.42, 0.3, 0.22], o: [1, 0.92, 0.55, 0, 0], sh: [0, 0.24, 0.48, 0.6, 0.6] };
+function layout() {
+  W = innerWidth; H = innerHeight; k = Math.min(W / 1280, H / 720); x0 = (W - 1280 * k) / 2; y0 = (H - 720 * k) / 2; wide = W / k > 1281;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Explorer mock
+const ex = $("#explorer");
+const cards = new Map();         // index -> element
+const label = document.createElement("div"); label.className = "label"; label.innerHTML = '<div class="t"></div><div class="a"></div>';
+const dots = document.createElement("div"); dots.className = "dots";
+const tabs = document.createElement("div"); tabs.className = "tabs";
+tabs.innerHTML = '<span class="tab" data-src="recent">Recently Added</span><span class="tab" data-src="favourites">Playlists</span>';
+const hints = document.createElement("div"); hints.className = "hints";
+hints.innerHTML = '<button class="hint" type="button" data-b="1"><b>1</b>Back</button><button class="hint" type="button" data-b="2"><b>2</b><span>Playlists</span></button>' +
+  '<button class="hint" type="button" data-b="3"><b>3</b>Visualizer</button><button class="hint" type="button" data-b="4"><b>4</b>Play</button>';
+ex.append(label, dots, tabs, hints);
+
+function cardEl(i) {
+  let el = cards.get(i);
+  if (!el) {
+    el = document.createElement("div"); el.className = "card";
+    el.innerHTML = '<img alt=""><div class="shade"></div>'; el.querySelector("img").src = list()[i].src;
+    el.style.opacity = "0"; ex.prepend(el); cards.set(i, el);
+  }
+  return el;
+}
+function placeCards(instant) {
+  const T = wide ? T32 : T16, amax = T.x.length - 1, L = list();
+  const want = new Set();
+  for (let i = Math.max(0, focus - amax); i <= Math.min(L.length - 1, focus + amax); i++) want.add(i);
+  for (const [i, el] of cards) if (!want.has(i)) { el.remove(); cards.delete(i); }
+  const size = 340 * k;
+  for (const i of want) {
+    const el = cardEl(i), a = Math.abs(i - focus), dir = Math.sign(i - focus);
+    const cx = x0 + (640 + dir * T.x[a]) * k, cy = y0 + 318 * k, s = T.s[a];
+    if (instant) el.style.transition = "none";
+    el.style.width = el.style.height = size + "px";
+    el.style.transform = `translate(${cx - size / 2}px, ${cy - size / 2}px) scale(${s})`;
+    el.style.opacity = String(T.o[a]);
+    el.style.zIndex = String(100 - a);
+    el.style.boxShadow = a === 0 ? `0 ${40 * k}px ${80 * k}px rgba(0,0,0,.55)` : `0 ${16 * k}px ${36 * k}px rgba(0,0,0,.40)`;
+    el.querySelector(".shade").style.opacity = String(T.sh[a]);
+    if (instant) { el.getBoundingClientRect(); el.style.transition = ""; }
+  }
+  // label, dots, tabs, hints
+  const it = L[focus];
+  Object.assign(label.style, { left: x0 + 190 * k + "px", top: y0 + 514 * k + "px", width: 900 * k + "px" });
+  label.querySelector(".t").style.fontSize = 34 * k + "px"; label.querySelector(".a").style.fontSize = 22 * k + "px";
+  label.querySelector(".t").textContent = it.title; label.querySelector(".a").textContent = it.artist;
+  Object.assign(dots.style, { left: x0 + 64 * k + "px", width: 1152 * k + "px", top: y0 + 622 * k + "px", gap: 8 * k + "px" });
+  dots.innerHTML = L.map((_, i) => `<i style="width:${6 * k}px;height:${6 * k}px;opacity:${i === focus ? 1 : 0.4}"></i>`).join("");
+  Object.assign(tabs.style, { left: "0", width: W + "px", top: y0 + 44 * k + "px", gap: 36 * k + "px", fontSize: 20 * k + "px" });
+  tabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.src === source));
+  Object.assign(hints.style, { left: "0", width: W + "px", top: y0 + 664 * k + "px", gap: 28 * k + "px", fontSize: Math.max(11, 16 * k) + "px" });
+  hints.querySelector('[data-b="2"] span').textContent = source === "recent" ? "Playlists" : "Recent";
+  hints.querySelector('[data-b="2"]').classList.toggle("lit", source === "favourites");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Backgrounds
+const bgPaper = $("#bg-paper"), bgCurrent = $("#bg-current"), bgBlobs = $("#bg-blobs"), blobGroup = $("#blob-group");
+let mount = null;
+function paperUniforms() {
+  const cols = shown.map((lab) => [...labToRgb(lab), 1]);
+  const worldWide = S.world === "wide";
+  return {
+    u_colors: cols, u_colorsCount: cols.length, u_distortion: S.distortion, u_swirl: clamp(S.swirl + motion.swirl, 0, 1),
+    u_grainMixer: S.grainMixer, u_grainOverlay: S.grainOverlay,
+    u_fit: Paper.ShaderFitOptions[worldWide ? "cover" : "none"], u_scale: S.scale, u_rotation: 0,
+    u_offsetX: motion.x, u_offsetY: 0, u_originX: 0.5, u_originY: 0.5,
+    u_worldWidth: worldWide ? 1600 : 0, u_worldHeight: worldWide ? 900 : 0,
+  };
+}
+function maxPixels() { return Math.max(1, Math.round(W * H * devicePixelRatio ** 2 * S.render * S.render)); }
+function startPaper() {
+  if (mount || !Paper) return !!mount;
+  try {
+    mount = new Paper.ShaderMount(bgPaper, Paper.meshGradientFragmentShader, paperUniforms(), { alpha: false, premultipliedAlpha: true }, 0, 0, 1, maxPixels());
+    return true;
+  } catch (e) { console.warn(e); mount = null; return false; }
+}
+
+// "Current": today's ambient, rebuilt as the stage does it: the bleed box at 1/8, blurred σ = 90k/8, saturate 1.5, ×8, 0.5 opacity, 600 ms crossfade
+const amb = [document.createElement("canvas"), document.createElement("canvas")]; let ambFront = 0;
+amb.forEach((c) => bgCurrent.append(c));
+function buildAmbient(item) {
+  const bw = W + 320 * k, bh = H + 320 * k, w8 = Math.ceil(bw / 8), h8 = Math.ceil(bh / 8);
+  const back = amb[1 - ambFront], x = back.getContext("2d");
+  back.width = w8; back.height = h8;
+  x.filter = `blur(${(90 * k) / 8}px) saturate(1.5)`;
+  const side = Math.max(w8, h8); x.drawImage(item.canvas, (w8 - side) / 2, (h8 - side) / 2, side, side);
+  Object.assign(back.style, { left: -160 * k + "px", top: -160 * k + "px", width: bw + "px", height: bh + "px" });
+  back.style.transitionDuration = S.xfade + "ms";
+  amb[ambFront].style.transitionDuration = S.xfade + "ms";
+  back.style.opacity = "0.5"; amb[ambFront].style.opacity = "0"; ambFront = 1 - ambFront;
+}
+
+// "Blobs": what DirectComposition could do with no per-frame Python: pre-rendered soft discs on looping
+// transform animations, colour changes as A/B crossfades, and the turn impulse as one group translate.
+const BLOBS = [];
+function buildBlobs() {
+  blobGroup.innerHTML = ""; BLOBS.length = 0;
+  const R = rng(7), n = 6;
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement("div"); b.className = "blob";
+    const w = H * (1.1 + R() * 0.7), h = w * (0.7 + R() * 0.3);
+    Object.assign(b.style, { width: w + "px", height: h + "px", left: (W * (i + 0.5)) / n - w / 2 + "px", top: H * (0.15 + R() * 0.7) - h / 2 + "px" });
+    b.style.setProperty("--dur", 18 + R() * 14 + "s"); b.style.setProperty("--delay", -R() * 20 + "s");
+    b.style.setProperty("--dx", (R() - 0.5) * W * 0.12 + "px"); b.style.setProperty("--dy", (R() - 0.5) * H * 0.3 + "px");
+    const a = document.createElement("i"), c = document.createElement("i"); c.style.opacity = "0";
+    b.append(a, c); blobGroup.append(b); BLOBS.push({ layers: [a, c], front: 0 });
+  }
+}
+function setBlobColours(labs) {
+  BLOBS.forEach((b, i) => {
+    const lab = labs[1 + (i % (labs.length - 1))] || labs[0];
+    const back = b.layers[1 - b.front];
+    back.style.background = `radial-gradient(closest-side, ${toHex(labToRgb(lab))} 0%, ${toHex(labToRgb(lab))}99 40%, transparent 100%)`;
+    back.style.transitionDuration = b.layers[b.front].style.transitionDuration = S.xfade + "ms";
+    back.style.opacity = "1"; b.layers[b.front].style.opacity = "0"; b.front = 1 - b.front;
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Focus change -> debounce -> new palette target (a fast spin builds nothing until it settles)
+function requestPalette(immediate) {
+  clearTimeout(debounceTimer);
+  const go = () => {
+    const item = list()[focus]; if (item === lastTarget && shown.length === S.colors) return; lastTarget = item;
+    const target = shapedPalette(item);
+    from = shown.length === target.length ? shown.map((c) => c.slice()) : target.map((c, i) => (shown[i] || shown[0] || [0, 0, 0]).slice());
+    to = target; tStart = performance.now(); tweenOn = true;
+    if (S.mode === "current") buildAmbient(item);
+    if (S.mode === "blobs") setBlobColours(target);
+    renderSwatches(target);
+  };
+  if (immediate) go(); else debounceTimer = setTimeout(go, S.debounce);
+}
+function renderSwatches(labs) { $("#swatches").innerHTML = labs.map((l) => `<i style="background:${toHex(labToRgb(l))}"></i>`).join(""); }
+const easeOut = (t) => 1 - (1 - t) ** 3;
+
+// ---------------------------------------------------------------------------------------------
+// Turn impulse: a damped spring on offset, decaying swirl and time boost; scaled by spin speed
+const motion = { x: 0, v: 0, swirl: 0, boost: 0 };
+let lastDetent = 0;
+function detent(dir) {
+  const L = list(), nf = clamp(focus + dir, 0, L.length - 1);
+  if (nf === focus) { toast(dir < 0 ? "First item" : "Last item"); return; }
+  focus = nf; placeCards(false);
+  const now = performance.now(), gap = now - lastDetent; lastDetent = now;
+  const velocity = clamp(220 / Math.max(40, gap), 0.6, 3);
+  if (!reduceMotion) {
+    const kk = S.kick * velocity;
+    motion.v += dir * 0.35 * kk; motion.swirl = Math.min(0.5, motion.swirl + 0.05 * kk); motion.boost = Math.min(6, motion.boost + 1.2 * kk);
+    if (S.mode === "blobs") { blobGroup.style.transitionDuration = "120ms"; blobGroup.style.transform = `translateX(${-dir * 50 * k * S.kick}px)`;
+      setTimeout(() => { blobGroup.style.transitionDuration = ""; blobGroup.style.transform = ""; }, 120); }
+  }
+  requestPalette(false);
+}
+function toggleSource() {
+  source = source === "recent" ? "favourites" : "recent"; focus = 0;
+  for (const el of cards.values()) el.remove(); cards.clear();
+  placeCards(true); requestPalette(false); toast(source === "recent" ? "Recently Added" : "Favourite playlists");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Frame loop: our own rAF drives Paper's clock, so the turn impulse can speed time up
+const frameTimes = []; let lastT = performance.now(), frame = 0, hudAt = 0;
+function tick(t) {
+  const dt = clamp(t - lastT, 0, 100); lastT = t;
+  frameTimes.push(dt); if (frameTimes.length > 480) frameTimes.shift();
+  // colour tween
+  if (tweenOn) { const p = clamp((t - tStart) / S.xfade, 0, 1), e = easeOut(p);
+    shown = to.map((c, i) => c.map((v, j) => from[i][j] + (v - from[i][j]) * e)); if (p >= 1) tweenOn = false; }
+  // spring + decays
+  const sdt = dt / 1000; motion.v += (-60 * motion.x - 12 * motion.v) * sdt; motion.x += motion.v * sdt;
+  motion.swirl *= Math.exp(-sdt / 0.6); motion.boost *= Math.exp(-sdt / 0.5);
+  frame += dt * S.speed * (1 + motion.boost);
+  if (S.mode === "paper" && mount) { mount.currentFrame = frame; mount.setUniforms(paperUniforms()); }
+  if (t - hudAt > 250) { hudAt = t; hud(); }
+  requestAnimationFrame(tick);
+}
+function hud() {
+  const last = frameTimes.slice(-240), n = last.length; if (!n) return;
+  const avg = last.reduce((a, b) => a + b, 0) / n, fps = 1000 / avg, p95 = [...last].sort((a, b) => a - b)[Math.floor(n * 0.95)] || avg;
+  const el = $("#hud .fps"); el.textContent = `${fps.toFixed(0)} fps`; el.className = "fps " + (fps > 200 ? "ok" : fps > 100 ? "meh" : "low");
+  $("#hud .ft").textContent = `p95 ${p95.toFixed(2)} ms`;
+  const cv = mount && S.mode === "paper" ? mount.canvasElement : null;
+  $("#hud .res").textContent = `${Math.round(W * devicePixelRatio)}×${Math.round(H * devicePixelRatio)}` + (cv ? ` · shader ${cv.width}×${cv.height}` : "") + ` · ${S.mode}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Modes
+function setMode(m) {
+  if (m === "paper" && !startPaper()) { failNote(); m = "blobs"; }
+  S.mode = m; save();
+  bgPaper.hidden = m !== "paper"; bgCurrent.hidden = m !== "current"; bgBlobs.hidden = m !== "blobs";
+  $("#sec-shader").hidden = m !== "paper";
+  for (const b of ["paper", "current", "blobs"]) $("#mode-" + b).setAttribute("aria-pressed", String(b === m));
+  $("#tint").style.opacity = String(m === "current" ? 0.5 : S.dim);
+  lastTarget = null;
+  if (m === "blobs" && !BLOBS.length) buildBlobs();
+  requestPalette(true);
+}
+function failNote() {
+  const f = $("#fail"); f.hidden = false;
+  f.textContent = Paper ? "WebGL2 is not available in this browser, so the Paper shader can't run. Showing Blobs instead."
+    : "Paper Shaders didn't load (the page needs cdn.jsdelivr.net). Showing Blobs instead.";
+  setTimeout(() => (f.hidden = true), 4000);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Panel wiring
+const SLIDERS = { distortion: (v) => v.toFixed(2), swirl: (v) => v.toFixed(2), speed: (v) => v.toFixed(2) + "×", scale: (v) => v.toFixed(2),
+  grainMixer: (v) => v.toFixed(2), grainOverlay: (v) => v.toFixed(2), colors: (v) => String(v), lcap: (v) => "L " + v.toFixed(2),
+  sat: (v) => v.toFixed(2) + "×", dim: (v) => Math.round(v * 100) + " %", debounce: (v) => v + " ms", xfade: (v) => v + " ms", kick: (v) => v.toFixed(2) + "×" };
+function syncPanel() {
+  for (const [key, fmt] of Object.entries(SLIDERS)) { const inp = $("#s-" + key); inp.value = S[key]; $(`output[for="s-${key}"]`).textContent = fmt(+S[key]); }
+  $("#s-world").value = S.world; $("#s-render").value = String(S.render);
+}
+for (const [key, fmt] of Object.entries(SLIDERS)) {
+  $("#s-" + key).addEventListener("input", (e) => {
+    S[key] = +e.target.value; $(`output[for="s-${key}"]`).textContent = fmt(S[key]); save();
+    if (["colors", "lcap", "sat"].includes(key)) { lastTarget = null; requestPalette(true); }
+    if (key === "dim" && S.mode !== "current") $("#tint").style.opacity = String(S.dim);
+  });
+}
+$("#s-world").addEventListener("change", (e) => { S.world = e.target.value; save(); });
+$("#s-render").addEventListener("change", (e) => { S.render = +e.target.value; save(); mount?.setMaxPixelCount(maxPixels()); });
+for (const m of ["paper", "current", "blobs"]) $("#mode-" + m).addEventListener("click", () => setMode(m));
+let autoTimer = null;
+$("#b-auto").addEventListener("click", (e) => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } else autoTimer = setInterval(() => { if (focus >= list().length - 1) { focus = -1; } detent(1); }, 2400);
+  e.currentTarget.setAttribute("aria-pressed", String(!!autoTimer));
+});
+$("#b-full").addEventListener("click", fullscreen);
+$("#b-files").addEventListener("click", () => $("#files").click());
+$("#files").addEventListener("change", async (e) => {
+  const files = [...e.target.files]; if (!files.length) return;
+  const items = [];
+  for (const f of files) { try { const bmp = await createImageBitmap(f); const c = makeCanvas(512), x = c.getContext("2d");
+      const side = Math.min(bmp.width, bmp.height); x.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 512, 512);
+      items.push(itemFromCanvas(c, f.name.replace(/\.[^.]+$/, ""), "Your cover")); } catch {} }
+  if (!items.length) { toast("Those files aren't images this browser can read"); return; }
+  LISTS.recent = items; source = "favourites"; toggleSource(); toast(`${items.length} of your covers loaded`);
+});
+$("#b-reset").addEventListener("click", () => { const m = S.mode; S = { ...DEFAULTS, mode: m }; save(); syncPanel(); mount?.setMaxPixelCount(maxPixels()); setMode(m); toast("Settings reset"); });
+$("#b-copy").addEventListener("click", () => {
+  const json = JSON.stringify(S, null, 2), box = $("#copybox");
+  navigator.clipboard?.writeText(json).then(() => toast("Settings copied"), () => { box.hidden = false; box.value = json; box.select(); toast("Select and copy the settings below"); })
+    ?? (box.hidden = false, box.value = json, box.select());
+});
+hints.addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) button(+b.dataset.b); });
+function button(n) {
+  if (n === 1) toast("Back closes the explorer in the app");
+  if (n === 2) toggleSource();
+  if (n === 3) toast("Visualizer comes later");
+  if (n === 4) { const el = cards.get(focus); if (el) { el.animate([{ scale: 1 }, { scale: 1.06 }, { scale: 1 }], { duration: 420, easing: "cubic-bezier(0.22,1,0.36,1)" }); } toast(`Playing ${list()[focus].title}`); }
+}
+function fullscreen() { (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())?.catch?.(() => toast("Full screen isn't available here")); }
+let toastTimer = null;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600); }
+
+// keyboard + wheel as the knob
+addEventListener("keydown", (e) => {
+  if (e.target.closest?.("input, select, textarea")) return;
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    e.preventDefault(); const dir = e.key === "ArrowRight" ? 1 : -1;
+    if (e.shiftKey) { for (let i = 0; i < 8; i++) setTimeout(() => detent(dir), i * 40); } else detent(dir);
+  } else if (["1", "2", "3", "4"].includes(e.key)) button(+e.key);
+  else if (e.key === "m" || e.key === "M") setMode({ paper: "current", current: "blobs", blobs: "paper" }[S.mode]);
+  else if (e.key === "f" || e.key === "F") fullscreen();
+  else if (e.key === "h" || e.key === "H") document.body.classList.toggle("ui-hidden");
+});
+let wheelAcc = 0;
+$("#stage").addEventListener("wheel", (e) => { e.preventDefault(); wheelAcc += e.deltaY + e.deltaX; while (Math.abs(wheelAcc) >= 60) { detent(Math.sign(wheelAcc)); wheelAcc -= Math.sign(wheelAcc) * 60; } }, { passive: false });
+
+addEventListener("resize", () => { layout(); placeCards(true); if (BLOBS.length) { buildBlobs(); if (S.mode === "blobs") setBlobColours(to.length ? to : shown); } mount?.setMaxPixelCount(maxPixels()); });
+
+// ---------------------------------------------------------------------------------------------
+// Boot
+layout(); syncPanel(); placeCards(true);
+shown = shapedPalette(list()[focus]); to = shown; renderSwatches(shown); lastTarget = list()[focus];
+setMode(S.mode);
+requestAnimationFrame(tick);
+window.__egl = { get state() { return { mode: S.mode, focus, source, shown: shown.map((l) => toHex(labToRgb(l))), mounted: !!mount, canvas: mount && [mount.canvasElement.width, mount.canvasElement.height] }; }, detent };
+</script>
