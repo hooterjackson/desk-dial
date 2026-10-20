@@ -43,15 +43,11 @@ The page has two full-screen views, the album explorer and Up next (`U` switches
 - **Simulated beat** (default): a beat clock at a set tempo. This is the Sonos case, where the app could know the tempo but has no audio.
 - **Song file**: you load a file in the browser tab and it plays there. A real spectrum analyser then drives the gradient.
 
-| Sound | Drives |
-| --- | --- |
-| Bass | Size pulse and swirl |
-| Beats (onsets) | A push forward in the drift |
-| Mids | Distortion |
-| Highs | Edge grain |
-| Overall level | Opens the dim |
+The gradient never pulses on beats. The song steers its motion:
+- **Tempo** sets the drift speed (120 BPM is the base speed). With a song file, the tempo is estimated from the gaps between bass hits.
+- **Energy**, a loudness average over a few seconds, adds a little swirl, speed and light in big sections and settles in quiet ones.
 
-The panel tunes the idle time, fade timings, visualizer dim and reactivity (in the visualizer and while browsing), and whether the song's title shows in the visualizer.
+The panel tunes the idle time, fade timings, visualizer dim, how closely speed follows tempo, the energy response (in the visualizer and while browsing), and whether the song's title shows in the visualizer.
 
 ## Palette
 

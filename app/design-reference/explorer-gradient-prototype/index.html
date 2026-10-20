@@ -162,8 +162,9 @@ body.ui-hidden #panel, body.ui-hidden #hud { display: none; }
     <div class="row-c"><label for="s-fadeOut">Fade away</label><output for="s-fadeOut"></output><input id="s-fadeOut" type="range" min="300" max="3000" step="50"></div>
     <div class="row-c"><label for="s-fadeIn">Come back</label><output for="s-fadeIn"></output><input id="s-fadeIn" type="range" min="150" max="1200" step="10"></div>
     <div class="row-c"><label for="s-vizDim">Dim in visualizer</label><output for="s-vizDim"></output><input id="s-vizDim" type="range" min="0" max="0.6" step="0.01"></div>
-    <div class="row-c"><label for="s-react">Reactivity in visualizer</label><output for="s-react"></output><input id="s-react" type="range" min="0" max="2" step="0.05"></div>
-    <div class="row-c"><label for="s-reactBrowse">Reactivity while browsing</label><output for="s-reactBrowse"></output><input id="s-reactBrowse" type="range" min="0" max="1" step="0.05"></div>
+    <div class="row-c"><label for="s-tempoFollow">Speed follows tempo</label><output for="s-tempoFollow"></output><input id="s-tempoFollow" type="range" min="0" max="1.5" step="0.05"></div>
+    <div class="row-c"><label for="s-react">Energy response in visualizer</label><output for="s-react"></output><input id="s-react" type="range" min="0" max="2" step="0.05"></div>
+    <div class="row-c"><label for="s-reactBrowse">Energy response while browsing</label><output for="s-reactBrowse"></output><input id="s-reactBrowse" type="range" min="0" max="1" step="0.05"></div>
     <label class="check"><input id="s-wakeOnly" type="checkbox"> First touch only wakes the screen</label>
     <label class="check"><input id="s-caption" type="checkbox"> Show the song in the visualizer</label>
   </div>
@@ -258,11 +259,11 @@ const DEFAULTS = {
   view: "explorer", distortion: 0.8, swirl: 0.1, speed: 0.6, scale: 1, grainMixer: 0, grainOverlay: 0, world: "stretch",
   colors: 6, lcap: 0.55, sat: 1.2, dim: 0.35, debounce: 200, xfade: 600, kick: 1, render: 1,
   idle: 5, fadeOut: 1100, fadeIn: 480, vizDim: 0.1, react: 1, reactBrowse: 0.15, wakeOnly: true, caption: false,
-  audio: "beat", bpm: 118,
+  audio: "beat", bpm: 118, tempoFollow: 1,
 };
 let S = { ...DEFAULTS };
-try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings.v3") || "{}")); } catch {}
-const save = () => { try { localStorage.setItem("egl.settings.v3", JSON.stringify(S)); } catch {} };
+try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings.v4") || "{}")); } catch {}
+const save = () => { try { localStorage.setItem("egl.settings.v4", JSON.stringify(S)); } catch {} };
 
 // ---------------------------------------------------------------------------------------------
 // OKLab (Björn Ottosson's reference matrices)
@@ -665,7 +666,16 @@ function setView(v) {
 // Sound: a simulated beat (the Sonos case: tempo known, no audio on the PC) or a song file played here
 const song = $("#song"); let actx = null, analyser = null, fbuf = null, songUrl = null;
 const band = { bass: 0, mid: 0, high: 0, level: 0, onset: 0 }, peak = { bass: 0.2, mid: 0.2, high: 0.2, level: 0.2 };
-let beatIdx = -1, bassAvg = 0;
+let beatIdx = -1, bassAvg = 0, onsetTimes = [], fileTempo = 120;
+function songTempo() { return S.audio === "beat" ? S.bpm : S.audio === "file" && !song.paused ? fileTempo : 120; }
+function noteOnset(t) {
+  onsetTimes.push(t); onsetTimes = onsetTimes.filter((x) => t - x < 10000);
+  const gaps = onsetTimes.slice(1).map((x, i) => x - onsetTimes[i]).filter((g) => g > 250 && g < 1500).sort((a, b) => a - b);
+  if (gaps.length < 6) return;
+  let bpm = 60000 / gaps[Math.floor(gaps.length / 2)];
+  while (bpm < 75) bpm *= 2; while (bpm > 160) bpm /= 2;   // fold into a musical range
+  fileTempo = bpm;
+}
 function analyse(t, dt) {
   let bass, mid, high, level, onset = 0;
   if (S.audio === "file" && analyser && !song.paused) {
@@ -676,7 +686,7 @@ function analyse(t, dt) {
     const fall = Math.exp(-dt / 4000);
     for (const [key, v] of [["bass", bass], ["mid", mid], ["high", high], ["level", level]]) peak[key] = Math.max(v, peak[key] * fall, 0.05);
     bass /= peak.bass; mid /= peak.mid; high /= peak.high; level /= peak.level;
-    if (bass - bassAvg > 0.22 && bass > 0.6) onset = 1;
+    if (bass - bassAvg > 0.22 && bass > 0.6 && t - (onsetTimes.at(-1) || 0) > 250) { onset = 1; noteOnset(t); }
     bassAvg += (bass - bassAvg) * Math.min(1, dt / 180);
   } else if (S.audio === "beat") {
     const beatLen = 60000 / S.bpm, pos = t / beatLen, ph = pos % 1, i = Math.floor(pos), ms = ph * beatLen;
@@ -706,7 +716,7 @@ function syncAudioUi() { $("#bpm-row").hidden = S.audio !== "beat"; }
 
 // ---------------------------------------------------------------------------------------------
 // Frame loop: our own rAF drives Paper's clock, so turns and beats can push time forward
-const frameTimes = []; let lastT = performance.now(), frame = 0, hudAt = 0, dimNow = S.dim, reactNow = S.reactBrowse;
+const frameTimes = []; let lastT = performance.now(), frame = 0, hudAt = 0, dimNow = S.dim, reactNow = S.reactBrowse, tempoNow = 120, energy = 0.5;
 function tick(t) {
   const dt = clamp(t - lastT, 0, 100); lastT = t;
   frameTimes.push(dt); if (frameTimes.length > 480) frameTimes.shift();
@@ -723,14 +733,16 @@ function tick(t) {
   // turn spring + decays
   const sdt = dt / 1000; motion.v += (-60 * motion.x - 12 * motion.v) * sdt; motion.x += motion.v * sdt;
   motion.swirl *= Math.exp(-sdt / 0.6); motion.boost *= Math.exp(-sdt / 0.5);
-  if (band.onset) motion.boost = Math.min(6, motion.boost + 1.4 * r * band.onset);
-  // sound → shader: bass pumps scale and swirl, mids add distortion, highs add edge grain, level opens the dim
-  live.distortion = clamp(S.distortion + 0.22 * r * band.mid, 0, 1);
-  live.swirl = clamp(S.swirl + motion.swirl + 0.12 * r * band.bass, 0, 1);
-  live.scale = S.scale * (1 - 0.045 * r * band.bass);
-  live.grainMixer = clamp(S.grainMixer + 0.3 * r * band.high, 0, 1);
-  live.dim = clamp(dimNow * (1 - 0.35 * r * band.level), 0, 1);
-  frame += dt * S.speed * (1 + motion.boost) * (asleep ? 1.15 : 1);
+  // the song steers the motion, it never pulses: tempo sets the drift speed, slow energy adds swirl and light
+  tempoNow += (songTempo() - tempoNow) * Math.min(1, dt / 1500);
+  energy += (band.level - energy) * Math.min(1, dt / 2500);
+  const tempoFactor = 1 + S.tempoFollow * (tempoNow / 120 - 1);
+  live.distortion = S.distortion;
+  live.swirl = clamp(S.swirl + motion.swirl + 0.18 * r * (energy - 0.5), 0, 1);
+  live.scale = S.scale;
+  live.grainMixer = S.grainMixer;
+  live.dim = clamp(dimNow * (1 - 0.25 * r * energy), 0, 1);
+  frame += dt * S.speed * tempoFactor * (1 + 0.35 * r * (energy - 0.5)) * (1 + motion.boost);
   if (mount) { mount.currentFrame = frame; mount.setUniforms(paperUniforms()); }
   if (t - hudAt > 120) { hudAt = t; hud(t); }
   requestAnimationFrame(tick);
@@ -740,7 +752,7 @@ function hud(t) {
   const avg = last.reduce((a, b) => a + b, 0) / n, fps = 1000 / avg, p95 = [...last].sort((a, b) => a - b)[Math.floor(n * 0.95)] || avg;
   const el = $("#hud .fps"); el.textContent = `${fps.toFixed(0)} fps`; el.className = "fps " + (fps > 200 ? "ok" : fps > 100 ? "meh" : "low");
   $("#hud .ft").textContent = `p95 ${p95.toFixed(2)} ms`;
-  $("#hud .state").textContent = asleep ? "visualizer" : `visualizer in ${Math.max(0, S.idle - (t - lastInput) / 1000).toFixed(1)} s`;
+  $("#hud .state").textContent = (asleep ? "visualizer" : `visualizer in ${Math.max(0, S.idle - (t - lastInput) / 1000).toFixed(1)} s`) + ` · ${Math.round(tempoNow)} BPM`;
   $("#hud .res").textContent = `${Math.round(W * devicePixelRatio)}×${Math.round(H * devicePixelRatio)}` + (mount ? ` · shader ${mount.canvasElement.width}×${mount.canvasElement.height}` : "");
   for (const key of ["bass", "mid", "high", "level"]) $("#m-" + key).style.width = Math.round(band[key] * 100) + "%";
 }
@@ -751,7 +763,7 @@ const SLIDERS = { distortion: (v) => v.toFixed(2), swirl: (v) => v.toFixed(2), s
   grainMixer: (v) => v.toFixed(2), grainOverlay: (v) => v.toFixed(2), colors: (v) => String(v), lcap: (v) => "L " + v.toFixed(2),
   sat: (v) => v.toFixed(2) + "×", dim: (v) => Math.round(v * 100) + " %", debounce: (v) => v + " ms", xfade: (v) => v + " ms", kick: (v) => v.toFixed(2) + "×",
   idle: (v) => v.toFixed(1) + " s", fadeOut: (v) => v + " ms", fadeIn: (v) => v + " ms", vizDim: (v) => Math.round(v * 100) + " %",
-  react: (v) => v.toFixed(2) + "×", reactBrowse: (v) => v.toFixed(2) + "×", bpm: (v) => v + " BPM" };
+  react: (v) => v.toFixed(2) + "×", reactBrowse: (v) => v.toFixed(2) + "×", bpm: (v) => v + " BPM", tempoFollow: (v) => Math.round(v * 100) + " %" };
 function syncPanel() {
   for (const [key, fmt] of Object.entries(SLIDERS)) { $("#s-" + key).value = S[key]; $(`output[for="s-${key}"]`).textContent = fmt(+S[key]); }
   $("#s-world").value = S.world; $("#s-render").value = String(S.render); $("#s-audio").value = S.audio;
