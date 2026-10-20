@@ -9,27 +9,49 @@ The page doesn't touch the app. Nothing in `app/control_center` imports it.
 
 ## Open it
 
-Open `index.html` in Chrome or Edge on the 32:9 monitor, then press `F` for full screen. Paper Shaders loads from cdn.jsdelivr.net, so the page needs internet. Without it, or without WebGL2, the page falls back to Blobs. The file has no `<!doctype>` because it is also published as an Artifact, which adds its own; locally it runs in quirks mode, which doesn't affect this layout.
+Open `index.html` in Chrome or Edge on the 32:9 monitor, then press `F` for full screen. Paper Shaders loads from cdn.jsdelivr.net, so the page needs internet. Without it, or without WebGL2, the page shows a message instead of the gradient. The file has no `<!doctype>` because it is also published as an Artifact, which adds its own; locally it runs in quirks mode, which doesn't affect this layout.
 
 | Key | Acts as |
 | --- | --- |
 | ← / → or mouse wheel | One knob detent |
 | Shift + ← / → | Fast spin (8 detents) |
-| `2` | Recently Added ⇄ Playlists (the planned one-button toggle) |
-| `1`, `3`, `4` | Back, Visualizer, Play (only show a message) |
-| `M` | Next background mode |
+| `2` | Recently Added ⇄ Playlists (explorer) |
+| `3` | Open Up next (explorer) |
+| `4` | Play: the visualizer follows the song you play |
+| `U` | Album explorer ⇄ Up next |
+| `V` | Visualizer now |
 | `F` | Full screen |
 | `H` | Hide the panel and the fps chip |
 
-## What to compare
+## Idle visualizer
 
-| Mode | What it is | What the native build would need |
-| --- | --- | --- |
-| Paper shader | The real mesh-gradient shader at full resolution | A pixel shader that runs every frame: an HLSL port on the stage's D3D11 device with a small native render thread, so no Python runs per frame |
-| Current | Today's ambient, rebuilt the way the stage builds it (DESKTOP_STAGE §7.5 / §12) | Nothing, it ships today |
-| Blobs | Soft colour discs on looping transform animations, colour changes as A/B crossfades, the turn as one group nudge | Only what DirectComposition already does: DWM-run animations, zero per-frame Python, no new code outside the stage |
+The page has two full-screen views, the album explorer and Up next (`U` switches between them), with the gradient behind both.
 
-The fps chip shows frames per second and the 95th-percentile frame time. On the G93SC it should read close to 240 fps and about 4.2 ms. Lower **Render scale** to see how much a lower-resolution shader saves; a soft gradient barely changes at 50 %.
+**Going idle**
+- After 5 s with no knob input, the albums or tracks fade away. The outer items go first and the centre last, sinking and blurring as they go.
+- The gradient then becomes a full-screen visualizer:
+  - it glides to the playing song's colours;
+  - it gets brighter;
+  - it reacts more strongly to the sound.
+
+**Waking up**
+- Any knob input (arrows, wheel, `1`–`4`) brings the view back, centre first.
+- By default that first touch only wakes the screen; it doesn't also turn or press. The panel can change this.
+- The mouse and the panel never wake it, so you can tune the visualizer while it runs.
+
+**Where the sound comes from**
+- **Simulated beat** (default): a beat clock at a set tempo. This is the Sonos case, where the app could know the tempo but has no audio.
+- **Song file**: you load a file in the browser tab and it plays there. A real spectrum analyser then drives the gradient.
+
+| Sound | Drives |
+| --- | --- |
+| Bass | Size pulse and swirl |
+| Beats (onsets) | A push forward in the drift |
+| Mids | Distortion |
+| Highs | Edge grain |
+| Overall level | Opens the dim |
+
+The panel tunes the idle time, fade timings, visualizer dim and reactivity (in the visualizer and while browsing), and whether the song's title shows in the visualizer.
 
 ## Palette
 
@@ -44,6 +66,6 @@ A focus change waits 200 ms (the debounce), then all colours glide to the new pa
 
 ## Covers
 
-The covers and titles are made up and drawn in the page. **Use my covers** loads your own images into that browser tab only. Nothing is uploaded or saved.
+The covers, songs and titles are made up and drawn in the page. **Use my covers** and **Load a song file** load your own files into that browser tab only. Nothing is uploaded or saved.
 
 **Copy settings** copies the panel's values as JSON, ready to take into the native build.

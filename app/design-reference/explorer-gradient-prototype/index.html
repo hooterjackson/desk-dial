@@ -1,14 +1,15 @@
 <title>Explorer Gradient Lab</title>
 <style>
-/* Layout: one full-bleed 32:9 stage (the explorer mock, laid out in 1280×720 units × k like StageLayout),
-   with a floating tuning panel and a frame-rate chip on top. Single dark look: this is an OLED overlay. */
+/* Layout: one full-bleed 32:9 stage (the explorer and Up next mocks, laid out in 1280×720 units × k like
+   StageLayout), the Paper gradient behind them, a floating tuning panel and a status chip. Single dark look:
+   this is an OLED overlay. */
 :root {
   color-scheme: dark;
   --void: #000000;          /* OLED black, the stage ground */
-  --frost: #0e0e10;         /* today's neutral frost base (DESKTOP_STAGE §12) */
-  --ink: #f2f1ee;           /* card titles, panel text */
+  --ink: #f2f1ee;           /* titles, panel text */
   --ink-dim: #a7a5a0;       /* artists, hints */
   --panel: rgba(18, 18, 20, 0.82);
+  --plate: rgba(255, 255, 255, 0.10);
   --line: rgba(255, 255, 255, 0.12);
   --accent: #f0b35a;        /* the knob's amber "lit" button colour */
   --good: #7fd48a;
@@ -18,6 +19,7 @@
   --ui-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --out: cubic-bezier(0.22, 1, 0.36, 1);
+  --in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 html, body { height: 100%; }
 [hidden] { display: none !important; }
@@ -25,29 +27,25 @@ body { background: var(--void); color: var(--ink); font-family: var(--ui); overf
 
 #stage { position: fixed; inset: 0; overflow: hidden; background: var(--void); }
 .layer { position: absolute; inset: 0; }
-#bg-paper > canvas { display: block; }
-#bg-current { background: var(--frost); }
-#bg-current canvas { position: absolute; transition: opacity 600ms var(--out); opacity: 0; }
-#bg-blobs { background: var(--void); }
-#blob-group { position: absolute; inset: 0; transition: transform 900ms var(--out); }
-.blob { position: absolute; border-radius: 50%; animation: drift var(--dur) ease-in-out infinite alternate; animation-delay: var(--delay); }
-.blob > i { position: absolute; inset: 0; border-radius: 50%; transition: opacity 600ms var(--out); }
-@keyframes drift {
-  0%   { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(var(--dx), var(--dy)) scale(1.12); }
-  100% { transform: translate(calc(var(--dx) * -0.6), calc(var(--dy) * 0.8)) scale(0.94); }
-}
+#bg > canvas { display: block; }
 #tint { background: rgb(8, 8, 10); pointer-events: none; }
+.view { pointer-events: none; }
 
-/* explorer mock */
-#explorer { pointer-events: none; }
+/* Everything that leaves for the visualizer carries .fx; positioned items keep their position on the
+   parent and fade an .fx child, so the sleep transform never fights the layout transform. */
+.fx { transition: opacity var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms), transform var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms),
+  filter var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms); }
+.view.asleep .fx { opacity: 0; transform: translateY(var(--sink, 12px)) scale(0.94); filter: blur(var(--blur, 6px)); }
+.view.asleep .fx.flat { transform: translateY(var(--sink, 12px)); }
+
 .card { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; will-change: transform, opacity;
-  transition: transform 420ms var(--out), opacity 420ms var(--out), box-shadow 420ms var(--out); border-radius: 0.6%; overflow: hidden; }
+  transition: transform 420ms var(--out), opacity 420ms var(--out); }
+.card .fx { position: absolute; inset: 0; border-radius: 0.6%; overflow: hidden; transition-property: opacity, transform, filter, box-shadow; }
 .card img { display: block; width: 100%; height: 100%; }
 .card .shade { position: absolute; inset: 0; background: #0b0b0c; transition: opacity 420ms var(--out); }
-.label { position: absolute; text-align: center; transition: opacity 160ms linear; }
-.label .t { font-family: var(--ui-display); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.label .a { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label { position: absolute; text-align: center; }
+.label .t, .uq-title { font-family: var(--ui-display); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label .a, .uq-artist { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dots { position: absolute; display: flex; justify-content: center; }
 .dots i { display: block; border-radius: 50%; background: var(--ink); }
 .tabs { position: absolute; display: flex; justify-content: center; }
@@ -56,34 +54,67 @@ body { background: var(--void); color: var(--ink); font-family: var(--ui); overf
 .tab::after { content: ""; position: absolute; left: 0; right: 0; bottom: -0.45em; height: 0.12em; border-radius: 1em; background: var(--ink); opacity: 0; transition: opacity 320ms var(--out); }
 .tab.on::after { opacity: 1; }
 .hints { position: absolute; display: flex; justify-content: center; pointer-events: auto; }
+.view.asleep .hints { pointer-events: none; }
 .hint { display: inline-flex; align-items: center; gap: 0.5em; color: var(--ink-dim); background: none; border: 0; font: inherit; cursor: pointer; padding: 0.2em 0.4em; border-radius: 0.4em; }
 .hint:hover { color: var(--ink); }
 .hint:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hint b { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; border-radius: 0.35em; border: 1px solid var(--line); color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .hint.lit b { border-color: var(--accent); color: var(--accent); }
 
+/* Up next */
+.uq-head { position: absolute; font-family: var(--ui-display); font-weight: 600; color: var(--ink); }
+.uq-head small { display: block; font-family: var(--ui); font-weight: 400; color: var(--ink-dim); }
+.uq-cover { position: absolute; }
+.uq-cover .fx { position: absolute; inset: 0; overflow: hidden; border-radius: 0.6%; }
+.uq-cover img { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 420ms var(--out); }
+.uq-meta { position: absolute; }
+.row { position: absolute; left: 0; top: 0; transition: transform 420ms var(--out), opacity 420ms var(--out); }
+.row > .fx { display: grid; align-items: center; height: 100%; border-radius: 0.5em; padding: 0 0.8em; box-sizing: border-box; }
+.row.sel > .fx { background: var(--plate); }
+.row .n { color: var(--ink-dim); font-variant-numeric: tabular-nums; text-align: right; }
+.row .n.playing { color: var(--accent); }
+.row img { display: block; border-radius: 6%; }
+.row .tt { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .ta { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .d { color: var(--ink-dim); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Song caption in the visualizer (optional) */
+#caption { position: absolute; pointer-events: none; opacity: 0; transition: opacity 900ms var(--in-out); }
+#caption.show { opacity: 1; }
+#caption .t { font-family: var(--ui-display); font-weight: 600; color: var(--ink); opacity: 0.86; }
+#caption .a { color: var(--ink-dim); }
+
 /* HUD + panel */
 .ui { font-size: 12.5px; line-height: 1.4; }
 #hud { position: fixed; z-index: 5; top: calc(12px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px));
   font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 32px); }
+  border-radius: 8px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 32px); transition: opacity 600ms linear; }
 #hud .fps { font-weight: 600; }
 #hud .ok { color: var(--good); } #hud .meh { color: var(--warn); } #hud .low { color: var(--bad); }
+#hud .state { color: var(--accent); }
 #panel { position: fixed; z-index: 6; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
   width: min(320px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow: auto; background: var(--panel);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 14px; }
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px;
+  display: flex; flex-direction: column; gap: 14px; transition: opacity 600ms linear; }
+body.asleep #panel:not(:hover):not(:focus-within), body.asleep #hud { opacity: 0.08; }
 #panel h1 { margin: 0; font-family: var(--ui-display); font-size: 15px; font-weight: 600; text-wrap: balance; }
 #panel h1 small { display: block; font-family: var(--ui); font-weight: 400; font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
 #panel h2 { margin: 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-dim); font-weight: 600; }
 .sec { display: flex; flex-direction: column; gap: 8px; }
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: 8px; }
+.seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: 8px; }
 .seg button { font: inherit; color: var(--ink-dim); background: none; border: 0; border-radius: 6px; padding: 6px 4px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: rgba(255,255,255,0.12); color: var(--ink); }
-.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
-.row label { color: var(--ink); }
-.row output { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 11.5px; }
-.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
-.row select { grid-column: 2; font: inherit; color: var(--ink); background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.row-c { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+.row-c label { color: var(--ink); }
+.row-c output { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 11.5px; }
+.row-c input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.row-c select { grid-column: 2; font: inherit; color: var(--ink); background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.check { display: flex; gap: 8px; align-items: center; }
+.check input { accent-color: var(--accent); margin: 0; }
+.meters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.meter { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.meter span { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.meter span i { display: block; height: 100%; width: 0; background: var(--accent); }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .btn { font: inherit; color: var(--ink); background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px; cursor: pointer; text-align: center; }
 .btn:hover { background: rgba(255,255,255,0.12); }
@@ -102,67 +133,91 @@ body { background: var(--void); color: var(--ink); font-family: var(--ui); overf
 #fail { position: fixed; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(520px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 body.ui-hidden #panel, body.ui-hidden #hud { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .card, .card .shade, #blob-group { transition-duration: 1ms; }
-  .blob { animation: none; }
+  .card, .row, .card .shade { transition-duration: 1ms; }
+  .view.asleep .fx { transform: none; filter: none; }
 }
 </style>
 
 <div id="stage">
-  <div id="bg-paper" class="layer"></div>
-  <div id="bg-current" class="layer" hidden></div>
-  <div id="bg-blobs" class="layer" hidden><div id="blob-group"></div></div>
+  <div id="bg" class="layer"></div>
   <div id="tint" class="layer"></div>
-  <div id="explorer" class="layer"></div>
+  <div id="explorer" class="layer view"></div>
+  <div id="upnext" class="layer view" hidden></div>
+  <div id="caption"><div class="t"></div><div class="a"></div></div>
 </div>
 
-<div id="hud" class="ui" aria-live="off"><span class="fps">– fps</span><span class="ft">p95 – ms</span><span class="res">–</span></div>
+<div id="hud" class="ui" aria-live="off"><span class="fps">– fps</span><span class="ft">p95 – ms</span><span class="state">–</span><span class="res">–</span></div>
 
 <aside id="panel" class="ui" aria-label="Tuning">
-  <h1>Explorer gradient lab<small>Desk Dial · full-screen Music explorer background · prototype</small></h1>
+  <h1>Explorer gradient lab<small>Desk Dial · full-screen Music background and idle visualizer · prototype</small></h1>
 
   <div class="sec">
-    <h2>Background</h2>
-    <div class="seg" role="group" aria-label="Background mode">
-      <button id="mode-paper" type="button" aria-pressed="true">Paper shader</button>
-      <button id="mode-current" type="button" aria-pressed="false">Current</button>
-      <button id="mode-blobs" type="button" aria-pressed="false">Blobs</button>
+    <h2>Screen</h2>
+    <div class="seg" role="group" aria-label="Screen">
+      <button id="v-explorer" type="button" aria-pressed="true">Album explorer</button>
+      <button id="v-upnext" type="button" aria-pressed="false">Up next</button>
     </div>
     <div class="swatches" id="swatches" aria-label="Current palette"></div>
   </div>
 
-  <div class="sec" id="sec-shader">
+  <div class="sec">
+    <h2>Visualizer</h2>
+    <div class="row-c"><label for="s-idle">Idle before visualizer</label><output for="s-idle"></output><input id="s-idle" type="range" min="2" max="15" step="0.5"></div>
+    <div class="row-c"><label for="s-fadeOut">Fade away</label><output for="s-fadeOut"></output><input id="s-fadeOut" type="range" min="300" max="3000" step="50"></div>
+    <div class="row-c"><label for="s-fadeIn">Come back</label><output for="s-fadeIn"></output><input id="s-fadeIn" type="range" min="150" max="1200" step="10"></div>
+    <div class="row-c"><label for="s-vizDim">Dim in visualizer</label><output for="s-vizDim"></output><input id="s-vizDim" type="range" min="0" max="0.6" step="0.01"></div>
+    <div class="row-c"><label for="s-react">Reactivity in visualizer</label><output for="s-react"></output><input id="s-react" type="range" min="0" max="2" step="0.05"></div>
+    <div class="row-c"><label for="s-reactBrowse">Reactivity while browsing</label><output for="s-reactBrowse"></output><input id="s-reactBrowse" type="range" min="0" max="1" step="0.05"></div>
+    <label class="check"><input id="s-wakeOnly" type="checkbox"> First touch only wakes the screen</label>
+    <label class="check"><input id="s-caption" type="checkbox"> Show the song in the visualizer</label>
+  </div>
+
+  <div class="sec">
+    <h2>Sound</h2>
+    <div class="row-c"><label for="s-audio">Source</label><select id="s-audio"><option value="beat">Simulated beat</option><option value="file">Song file</option></select></div>
+    <div class="row-c" id="bpm-row"><label for="s-bpm">Tempo</label><output for="s-bpm"></output><input id="s-bpm" type="range" min="60" max="180" step="1"></div>
+    <div class="actions">
+      <button class="btn" id="b-song" type="button">Load a song file</button>
+      <button class="btn" id="b-pause" type="button" disabled>Pause song</button>
+    </div>
+    <div class="meters" aria-label="Sound levels">
+      <div class="meter">Bass<span><i id="m-bass"></i></span></div>
+      <div class="meter">Mid<span><i id="m-mid"></i></span></div>
+      <div class="meter">High<span><i id="m-high"></i></span></div>
+      <div class="meter">Level<span><i id="m-level"></i></span></div>
+    </div>
+    <input id="songfile" type="file" accept="audio/*" hidden>
+  </div>
+
+  <div class="sec">
     <h2>Shader</h2>
-    <div class="row"><label for="s-distortion">Distortion</label><output for="s-distortion"></output><input id="s-distortion" type="range" min="0" max="1" step="0.01"></div>
-    <div class="row"><label for="s-swirl">Swirl</label><output for="s-swirl"></output><input id="s-swirl" type="range" min="0" max="1" step="0.01"></div>
-    <div class="row"><label for="s-speed">Drift speed</label><output for="s-speed"></output><input id="s-speed" type="range" min="0" max="3" step="0.05"></div>
-    <div class="row"><label for="s-scale">Scale</label><output for="s-scale"></output><input id="s-scale" type="range" min="0.3" max="2.5" step="0.01"></div>
-    <div class="row"><label for="s-grainMixer">Grain (edges)</label><output for="s-grainMixer"></output><input id="s-grainMixer" type="range" min="0" max="1" step="0.01"></div>
-    <div class="row"><label for="s-grainOverlay">Grain (overlay)</label><output for="s-grainOverlay"></output><input id="s-grainOverlay" type="range" min="0" max="1" step="0.01"></div>
-    <div class="row"><label for="s-world">Shape on 32:9</label><select id="s-world"><option value="stretch">Stretch to screen</option><option value="wide">16:9 world, cover</option></select></div>
+    <div class="row-c"><label for="s-distortion">Distortion</label><output for="s-distortion"></output><input id="s-distortion" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row-c"><label for="s-swirl">Swirl</label><output for="s-swirl"></output><input id="s-swirl" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row-c"><label for="s-speed">Drift speed</label><output for="s-speed"></output><input id="s-speed" type="range" min="0" max="3" step="0.05"></div>
+    <div class="row-c"><label for="s-scale">Scale</label><output for="s-scale"></output><input id="s-scale" type="range" min="0.3" max="2.5" step="0.01"></div>
+    <div class="row-c"><label for="s-grainMixer">Grain (edges)</label><output for="s-grainMixer"></output><input id="s-grainMixer" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row-c"><label for="s-grainOverlay">Grain (overlay)</label><output for="s-grainOverlay"></output><input id="s-grainOverlay" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row-c"><label for="s-world">Shape on 32:9</label><select id="s-world"><option value="stretch">Stretch to screen</option><option value="wide">16:9 world, cover</option></select></div>
   </div>
 
   <div class="sec">
     <h2>Palette</h2>
-    <div class="row"><label for="s-colors">Colours</label><output for="s-colors"></output><input id="s-colors" type="range" min="2" max="9" step="1"></div>
-    <div class="row"><label for="s-lcap">Lightness cap (OLED)</label><output for="s-lcap"></output><input id="s-lcap" type="range" min="0.3" max="0.95" step="0.01"></div>
-    <div class="row"><label for="s-sat">Saturation</label><output for="s-sat"></output><input id="s-sat" type="range" min="0.5" max="2" step="0.05"></div>
-    <div class="row"><label for="s-dim">Dim</label><output for="s-dim"></output><input id="s-dim" type="range" min="0" max="0.85" step="0.01"></div>
+    <div class="row-c"><label for="s-colors">Colours</label><output for="s-colors"></output><input id="s-colors" type="range" min="2" max="9" step="1"></div>
+    <div class="row-c"><label for="s-lcap">Lightness cap (OLED)</label><output for="s-lcap"></output><input id="s-lcap" type="range" min="0.3" max="0.95" step="0.01"></div>
+    <div class="row-c"><label for="s-sat">Saturation</label><output for="s-sat"></output><input id="s-sat" type="range" min="0.5" max="2" step="0.05"></div>
+    <div class="row-c"><label for="s-dim">Dim while browsing</label><output for="s-dim"></output><input id="s-dim" type="range" min="0" max="0.85" step="0.01"></div>
   </div>
 
   <div class="sec">
     <h2>Motion</h2>
-    <div class="row"><label for="s-debounce">Debounce</label><output for="s-debounce"></output><input id="s-debounce" type="range" min="0" max="600" step="10"></div>
-    <div class="row"><label for="s-xfade">Colour transition</label><output for="s-xfade"></output><input id="s-xfade" type="range" min="100" max="2000" step="20"></div>
-    <div class="row"><label for="s-kick">Turn impulse</label><output for="s-kick"></output><input id="s-kick" type="range" min="0" max="2" step="0.05"></div>
-  </div>
-
-  <div class="sec">
-    <h2>Performance</h2>
-    <div class="row"><label for="s-render">Render scale</label><select id="s-render"><option value="1">100 %</option><option value="0.5">50 %</option><option value="0.25">25 %</option><option value="0.125">12.5 %</option></select></div>
+    <div class="row-c"><label for="s-debounce">Debounce</label><output for="s-debounce"></output><input id="s-debounce" type="range" min="0" max="600" step="10"></div>
+    <div class="row-c"><label for="s-xfade">Colour transition</label><output for="s-xfade"></output><input id="s-xfade" type="range" min="100" max="2000" step="20"></div>
+    <div class="row-c"><label for="s-kick">Turn impulse</label><output for="s-kick"></output><input id="s-kick" type="range" min="0" max="2" step="0.05"></div>
+    <div class="row-c"><label for="s-render">Render scale</label><select id="s-render"><option value="1">100 %</option><option value="0.5">50 %</option><option value="0.25">25 %</option><option value="0.125">12.5 %</option></select></div>
   </div>
 
   <div class="actions">
-    <button class="btn" id="b-auto" type="button" aria-pressed="false">Auto-rotate</button>
+    <button class="btn" id="b-sleep" type="button">Visualizer now</button>
     <button class="btn" id="b-full" type="button">Full screen</button>
     <button class="btn" id="b-files" type="button">Use my covers</button>
     <button class="btn" id="b-reset" type="button">Reset</button>
@@ -172,23 +227,26 @@ body.ui-hidden #panel, body.ui-hidden #hud { display: none; }
   <input id="files" type="file" accept="image/*" multiple hidden>
 
   <div class="keys">
-    <kbd>← →</kbd><span>Turn one detent (also the mouse wheel)</span>
+    <kbd>← →</kbd><span>Turn the knob one detent (also the mouse wheel)</span>
     <kbd>Shift ←→</kbd><span>Fast spin, 8 detents</span>
-    <kbd>2</kbd><span>Recently Added ⇄ Playlists</span>
-    <kbd>M</kbd><span>Next background mode</span>
+    <kbd>1–4</kbd><span>Knob buttons</span>
+    <kbd>U</kbd><span>Switch between the album explorer and Up next</span>
+    <kbd>V</kbd><span>Go to the visualizer now</span>
     <kbd>F</kbd><span>Full screen</span>
-    <kbd>H</kbd><span>Hide this panel and the fps chip</span>
+    <kbd>H</kbd><span>Hide this panel and the status chip</span>
   </div>
-  <div class="foot">Covers and titles are made up. Your own covers stay in this browser tab.
-    Background shader: <a href="https://github.com/paper-design/shaders" target="_blank" rel="noopener">Paper Shaders</a> 0.0.81, Apache-2.0.</div>
+  <div class="foot">Only the knob keys wake the screen; the mouse and this panel don't. Covers, songs and titles are made up.
+    Your own covers and song files stay in this browser tab. Background shader:
+    <a href="https://github.com/paper-design/shaders" target="_blank" rel="noopener">Paper Shaders</a> 0.0.81, Apache-2.0.</div>
 </aside>
 
 <div id="toast" class="ui" role="status"></div>
 <div id="fail" class="ui" hidden></div>
+<audio id="song" hidden></audio>
 
 <script type="module">
 // ---------------------------------------------------------------------------------------------
-// Paper Shaders, pinned. If it cannot load (offline, no WebGL2) the page falls back to Blobs.
+// Paper Shaders, pinned.
 let Paper = null;
 try {
   Paper = await import("https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.81/dist/index.js");
@@ -201,12 +259,14 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // ---------------------------------------------------------------------------------------------
 // Settings (per-viewer convenience in localStorage; the page works without it)
 const DEFAULTS = {
-  mode: "paper", distortion: 0.8, swirl: 0.1, speed: 0.6, scale: 1, grainMixer: 0, grainOverlay: 0, world: "stretch",
+  view: "explorer", distortion: 0.8, swirl: 0.1, speed: 0.6, scale: 1, grainMixer: 0, grainOverlay: 0, world: "stretch",
   colors: 6, lcap: 0.55, sat: 1.2, dim: 0.35, debounce: 200, xfade: 600, kick: 1, render: 1,
+  idle: 5, fadeOut: 1400, fadeIn: 520, vizDim: 0.1, react: 1, reactBrowse: 0.15, wakeOnly: true, caption: false,
+  audio: "beat", bpm: 118,
 };
 let S = { ...DEFAULTS };
-try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings") || "{}")); } catch {}
-const save = () => { try { localStorage.setItem("egl.settings", JSON.stringify(S)); } catch {} };
+try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings.v2") || "{}")); } catch {}
+const save = () => { try { localStorage.setItem("egl.settings.v2", JSON.stringify(S)); } catch {} };
 
 // ---------------------------------------------------------------------------------------------
 // OKLab (Björn Ottosson's reference matrices)
@@ -221,14 +281,6 @@ function rgbToLab(r, g, b) {
           1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
           0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
 }
-function labToRgb([L, a, b]) {
-  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-          -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-          -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map((c) => clamp(gam(clamp(c, 0, 1)), 0, 1));
-}
 function labToLinear([L, a, b]) {
   const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
   const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
@@ -236,6 +288,7 @@ function labToLinear([L, a, b]) {
   return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
           -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
 }
+const labToRgb = (lab) => labToLinear(lab).map((c) => clamp(gam(clamp(c, 0, 1)), 0, 1));
 // Pull chroma in (same L and hue) until the colour fits sRGB, so a boosted colour never clips to a pure channel
 function toGamut([L, a, b]) {
   const fits = (f) => labToLinear([L, a * f, b * f]).every((c) => c >= -1e-4 && c <= 1 + 1e-4);
@@ -259,6 +312,8 @@ const RECENT_SEED = [
   ["Ultraviolet Kitchen", "Moss & Margin"], ["Ember Season", "Cato Reyes"], ["Blue Hours", "Wren Abernathy"],
 ];
 const PLAYLIST_SEED = ["Morning Mix", "Late Drive", "Focus Room", "Sunday Records", "Rainy Window", "Loud Workout", "Dinner Party", "Deep Night"];
+const SONG_A = ["Slow", "Paper", "Neon", "Quiet", "Golden", "Hollow", "Silver", "Little", "Northern", "Open", "Electric", "Soft", "Lost", "Bright", "Late", "Wild"];
+const SONG_B = ["Weather", "Signals", "Harbour", "Machines", "Gardens", "Lights", "Rooms", "Rivers", "Static", "Mornings", "Satellites", "Houses", "Engines", "Shores", "Letters", "Hours"];
 const STYLES = ["sun", "bands", "grid", "blobs", "type", "rings"];
 
 function hsl(h, s, l) { return `hsl(${((h % 360) + 360) % 360} ${s}% ${l}%)`; }
@@ -283,7 +338,7 @@ function drawCover(ctx, title, size) {
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (R() < 0.6) { ctx.fillStyle = hsl(R() < 0.5 ? h0 : h1, 40 + R() * 40, 22 + R() * 45); ctx.fillRect(i * c + c * 0.06, j * c + c * 0.06, c * 0.88, c * 0.88); }
   } else if (style === "blobs") {
     for (let i = 0; i < 6; i++) { const x = R() * size, y = R() * size, r = size * (0.15 + R() * 0.35); const bg = ctx.createRadialGradient(x, y, 0, x, y, r);
-      bg.addColorStop(0, hsl(i % 2 ? h0 : h1, 80, 55 + R() * 20)); bg.addColorStop(1, hsl(h0, 60, 30, 0).replace(")", " / 0)"));
+      bg.addColorStop(0, hsl(i % 2 ? h0 : h1, 80, 55 + R() * 20)); bg.addColorStop(1, `hsl(${h0} 60% 30% / 0)`);
       ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size); }
   } else if (style === "type") {
     ctx.fillStyle = hsl(h1, 85, dark ? 62 : 92); ctx.font = `800 ${size * 0.62}px ${getComputedStyle(document.body).fontFamily}`;
@@ -291,22 +346,30 @@ function drawCover(ctx, title, size) {
   } else {
     for (let i = 7; i > 0; i--) { ctx.fillStyle = hsl(i % 2 ? h0 : h1, 60 + R() * 30, 15 + i * 8); ctx.beginPath(); ctx.arc(size * 0.5, size * 0.55, (size * 0.62 * i) / 7, 0, Math.PI * 2); ctx.fill(); }
   }
-  // fine grain so covers read as print, not flat vector
   const img = ctx.getImageData(0, 0, size, size), d = img.data;
   for (let i = 0; i < d.length; i += 4) { const n = (R() - 0.5) * 14; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
   ctx.putImageData(img, 0, 0);
 }
 function makeCanvas(size) { const c = document.createElement("canvas"); c.width = c.height = size; return c; }
-function itemFromCanvas(canvas, title, artist) {
-  return { title, artist, canvas, src: canvas.toDataURL("image/jpeg", 0.88), palette: null };
-}
+function itemFromCanvas(canvas, title, artist) { return { title, artist, canvas, src: canvas.toDataURL("image/jpeg", 0.88), palette: null }; }
 const RECENT = RECENT_SEED.map(([t, a]) => { const c = makeCanvas(512); drawCover(c.getContext("2d"), t, 512); return itemFromCanvas(c, t, a); });
-const PLAYLISTS = PLAYLIST_SEED.map((name, i) => {
+const PLAYLISTS = PLAYLIST_SEED.map((name) => {
   const c = makeCanvas(512), x = c.getContext("2d"), R = rng(hash(name));
   for (let q = 0; q < 4; q++) { const src = RECENT[Math.floor(R() * RECENT.length)].canvas; x.drawImage(src, (q % 2) * 256, Math.floor(q / 2) * 256, 256, 256); }
   return itemFromCanvas(c, name, `Playlist · ${12 + Math.floor(R() * 60)} songs`);
 });
 const LISTS = { recent: RECENT, favourites: PLAYLISTS };
+// Up next: 24 songs from the albums above
+let QUEUE = [];
+function buildQueue() {
+  const R = rng(99);
+  QUEUE = Array.from({ length: 24 }, (_, i) => {
+    const album = LISTS.recent[Math.floor(R() * LISTS.recent.length)];
+    const secs = 150 + Math.floor(R() * 150);
+    return { title: `${SONG_A[Math.floor(R() * 16)]} ${SONG_B[Math.floor(R() * 16)]}`, artist: album.artist, album, dur: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}` };
+  });
+}
+buildQueue();
 
 // ---------------------------------------------------------------------------------------------
 // Palette: k-means in OKLab on a 64 px copy (today's ambient also starts from 64 px), biggest cluster first
@@ -317,7 +380,6 @@ function clusters(item) {
   x.drawImage(item.canvas, 0, 0, 64, 64);
   const d = x.getImageData(0, 0, 64, 64).data, pts = [];
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 127) pts.push(rgbToLab(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255));
-  // farthest-point init from the mean: deterministic, so a cover always gives the same palette
   const mean = [0, 1, 2].map((j) => pts.reduce((s, p) => s + p[j], 0) / pts.length);
   const dist = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
   const cent = [];
@@ -332,7 +394,6 @@ function clusters(item) {
   item.palette = cent.map((lab, k) => ({ lab, share: count[k] / pts.length })).filter((c) => c.share > 0).sort((a, b) => b.share - a.share);
   return item.palette;
 }
-// Shape for the background: cap lightness (OLED), scale chroma, add a near-black anchor in the lead hue
 function shapedPalette(item) {
   const cl = clusters(item), n = S.colors;
   const shape = ([L, a, b], lcap) => { const C = Math.hypot(a, b) * S.sat, h = Math.atan2(b, a), c = Math.min(C, 0.3);
@@ -345,11 +406,12 @@ function shapedPalette(item) {
 
 // ---------------------------------------------------------------------------------------------
 // State
-let source = "recent", focus = 0;
+let view = S.view === "upnext" ? "upnext" : "explorer";
+let source = "recent", focus = 0, sel = 0, playingRow = 0;
+let nowPlaying = { item: QUEUE[0].album, title: QUEUE[0].title, artist: QUEUE[0].artist };
 const list = () => LISTS[source];
-let shown = [];                  // OKLab per slot, what the background shows now
-let from = [], to = [], tStart = 0, tweenOn = false;
-let debounceTimer = null, lastTarget = null;
+let shown = [], from = [], to = [], tStart = 0, tweenOn = false, debounceTimer = null, lastTarget = null;
+let asleep = false, lastInput = performance.now();
 
 // ---------------------------------------------------------------------------------------------
 // Layout (StageLayout: 1280×720 units, k = min(W/1280, H/720), centred; wide when W/k > 1281)
@@ -357,33 +419,32 @@ let W = innerWidth, H = innerHeight, k = 1, x0 = 0, y0 = 0, wide = true;
 const T32 = { x: [0, 300, 500, 680, 850, 1010, 1170, 1330, 1490], s: [1, 0.6, 0.46, 0.42, 0.4, 0.4, 0.4, 0.4, 0.4],
   o: [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.54, 0.5, 0], sh: [0, 0.24, 0.34, 0.42, 0.48, 0.52, 0.55, 0.58, 0.6] };
 const T16 = { x: [0, 300, 470, 590, 660], s: [1, 0.6, 0.42, 0.3, 0.22], o: [1, 0.92, 0.55, 0, 0], sh: [0, 0.24, 0.48, 0.6, 0.6] };
-function layout() {
-  W = innerWidth; H = innerHeight; k = Math.min(W / 1280, H / 720); x0 = (W - 1280 * k) / 2; y0 = (H - 720 * k) / 2; wide = W / k > 1281;
-}
+function layout() { W = innerWidth; H = innerHeight; k = Math.min(W / 1280, H / 720); x0 = (W - 1280 * k) / 2; y0 = (H - 720 * k) / 2; wide = W / k > 1281; }
+const U = (v) => v * k + "px";
 
 // ---------------------------------------------------------------------------------------------
-// Explorer mock
+// Album explorer mock
 const ex = $("#explorer");
-const cards = new Map();         // index -> element
-const label = document.createElement("div"); label.className = "label"; label.innerHTML = '<div class="t"></div><div class="a"></div>';
-const dots = document.createElement("div"); dots.className = "dots";
-const tabs = document.createElement("div"); tabs.className = "tabs";
+const cards = new Map();
+const label = document.createElement("div"); label.className = "label fx flat"; label.innerHTML = '<div class="t"></div><div class="a"></div>';
+const dots = document.createElement("div"); dots.className = "dots fx flat";
+const tabs = document.createElement("div"); tabs.className = "tabs fx flat";
 tabs.innerHTML = '<span class="tab" data-src="recent">Recently Added</span><span class="tab" data-src="favourites">Playlists</span>';
-const hints = document.createElement("div"); hints.className = "hints";
-hints.innerHTML = '<button class="hint" type="button" data-b="1"><b>1</b>Back</button><button class="hint" type="button" data-b="2"><b>2</b><span>Playlists</span></button>' +
-  '<button class="hint" type="button" data-b="3"><b>3</b>Visualizer</button><button class="hint" type="button" data-b="4"><b>4</b>Play</button>';
-ex.append(label, dots, tabs, hints);
+const exHints = document.createElement("div"); exHints.className = "hints fx flat";
+exHints.innerHTML = '<button class="hint" type="button" data-b="1"><b>1</b>Back</button><button class="hint" type="button" data-b="2"><b>2</b><span>Playlists</span></button>' +
+  '<button class="hint" type="button" data-b="3"><b>3</b>Tracks</button><button class="hint" type="button" data-b="4"><b>4</b>Play</button>';
+ex.append(label, dots, tabs, exHints);
 
 function cardEl(i) {
   let el = cards.get(i);
   if (!el) {
     el = document.createElement("div"); el.className = "card";
-    el.innerHTML = '<img alt=""><div class="shade"></div>'; el.querySelector("img").src = list()[i].src;
+    el.innerHTML = '<div class="fx"><img alt=""><div class="shade"></div></div>'; el.querySelector("img").src = list()[i].src;
     el.style.opacity = "0"; ex.prepend(el); cards.set(i, el);
   }
   return el;
 }
-function placeCards(instant) {
+function placeExplorer(instant) {
   const T = wide ? T32 : T16, amax = T.x.length - 1, L = list();
   const want = new Set();
   for (let i = Math.max(0, focus - amax); i <= Math.min(L.length - 1, focus + amax); i++) want.add(i);
@@ -397,100 +458,117 @@ function placeCards(instant) {
     el.style.transform = `translate(${cx - size / 2}px, ${cy - size / 2}px) scale(${s})`;
     el.style.opacity = String(T.o[a]);
     el.style.zIndex = String(100 - a);
-    el.style.boxShadow = a === 0 ? `0 ${40 * k}px ${80 * k}px rgba(0,0,0,.55)` : `0 ${16 * k}px ${36 * k}px rgba(0,0,0,.40)`;
+    el.dataset.a = a;
+    el.firstChild.style.boxShadow = a === 0 ? `0 ${40 * k}px ${80 * k}px rgba(0,0,0,.55)` : `0 ${16 * k}px ${36 * k}px rgba(0,0,0,.40)`;
+    el.firstChild.style.overflow = "hidden";
     el.querySelector(".shade").style.opacity = String(T.sh[a]);
     if (instant) { el.getBoundingClientRect(); el.style.transition = ""; }
   }
-  // label, dots, tabs, hints
   const it = L[focus];
-  Object.assign(label.style, { left: x0 + 190 * k + "px", top: y0 + 514 * k + "px", width: 900 * k + "px" });
-  label.querySelector(".t").style.fontSize = 34 * k + "px"; label.querySelector(".a").style.fontSize = 22 * k + "px";
+  Object.assign(label.style, { left: U(190 + x0 / k), top: U(514 + y0 / k), width: U(900) });
+  label.querySelector(".t").style.fontSize = U(34); label.querySelector(".a").style.fontSize = U(22);
   label.querySelector(".t").textContent = it.title; label.querySelector(".a").textContent = it.artist;
-  Object.assign(dots.style, { left: x0 + 64 * k + "px", width: 1152 * k + "px", top: y0 + 622 * k + "px", gap: 8 * k + "px" });
+  Object.assign(dots.style, { left: U(64 + x0 / k), width: U(1152), top: U(622 + y0 / k), gap: U(8) });
   dots.innerHTML = L.map((_, i) => `<i style="width:${6 * k}px;height:${6 * k}px;opacity:${i === focus ? 1 : 0.4}"></i>`).join("");
-  Object.assign(tabs.style, { left: "0", width: W + "px", top: y0 + 44 * k + "px", gap: 36 * k + "px", fontSize: 20 * k + "px" });
+  Object.assign(tabs.style, { left: "0", width: W + "px", top: U(44 + y0 / k), gap: U(36), fontSize: U(20) });
   tabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.src === source));
-  Object.assign(hints.style, { left: "0", width: W + "px", top: y0 + 664 * k + "px", gap: 28 * k + "px", fontSize: Math.max(11, 16 * k) + "px" });
-  hints.querySelector('[data-b="2"] span').textContent = source === "recent" ? "Playlists" : "Recent";
-  hints.querySelector('[data-b="2"]').classList.toggle("lit", source === "favourites");
+  Object.assign(exHints.style, { left: "0", width: W + "px", top: U(664 + y0 / k), gap: U(28), fontSize: Math.max(11, 16 * k) + "px" });
+  exHints.querySelector('[data-b="2"] span').textContent = source === "recent" ? "Playlists" : "Recent";
+  exHints.querySelector('[data-b="2"]').classList.toggle("lit", source === "favourites");
 }
 
 // ---------------------------------------------------------------------------------------------
-// Backgrounds
-const bgPaper = $("#bg-paper"), bgCurrent = $("#bg-current"), bgBlobs = $("#bg-blobs"), blobGroup = $("#blob-group");
-let mount = null;
+// Up next mock (stays inside the 16:9 stage, as DESKTOP_STAGE §8 says)
+const un = $("#upnext");
+un.innerHTML = '<div class="uq-head fx flat">Up next<small>Playing from your queue</small></div>' +
+  '<div class="uq-cover"><div class="fx"><img alt=""></div></div>' +
+  '<div class="uq-meta fx flat"><div class="uq-title"></div><div class="uq-artist"></div></div>' +
+  '<div class="uq-rows"></div>' +
+  '<div class="hints fx flat"><button class="hint" type="button" data-b="1"><b>1</b>Back</button><button class="hint" type="button" data-b="2"><b>2</b>Shuffle</button>' +
+  '<button class="hint" type="button" data-b="3"><b>3</b>Like</button><button class="hint" type="button" data-b="4"><b>4</b>Play</button></div>';
+const rowsEl = un.querySelector(".uq-rows"), rows = new Map();
+const ROW_H = 58, ROWS_VIS = 4;
+function rowEl(i) {
+  let el = rows.get(i);
+  if (!el) {
+    const q = QUEUE[i];
+    el = document.createElement("div"); el.className = "row";
+    el.innerHTML = `<div class="fx"><span class="n"></span><img alt="" src="${q.album.src}"><span><div class="tt"></div><div class="ta"></div></span><span class="d"></span></div>`;
+    el.querySelector(".tt").textContent = q.title; el.querySelector(".ta").textContent = q.artist; el.querySelector(".d").textContent = q.dur;
+    el.style.opacity = "0"; rowsEl.append(el); rows.set(i, el);
+  }
+  return el;
+}
+function placeUpnext(instant) {
+  const head = un.querySelector(".uq-head");
+  Object.assign(head.style, { left: U(x0 / k + 120), top: U(y0 / k + 52), fontSize: U(26) });
+  head.querySelector("small").style.fontSize = U(15);
+  const cov = un.querySelector(".uq-cover");
+  Object.assign(cov.style, { left: U(x0 / k + 120), top: U(y0 / k + 150), width: U(330), height: U(330) });
+  cov.firstChild.style.boxShadow = `0 ${40 * k}px ${80 * k}px rgba(0,0,0,.55)`;
+  const img = cov.querySelector("img"), q = QUEUE[sel];
+  if (img.dataset.src !== q.album.src) { img.dataset.src = q.album.src; img.src = q.album.src; }
+  const meta = un.querySelector(".uq-meta");
+  Object.assign(meta.style, { left: U(x0 / k + 120), top: U(y0 / k + 500), width: U(330) });
+  meta.querySelector(".uq-title").style.fontSize = U(24); meta.querySelector(".uq-artist").style.fontSize = U(17);
+  meta.querySelector(".uq-title").textContent = q.title; meta.querySelector(".uq-artist").textContent = `${q.artist} · ${q.album.title}`;
+  // rows: centred on the selected one, ±ROWS_VIS visible
+  const want = new Set();
+  for (let i = Math.max(0, sel - ROWS_VIS - 1); i <= Math.min(QUEUE.length - 1, sel + ROWS_VIS + 1); i++) want.add(i);
+  for (const [i, el] of rows) if (!want.has(i)) { el.remove(); rows.delete(i); }
+  const left = x0 + 520 * k, width = 640 * k, cy = y0 + 315 * k;
+  for (const i of want) {
+    const el = rowEl(i), d = i - sel;
+    if (instant) el.style.transition = "none";
+    Object.assign(el.style, { width: width + "px", height: ROW_H * k + "px", fontSize: U(17), transform: `translate(${left}px, ${cy + (d - 0.5) * ROW_H * k}px)` });
+    el.style.opacity = String(Math.abs(d) > ROWS_VIS ? 0 : 1 - Math.abs(d) * 0.16);
+    el.dataset.a = Math.abs(d);
+    el.classList.toggle("sel", d === 0);
+    const fx = el.firstChild; fx.style.gridTemplateColumns = `${2.2 * 17 * k}px ${40 * k}px 1fr auto`; fx.style.gap = U(16);
+    el.querySelector("img").style.width = el.querySelector("img").style.height = U(40);
+    const n = el.querySelector(".n"); n.textContent = i === playingRow ? "♪" : String(i + 1); n.classList.toggle("playing", i === playingRow);
+    if (instant) { el.getBoundingClientRect(); el.style.transition = ""; }
+  }
+  const h = un.querySelector(".hints");
+  Object.assign(h.style, { left: "0", width: W + "px", top: U(664 + y0 / k), gap: U(28), fontSize: Math.max(11, 16 * k) + "px" });
+}
+function place(instant) { if (view === "explorer") placeExplorer(instant); else placeUpnext(instant); placeCaption(); }
+
+// ---------------------------------------------------------------------------------------------
+// Background: Paper mesh gradient
+const bg = $("#bg"); let mount = null;
+const live = { distortion: 0, swirl: 0, scale: 1, grainMixer: 0 };
 function paperUniforms() {
   const cols = shown.map((lab) => [...labToRgb(lab), 1]);
   const worldWide = S.world === "wide";
   return {
-    u_colors: cols, u_colorsCount: cols.length, u_distortion: S.distortion, u_swirl: clamp(S.swirl + motion.swirl, 0, 1),
-    u_grainMixer: S.grainMixer, u_grainOverlay: S.grainOverlay,
-    u_fit: Paper.ShaderFitOptions[worldWide ? "cover" : "none"], u_scale: S.scale, u_rotation: 0,
+    u_colors: cols, u_colorsCount: cols.length, u_distortion: live.distortion, u_swirl: live.swirl,
+    u_grainMixer: live.grainMixer, u_grainOverlay: S.grainOverlay,
+    u_fit: Paper.ShaderFitOptions[worldWide ? "cover" : "none"], u_scale: live.scale, u_rotation: 0,
     u_offsetX: motion.x, u_offsetY: 0, u_originX: 0.5, u_originY: 0.5,
     u_worldWidth: worldWide ? 1600 : 0, u_worldHeight: worldWide ? 900 : 0,
   };
 }
 function maxPixels() { return Math.max(1, Math.round(W * H * devicePixelRatio ** 2 * S.render * S.render)); }
 function startPaper() {
-  if (mount || !Paper) return !!mount;
-  try {
-    mount = new Paper.ShaderMount(bgPaper, Paper.meshGradientFragmentShader, paperUniforms(), { alpha: false, premultipliedAlpha: true }, 0, 0, 1, maxPixels());
-    return true;
-  } catch (e) { console.warn(e); mount = null; return false; }
-}
-
-// "Current": today's ambient, rebuilt as the stage does it: the bleed box at 1/8, blurred σ = 90k/8, saturate 1.5, ×8, 0.5 opacity, 600 ms crossfade
-const amb = [document.createElement("canvas"), document.createElement("canvas")]; let ambFront = 0;
-amb.forEach((c) => bgCurrent.append(c));
-function buildAmbient(item) {
-  const bw = W + 320 * k, bh = H + 320 * k, w8 = Math.ceil(bw / 8), h8 = Math.ceil(bh / 8);
-  const back = amb[1 - ambFront], x = back.getContext("2d");
-  back.width = w8; back.height = h8;
-  x.filter = `blur(${(90 * k) / 8}px) saturate(1.5)`;
-  const side = Math.max(w8, h8); x.drawImage(item.canvas, (w8 - side) / 2, (h8 - side) / 2, side, side);
-  Object.assign(back.style, { left: -160 * k + "px", top: -160 * k + "px", width: bw + "px", height: bh + "px" });
-  back.style.transitionDuration = S.xfade + "ms";
-  amb[ambFront].style.transitionDuration = S.xfade + "ms";
-  back.style.opacity = "0.5"; amb[ambFront].style.opacity = "0"; ambFront = 1 - ambFront;
-}
-
-// "Blobs": what DirectComposition could do with no per-frame Python: pre-rendered soft discs on looping
-// transform animations, colour changes as A/B crossfades, and the turn impulse as one group translate.
-const BLOBS = [];
-function buildBlobs() {
-  blobGroup.innerHTML = ""; BLOBS.length = 0;
-  const R = rng(7), n = 6;
-  for (let i = 0; i < n; i++) {
-    const b = document.createElement("div"); b.className = "blob";
-    const w = H * (1.1 + R() * 0.7), h = w * (0.7 + R() * 0.3);
-    Object.assign(b.style, { width: w + "px", height: h + "px", left: (W * (i + 0.5)) / n - w / 2 + "px", top: H * (0.15 + R() * 0.7) - h / 2 + "px" });
-    b.style.setProperty("--dur", 18 + R() * 14 + "s"); b.style.setProperty("--delay", -R() * 20 + "s");
-    b.style.setProperty("--dx", (R() - 0.5) * W * 0.12 + "px"); b.style.setProperty("--dy", (R() - 0.5) * H * 0.3 + "px");
-    const a = document.createElement("i"), c = document.createElement("i"); c.style.opacity = "0";
-    b.append(a, c); blobGroup.append(b); BLOBS.push({ layers: [a, c], front: 0 });
-  }
-}
-function setBlobColours(labs) {
-  BLOBS.forEach((b, i) => {
-    const lab = labs[1 + (i % (labs.length - 1))] || labs[0];
-    const back = b.layers[1 - b.front];
-    back.style.background = `radial-gradient(closest-side, ${toHex(labToRgb(lab))} 0%, ${toHex(labToRgb(lab))}99 40%, transparent 100%)`;
-    back.style.transitionDuration = b.layers[b.front].style.transitionDuration = S.xfade + "ms";
-    back.style.opacity = "1"; b.layers[b.front].style.opacity = "0"; b.front = 1 - b.front;
-  });
+  if (!Paper) return false;
+  try { mount = new Paper.ShaderMount(bg, Paper.meshGradientFragmentShader, paperUniforms(), { alpha: false }, 0, 0, 1, maxPixels()); return true; }
+  catch (e) { console.warn(e); mount = null; return false; }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Focus change -> debounce -> new palette target (a fast spin builds nothing until it settles)
+// Palette target: the focused album or row while browsing, the playing song in the visualizer
+function targetItem() {
+  if (asleep) return nowPlaying.item;
+  return view === "explorer" ? list()[focus] : QUEUE[sel].album;
+}
 function requestPalette(immediate) {
   clearTimeout(debounceTimer);
   const go = () => {
-    const item = list()[focus]; if (item === lastTarget && shown.length === S.colors) return; lastTarget = item;
+    const item = targetItem(); if (item === lastTarget && shown.length === S.colors) return; lastTarget = item;
     const target = shapedPalette(item);
     from = shown.length === target.length ? shown.map((c) => c.slice()) : target.map((c, i) => (shown[i] || shown[0] || [0, 0, 0]).slice());
     to = target; tStart = performance.now(); tweenOn = true;
-    if (S.mode === "current") buildAmbient(item);
-    if (S.mode === "blobs") setBlobColours(target);
     renderSwatches(target);
   };
   if (immediate) go(); else debounceTimer = setTimeout(go, S.debounce);
@@ -499,99 +577,214 @@ function renderSwatches(labs) { $("#swatches").innerHTML = labs.map((l) => `<i s
 const easeOut = (t) => 1 - (1 - t) ** 3;
 
 // ---------------------------------------------------------------------------------------------
-// Turn impulse: a damped spring on offset, decaying swirl and time boost; scaled by spin speed
-const motion = { x: 0, v: 0, swirl: 0, boost: 0 };
-let lastDetent = 0;
-function detent(dir) {
-  const L = list(), nf = clamp(focus + dir, 0, L.length - 1);
-  if (nf === focus) { toast(dir < 0 ? "First item" : "Last item"); return; }
-  focus = nf; placeCards(false);
-  const now = performance.now(), gap = now - lastDetent; lastDetent = now;
-  const velocity = clamp(220 / Math.max(40, gap), 0.6, 3);
-  if (!reduceMotion) {
-    const kk = S.kick * velocity;
-    motion.v += dir * 0.35 * kk; motion.swirl = Math.min(0.5, motion.swirl + 0.05 * kk); motion.boost = Math.min(6, motion.boost + 1.2 * kk);
-    if (S.mode === "blobs") { blobGroup.style.transitionDuration = "120ms"; blobGroup.style.transform = `translateX(${-dir * 50 * k * S.kick}px)`;
-      setTimeout(() => { blobGroup.style.transitionDuration = ""; blobGroup.style.transform = ""; }, 120); }
-  }
-  requestPalette(false);
+// Sleep (visualizer) and wake. Outer items leave first and the centre last; on wake the centre comes
+// back first. Only knob input wakes; the panel and the mouse don't.
+function viewEl() { return view === "explorer" ? ex : un; }
+function fxItems() {
+  const v = viewEl(), items = [];
+  v.querySelectorAll(".card, .row").forEach((el) => items.push([el.firstChild, +el.dataset.a || 0]));
+  v.querySelectorAll(":scope > .fx").forEach((el) => items.push([el, -1]));
+  const cov = v.querySelector(".uq-cover > .fx"); if (cov) items.push([cov, 0]);
+  return items;
 }
-function toggleSource() {
-  source = source === "recent" ? "favourites" : "recent"; focus = 0;
-  for (const el of cards.values()) el.remove(); cards.clear();
-  placeCards(true); requestPalette(false); toast(source === "recent" ? "Recently Added" : "Favourite playlists");
+function sleep() {
+  if (asleep) return; asleep = true; document.body.classList.add("asleep");
+  const items = fxItems(), amax = Math.max(1, ...items.map(([, a]) => a));
+  for (const [el, a] of items) {
+    const isChrome = a < 0;
+    el.style.setProperty("--d", (isChrome ? S.fadeOut * 0.55 : S.fadeOut) + "ms");
+    el.style.setProperty("--dl", (isChrome ? 0 : ((amax - a) / amax) * S.fadeOut * 0.35) + "ms");
+    el.style.setProperty("--ease", "var(--in-out)");
+    el.style.setProperty("--sink", (isChrome ? 10 : 24) * k + "px");
+    el.style.setProperty("--blur", 10 * k + "px");
+  }
+  viewEl().classList.add("asleep");
+  requestPalette(true);                  // ease to the playing song's colours
+  captionTimer = setTimeout(() => { if (asleep && S.caption) $("#caption").classList.add("show"); }, S.fadeOut * 0.8);
+}
+let captionTimer = null;
+function wake() {
+  if (!asleep) return; asleep = false; document.body.classList.remove("asleep");
+  clearTimeout(captionTimer); $("#caption").classList.remove("show");
+  for (const [el, a] of fxItems()) {
+    const isChrome = a < 0;
+    el.style.setProperty("--d", S.fadeIn + "ms");
+    el.style.setProperty("--dl", (isChrome ? S.fadeIn * 0.25 : a * 35) + "ms");
+    el.style.setProperty("--ease", "var(--out)");
+  }
+  viewEl().classList.remove("asleep");
+  lastTarget = null; requestPalette(true);
+}
+function input() {                       // every knob input goes through here first; true = it only woke the screen
+  lastInput = performance.now();
+  if (asleep) { wake(); return S.wakeOnly; }
+  return false;
+}
+function placeCaption() {
+  const c = $("#caption");
+  Object.assign(c.style, { left: U(x0 / k + 64), bottom: U(y0 / k + 52) });
+  c.querySelector(".t").style.fontSize = U(22); c.querySelector(".a").style.fontSize = U(15);
+  c.querySelector(".t").textContent = nowPlaying.title; c.querySelector(".a").textContent = nowPlaying.artist;
 }
 
 // ---------------------------------------------------------------------------------------------
-// Frame loop: our own rAF drives Paper's clock, so the turn impulse can speed time up
-const frameTimes = []; let lastT = performance.now(), frame = 0, hudAt = 0;
+// Knob
+const motion = { x: 0, v: 0, swirl: 0, boost: 0 };
+let lastDetent = 0;
+function detent(dir) {
+  if (input()) return;
+  if (view === "explorer") {
+    const nf = clamp(focus + dir, 0, list().length - 1); if (nf === focus) { toast(dir < 0 ? "First item" : "Last item"); return; } focus = nf;
+  } else {
+    const ns = clamp(sel + dir, 0, QUEUE.length - 1); if (ns === sel) { toast(dir < 0 ? "First song" : "Last song"); return; } sel = ns;
+  }
+  place(false);
+  const now = performance.now(), gap = now - lastDetent; lastDetent = now;
+  const velocity = clamp(220 / Math.max(40, gap), 0.6, 3);
+  if (!reduceMotion) { const kk = S.kick * velocity; motion.v += dir * 0.35 * kk; motion.swirl = Math.min(0.5, motion.swirl + 0.05 * kk); motion.boost = Math.min(6, motion.boost + 1.2 * kk); }
+  requestPalette(false);
+}
+function button(n) {
+  if (input()) return;
+  if (view === "explorer") {
+    if (n === 1) toast("Back closes the explorer in the app");
+    if (n === 2) { source = source === "recent" ? "favourites" : "recent"; focus = 0; for (const el of cards.values()) el.remove(); cards.clear(); place(true); requestPalette(false); toast(source === "recent" ? "Recently Added" : "Favourite playlists"); }
+    if (n === 3) setView("upnext");
+    if (n === 4) { const it = list()[focus]; nowPlaying = { item: it, title: it.title, artist: it.artist }; cards.get(focus)?.firstChild.animate([{ scale: 1 }, { scale: 1.06 }, { scale: 1 }], { duration: 420, easing: "cubic-bezier(0.22,1,0.36,1)" }); toast(`Playing ${it.title}`); placeCaption(); }
+  } else {
+    if (n === 1) setView("explorer");
+    if (n === 2) toast("Shuffle");
+    if (n === 3) toast("Liked");
+    if (n === 4) { playingRow = sel; const q = QUEUE[sel]; nowPlaying = { item: q.album, title: q.title, artist: q.artist }; place(false); toast(`Playing ${q.title}`); }
+  }
+}
+function setView(v) {
+  if (asleep) { asleep = false; document.body.classList.remove("asleep"); ex.classList.remove("asleep"); un.classList.remove("asleep"); }
+  view = v; S.view = v; save();
+  ex.hidden = v !== "explorer"; un.hidden = v !== "upnext";
+  $("#v-explorer").setAttribute("aria-pressed", String(v === "explorer")); $("#v-upnext").setAttribute("aria-pressed", String(v === "upnext"));
+  lastInput = performance.now(); place(true); lastTarget = null; requestPalette(true);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sound: a simulated beat (the Sonos case: tempo known, no audio on the PC) or a song file played here
+const song = $("#song"); let actx = null, analyser = null, fbuf = null, songUrl = null;
+const band = { bass: 0, mid: 0, high: 0, level: 0, onset: 0 }, peak = { bass: 0.2, mid: 0.2, high: 0.2, level: 0.2 };
+let beatIdx = -1, bassAvg = 0;
+function analyse(t, dt) {
+  let bass, mid, high, level, onset = 0;
+  if (S.audio === "file" && analyser && !song.paused) {
+    analyser.getByteFrequencyData(fbuf);
+    const hz = actx.sampleRate / analyser.fftSize, avg = (a, b) => { let s = 0, n = 0; for (let i = Math.max(1, Math.floor(a / hz)); i <= Math.floor(b / hz); i++) { s += fbuf[i]; n++; } return n ? s / n / 255 : 0; };
+    bass = avg(30, 150); mid = avg(150, 2000); high = avg(2000, 10000); level = (bass + mid + high) / 3;
+    // adaptive gain: each band against its own slowly falling peak
+    const fall = Math.exp(-dt / 4000);
+    for (const [key, v] of [["bass", bass], ["mid", mid], ["high", high], ["level", level]]) peak[key] = Math.max(v, peak[key] * fall, 0.05);
+    bass /= peak.bass; mid /= peak.mid; high /= peak.high; level /= peak.level;
+    if (bass - bassAvg > 0.22 && bass > 0.6) onset = 1;
+    bassAvg += (bass - bassAvg) * Math.min(1, dt / 180);
+  } else if (S.audio === "beat") {
+    const beatLen = 60000 / S.bpm, pos = t / beatLen, ph = pos % 1, i = Math.floor(pos), ms = ph * beatLen;
+    bass = Math.exp(-ms / 130);
+    mid = 0.25 + (i % 2 === 1 ? 0.7 * Math.exp(-ms / 110) : 0);
+    const ph8 = (pos * 2) % 1; high = 0.2 + 0.6 * Math.exp(-(ph8 * beatLen / 2) / 45);
+    const bar16 = (pos / 64) % 1; level = 0.55 + 0.35 * Math.sin(bar16 * Math.PI * 2);
+    if (i !== beatIdx) { beatIdx = i; onset = i % 4 === 0 ? 1 : 0.6; }
+  } else { bass = mid = high = level = 0; }
+  // smooth the meters a little; keep the onset as a one-frame event
+  const a = Math.min(1, dt / 60);
+  band.bass += (clamp(bass, 0, 1) - band.bass) * Math.min(1, dt / 25); band.mid += (clamp(mid, 0, 1) - band.mid) * a;
+  band.high += (clamp(high, 0, 1) - band.high) * a; band.level += (clamp(level, 0, 1) - band.level) * Math.min(1, dt / 300); band.onset = onset;
+}
+async function loadSong(file) {
+  try {
+    if (!actx) { actx = new AudioContext(); analyser = actx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.55;
+      fbuf = new Uint8Array(analyser.frequencyBinCount); actx.createMediaElementSource(song).connect(analyser); analyser.connect(actx.destination); }
+    if (songUrl) URL.revokeObjectURL(songUrl);
+    songUrl = URL.createObjectURL(file); song.src = songUrl; song.loop = true;
+    await actx.resume(); await song.play();
+    S.audio = "file"; save(); $("#s-audio").value = "file"; syncAudioUi(); $("#b-pause").disabled = false; $("#b-pause").textContent = "Pause song";
+    toast(`Playing ${file.name.replace(/\.[^.]+$/, "")}`);
+  } catch (e) { console.warn(e); toast("This browser can't play that file"); }
+}
+function syncAudioUi() { $("#bpm-row").hidden = S.audio !== "beat"; }
+
+// ---------------------------------------------------------------------------------------------
+// Frame loop: our own rAF drives Paper's clock, so turns and beats can push time forward
+const frameTimes = []; let lastT = performance.now(), frame = 0, hudAt = 0, dimNow = S.dim, reactNow = S.reactBrowse;
 function tick(t) {
   const dt = clamp(t - lastT, 0, 100); lastT = t;
   frameTimes.push(dt); if (frameTimes.length > 480) frameTimes.shift();
-  // colour tween
-  if (tweenOn) { const p = clamp((t - tStart) / S.xfade, 0, 1), e = easeOut(p);
+  if (!asleep && t - lastInput > S.idle * 1000) sleep();
+  // colour tween (slower on the way into the visualizer)
+  if (tweenOn) { const dur = asleep ? Math.max(S.xfade, S.fadeOut) : S.xfade, p = clamp((t - tStart) / dur, 0, 1), e = easeOut(p);
     shown = to.map((c, i) => c.map((v, j) => from[i][j] + (v - from[i][j]) * e)); if (p >= 1) tweenOn = false; }
-  // spring + decays
+  // dim and reactivity ease between browsing and visualizer
+  const toward = (cur, target, ms) => cur + (target - cur) * Math.min(1, dt / ms);
+  dimNow = toward(dimNow, asleep ? S.vizDim : S.dim, asleep ? S.fadeOut / 2.5 : S.fadeIn / 2.5);
+  reactNow = toward(reactNow, asleep ? S.react : S.reactBrowse, asleep ? S.fadeOut / 2 : S.fadeIn / 3);
+  analyse(t, dt);
+  const r = reduceMotion ? 0 : reactNow;
+  // turn spring + decays
   const sdt = dt / 1000; motion.v += (-60 * motion.x - 12 * motion.v) * sdt; motion.x += motion.v * sdt;
   motion.swirl *= Math.exp(-sdt / 0.6); motion.boost *= Math.exp(-sdt / 0.5);
-  frame += dt * S.speed * (1 + motion.boost);
-  if (S.mode === "paper" && mount) { mount.currentFrame = frame; mount.setUniforms(paperUniforms()); }
-  if (t - hudAt > 250) { hudAt = t; hud(); }
+  if (band.onset) motion.boost = Math.min(6, motion.boost + 1.4 * r * band.onset);
+  // sound → shader: bass pumps scale and swirl, mids add distortion, highs add edge grain, level opens the dim
+  live.distortion = clamp(S.distortion + 0.22 * r * band.mid, 0, 1);
+  live.swirl = clamp(S.swirl + motion.swirl + 0.12 * r * band.bass, 0, 1);
+  live.scale = S.scale * (1 - 0.045 * r * band.bass);
+  live.grainMixer = clamp(S.grainMixer + 0.3 * r * band.high, 0, 1);
+  $("#tint").style.opacity = String(clamp(dimNow * (1 - 0.35 * r * band.level), 0, 1));
+  frame += dt * S.speed * (1 + motion.boost) * (asleep ? 1.15 : 1);
+  if (mount) { mount.currentFrame = frame; mount.setUniforms(paperUniforms()); }
+  if (t - hudAt > 120) { hudAt = t; hud(t); }
   requestAnimationFrame(tick);
 }
-function hud() {
+function hud(t) {
   const last = frameTimes.slice(-240), n = last.length; if (!n) return;
   const avg = last.reduce((a, b) => a + b, 0) / n, fps = 1000 / avg, p95 = [...last].sort((a, b) => a - b)[Math.floor(n * 0.95)] || avg;
   const el = $("#hud .fps"); el.textContent = `${fps.toFixed(0)} fps`; el.className = "fps " + (fps > 200 ? "ok" : fps > 100 ? "meh" : "low");
   $("#hud .ft").textContent = `p95 ${p95.toFixed(2)} ms`;
-  const cv = mount && S.mode === "paper" ? mount.canvasElement : null;
-  $("#hud .res").textContent = `${Math.round(W * devicePixelRatio)}×${Math.round(H * devicePixelRatio)}` + (cv ? ` · shader ${cv.width}×${cv.height}` : "") + ` · ${S.mode}`;
+  $("#hud .state").textContent = asleep ? "visualizer" : `visualizer in ${Math.max(0, S.idle - (t - lastInput) / 1000).toFixed(1)} s`;
+  $("#hud .res").textContent = `${Math.round(W * devicePixelRatio)}×${Math.round(H * devicePixelRatio)}` + (mount ? ` · shader ${mount.canvasElement.width}×${mount.canvasElement.height}` : "");
+  for (const key of ["bass", "mid", "high", "level"]) $("#m-" + key).style.width = Math.round(band[key] * 100) + "%";
 }
 
 // ---------------------------------------------------------------------------------------------
-// Modes
-function setMode(m) {
-  if (m === "paper" && !startPaper()) { failNote(); m = "blobs"; }
-  S.mode = m; save();
-  bgPaper.hidden = m !== "paper"; bgCurrent.hidden = m !== "current"; bgBlobs.hidden = m !== "blobs";
-  $("#sec-shader").hidden = m !== "paper";
-  for (const b of ["paper", "current", "blobs"]) $("#mode-" + b).setAttribute("aria-pressed", String(b === m));
-  $("#tint").style.opacity = String(m === "current" ? 0.5 : S.dim);
-  lastTarget = null;
-  if (m === "blobs" && !BLOBS.length) buildBlobs();
-  requestPalette(true);
-}
-function failNote() {
-  const f = $("#fail"); f.hidden = false;
-  f.textContent = Paper ? "WebGL2 is not available in this browser, so the Paper shader can't run. Showing Blobs instead."
-    : "Paper Shaders didn't load (the page needs cdn.jsdelivr.net). Showing Blobs instead.";
-  setTimeout(() => (f.hidden = true), 4000);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Panel wiring
+// Panel wiring (the panel never counts as knob input)
 const SLIDERS = { distortion: (v) => v.toFixed(2), swirl: (v) => v.toFixed(2), speed: (v) => v.toFixed(2) + "×", scale: (v) => v.toFixed(2),
   grainMixer: (v) => v.toFixed(2), grainOverlay: (v) => v.toFixed(2), colors: (v) => String(v), lcap: (v) => "L " + v.toFixed(2),
-  sat: (v) => v.toFixed(2) + "×", dim: (v) => Math.round(v * 100) + " %", debounce: (v) => v + " ms", xfade: (v) => v + " ms", kick: (v) => v.toFixed(2) + "×" };
+  sat: (v) => v.toFixed(2) + "×", dim: (v) => Math.round(v * 100) + " %", debounce: (v) => v + " ms", xfade: (v) => v + " ms", kick: (v) => v.toFixed(2) + "×",
+  idle: (v) => v.toFixed(1) + " s", fadeOut: (v) => v + " ms", fadeIn: (v) => v + " ms", vizDim: (v) => Math.round(v * 100) + " %",
+  react: (v) => v.toFixed(2) + "×", reactBrowse: (v) => v.toFixed(2) + "×", bpm: (v) => v + " BPM" };
 function syncPanel() {
-  for (const [key, fmt] of Object.entries(SLIDERS)) { const inp = $("#s-" + key); inp.value = S[key]; $(`output[for="s-${key}"]`).textContent = fmt(+S[key]); }
-  $("#s-world").value = S.world; $("#s-render").value = String(S.render);
+  for (const [key, fmt] of Object.entries(SLIDERS)) { $("#s-" + key).value = S[key]; $(`output[for="s-${key}"]`).textContent = fmt(+S[key]); }
+  $("#s-world").value = S.world; $("#s-render").value = String(S.render); $("#s-audio").value = S.audio;
+  $("#s-wakeOnly").checked = S.wakeOnly; $("#s-caption").checked = S.caption; syncAudioUi();
 }
 for (const [key, fmt] of Object.entries(SLIDERS)) {
   $("#s-" + key).addEventListener("input", (e) => {
     S[key] = +e.target.value; $(`output[for="s-${key}"]`).textContent = fmt(S[key]); save();
     if (["colors", "lcap", "sat"].includes(key)) { lastTarget = null; requestPalette(true); }
-    if (key === "dim" && S.mode !== "current") $("#tint").style.opacity = String(S.dim);
   });
 }
 $("#s-world").addEventListener("change", (e) => { S.world = e.target.value; save(); });
 $("#s-render").addEventListener("change", (e) => { S.render = +e.target.value; save(); mount?.setMaxPixelCount(maxPixels()); });
-for (const m of ["paper", "current", "blobs"]) $("#mode-" + m).addEventListener("click", () => setMode(m));
-let autoTimer = null;
-$("#b-auto").addEventListener("click", (e) => {
-  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } else autoTimer = setInterval(() => { if (focus >= list().length - 1) { focus = -1; } detent(1); }, 2400);
-  e.currentTarget.setAttribute("aria-pressed", String(!!autoTimer));
+$("#s-audio").addEventListener("change", (e) => {
+  S.audio = e.target.value; save(); syncAudioUi();
+  if (S.audio === "file" && !song.src) $("#songfile").click();
+  if (S.audio === "beat" && !song.paused) song.pause();
 });
+$("#s-wakeOnly").addEventListener("change", (e) => { S.wakeOnly = e.target.checked; save(); });
+$("#s-caption").addEventListener("change", (e) => { S.caption = e.target.checked; save(); $("#caption").classList.toggle("show", asleep && S.caption); });
+$("#b-song").addEventListener("click", () => $("#songfile").click());
+$("#songfile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) loadSong(f); e.target.value = ""; });
+$("#b-pause").addEventListener("click", async () => {
+  if (song.paused) { await actx?.resume(); song.play().catch(() => {}); $("#b-pause").textContent = "Pause song"; } else { song.pause(); $("#b-pause").textContent = "Play song"; }
+});
+$("#v-explorer").addEventListener("click", () => setView("explorer"));
+$("#v-upnext").addEventListener("click", () => setView("upnext"));
+$("#b-sleep").addEventListener("click", sleep);
 $("#b-full").addEventListener("click", fullscreen);
 $("#b-files").addEventListener("click", () => $("#files").click());
 $("#files").addEventListener("change", async (e) => {
@@ -601,46 +794,49 @@ $("#files").addEventListener("change", async (e) => {
       const side = Math.min(bmp.width, bmp.height); x.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 512, 512);
       items.push(itemFromCanvas(c, f.name.replace(/\.[^.]+$/, ""), "Your cover")); } catch {} }
   if (!items.length) { toast("Those files aren't images this browser can read"); return; }
-  LISTS.recent = items; source = "favourites"; toggleSource(); toast(`${items.length} of your covers loaded`);
+  LISTS.recent = items; buildQueue(); for (const el of rows.values()) el.remove(); rows.clear(); sel = 0; playingRow = 0;
+  nowPlaying = { item: QUEUE[0].album, title: QUEUE[0].title, artist: QUEUE[0].artist };
+  source = "recent"; focus = 0; for (const el of cards.values()) el.remove(); cards.clear();
+  place(true); lastTarget = null; requestPalette(true); toast(`${items.length} of your covers loaded`);
 });
-$("#b-reset").addEventListener("click", () => { const m = S.mode; S = { ...DEFAULTS, mode: m }; save(); syncPanel(); mount?.setMaxPixelCount(maxPixels()); setMode(m); toast("Settings reset"); });
+$("#b-reset").addEventListener("click", () => { const v = S.view, a = S.audio; S = { ...DEFAULTS, view: v, audio: a }; save(); syncPanel(); mount?.setMaxPixelCount(maxPixels()); lastTarget = null; requestPalette(true); toast("Settings reset"); });
 $("#b-copy").addEventListener("click", () => {
   const json = JSON.stringify(S, null, 2), box = $("#copybox");
-  navigator.clipboard?.writeText(json).then(() => toast("Settings copied"), () => { box.hidden = false; box.value = json; box.select(); toast("Select and copy the settings below"); })
-    ?? (box.hidden = false, box.value = json, box.select());
+  const fallback = () => { box.hidden = false; box.value = json; box.select(); toast("Select and copy the settings below"); };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(json).then(() => toast("Settings copied"), fallback); else fallback();
 });
-hints.addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) button(+b.dataset.b); });
-function button(n) {
-  if (n === 1) toast("Back closes the explorer in the app");
-  if (n === 2) toggleSource();
-  if (n === 3) toast("Visualizer comes later");
-  if (n === 4) { const el = cards.get(focus); if (el) { el.animate([{ scale: 1 }, { scale: 1.06 }, { scale: 1 }], { duration: 420, easing: "cubic-bezier(0.22,1,0.36,1)" }); } toast(`Playing ${list()[focus].title}`); }
-}
+document.querySelectorAll(".hints").forEach((h) => h.addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) button(+b.dataset.b); }));
 function fullscreen() { (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())?.catch?.(() => toast("Full screen isn't available here")); }
 let toastTimer = null;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600); }
 
-// keyboard + wheel as the knob
+// keyboard + wheel stand in for the knob
 addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, select, textarea")) return;
   if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
     e.preventDefault(); const dir = e.key === "ArrowRight" ? 1 : -1;
     if (e.shiftKey) { for (let i = 0; i < 8; i++) setTimeout(() => detent(dir), i * 40); } else detent(dir);
   } else if (["1", "2", "3", "4"].includes(e.key)) button(+e.key);
-  else if (e.key === "m" || e.key === "M") setMode({ paper: "current", current: "blobs", blobs: "paper" }[S.mode]);
+  else if (e.key === "u" || e.key === "U") setView(view === "explorer" ? "upnext" : "explorer");
+  else if (e.key === "v" || e.key === "V") sleep();
   else if (e.key === "f" || e.key === "F") fullscreen();
   else if (e.key === "h" || e.key === "H") document.body.classList.toggle("ui-hidden");
 });
 let wheelAcc = 0;
 $("#stage").addEventListener("wheel", (e) => { e.preventDefault(); wheelAcc += e.deltaY + e.deltaX; while (Math.abs(wheelAcc) >= 60) { detent(Math.sign(wheelAcc)); wheelAcc -= Math.sign(wheelAcc) * 60; } }, { passive: false });
-
-addEventListener("resize", () => { layout(); placeCards(true); if (BLOBS.length) { buildBlobs(); if (S.mode === "blobs") setBlobColours(to.length ? to : shown); } mount?.setMaxPixelCount(maxPixels()); });
+addEventListener("resize", () => { layout(); place(true); mount?.setMaxPixelCount(maxPixels()); });
 
 // ---------------------------------------------------------------------------------------------
 // Boot
-layout(); syncPanel(); placeCards(true);
-shown = shapedPalette(list()[focus]); to = shown; renderSwatches(shown); lastTarget = list()[focus];
-setMode(S.mode);
+layout(); syncPanel();
+ex.hidden = view !== "explorer"; un.hidden = view !== "upnext";
+$("#v-explorer").setAttribute("aria-pressed", String(view === "explorer")); $("#v-upnext").setAttribute("aria-pressed", String(view === "upnext"));
+place(true);
+shown = shapedPalette(targetItem()); to = shown; renderSwatches(shown); lastTarget = targetItem();
+if (!startPaper()) {
+  const f = $("#fail"); f.hidden = false;
+  f.textContent = Paper ? "WebGL2 isn't available in this browser, so the gradient can't run." : "Paper Shaders didn't load. The page needs cdn.jsdelivr.net.";
+}
 requestAnimationFrame(tick);
-window.__egl = { get state() { return { mode: S.mode, focus, source, shown: shown.map((l) => toHex(labToRgb(l))), mounted: !!mount, canvas: mount && [mount.canvasElement.width, mount.canvasElement.height] }; }, detent };
+window.__egl = { get state() { return { view, asleep, focus, sel, source, nowPlaying: nowPlaying.title, shown: shown.map((l) => toHex(labToRgb(l))), mounted: !!mount, band: { ...band } }; }, detent, sleep };
 </script>
