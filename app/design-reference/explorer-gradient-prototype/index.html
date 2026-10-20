@@ -28,19 +28,17 @@ body { background: var(--void); color: var(--ink); font-family: var(--ui); overf
 #stage { position: fixed; inset: 0; overflow: hidden; background: var(--void); }
 .layer { position: absolute; inset: 0; }
 #bg > canvas { display: block; }
-#tint { background: rgb(8, 8, 10); pointer-events: none; }
 .view { pointer-events: none; }
 
 /* Everything that leaves for the visualizer carries .fx; positioned items keep their position on the
    parent and fade an .fx child, so the sleep transform never fights the layout transform. */
-.fx { transition: opacity var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms), transform var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms),
-  filter var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms); }
-.view.asleep .fx { opacity: 0; transform: translateY(var(--sink, 12px)) scale(0.94); filter: blur(var(--blur, 6px)); }
+.fx { will-change: opacity, transform; transition: opacity var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms), transform var(--d, 400ms) var(--ease, var(--out)) var(--dl, 0ms); }
+.view.asleep .fx { opacity: 0; transform: translateY(var(--sink, 12px)) scale(0.97); }
 .view.asleep .fx.flat { transform: translateY(var(--sink, 12px)); }
 
 .card { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; will-change: transform, opacity;
   transition: transform 420ms var(--out), opacity 420ms var(--out); }
-.card .fx { position: absolute; inset: 0; border-radius: 0.6%; overflow: hidden; transition-property: opacity, transform, filter, box-shadow; }
+.card .fx { position: absolute; inset: 0; border-radius: 0.6%; overflow: hidden; }
 .card img { display: block; width: 100%; height: 100%; }
 .card .shade { position: absolute; inset: 0; background: #0b0b0c; transition: opacity 420ms var(--out); }
 .label { position: absolute; text-align: center; }
@@ -93,8 +91,7 @@ body { background: var(--void); color: var(--ink); font-family: var(--ui); overf
 #hud .ok { color: var(--good); } #hud .meh { color: var(--warn); } #hud .low { color: var(--bad); }
 #hud .state { color: var(--accent); }
 #panel { position: fixed; z-index: 6; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
-  width: min(320px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow: auto; background: var(--panel);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px;
+  width: min(320px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow: auto; background: rgba(18, 18, 20, 0.94); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px;
   display: flex; flex-direction: column; gap: 14px; transition: opacity 600ms linear; }
 body.asleep #panel:not(:hover):not(:focus-within), body.asleep #hud { opacity: 0.08; }
 #panel h1 { margin: 0; font-family: var(--ui-display); font-size: 15px; font-weight: 600; text-wrap: balance; }
@@ -134,13 +131,12 @@ body.asleep #panel:not(:hover):not(:focus-within), body.asleep #hud { opacity: 0
 body.ui-hidden #panel, body.ui-hidden #hud { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .card, .row, .card .shade { transition-duration: 1ms; }
-  .view.asleep .fx { transform: none; filter: none; }
+  .view.asleep .fx { transform: none; }
 }
 </style>
 
 <div id="stage">
   <div id="bg" class="layer"></div>
-  <div id="tint" class="layer"></div>
   <div id="explorer" class="layer view"></div>
   <div id="upnext" class="layer view" hidden></div>
   <div id="caption"><div class="t"></div><div class="a"></div></div>
@@ -261,12 +257,12 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DEFAULTS = {
   view: "explorer", distortion: 0.8, swirl: 0.1, speed: 0.6, scale: 1, grainMixer: 0, grainOverlay: 0, world: "stretch",
   colors: 6, lcap: 0.55, sat: 1.2, dim: 0.35, debounce: 200, xfade: 600, kick: 1, render: 1,
-  idle: 5, fadeOut: 1400, fadeIn: 520, vizDim: 0.1, react: 1, reactBrowse: 0.15, wakeOnly: true, caption: false,
+  idle: 5, fadeOut: 1100, fadeIn: 480, vizDim: 0.1, react: 1, reactBrowse: 0.15, wakeOnly: true, caption: false,
   audio: "beat", bpm: 118,
 };
 let S = { ...DEFAULTS };
-try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings.v2") || "{}")); } catch {}
-const save = () => { try { localStorage.setItem("egl.settings.v2", JSON.stringify(S)); } catch {} };
+try { Object.assign(S, JSON.parse(localStorage.getItem("egl.settings.v3") || "{}")); } catch {}
+const save = () => { try { localStorage.setItem("egl.settings.v3", JSON.stringify(S)); } catch {} };
 
 // ---------------------------------------------------------------------------------------------
 // OKLab (Björn Ottosson's reference matrices)
@@ -537,9 +533,9 @@ function place(instant) { if (view === "explorer") placeExplorer(instant); else 
 // ---------------------------------------------------------------------------------------------
 // Background: Paper mesh gradient
 const bg = $("#bg"); let mount = null;
-const live = { distortion: 0, swirl: 0, scale: 1, grainMixer: 0 };
+const live = { distortion: 0, swirl: 0, scale: 1, grainMixer: 0, dim: 0 };
 function paperUniforms() {
-  const cols = shown.map((lab) => [...labToRgb(lab), 1]);
+  const keep = 1 - live.dim, cols = shown.map((lab) => [...labToRgb(lab).map((c) => c * keep), 1]);
   const worldWide = S.world === "wide";
   return {
     u_colors: cols, u_colorsCount: cols.length, u_distortion: live.distortion, u_swirl: live.swirl,
@@ -592,11 +588,10 @@ function sleep() {
   const items = fxItems(), amax = Math.max(1, ...items.map(([, a]) => a));
   for (const [el, a] of items) {
     const isChrome = a < 0;
-    el.style.setProperty("--d", (isChrome ? S.fadeOut * 0.55 : S.fadeOut) + "ms");
-    el.style.setProperty("--dl", (isChrome ? 0 : ((amax - a) / amax) * S.fadeOut * 0.35) + "ms");
+    el.style.setProperty("--d", (isChrome ? S.fadeOut * 0.6 : S.fadeOut) + "ms");
+    el.style.setProperty("--dl", (isChrome ? 0 : ((amax - a) / amax) * S.fadeOut * 0.18) + "ms");
     el.style.setProperty("--ease", "var(--in-out)");
-    el.style.setProperty("--sink", (isChrome ? 10 : 24) * k + "px");
-    el.style.setProperty("--blur", 10 * k + "px");
+    el.style.setProperty("--sink", (isChrome ? 6 : 14) * k + "px");
   }
   viewEl().classList.add("asleep");
   requestPalette(true);                  // ease to the playing song's colours
@@ -734,7 +729,7 @@ function tick(t) {
   live.swirl = clamp(S.swirl + motion.swirl + 0.12 * r * band.bass, 0, 1);
   live.scale = S.scale * (1 - 0.045 * r * band.bass);
   live.grainMixer = clamp(S.grainMixer + 0.3 * r * band.high, 0, 1);
-  $("#tint").style.opacity = String(clamp(dimNow * (1 - 0.35 * r * band.level), 0, 1));
+  live.dim = clamp(dimNow * (1 - 0.35 * r * band.level), 0, 1);
   frame += dt * S.speed * (1 + motion.boost) * (asleep ? 1.15 : 1);
   if (mount) { mount.currentFrame = frame; mount.setUniforms(paperUniforms()); }
   if (t - hudAt > 120) { hudAt = t; hud(t); }

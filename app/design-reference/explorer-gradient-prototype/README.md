@@ -28,7 +28,7 @@ Open `index.html` in Chrome or Edge on the 32:9 monitor, then press `F` for full
 The page has two full-screen views, the album explorer and Up next (`U` switches between them), with the gradient behind both.
 
 **Going idle**
-- After 5 s with no knob input, the albums or tracks fade away. The outer items go first and the centre last, sinking and blurring as they go.
+- After 5 s with no knob input, the albums or tracks fade away. The outer items go first and the centre last, sinking slightly as they go.
 - The gradient then becomes a full-screen visualizer:
   - it glides to the playing song's colours;
   - it gets brighter;
